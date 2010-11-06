@@ -166,7 +166,7 @@
 (when (>= emacs-major-version 23)
   (set-face-font 'default "DejaVu Sans Mono-11"))
 
-(transient-mark-mode nil)
+(transient-mark-mode -1)
 
 (defvar ctrl-l-appearance
   nil
