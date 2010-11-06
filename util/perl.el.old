@@ -1,0 +1,183 @@
+;;; perl/elisp stuff
+
+(defvar perl-code-hist
+  nil
+  "History for entered perl code")
+
+(defvar perl-args-hist
+  nil
+  "History for entered perl code")
+
+(defun perl-escape-quotes (string)
+  "Quote quotes with quotes(!) for eshell.
+A null is inserted between pairs of ' characters,
+which must be subsequently removed"
+    (replace-regexp-in-string
+     "''''" "'''\"\"'''"
+     (replace-regexp-in-string
+      "'" "''" string)))
+
+(defun perl-get-option-string (loop-flag print-flag)
+  (concat
+   (if (eql t loop-flag)
+       "-l" "")
+   (if (eql t print-flag)
+       "-p" "")))
+
+(defun perl-on-string (code string loop-flag print-flag)
+  "Execute CODE using perl -e with STRING piped into
+STDIN. If LOOP-FLAG is set, perl will be given the -l
+option. If PRINT-FLAG is set, perl will be given the -p
+option. Note: if STRING contains ASCII null characters,
+they will be removed. If CODE contains consecutive single
+quotes, they will have ASCII null inserted between them.
+Avoid this."
+  (replace-regexp-in-string
+   "?\000" ""
+   (eshell-command-result
+    (format "echo '%s' | perl %s -e '%s'"
+            (perl-escape-quotes
+             string)
+            (perl-get-option-string loop-flag print-flag)
+            (perl-escape-quotes
+             code)))))
+
+
+(defun perl-to-string (code args 
+                            &optional loop-flag print-flag)
+  "Execute CODE with perl -e supplying 
+ARGS, returning the result as a string."
+  (eshell-command-result
+  ;(message
+   (format
+    "perl %s -e '%s' %s"
+    (perl-get-option-string loop-flag print-flag)
+    (perl-escape-quotes code)
+    args)))
+    
+
+(defun perl-on-region-fun (start end code 
+                                 &optional pre)
+  "Run arbitrary Perl code CODE across the current region.
+With a positive prefix argument, put the result after
+the region. With a negative prefix argument, put the result
+before the region. Without a prefix argument, replace the
+region.
+LOOP is provided for the benefit of other callers"
+  (interactive
+   (let 
+       ((string 
+         (read-string 
+          "Perl Code: "
+          nil
+          perl-code-hist))
+        (prefix
+         current-prefix-arg))
+     (unless (mark)
+       (error "Mark not set!"))
+     (list (region-beginning)
+           (region-end)
+           string 
+           prefix)))
+  (let 
+      ((text
+        (buffer-substring
+         start end))
+       (currbuf (current-buffer)))
+    (if (not (numberp pre))
+        (delete-region start end)
+      (progn
+        (if (= 0 pre)
+            (pop-to-buffer "**Perl Command Output**")
+          (progn
+            (if (> start end)
+                (let ((tmpstart start))
+                  (progn 
+                    (setq start end
+                          end tmpstart))))
+            (if (<  0 pre)
+                (goto-char end))
+            (if (> 0 pre)
+                (goto-char start))))))
+    (insert
+     (perl-on-string code text 
+                     (if (boundp loop-flag)
+                         (if (eql loop-flag t) 
+                             t nil) nil)
+                     (if (boundp print-flag)
+                         (if (eql print-flag t) 
+                             t nil) nil)))))
+
+
+(defun perl-on-region-int (loop-flag print-flag)
+  (call-interactively
+   #'perl-on-region-fun))
+
+(defun perl-on-region (start end code
+                             &optional pre loop-flag print-flag)
+  (perl-on-region-fun start end code pre))
+
+
+(defun perl-loop-region ()
+  "Run arbitrary perl code across region, using the
+-l switch to perl"
+  (interactive)
+  (perl-on-region-int t nil))
+
+(defun perl-print-region ()
+  "Run arbitrary perl code across region, using the
+-p switch to perl"
+  (interactive)
+  (perl-on-region-int nil t))
+
+(defun perl-execute-region ()
+  "Run arbitrary perl code across region, using
+neither looping switch to perl"
+  (interactive)
+  (let ((print-flag nil)
+        (loop-flag t))
+    (perl-on-region-int nil nil)))
+
+
+(defun perl-insert (code args)
+  "Insert the STDOUT of arbitrary perl into
+the current buffer at point"
+  (interactive
+   (let
+       ((code
+         (read-string 
+          "Perl Code: "
+          nil
+          perl-code-hist))
+        (args
+         (read-string
+          "Args to Perl Code: "
+          nil
+          perl-args-hist)))
+     (list code args)))
+  (insert 
+   (perl-to-string code args)))
+
+
+(defun perl-duplicate-line (code &optional flag)
+  "Duplicate the current line, run it through
+arbitrary perl, and insert the result into the
+current buffer after current line. Prefix arg 
+to insert before current line."
+  (interactive
+   (let
+       ((string
+         (read-string
+          "Perl Code: "
+          nil
+          perl-code-hist))
+        (prefix
+         current-prefix-arg))
+     (list string prefix)))
+  (perl-on-region
+   (line-beginning-position)
+   (+ 1 (line-end-position))
+   code
+   (if (eql nil flag)
+       '1 '-1)
+   nil t))
