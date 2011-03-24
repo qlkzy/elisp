@@ -41,4 +41,5 @@
                  ;; "cedet"
                  "qmake"
                  "comment"
+                 "geiser"
                  )

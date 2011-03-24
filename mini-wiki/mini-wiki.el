@@ -3,7 +3,7 @@
   "Regex to match mini-wiki links")
 
 (defconst mini-wiki-pagesep-regex
-  "\x0c[^A-Za-z]*"
+  "\\(\x0c[^A-Za-z]*\\|\\`\\)"
   "Regex to match mini-wiki page separators")
 
 (defconst mini-wiki-page-regex
@@ -32,11 +32,12 @@ value of mini-wiki-link-regex"
    (mini-wiki-build-page-regex name)
    nil t))
 
-  
 (defun mini-wiki-make-page (name)
   (widen)
   (goto-char (point-max))
   (insert "\n\x0c\n" name "\n")
+  (save-excursion
+    (insert "\n\nHomePage\n"))
   (narrow-to-page)
   (add-to-list (make-local-variable 'mini-wiki-pages-list)
                name)
@@ -97,11 +98,6 @@ value of mini-wiki-link-regex"
                (list 
                 (cons mini-wiki-link-regex font-lock-builtin-face))))
 
-;; (defun mini-wiki-setup-keymap ()
-;;   "Setup keymap for use in mini-wiki mode"
-;;   (define-key mini-wiki-mode-map 
-;;     (kbd "RET") 'mini-wiki-newline-or-follow))
-
 (defun mini-wiki-setup-keymap ()
   (drm-define-in-maps (mini-wiki-mode-map)
     ((kbd "RET") 'mini-wiki-newline-or-follow)
@@ -119,4 +115,3 @@ value of mini-wiki-link-regex"
   (mini-wiki-setup-keymap)
   (mini-wiki-setup-pagelist)
   (mini-wiki-refresh-font-lock))
-
