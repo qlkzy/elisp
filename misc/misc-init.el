@@ -10,6 +10,9 @@
 (load-file "~/elisp/misc/keywiz.el")
 (load-file "~/elisp/misc/w32-fullscreen.el")
 
+;; Other modules we would like
+(require 'generic-x)
+
 ;; Remove Annoyances
 
 ;;; We want to rebind yes-or-no-p because it's annoying, but we still
@@ -25,7 +28,7 @@
 
 (setq save-abbrevs nil)                 ;configure by hand
 
-(setq make-backup-files nil)            ;I like being able to *read* my directory listings
+(setq make-backup-files nil) ;I like being able to *read* my directory listings
 
 (savehist-mode 1)
 
