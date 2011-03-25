@@ -3,7 +3,7 @@
   "Regex to match mini-wiki links")
 
 (defconst mini-wiki-pagesep-regex
-  "\x0c[^A-Za-z]*"
+  "\\(\x0c[^A-Za-z]*\\|\\`\\)"
   "Regex to match mini-wiki page separators")
 
 (defconst mini-wiki-page-regex
@@ -37,6 +37,8 @@ value of mini-wiki-link-regex"
   (widen)
   (goto-char (point-max))
   (insert "\n\x0c\n" name "\n")
+  (save-excursion 
+    (insert "\n\n\nHomePage\n"))
   (narrow-to-page)
   (add-to-list (make-local-variable 'mini-wiki-pages-list)
                name)
