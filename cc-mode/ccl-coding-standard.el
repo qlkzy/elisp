@@ -86,35 +86,14 @@
   > " * " _ \n
   > " ********************/"\n)
 
-(define-skeleton c-include-guard
-  "Insert an #ifndef ... etc." 
-  (setq str (skeleton-read "Enter symbol: "))
-  > "#ifndef " str \n
-  > "#define " str \n 
-  > \n
-  > - \n
-  > \n
-  > "#endif /* " str "*/" \n)
+(define-skeleton ccl-standard-copyright-notice
+  "Insert a CCL Copyright notice" nil
+  > "/* Copyright (C) Cambridge Consultants Ltd., 2011" \n
+  > "Cambridge Consultants Project Reference P" _ " */" \n)
 
 
-(defun cc-insert-magic-brace ()
-  "If an open-brace is the first character on a line, insert a
-  matching close-brace two lines down"
+(defun ccl-cc-skeletons ()
   (interactive)
-  (let ((start (line-beginning-position)))
-    (if (string-match
-         "^[[:space:]]*$"
-         (buffer-substring (point)
-                           (line-beginning-position)))
-        (progn
-          (insert "{\n")
-          (save-excursion
-            (insert "\n}\n")
-            (indent-region
-             start (point))))
-      (insert "{"))))
-
-(defun cc-mode-skeleton-init ()
   (setq skeleton-further-elements '((abbrev-mode nil)))
   (abbrev-def-list local-abbrev-table
     ("if" "" 'ccl-standard-if-statement)
@@ -122,6 +101,7 @@
     ("elsif" "" 'ccl-standard-else-if-statement)
     ("else" "" 'ccl-standard-else-statement)
     ("while" "" 'ccl-standard-while-statement)
+    ("cclcopyright" "" 'ccl-standard-copyright-notice)
     ("case" "case"))
   (local-set-key (kbd "{") 'cc-insert-magic-brace))
 
