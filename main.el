@@ -36,9 +36,12 @@
                  "slime"                ;nice lisp stuff
                  "nxhtml"               ;nice xhtml/php mode
                  "remember"             ;notes mode
-                 ;; "viper"                ;vi has some nice features
+                 ;; "viper"             ;vi has some nice features
                  "findr"
                  ;; "cedet"
                  "qmake"
                  "comment"
+                 "fortunes"
+                 "geiser"
+                 "ccl"                  ;CCL standards stuff
                  )
