@@ -2,13 +2,16 @@
 
 ;; load reqired files
 
-(defvar ccl-coding-standard nil
-  "CCL coding standard is in effect")
+(defvar ccl-style-available nil
+  "CCL coding standard is available")
 
-(if ccl-coding-standard
-    (load-file "~/elisp/cc-mode/ccl-coding-standard.el")
-  (load-file "~/elisp/cc-mode/cc-mode-skeletons.el"))
+(defvar ccl-style-enforced nil
+  "CCL coding standard is enforced")
 
+(when ccl-style-available
+    (drm-custom-load "cc-mode/ccl-coding-standard.el"))
+
+(drm-custom-load "cc-mode/cc-mode-skeletons.el")
 (drm-custom-load "cc-mode/cc-mode-general-skeletons.el")
 
 (defun drm-c-pre-abbrev ()
@@ -69,6 +72,8 @@
   (setq c-mode-electric-newline t)
   (c-set-offset 'inline-open 0)
   (c-set-offset 'cpp-macro-cont '--)
+  (c-set-offset 'namespace-open 0)
+  (c-set-offset 'innamespace 0)
   (hs-minor-mode t)
   (local-set-key (kbd "C-c c") 'drm-c-mode-prefix)
   (local-set-key (kbd "RET") 'drm-c-mode-return)
@@ -120,8 +125,12 @@
         (progn
           (insert 
            (concat (format "namespace %s \n {\n" space)
-                   "\n"
-                   (format "class %s \n {\n" cname)))
+                   "\n"))
+          (goto-char (drm-insert-doxygen-block))
+          (insert 
+           (format "class %s \n {\n" cname)
+          "\n")
+
           ;; this is where we're likely to want to start inserting text
           (save-excursion
             (insert 
@@ -131,25 +140,29 @@
             (indent-region (point-min)
                            (point-max))))
       (progn
+        (goto-char (drm-insert-doxygen-block))
         (insert 
-         (format "class %s \n {\n" cname)))
-      ;; this is where we're likely to want to start inserting text
-      (save-excursion
-        (insert 
-         (concat "\n"
-                 "};\n"))
-        (indent-region (point-min)
-                       (point-max))))))
+         (format "class %s \n {\n" cname))
+        ;; this is where we're likely to want to start inserting text
+        (save-excursion
+          (insert 
+           (concat "\n"
+                   "};\n"))
+          (indent-region (point-min)
+                         (point-max)))))))
 
 
 (defun drm-insert-doxygen-block ()
   (interactive)
-  (let ((p (point)))
-    (insert (concat "/*!\n"
-                    "\t\\brief"))
+  (let ((p (point))
+        (after-p nil))
+    (insert (concat "/*!\n\n"
+                    "\t\\brief "))
     (save-excursion
-      (insert "\n**/")
-      (indent-region p (point)))))
+      (insert "\n\n*/\n")
+      (indent-region p (point))
+      (setq after-p (point)))
+    after-p))
     
 (defun drm-cpp-get-classname ()
   (save-excursion
@@ -290,6 +303,7 @@
                   "// Cambridge Consultants Project Reference P0326\n"
                   "\n"))
   (drm-insert-doxygen-boilerplate))
+
 
 (defun drm-c-indent-case ()
   (interactive)

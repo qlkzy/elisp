@@ -45,6 +45,12 @@
   > _ \n
   > "break;" \n)
 
+(define-skeleton c-skeleton-struct
+  "Insert a struct {};" nil
+  > "struct "_" {" \n
+  > _ \n
+  > -4 "};"\n)
+
 (define-skeleton c-skeleton-file-header
   "Insert a file header" nil
   > "/**********************************************************************" \n
@@ -161,12 +167,18 @@
 ;;     ("case" "" 'c-skeleton-case-statement)))
 
 (defun cc-mode-skeleton-init ()
+  (local-set-key (kbd "{") 'cc-insert-magic-brace)
+  (if ccl-style-enforced
+      (ccl-cc-skeletons)
+    (drm-cc-skeletons)))
+
+(defun drm-cc-skeletons ()
+  (interactive)
   (abbrev-def-list local-abbrev-table
     ("if" "" 'c-skeleton-if-statement)
     ("for" "" 'c-skeleton-for-statement)
     ("elsif" "" 'c-skeleton-else-if-statement)
     ("else" "" 'c-skeleton-else-statement)
     ("while" "" 'c-skeleton-while-statement)
-    ("case" "" 'c-skeleton-case-statement))
-  (local-set-key (kbd "{") 'cc-insert-magic-brace))
-
+    ("case" "" 'c-skeleton-case-statement)
+    ("struct" "" 'c-skeleton-struct)))

@@ -619,9 +619,9 @@ first nonblank character is at column TARGET"
 
 (defun matlab-setup-newcomment ()
   (if (boundp 'comment-start)
-      (setq comment-start "%"))
+      (set (make-local-variable 'comment-start) "%"))
   (if (boundp 'comment-end)
-      (setq comment-end "")))
+      (set (make-local-variable 'comment-end) "")))
 
 
 ;;;; Indentation
