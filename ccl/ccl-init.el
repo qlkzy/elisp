@@ -18,7 +18,8 @@
 ;; comment skeletons
 (define-skeleton ccl-c-file-header
   "Insert a CCL C file header" nil
-  "/*-----------------------------------------------------------------------------" \n
+  "/*-------------------------------------------"
+  "----------------------------------" \n
   "(C) Copyright Cambridge Consultants, " (format-time-string "%Y") \n \n
   "Cambridge Consultants Project Reference: " _ \n \n
   "FILE" \n
@@ -27,12 +28,15 @@
   "    David Morris" \n \n
   "DESCRIPTION" \n
   "    " _ \n \n
-  "-----------------------------------------------------------------------------*/" \n
+  "---------------------------------------------"
+  "--------------------------------*/" \n
   \n \n)
 
 (define-skeleton ccl-c-section-header
   "Insert a CCL C section header" nil
-  "/*-----------------------------------------------------------------------------" \n
+  \n \n
+  "/*-------------------------------------------"
+  "----------------------------------" \n
   "" _ \n
   "-----------------------------------------------------------------------------*/" \n
   \n \n)
@@ -57,20 +61,35 @@ unless horrible manual things are done."
    (t (message "Unknown header style"))))
   
 
-(defun ccl-insert-section-header (section-name)
+(defun ccl-insert-c-section-header (section-name)
   (let ((p (point)))
     (insert
      (concat
+      "\n"
       "/*---------------------------------------"
       "--------------------------------------\n"
       section-name "\n"
       "----------------------------------------"
       "-------------------------------------*/\n"
-      "\n\n"))
+      "\n"))
     (indent-region p (point))))
 
 
-
+(defun ccl-insert-c-function-header (name args ret)
+  (let ((p (point)))
+    (insert
+     (concat
+      "/*---------------------------------------"
+      "--------------------------------------\n"
+      "NAME\n"
+      name "\n\n"
+      "DESCRIPTION\n\n"
+      args "\n\n"
+      "RETURNS\n"
+      ret "\n\n"
+      "-----------------------------------------"
+      "------------------------------------*/\n"
+      (indent-region p (point))))))
 
 ;; keybindings
 (define-prefix-command 'ccl-prefix-map)
@@ -87,20 +106,22 @@ unless horrible manual things are done."
   (goto-char (point-max))
   (drm-insert-include-guard)
   (mapc
-   'ccl-insert-section-header
+   'ccl-insert-c-section-header
    '("Required header files"
      "Public defines"
      "Public data types"
      "Public data"
-     "Public functions"
-     "End of file")))
+     "Public functions"))
+  (goto-char (point-max))
+  (insert "\n")
+  (ccl-insert-c-section-header "End of file"))
 
 (defun ccl-insert-c-implementation-boilerplate ()
   (interactive)
   (ccl-comment-header 'file)
   (goto-char (point-max))
   (mapc
-   'ccl-insert-section-header
+   'ccl-insert-c-section-header
    '("System level includes"
      "Project level includes"
      "Local includes"
