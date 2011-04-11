@@ -171,28 +171,39 @@ unless horrible manual things are done."
 (defun ccl-insert-pod-boilerplate ()
   (interactive)
   (goto-char (point-max))
-  (insert
-   (concat
-    "=head1 NAME\n"
-    "\n"
-    "=head1 SYNOPSIS\n"
-    "\n"
-    "=head1 DESCRIPTION\n"
-    "\n"
-    "=head1 OPTIONS\n"
-    "\n"
-    "=item B<--setting>=I<value>\n"
-    "\n"
-    "=head1 EXAMPLES\n"
-    "\n"
-    "=head1 CAVEATS\n"
-    "\n"
-    "=head1 BUGS\n"
-    "\n"
-    "=head1 RESTRICTIONS\n"
-    "\n"
-    "=head1 NOTES\n"
-    "\n")))
+  (let ((command (file-name-sans-extension 
+                  (file-name-nondirectory 
+                   (buffer-file-name)))))
+    (insert
+     (concat
+      "=head1 NAME\n"
+      "\n"
+      command " - <brief desc>\n"
+      "\n"
+      "=head1 SYNOPSIS\n"
+      "\n"
+      command "\n"
+      "\n"
+      "=head1 DESCRIPTION\n"
+      "\n"
+      "=head1 OPTIONS\n"
+      "\n"
+      "=over\n"
+      "\n"
+      "=item B<--setting>=I<value>\n"
+      "\n"
+      "=over\n"
+      "\n"
+      "=head1 EXAMPLES\n"
+      "\n"
+      "=head1 CAVEATS\n"
+      "\n"
+      "=head1 BUGS\n"
+      "\n"
+      "=head1 RESTRICTIONS\n"
+      "\n"
+      "=head1 NOTES\n"
+      "\n"))))
 
 
 ;; boilerplate keybindings
@@ -200,6 +211,8 @@ unless horrible manual things are done."
 (global-set-key (kbd "C-c s b") 'ccl-boilerplate-map)
 (global-set-key (kbd "C-c s b h") 'ccl-insert-c-header-boilerplate)
 (global-set-key (kbd "C-c s b i") 'ccl-insert-c-implementation-boilerplate)
-(global-set-key (kbd "C-c s b p") 'ccl-insert-perl-boilerplate)
+(global-set-key (kbd "C-c s b p") (lambda () (interactive)
+                                    (ccl-insert-perl-boilerplate)
+                                    (ccl-insert-pod-boilerplate)))
 (global-set-key (kbd "C-c s b f") (lambda () (interactive)
                                     (ccl-insert-c-function-header "" "" "")))
