@@ -95,8 +95,11 @@
   (add-hook 'c-special-indent-hook 'drm-c-indent-case)
   (setq semantic-symref-tool 'global))
 
+(defun c-mode-init ()
+  (local-set-key (kbd "C-c c o") 'drm-c-goto-other))
 
-
+(defun c++-mode-init ()
+  (local-set-key (kbd "C-c c o") 'drm-cpp-goto-other))
 
 (defun drm-c-mode-return ()
   (interactive)
@@ -252,12 +255,33 @@
                                             ".cpp"
                                             (buffer-file-name)))))
 
+(defun drm-c-goto-header ()
+  (interactive)
+  (pop-to-buffer (find-file
+                  (replace-regexp-in-string "\\.c$"
+                                            ".h"
+                                            (buffer-file-name)))))
+
+(defun drm-c-goto-implementation ()
+  (interactive)
+  (pop-to-buffer (find-file
+                  (replace-regexp-in-string "\\.h$"
+                                            ".c"
+                                            (buffer-file-name)))))
+
 (defun drm-cpp-goto-other ()
   (interactive)
   (if (string-match-p "\\.cpp$"
                       (buffer-file-name))
       (drm-cpp-goto-header)
     (drm-cpp-goto-implementation)))
+
+(defun drm-c-goto-other ()
+  (interactive)
+  (if (string-match-p "\\.c$"
+                      (buffer-file-name))
+      (drm-c-goto-header)
+    (drm-c-goto-implementation)))
 
 (defun drm-cpp-new-boost-test-suite (dir name)
   (interactive "DCreate test suite in directory: \nMClass under test: ")
@@ -318,3 +342,5 @@
 (add-hook 'c-mode-common-hook 'c-mode-general-init t)
 (add-hook 'c-mode-common-hook 'cc-mode-skeleton-init t)
 
+(add-hook 'c-mode-hook 'c-mode-init t)
+(add-hook 'c++-mode-hook 'c++-mode-init t)
