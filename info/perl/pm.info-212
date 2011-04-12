@@ -1,0 +1,1604 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Log/Dispatch/ApacheLog,  Next: Log/Dispatch/Base,  Prev: Log/Dispatch,  Up: Module List
+
+Object for logging to Apache::Log objects
+*****************************************
+
+NAME
+====
+
+   Log::Dispatch::ApacheLog - Object for logging to Apache::Log objects
+
+SYNOPSIS
+========
+
+     use Log::Dispatch::ApacheLog;
+
+     my $handle = Log::Dispatch::ApacheLog->new( name      => 'apache log',
+                                                 min_level => 'emerg',
+                                                 apache    => $r );
+
+     $handle->log( level => 'emerg', message => 'Kaboom' );
+
+DESCRIPTION
+===========
+
+   This module allows you to pass messages Apache's log object,
+represented by the Apache::Log class.
+
+METHODS
+=======
+
+   * new(%PARAMS)
+
+     This method takes a hash of parameters.  The following options are
+     valid:
+
+   * - name ($) The name of the object (not the filename!).  Required.
+
+   * - min_level ($) The minimum logging level this object will accept.
+     See the Log::Dispatch documentation for more information.  Required.
+
+   * - max_level ($) The maximum logging level this obejct will accept.
+     See the Log::Dispatch documentation for more information.  This is not
+     required.  By default the maximum is the highest possible level (which
+     means functionally that the object has no maximum).
+
+   * - apache ($) The apache object.
+
+   * - callbacks( \& or [ \&, \&, ... ] ) This parameter may be a single
+     subroutine reference or an array reference of subroutine references.
+     These callbacks will be called in the order they are given and passed
+     a hash containing the following keys:
+
+          ( message => $log_message )
+
+     It's a hash in case I need to add parameters in the future.
+
+     The callbacks are expected to modify the message and then return a
+     single scalar containing that modified message.  These callbacks will
+     be called when either the log or `log_to' methods are called and will
+     only be applied to a given message once.
+
+   * log_message( message => $ )
+
+     Sends a message to the appropriate output.  Generally this shouldn't
+     be called directly but should be called through the `log()' method
+     (in Log::Dispatch::Output).
+
+AUTHOR
+======
+
+   Dave Rolsky, <autarch@urth.org>
+
+SEE ALSO
+========
+
+   Log::Dispatch, Log::Dispatch::Email, Log::Dispatch::Email::MailSend,
+Log::Dispatch::Email::MailSendmail, Log::Dispatch::Email::MIMELite,
+Log::Dispatch::File, Log::Dispatch::Output, Log::Dispatch::Screen,
+Log::Dispatch::Syslog, Apache::Log
+
+
+File: pm.info,  Node: Log/Dispatch/Base,  Next: Log/Dispatch/Email,  Prev: Log/Dispatch/ApacheLog,  Up: Module List
+
+Code shared by dispatch and output objects.
+*******************************************
+
+NAME
+====
+
+   Log::Dispatch::Base - Code shared by dispatch and output objects.
+
+SYNOPSIS
+========
+
+     use Log::Dispatch::Base;
+
+     ...
+
+     @ISA = qw(Log::Dispatch::Base);
+
+DESCRIPTION
+===========
+
+   Unless you are me, you probably don't need to know what this class does.
+
+AUTHOR
+======
+
+   Dave Rolsky, <autarch@urth.org>
+
+SEE ALSO
+========
+
+   Log::Dispatch, Log::Dispatch::ApacheLog, Log::Dispatch::Email,
+Log::Dispatch::Email::MailSend, Log::Dispatch::Email::MailSendmail,
+Log::Dispatch::Email::MIMELite, Log::Dispatch::Handle,
+Log::Dispatch::Output, Log::Dispatch::Screen, Log::Dispatch::Syslog
+
+
+File: pm.info,  Node: Log/Dispatch/Email,  Next: Log/Dispatch/Email/MIMELite,  Prev: Log/Dispatch/Base,  Up: Module List
+
+Base class for objects that send log messages via email
+*******************************************************
+
+NAME
+====
+
+   Log::Dispatch::Email - Base class for objects that send log messages
+via email
+
+SYNOPSIS
+========
+
+     package Log::Dispatch::Email::MySender
+
+     use Log::Dispatch::Email;
+     use base qw( Log::Dispatch::Email );
+
+     sub send_email
+     {
+         my Log::Dispatch::Email::MySender $self = shift;
+         my %params = @_;
+
+     # Send email somehow.  Message is in $params{message}
+       }
+
+DESCRIPTION
+===========
+
+   This module should be used as a base class to implement
+Log::Dispatch::* objects that send their log messages via email.
+Implementing a subclass simply requires the code shown in the `SYNOPSIS'
+in this node with a real implementation of the `send_email()' method.
+
+METHODS
+=======
+
+   * new(%PARAMS)
+
+     This method takes a hash of parameters.  The following options are
+     valid:
+
+   * - name ($) The name of the object (not the filename!).  Required.
+
+   * - min_level ($) The minimum logging level this object will accept.
+     See the Log::Dispatch documentation for more information.  Required.
+
+   * - max_level ($) The maximum logging level this obejct will accept.
+     See the Log::Dispatch documentation for more information.  This is not
+     required.  By default the maximum is the highest possible level (which
+     means functionally that the object has no maximum).
+
+   * - subject ($) The subject of the email messages which are sent.
+     Defaults to "$0: log email"
+
+   * - to ($ or \@) Either a string or a list reference of strings
+     containing email addresses.  Required.
+
+   * - from ($) A string containing an email address.  This is optional
+     and may not work with all mail sending methods.
+
+   * - buffered (0 or 1) This determines whether the object sends one
+     email per message it is given or whether it stores them up and sends
+     them all at once.  The default is to buffer messages.
+
+   * - callbacks( \& or [ \&, \&, ... ] ) This parameter may be a single
+     subroutine reference or an array reference of subroutine references.
+     These callbacks will be called in the order they are given and passed
+     a hash containing the following keys:
+
+          ( message => $log_message )
+
+     It's a hash in case I need to add parameters in the future.
+
+     The callbacks are expected to modify the message and then return a
+     single scalar containing that modified message.  These callbacks will
+     be called when either the log or `log_to' methods are called and will
+     only be applied to a given message once.
+
+   * log_message( message => $ )
+
+     Sends a message to the appropriate output.  Generally this shouldn't
+     be called directly but should be called through the `log()' method
+     (in Log::Dispatch::Output).
+
+   * send_email(%PARAMS)
+
+     This is the method that must be subclassed.  For now the only
+     parameter in the hash is 'message'.
+
+   * DESTROY
+
+     If the object is buffered, then this method will call the
+     `send_email()' method to send the contents of the buffer.
+
+AUTHOR
+======
+
+   Dave Rolsky, <autarch@urth.org>
+
+SEE ALSO
+========
+
+   Log::Dispatch, Log::Dispatch::ApacheLog,
+Log::Dispatch::Email::MailSend, Log::Dispatch::Email::MailSendmail,
+Log::Dispatch::Email::MIMELite, Log::Dispatch::File,
+Log::Dispatch::Handle, Log::Dispatch::Output, Log::Dispatch::Screen,
+Log::Dispatch::Syslog
+
+
+File: pm.info,  Node: Log/Dispatch/Email/MIMELite,  Next: Log/Dispatch/Email/MailSend,  Prev: Log/Dispatch/Email,  Up: Module List
+
+Subclass of Log::Dispatch::Email that uses the Mail::Sendmail module
+********************************************************************
+
+NAME
+====
+
+   Log::Dispatch::Email::MIMELite - Subclass of Log::Dispatch::Email that
+uses the Mail::Sendmail module
+
+SYNOPSIS
+========
+
+     use Log::Dispatch::Email::MIMELite;
+
+     my $email = Log::Dispatch::Email::MIMELite->new( name => 'email',
+                                                      min_level => 'emerg',
+                                                      to => [ qw( foo@bar.com bar@baz.org ) ],
+                                                      subject => 'Oh no!!!!!!!!!!!', );
+
+     $email->log( message => "Something bad is happening\n", level => 'emerg' );
+
+DESCRIPTION
+===========
+
+   This is a subclass of Log::Dispatch::Email that implements the
+send_email method using the MIME::Lite module.
+
+METHODS
+=======
+
+   * new
+
+     This method takes a hash of parameters.  The following options are
+     valid:
+
+   * - name ($) The name of the object (not the filename!).  Required.
+
+   * - min_level ($) The minimum logging level this object will accept.
+     See the Log::Dispatch documentation for more information.  Required.
+
+   * - max_level ($) The maximum logging level this obejct will accept.
+     See the Log::Dispatch documentation for more information.  This is not
+     required.  By default the maximum is the highest possible level (which
+     means functionally that the object has no maximum).
+
+   * - subject ($) The subject of the email messages which are sent.
+     Defaults to "$0: log email"
+
+   * - to ($ or \@) Either a string or a list reference of strings
+     containing email addresses.  Required.
+
+   * - from ($) A string containing an email address.  This is optional
+     and may not work with all mail sending methods.
+
+   * - buffered (0 or 1) This determines whether the object sends one
+     email per message it is given or whether it stores them up and sends
+     them all at once.  The default is to buffer messages.
+
+   * - callbacks( \& or [ \&, \&, ... ] ) This parameter may be a single
+     subroutine reference or an array reference of subroutine references.
+     These callbacks will be called in the order they are given and passed
+     a hash containing the following keys:
+
+          ( message => $log_message )
+
+     It's a hash in case I need to add parameters in the future.
+
+     The callbacks are expected to modify the message and then return a
+     single scalar containing that modified message.  These callbacks will
+     be called when either the log or `log_to' methods are called and will
+     only be applied to a given message once.
+
+   * log( level => $, message => $ )
+
+     Sends a message if the level is greater than or equal to the object's
+     minimum level.
+
+AUTHOR
+======
+
+   Dave Rolsky, <autarch@urth.org>
+
+SEE ALSO
+========
+
+   Log::Dispatch, Log::Dispatch::ApacheLog, Log::Dispatch::Email,
+Log::Dispatch::Email::MailSend, Log::Dispatch::Email::MailSendmail,
+Log::Dispatch::File, Log::Dispatch::Handle, Log::Dispatch::Output,
+Log::Dispatch::Screen, Log::Dispatch::Syslog
+
+
+File: pm.info,  Node: Log/Dispatch/Email/MailSend,  Next: Log/Dispatch/Email/MailSendmail,  Prev: Log/Dispatch/Email/MIMELite,  Up: Module List
+
+Subclass of Log::Dispatch::Email that uses the Mail::Send module
+****************************************************************
+
+NAME
+====
+
+   Log::Dispatch::Email::MailSend - Subclass of Log::Dispatch::Email that
+uses the Mail::Send module
+
+SYNOPSIS
+========
+
+     use Log::Dispatch::Email::MailSend;
+
+     my $email = Log::Dispatch::Email::MailSend->new( name => 'email',
+                                                      min_level => 'emerg',
+                                                      to => [ qw( foo@bar.com bar@baz.org ) ],
+                                                      subject => 'Oh no!!!!!!!!!!!', );
+
+     $email->log( message => 'Something bad is happening', level => 'emerg' );
+
+DESCRIPTION
+===========
+
+   This is a subclass of Log::Dispatch::Email that implements the
+send_email method using the Mail::Send module.
+
+METHODS
+=======
+
+   * new
+
+     This method takes a hash of parameters.  The following options are
+     valid:
+
+   * - name ($) The name of the object (not the filename!).  Required.
+
+   * - min_level ($) The minimum logging level this object will accept.
+     See the Log::Dispatch documentation for more information.  Required.
+
+   * - max_level ($) The maximum logging level this obejct will accept.
+     See the Log::Dispatch documentation for more information.  This is not
+     required.  By default the maximum is the highest possible level (which
+     means functionally that the object has no maximum).
+
+   * - subject ($) The subject of the email messages which are sent.
+     Defaults to "$0: log email"
+
+   * - to ($ or \@) Either a string or a list reference of strings
+     containing email addresses.  Required.
+
+   * - from ($) A string containing an email address.  This is optional
+     and may not work with all mail sending methods.
+
+   * - buffered (0 or 1) This determines whether the object sends one
+     email per message it is given or whether it stores them up and sends
+     them all at once.  The default is to buffer messages.
+
+   * - callbacks( \& or [ \&, \&, ... ] ) This parameter may be a single
+     subroutine reference or an array reference of subroutine references.
+     These callbacks will be called in the order they are given and passed
+     a hash containing the following keys:
+
+          ( message => $log_message )
+
+     It's a hash in case I need to add parameters in the future.
+
+     The callbacks are expected to modify the message and then return a
+     single scalar containing that modified message.  These callbacks will
+     be called when either the log or `log_to' methods are called and will
+     only be applied to a given message once.
+
+   * log( level => $, message => $ )
+
+     Sends a message if the level is greater than or equal to the object's
+     minimum level.
+
+AUTHOR
+======
+
+   Dave Rolsky, <autarch@urth.org>
+
+SEE ALSO
+========
+
+   Log::Dispatch, Log::Dispatch::ApacheLog, Log::Dispatch::Email,
+Log::Dispatch::Email::MailSendmail, Log::Dispatch::Email::MIMELite,
+Log::Dispatch::File, Log::Dispatch::Handle, Log::Dispatch::Output,
+Log::Dispatch::Screen, Log::Dispatch::Syslog
+
+
+File: pm.info,  Node: Log/Dispatch/Email/MailSendmail,  Next: Log/Dispatch/File,  Prev: Log/Dispatch/Email/MailSend,  Up: Module List
+
+Subclass of Log::Dispatch::Email that uses the Mail::Sendmail module
+********************************************************************
+
+NAME
+====
+
+   Log::Dispatch::Email::MailSendmail - Subclass of Log::Dispatch::Email
+that uses the Mail::Sendmail module
+
+SYNOPSIS
+========
+
+     use Log::Dispatch::Email::MailSendmail;
+
+     my $email = Log::Dispatch::Email::MailSendmail->new( name => 'email',
+                                                          min_level => 'emerg',
+                                                          to => [ qw( foo@bar.com bar@baz.org ) ],
+                                                          subject => 'Oh no!!!!!!!!!!!', );
+
+     $email->log( message => 'Something bad is happening', level => 'emerg' );
+
+DESCRIPTION
+===========
+
+   This is a subclass of Log::Dispatch::Email that implements the
+send_email method using the Mail::Sendmail module.
+
+METHODS
+=======
+
+   * new
+
+     This method takes a hash of parameters.  The following options are
+     valid:
+
+   * - name ($) The name of the object (not the filename!).  Required.
+
+   * - min_level ($) The minimum logging level this object will accept.
+     See the Log::Dispatch documentation for more information.  Required.
+
+   * - max_level ($) The maximum logging level this obejct will accept.
+     See the Log::Dispatch documentation for more information.  This is not
+     required.  By default the maximum is the highest possible level (which
+     means functionally that the object has no maximum).
+
+   * - subject ($) The subject of the email messages which are sent.
+     Defaults to "$0: log email"
+
+   * - to ($ or \@) Either a string or a list reference of strings
+     containing email addresses.  Required.
+
+   * - from ($) A string containing an email address.  This is optional
+     and may not work with all mail sending methods.
+
+     NOTE: The Mail::Sendmail module requires an address be passed to it to
+     set this in the mail it sends.  We pass in 'LogDispatch@foo.bar' as
+     the default.
+
+   * - buffered (0 or 1) This determines whether the object sends one
+     email per message it is given or whether it stores them up and sends
+     them all at once.  The default is to buffer messages.
+
+   * - callbacks( \& or [ \&, \&, ... ] ) This parameter may be a single
+     subroutine reference or an array reference of subroutine references.
+     These callbacks will be called in the order they are given and passed
+     a hash containing the following keys:
+
+          ( message => $log_message )
+
+     It's a hash in case I need to add parameters in the future.
+
+     The callbacks are expected to modify the message and then return a
+     single scalar containing that modified message.  These callbacks will
+     be called when either the log or `log_to' methods are called and will
+     only be applied to a given message once.
+
+   * log( level => $, message => $ )
+
+     Sends a message if the level is greater than or equal to the object's
+     minimum level.
+
+AUTHOR
+======
+
+   Dave Rolsky, <autarch@urth.org>
+
+SEE ALSO
+========
+
+   Log::Dispatch, Log::Dispatch::ApacheLog, Log::Dispatch::Email,
+Log::Dispatch::Email::MailSend, Log::Dispatch::Email::MIMELite,
+Log::Dispatch::File, Log::Dispatch::Handle, Log::Dispatch::Output,
+Log::Dispatch::Screen, Log::Dispatch::Syslog
+
+
+File: pm.info,  Node: Log/Dispatch/File,  Next: Log/Dispatch/Handle,  Prev: Log/Dispatch/Email/MailSendmail,  Up: Module List
+
+Object for logging to files
+***************************
+
+NAME
+====
+
+   Log::Dispatch::File - Object for logging to files
+
+SYNOPSIS
+========
+
+     use Log::Dispatch::File;
+
+     my $file = Log::Dispatch::File->new( name      => 'file1',
+                                          min_level => 'info',
+                                          filename  => 'Somefile.log',
+                                          mode      => 'append' );
+
+     $file->log( level => 'emerg', message => "I've fallen and I can't get up\n" );
+
+DESCRIPTION
+===========
+
+   This module provides a simple object for logging to files under the
+Log::Dispatch::* system.
+
+METHODS
+=======
+
+   * new(%PARAMS)
+
+     This method takes a hash of parameters.  The following options are
+     valid:
+
+   * - name ($) The name of the object (not the filename!).  Required.
+
+   * - min_level ($) The minimum logging level this object will accept.
+     See the Log::Dispatch documentation for more information.  Required.
+
+   * - max_level ($) The maximum logging level this obejct will accept.
+     See the Log::Dispatch documentation for more information.  This is not
+     required.  By default the maximum is the highest possible level (which
+     means functionally that the object has no maximum).
+
+   * - filename ($) The filename to be opened for writing.
+
+   * - mode ($) The mode the file should be opened with.  Valid options
+     are 'write', '>', 'append', '>>', or the relevant constants from
+     Fcntl.  The default is 'write'.
+
+   * - callbacks( \& or [ \&, \&, ... ] ) This parameter may be a single
+     subroutine reference or an array reference of subroutine references.
+     These callbacks will be called in the order they are given and passed
+     a hash containing the following keys:
+
+          ( message => $log_message )
+
+     It's a hash in case I need to add parameters in the future.
+
+     The callbacks are expected to modify the message and then return a
+     single scalar containing that modified message.  These callbacks will
+     be called when either the log or `log_to' methods are called and will
+     only be applied to a given message once.
+
+   * log_message( message => $ )
+
+     Sends a message to the appropriate output.  Generally this shouldn't
+     be called directly but should be called through the `log()' method
+     (in Log::Dispatch::Output).
+
+AUTHOR
+======
+
+   Dave Rolsky, <autarch@urth.org>
+
+SEE ALSO
+========
+
+   Log::Dispatch, Log::Dispatch::ApacheLog, Log::Dispatch::Email,
+Log::Dispatch::Email::MailSend, Log::Dispatch::Email::MailSendmail,
+Log::Dispatch::Email::MIMELite, Log::Dispatch::Handle,
+Log::Dispatch::Output, Log::Dispatch::Screen, Log::Dispatch::Syslog
+
+
+File: pm.info,  Node: Log/Dispatch/Handle,  Next: Log/Dispatch/Output,  Prev: Log/Dispatch/File,  Up: Module List
+
+Object for logging to IO::Handle objects (and subclasses thereof)
+*****************************************************************
+
+NAME
+====
+
+   Log::Dispatch::Handle - Object for logging to IO::Handle objects (and
+subclasses thereof)
+
+SYNOPSIS
+========
+
+     use Log::Dispatch::Handle;
+
+     my $handle = Log::Dispatch::Handle->new( name      => 'a handle',
+                                              min_level => 'emerg',
+                                              handle    => $io_socket_object );
+
+     $handle->log( level => 'emerg', message => 'I am the Lizard King!' );
+
+DESCRIPTION
+===========
+
+   This module supplies a very simple object for logging to some sort of
+handle object.  Basically, anything that implements a print() method can
+be passed the object constructor and it should work.
+
+METHODS
+=======
+
+   * new(%PARAMS)
+
+     This method takes a hash of parameters.  The following options are
+     valid:
+
+   * - name ($) The name of the object (not the filename!).  Required.
+
+   * - min_level ($) The minimum logging level this object will accept.
+     See the Log::Dispatch documentation for more information.  Required.
+
+   * - max_level ($) The maximum logging level this obejct will accept.
+     See the Log::Dispatch documentation for more information.  This is not
+     required.  By default the maximum is the highest possible level (which
+     means functionally that the object has no maximum).
+
+   * - handle ($) The handle object.  This object must implement a print()
+     method.
+
+   * - callbacks( \& or [ \&, \&, ... ] ) This parameter may be a single
+     subroutine reference or an array reference of subroutine references.
+     These callbacks will be called in the order they are given and passed
+     a hash containing the following keys:
+
+          ( message => $log_message )
+
+     It's a hash in case I need to add parameters in the future.
+
+     The callbacks are expected to modify the message and then return a
+     single scalar containing that modified message.  These callbacks will
+     be called when either the log or `log_to' methods are called and will
+     only be applied to a given message once.
+
+   * log_message( message => $ )
+
+     Sends a message to the appropriate output.  Generally this shouldn't
+     be called directly but should be called through the `log()' method
+     (in Log::Dispatch::Output).
+
+AUTHOR
+======
+
+   Dave Rolsky, <autarch@urth.org>
+
+SEE ALSO
+========
+
+   Log::Dispatch, Log::Dispatch::ApacheLog, Log::Dispatch::Email,
+Log::Dispatch::Email::MailSend, Log::Dispatch::Email::MailSendmail,
+Log::Dispatch::Email::MIMELite, Log::Dispatch::File,
+Log::Dispatch::Output, Log::Dispatch::Screen, Log::Dispatch::Syslog
+
+
+File: pm.info,  Node: Log/Dispatch/Output,  Next: Log/Dispatch/Screen,  Prev: Log/Dispatch/Handle,  Up: Module List
+
+Base class for all Log::Dispatch::* object
+******************************************
+
+NAME
+====
+
+   Log::Dispatch::Output - Base class for all Log::Dispatch::* object
+
+SYNOPSIS
+========
+
+     package Log::Dispatch::MySubclass;
+
+     use Log::Dispatch::Output;
+     use base qw( Log::Dispatch::Output );
+
+     sub new
+     {
+         my $proto = shift;
+         my $class = ref $proto || $proto;
+
+     my %params = @_;
+
+     my $self;
+     {
+     	  no strict 'refs';
+     	  $self = bless [ \%{"${class}::FIELDS"} ], $class;
+     }
+
+     $self->_basic_init(%params);
+
+     # Do more if you like
+       }
+
+     sub log_message
+     {
+         my Log::Dispatch::MySubclass $self = shift;
+         my %params = @_;
+
+     # Do something with message in $params{message}
+       }
+
+DESCRIPTION
+===========
+
+   This module is the base class from which all Log::Dispatch::* objects
+should be derived.
+
+METHODS
+=======
+
+   * new(%PARAMS)
+
+     This must be overridden in a subclass.  Takes the following
+     parameters:
+
+   * - name ($) The name of the object (not the filename!).  Required.
+
+   * - min_level ($) The minimum logging level this object will accept.
+     See the Log::Dispatch documentation for more information.  Required.
+
+   * - max_level ($) The maximum logging level this obejct will accept.
+     See the Log::Dispatch documentation for more information.  This is not
+     required.  By default the maximum is the highest possible level (which
+     means functionally that the object has no maximum).
+
+   * - callbacks( \& or [ \&, \&, ... ] ) This parameter may be a single
+     subroutine reference or an array reference of subroutine references.
+     These callbacks will be called in the order they are given and passed
+     a hash containing the following keys:
+
+          ( message => $log_message )
+
+     It's a hash in case I need to add parameters in the future.
+
+     The callbacks are expected to modify the message and then return a
+     single scalar containing that modified message.  These callbacks will
+     be called when either the log or `log_to' methods are called and will
+     only be applied to a given message once.
+
+   * _basic_init(%PARAMS)
+
+     This should be called from a subclass's constructor.  Make sure to
+     pass the arguments in @_ to it.  It sets the object's name and minimum
+     level.  It also sets up two other attributes which are used by other
+     Log::Dispatch::Output methods, level_names and level_numbers.
+
+   * name
+
+     Returns the object's name.
+
+   * min_level
+
+     Returns the object's minimum log level.
+
+   * max_level
+
+     Returns the object's maximum log level.
+
+   * accepted_levels
+
+     Returns a list of the object's accepted levels (by name) from minimum
+     to maximum.
+
+   * log( level => $, message => $ )
+
+     Sends a message if the level is greater than or equal to the object's
+     minimum level.  This method applies any message formatting callbacks
+     that the object may have.
+
+   * _should_log ($)
+
+     This method is called from the `log()' method with the log level of
+     the message to be logged as an argument.  It returns a boolean value
+     indicating whether or not the message should be logged by this
+     particular object.  The `log()' method will not process the message
+     if the return value is false.
+
+   * _level_as_number ($)
+
+     This method will take a log level as a string (or a number) and return
+     the number of that log level.  If not given an argument, it returns
+     the calling object's log level instead.  If it cannot determine the
+     level then it will issue a warning and return undef.
+
+Subclassing
+-----------
+
+   This class should be used as the base class for all logging objects you
+create that you would like to work under the Log::Dispatch architecture.
+Subclassing is fairly trivial.  For most subclasses, if you simply copy
+the code in the SYNOPSIS and then put some functionality into the
+`log_message' method then you should be all set.  Please make sure to use
+the `_basic_init' method as directed.
+
+AUTHOR
+======
+
+   Dave Rolsky, <autarch@urth.org>
+
+SEE ALSO
+========
+
+   Log::Dispatch, Log::Dispatch::ApacheLog, Log::Dispatch::Email,
+Log::Dispatch::Email::MailSend, Log::Dispatch::Email::MailSendmail,
+Log::Dispatch::Email::MIMELite, Log::Dispatch::File,
+Log::Dispatch::Handle, Log::Dispatch::Screen, Log::Dispatch::Syslog
+
+
+File: pm.info,  Node: Log/Dispatch/Screen,  Next: Log/Dispatch/Syslog,  Prev: Log/Dispatch/Output,  Up: Module List
+
+Object for logging to the screen
+********************************
+
+NAME
+====
+
+   Log::Dispatch::Screen - Object for logging to the screen
+
+SYNOPSIS
+========
+
+     use Log::Dispatch::Screen;
+
+     my $screen = Log::Dispatch::Screen->new( name      => 'screen',
+                                              min_level => 'debug',
+                                              stderr    => 1 );
+
+     $screen->log( level => 'alert', message => "I'm searching the city for sci-fi wasabi\n" );
+
+DESCRIPTION
+===========
+
+   This module provides an object for logging to the screen (really STDOUT
+or STDERR).
+
+METHODS
+=======
+
+   * new(%PARAMS)
+
+     This method takes a hash of parameters.  The following options are
+     valid:
+
+   * - name ($) The name of the object (not the filename!).  Required.
+
+   * - min_level ($) The minimum logging level this object will accept.
+     See the Log::Dispatch documentation for more information.  Required.
+
+   * - max_level ($) The maximum logging level this obejct will accept.
+     See the Log::Dispatch documentation for more information.  This is not
+     required.  By default the maximum is the highest possible level (which
+     means functionally that the object has no maximum).
+
+   * - stderr (0 or 1) Indicates whether or not logging information should
+     go to STDERR.  If false, logging information is printed to STDOUT
+     instead.  This defaults to true.
+
+   * - callbacks( \& or [ \&, \&, ... ] ) This parameter may be a single
+     subroutine reference or an array reference of subroutine references.
+     These callbacks will be called in the order they are given and passed
+     a hash containing the following keys:
+
+          ( message => $log_message )
+
+     It's a hash in case I need to add parameters in the future.
+
+     The callbacks are expected to modify the message and then return a
+     single scalar containing that modified message.  These callbacks will
+     be called when either the log or `log_to' methods are called and will
+     only be applied to a given message once.
+
+   * log_message( message => $ )
+
+     Sends a message to the appropriate output.  Generally this shouldn't
+     be called directly but should be called through the `log()' method
+     (in Log::Dispatch::Output).
+
+AUTHOR
+======
+
+   Dave Rolsky, <autarch@urth.org>
+
+SEE ALSO
+========
+
+   Log::Dispatch, Log::Dispatch::ApacheLog, Log::Dispatch::Email,
+Log::Dispatch::Email::MailSend, Log::Dispatch::Email::MailSendmail,
+Log::Dispatch::Email::MIMELite, Log::Dispatch::File,
+Log::Dispatch::Handle, Log::Dispatch::Output, Log::Dispatch::Syslog
+
+
+File: pm.info,  Node: Log/Dispatch/Syslog,  Next: Log/Dispatch/TkText,  Prev: Log/Dispatch/Screen,  Up: Module List
+
+Object for logging to system log.
+*********************************
+
+NAME
+====
+
+   Log::Dispatch::Syslog - Object for logging to system log.
+
+SYNOPSIS
+========
+
+     use Log::Dispatch::Syslog;
+
+     my $file = Log::Dispatch::Syslog->new( name      => 'file1',
+                                            min_level => 'info',
+                                            ident     => 'Yadda yadda' );
+
+     $file->log( level => 'emerg', message => "Time to die." );
+
+DESCRIPTION
+===========
+
+   This module provides a simple object for sending messages to the system
+log (via UNIX syslog calls).
+
+METHODS
+=======
+
+   * new(%PARAMS)
+
+     This method takes a hash of parameters.  The following options are
+     valid:
+
+   * - name ($) The name of the object.  Required.
+
+   * - min_level ($) The minimum logging level this object will accept.
+     See the Log::Dispatch documentation for more information.  Required.
+
+   * - max_level ($) The maximum logging level this obejct will accept.
+     See the Log::Dispatch documentation for more information.  This is not
+     required.  By default the maximum is the highest possible level (which
+     means functionally that the object has no maximum).
+
+   * - ident ($) This string will be prepended to all messages in the
+     system log.  Defaults to $0.
+
+   * - logopt ($) A string containing the log options (separated by any
+     separator you like).  Valid options are 'cons', 'pid', 'ndelay', and
+     'nowait'.  See the openlog(3) and Sys::Syslog docs for more details.
+     I would suggest not using 'cons' but instead using
+     Log::Dispatch::Screen.  Defaults to ".
+
+   * - facility ($) Specifies what type of program is doing the logging to
+     the system log.  Valid options are 'auth', 'authpriv', 'cron',
+     'daemon', 'kern', 'local0' through 'local7', 'mail, 'news', 'syslog',
+     'user', 'uucp'.  Defaults to 'user'
+
+   * - socket ($) Tells what type of socket to use for sending syslog
+     messages.  Valid options are 'unix' or 'inet'.  Defaults to 'inet'.
+
+   * - callbacks( \& or [ \&, \&, ... ] ) This parameter may be a single
+     subroutine reference or an array reference of subroutine references.
+     These callbacks will be called in the order they are given and passed
+     a hash containing the following keys:
+
+          ( message => $log_message )
+
+     It's a hash in case I need to add parameters in the future.
+
+     The callbacks are expected to modify the message and then return a
+     single scalar containing that modified message.  These callbacks will
+     be called when either the log or `log_to' methods are called and will
+     only be applied to a given message once.
+
+   * log_message( message => $ )
+
+     Sends a message to the appropriate output.  Generally this shouldn't
+     be called directly but should be called through the `log()' method
+     (in Log::Dispatch::Output).
+
+AUTHOR
+======
+
+   Dave Rolsky, <autarch@urth.org>
+
+SEE ALSO
+========
+
+   Log::Dispatch, Log::Dispatch::ApacheLog, Log::Dispatch::Email,
+Log::Dispatch::Email::MailSend, Log::Dispatch::Email::MailSendmail,
+Log::Dispatch::Email::MIMELite, Log::Dispatch::File,
+Log::Dispatch::Handle, Log::Dispatch::Output, Log::Dispatch::Screen
+
+
+File: pm.info,  Node: Log/Dispatch/TkText,  Next: Log/Dispatch/ToTk,  Prev: Log/Dispatch/Syslog,  Up: Module List
+
+Text widget for Log::Dispatch
+*****************************
+
+NAME
+====
+
+   Log::Dispatch::TkText - Text widget for Log::Dispatch
+
+SYNOPSIS
+========
+
+     use Tk ;
+     use Log::Dispatch;
+     use Log::Dispatch::TkText ;
+
+     my $dispatch = Log::Dispatch->new;
+
+     my $mw = MainWindow-> new ;
+
+     my $tklog = $mw->Scrolled('LogText', name => 'tk',
+                                min_level => 'debug');
+     $tklog -> pack ;
+
+     # add the logger object to $dispatch (not the widget !!)
+     $dispatch->add($tklog->logger) ;
+
+     $dispatch -> log
+      (
+       level => 'info',
+       message => "Quaquacomekiki ? (so says Averell Dalton)"
+      ) ;
+
+DESCRIPTION
+===========
+
+   This widget provide a read-only text widget (based on *Note Tk/ROText:
+Tk/ROText,) for logging through the *Note Log/Dispatch: Log/Dispatch,
+module.
+
+   Note that this widget works with a buddy *Note Log/Dispatch/ToTk:
+Log/Dispatch/ToTk, object which will be created by the widget's
+constructor.  The reference to this buddy object must be added to the main
+log dispatcher.
+
+Filters
+=======
+
+   By clicking on <button-3> within the text widget, you get access to a
+filter menu which can hide specific levels of logging.
+
+   For instance if you text widget is cluttered with 'info' message and
+you are looking for only 'error' messages, you can hide all 'info'
+messages by disabling the 'info' level in the Filter menu so only the
+'error' messages will be left on the screen.
+
+   Note that the filter hides the text. They can be displaying again if
+you switch back the 'info' level in the Filter menu.
+
+METHODS
+=======
+
+   The following methods were added to the *Note Tk/ROText: Tk/ROText,
+widget:
+
+logger()
+--------
+
+   Returns the buddy ToTk object.
+
+log_message( level => $, message => $ )
+---------------------------------------
+
+   Sends a message if the level is greater than or equal to the object's
+minimum level.
+
+AUTHOR
+======
+
+   Dominique Dumont <Dominique_Dumont@hp.com> using *Note Log/Dispatch:
+Log/Dispatch, from Dave Rolsky, <autarch@urth.org>
+
+   Copyright (c) 2000-2001 Dominique Dumont. All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   *Note Log/Dispatch: Log/Dispatch,, *Note Log/Dispatch/Email:
+Log/Dispatch/Email,, *Note Log/Dispatch/Email/MailSend:
+Log/Dispatch/Email/MailSend,, *Note Log/Dispatch/Email/MailSendmail:
+Log/Dispatch/Email/MailSendmail,, *Note Log/Dispatch/Email/MIMELite:
+Log/Dispatch/Email/MIMELite,, *Note Log/Dispatch/File: Log/Dispatch/File,,
+*Note Log/Dispatch/Handle: Log/Dispatch/Handle,, *Note
+Log/Dispatch/Screen: Log/Dispatch/Screen,, *Note Log/Dispatch/Syslog:
+Log/Dispatch/Syslog,, *Note Log/Dispatch/ToTk: Log/Dispatch/ToTk,
+
+
+File: pm.info,  Node: Log/Dispatch/ToTk,  Next: Log/ErrLogger,  Prev: Log/Dispatch/TkText,  Up: Module List
+
+Class to redirect Log::Dispatch to Tk widgets
+*********************************************
+
+NAME
+====
+
+   Log::Dispatch::ToTk - Class to redirect Log::Dispatch to Tk widgets
+
+SYNOPSIS
+========
+
+     # Log::Dispatch::ToTk must be used in a composite widget
+
+     Tk::Widget->Construct('LogText');
+
+     sub InitObject
+      {
+        my ($dw,$args) = @_ ;
+     
+        # retrieve parameters specific to Log::Dispatch::*
+        my %params ;
+        foreach my $key (qw/name min_level max_level/)
+          {
+            $params{$key} = delete $args->{$key}
+               if defined $args->{$key};
+          }
+     
+        # create the TkTk buddy class
+        $dw->{logger} = Log::Dispatch::ToTk->
+          new(%params, widget => $dw) ;
+
+     # initiaze the widget
+     $dw->SUPER::InitObject($args) ;
+       }
+
+     # mandatory method in Tk widget using Log::Dispatch::ToTk
+     sub logger
+      {
+        my $dw = shift;
+        return $dw->{logger} ;
+      }
+
+   __END__
+
+DESCRIPTION
+===========
+
+   This module is the interface class between *Note Log/Dispatch:
+Log/Dispatch, and Tk widgets.  This class is derived from *Note
+Log/Dispatch/Output: Log/Dispatch/Output,.
+
+   This class must be used only by a composite widget dedicated to handle
+Log::Dispatch logs.
+
+   One ToTk object will be created for each Log::Dispatch::Tk* widget and
+the user must register the ToTk object to the log dispatcher.
+
+METHODS
+=======
+
+new(...)
+--------
+
+   Create a new ToTk object. Parameter are :
+
+   * widget ($)
+
+     The buddy widget object
+
+   * name ($)
+
+     The name of the object (not the filename!).  Required.
+
+   * min_level ($)
+
+     The minimum logging level this object will accept.  See the
+     Log::Dispatch documentation for more information.  Required.
+
+   * max_level ($)
+
+     The maximum logging level this obejct will accept.  See the
+     Log::Dispatch documentation for more information.  This is not
+     required.  By default the maximum is the highest possible level (which
+     means functionally that the object has no maximum).
+
+log_message( level => $, message => $ )
+---------------------------------------
+
+   Sends a message if the level is greater than or equal to the object's
+minimum level.
+
+AUTHOR
+======
+
+   Dominique Dumont <Dominique_Dumont@hp.com> using *Note Log/Dispatch:
+Log/Dispatch, and *Note Log/Dispatch/Output: Log/Dispatch/Output, from
+Dave Rolsky, autarch@urth.org
+
+   Copyright (c) 2000 Dominique Dumont. All rights reserved.  This program
+is free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+SEE ALSO
+========
+
+   *Note Log/Dispatch: Log/Dispatch,, *Note Log/Dispatch/Email:
+Log/Dispatch/Email,, *Note Log/Dispatch/Email/MailSend:
+Log/Dispatch/Email/MailSend,, *Note Log/Dispatch/Email/MailSendmail:
+Log/Dispatch/Email/MailSendmail,, *Note Log/Dispatch/Email/MIMELite:
+Log/Dispatch/Email/MIMELite,, *Note Log/Dispatch/File: Log/Dispatch/File,,
+*Note Log/Dispatch/Handle: Log/Dispatch/Handle,, *Note
+Log/Dispatch/Screen: Log/Dispatch/Screen,, *Note Log/Dispatch/Syslog:
+Log/Dispatch/Syslog,, *Note Log/Dispatch/TkText: Log/Dispatch/TkText,
+
+
+File: pm.info,  Node: Log/ErrLogger,  Next: Log/LogLite,  Prev: Log/Dispatch/ToTk,  Up: Module List
+
+Log errors and error-like events
+********************************
+
+NAME
+====
+
+   Log::ErrLogger - Log errors and error-like events
+
+SYNOPSIS
+========
+
+     use Log::ErrLogger;
+
+     # Send e-mail for ERROR or worse
+     my $mail_logger = new Log::ErrLogger::Mail(
+       SENSITIVITY => Log::ErrLogger::ERROR,
+       HEADERS     => { To      => "who@where.com",
+     					 Subject => "Errors occurred while running $0" });
+
+     # Log INFORMATIONAL or worse to a file
+     my $file_logger = new Log::ErrLogger::File(
+       FILE        => "/home/who/what.err",
+       SENSITIVITY => Log::ErrLogger::INFORMATIONAL );
+
+     # Print a nice HTML error message
+     my $sub_logger  = new Log::ErrLogger::Sub (
+       SENSITIVITY => FATAL,
+       SUB         => sub { print STDOUT "<TITLE>Oops!</TITLE><HTML><HEAD1>Please try again later.</HEAD1></HTML>\n";
+     						 exit(0); } );
+
+     # Capture all output to STDERR as an UNEXPECTED error
+     my $stderr_logger = Log::ErrLogger::tie( Log::ErrLogger::UNEXPECTED );
+
+     # But don't actually print to STDERR
+     $stderr_logger->close;
+
+     # Log a warning
+     log_error( WARNING, "Danger, %s!", "Will Robinson" );
+
+DESCRIPTION
+===========
+
+   Log::ErrLogger provides a means of logging errors and error-like events
+(such as warnings and unexpected situations) when printing to STDERR just
+will not do.
+
+   Error-like events are classified by a severity (see `ERROR SEVERITIES'
+in this node below).  Programs instantiate error logging objects which can
+respond differently to events.  The objects have a sensitivity - they will
+respond to any event at least as severe as their sensitivity, and will
+ignore any events that are less severe.
+
+   This module instantiates new __DIE__ and __WARN__ handlers that call
+log_error( FATAL, die-message) and log_error( WARNING, warn-message),
+respectively.
+
+HISTORY
+=======
+
+   $Id: ErrLogger.pm,v 1.6 1999/09/23 21:37:24 dcw Exp $
+
+   $Log: ErrLogger.pm,v $ Revision 1.6  1999/09/23 21:37:24  dcw
+Incorporated Tim Ayers <tayers@bridge.com> suggestions
+
+   Revision 1.5  1999/09/13 17:59:48  dcw Copyright
+
+   Revision 1.4  1999/09/13 16:37:17  dcw Documentation
+
+   Revision 1.3  1999/09/01 14:28:28  dcw Backup file, export, autoflush
+
+   Revision 1.2  1999/08/31 17:18:39  dcw Log::ErrLogger::Sub
+
+   Revision 1.1  1999/08/30 21:28:43  dcw Initial
+
+AUTHOR
+======
+
+   David C. Worenklein <dcw@gcm.com>
+
+COPYRIGHT
+=========
+
+   Copyright 1999 Greenwich Capital Markets
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+ERROR SEVERITIES
+================
+
+   The predefined severities are
+
+DEBUGGING
+INFORMATIONAL
+UNEXPECTED
+WARNING
+ERROR
+FATAL
+   They have numerical values from 1 to 6.
+
+NON-METHOD SUBROUTINES
+======================
+
+log_error( SEVERITY, FORMAT [,LIST] )
+     Log an error of the specified severity.  The text of the message is
+     the output of sprintf FORMAT, ARGS.  A carriage-return (\n) will be
+     appended if one is not supplied.
+
+my $stderr_logger = tie( [SEVERITY] );
+     Tie the STDERR handle to the Log::ErrLogger module, so that any
+     output to STDERR will call log_error( $severity, output ).
+
+     If $severity is not specified, it will default to INFORMATIONAL.
+
+METHODS
+=======
+
+my $sensitivity = $logger->sensitivity;
+     Returns the sensitivty of an error logger object.  Objects respond to
+     events that are at least as severe as their sensitivity.  There are
+     two special sensitivities.  Objects with a sensitivity of NONE do not
+     respond to any events.  Objects with a sensitivity of ALL respond to
+     all events.
+
+my $old_sensitivity = $logger->sensitivity( SENSITIVITY );
+     Sets the sensitivty of an error logger object.  Objects respond to
+     events that are at least as severe as their sensitivity.
+
+     Returns what the sensitivity of the object used to be.
+
+my $fh = $logger->file_handle;
+     Returns the IO::Handle associated with the error logger object.  Not
+     all error loggers will have a file handle, but most will.
+
+$logger->set_file_handle( HANDLE );
+     Associates the error logger object with the given (opened)
+     IO::Handle, and closes the old file handle that used to be associated
+     with the object (if there was one.)
+
+     The handle is set to autoflush, since buffering is usually a bad idea
+     on error loggers.
+
+$logger->close;
+     Decommission the error logging object.  `log_error' in this node will
+     no longer invoke this object.
+
+     Note that this does NOT close the associated file handle.  However,
+     if the error logging object has the only reference to the file
+     handle, and the program does not have any references to the error
+     logging object, the handle will have no references left and will be
+     destroyed.
+
+$logger->log( SEVERITY, MESSAGE );
+     This is the method called by `log_error' in this node, above.  It
+     prints
+
+     <time>: <message>
+
+     to the associated file handle, where <time> is the output of
+     `localtime' in this node, evaluated in a scalar context.
+
+     Additionally, if the object has a TRACE attribute that is at least as
+     large as the error severity, this method will print a trace of where
+     the error occurred:
+
+     <spaces>: From <subroutine1>, at <filename1>:<line1> <spaces>: From
+     <subroutine2>, at <filename2>:<line2>
+
+     where <spaces> is the number of spaces needed to make all the colons
+     line up.
+
+CONSTRUCTORS
+============
+
+   The following erorr logging classes are provided by the module:
+
+my $logger = new Log::ErrLogger( [parameter-hash] );
+     Creates a new error logging object that uses the default `log' in
+     this node given above.  The parameters that are understood are
+
+    SENSITIVITY
+          The sensitivity of the object.  Defaults to INFORMATIONAL or, in
+          the perl debugger, DEBUGGING.
+
+    TRACE
+          Events that are at least as severe as the TRACE value will have
+          their call stack printed.
+
+my $logger = new Log::ErrLogger::File( [parameter-hash] );
+     Creates an error logging object that logs events to a file.  In
+     addition to the parameters that the Log::ErrLogger constructor takes,
+     it also takes
+
+    FILE
+          Name of the file that in which to log events.  Defaults to
+          /tmp/<program-base-name>.<pid>.err.  See the `set_file' in this
+          node method, below, for details.
+
+     Log::ErrLogger::File objects also provides the following methods:
+
+    my $filename = $filelogger->filename();
+          Returns the name of the file to which events are logger.
+
+    my $old_filename = $filelogger->set_file( $new_filename [, mode [, perms]])
+          Opens the given file for output and sets its FILEHANDLE to that
+          file.  An ERROR event is generated if the file could not be
+          opened.
+
+          Note that the file is opened by putting a ">" at the beginning
+          and creating a new IO::File object.  This means that if the
+          filename given already begins with a ">", the file will be
+          opened for appending.
+
+          If the file already exists, it is renamed by appending ".bak" to
+          it.  A WARNING event is generated if the file could not be
+          backed up.
+
+          Returns the old filename that errors used to be logged to.
+
+my $logger = new Log::ErrLogger::Mail( [parameter-hash] );
+     Log events by sending email to interested parties. In addition to the
+     parameters that the Log::ErrLogger constructor takes, it also takes
+
+    HEADERS
+          A reference to a hash containing the headers of the e-mail, such
+          as To and Subject.
+
+     If no sufficiently severe events occur, no email is sent.  (In other
+     words, you will not get a blank e-mail.)
+
+my $logger = new Log::ErrLogger::Sub( [parameter-hash] );
+     Calls a user specified subroutine every time a sufficiently severe
+     events occurs.  In addition to the parameters that the Log::ErrLogger
+     constructor takes, it also takes
+
+    SUB
+          A reference (regular or symbolic) to the subroutine to be
+          called.  The subroutine will receive two parameters - the event
+          message and the error severity.  This parameter MUST be supplied
+          to the constructor.
+
+          Note that, within this subroutine, STDERR is what you would want
+          it to be, even if the program has used tie to capture STDERR.
+          Thus, the subroutine does not have to worry that output to
+          STDERR will cause infinite recursion.
+
+
+File: pm.info,  Node: Log/LogLite,  Next: Log/Logger,  Prev: Log/ErrLogger,  Up: Module List
+
+The `Log::LogLite' class helps us create simple logs for our application.
+*************************************************************************
+
+NAME
+====
+
+   Log::LogLite - The `Log::LogLite' class helps us create simple logs for
+our application.
+
+SYNOPSIS
+========
+
+     use Log::LogLite;
+     my $LOG_DIRECTORY = "/where/ever/our/log/file/should/be";
+     my $ERROR_LOG_LEVEL = 6;
+     
+     # create new Log::LogLite object
+     my $log = new Log::LogLite($LOG_DIRECTORY."/error.log", $ERROR_LOG_LEVEL);
+
+     ...
+
+     # we had an error
+     $log->write("Could not open the file ".$file_name.": $!", 4);
+
+DESCRIPTION
+===========
+
+   In order to have a log we have first to create a `Log::LogLite' object.
+The c<Log::LogLite> object is created with a logging level. The default
+logging level is 5. After the `Log::LogLite' object is created, each call
+to the write method may write a new line in the log file. If the level of
+the message is lower or equal to the logging level, the message will be
+written to the log file. The format of the logging messages can be
+controled by changing the template, and by defining a default message.
+The log file uses the IO::LockedFile class and the Devel::DumpStack module.
+
+CONSTRUCTOR
+===========
+
+new ( FILEPATH [,LEVEL [,DEFAULT_MESSAGE ]] )
+     The constructor. FILEPATH is the path of the log file. LEVEL is the
+     defined logging level - the LEVEL data member. DEFAULT_MESSAGE will
+     define the DEFAULT_MESSAGE data member - a message that will be added
+     to the message of each entry in the log (according to the TEMPLATE
+     data member, see below).
+
+     The levels can be any levels that the user chooses to use. There are,
+     though, recommended levels:       0  the application is unusable
+     1  the application is going to be unusable       2  critical
+     conditions       3  error conditions       4  warning conditions
+     5  normal but significant condition       6  informational       7+
+     debug-level messages
+
+     The default value of LEVEL is 5.  The default value of
+     DEFAULT_MESSAGE is "".  Returns the new object.
+
+METHODS
+=======
+
+write( MESSAGE [, LEVEL ] )
+     If LEVEL is less or equal to the LEVEL data member, or if LEVEL is
+     undefined, the string in MESSAGE will be written to the log file.
+     Does not return anything.
+
+level( [ LEVEL ] )
+     Access method to the LEVEL data member. If LEVEL is defined, the
+     LEVEL data member will get its value.  Returns the value of the LEVEL
+     data member.
+
+default_message( [ MESSAGE ] )
+     Access method to the DEFAULT_MESSAGE data member. If MESSAGE is
+     defined, the DEFAULT_MESSAGE data member will get its value.  Returns
+     the value of the DEFAULT_MESSAGE data member.
+
+log_line_numbers( [ BOOLEAN ] )
+     If this flag is set to true, the <called_by> string will hold the file
+     that calls the subroutine and the line where the call is issued. The
+     default value is zero.
+
+template( [ TEMPLATE ] )
+     Access method to the TEMPLATE data member. The TEMPLATE data member
+     is a string that defines how the log entries will look like. The
+     default TEMPLATE is:
+
+     '[<date>] <<level>> <called_by><default_message><message>'
+
+     Where:
+
+          <date>           will be replaced by a string that represent
+                            the date. For example: 09/01/2000 17:00:13
+          <level>          will be replaced by the level of the entry.
+          <called_by>       will be replaced by a call trace string. For
+                            example:
+                            CGIDaemon::listen > MyCGIDaemon::accepted
+          <default_message> will be replaced by the value of the
+                            DEFAULT_MESSAGE data member.
+          <message>         will be replaced by the message string that
+                            is sent to the C<write> method.
+
+     Returns the value of the TEMPLATE data member.
+
+AUTHOR
+======
+
+   Rani Pinchuk, rani@cpan.org
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2001 EM-TECH (www.em-tech.net) & Rani Pinchuk.  All
+rights reserved.  This package is free software; you can redistribute it
+and/or modify it under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   `Devel::DumpStack(3)' in this node, `IO::LockedFile(3)' in this node
+
+

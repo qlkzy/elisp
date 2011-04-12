@@ -1,0 +1,1501 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Bio/Root/RootI,  Next: Bio/Root/Utilities,  Prev: Bio/Root/Object,  Up: Module List
+
+Abstract interface to root object code
+**************************************
+
+NAME
+====
+
+   Bio::Root::RootI - Abstract interface to root object code
+
+SYNOPSIS
+========
+
+     # any bioperl or bioperl compliant object is a RootI
+     # compliant object
+
+     $obj->throw("This is an exception");
+
+     eval {
+         $obj->throw("This is catching an exception");
+     };
+
+     if( $@ ) {
+         print "Caught exception";
+     } else {
+         print "no exception";
+     }
+
+DESCRIPTION
+===========
+
+   This is just a set of methods which do not assumme anything about the
+object they are on. The methods provide the ability to throw exceptions
+with nice stack traces.
+
+   This is what should be inherieted by all bioperl compliant interfaces,
+even if they are exotic XS/CORBA/Other perl systems.
+
+CONTACT
+=======
+
+   Functions originally from Steve Chervitz. Refactored by Ewan Birney.
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+new
+---
+
+     Purpose   : generic intantiation function can be overridden if
+                 special needs of a module cannot be done in _initialize
+     
+     =cut
+
+   sub new {     local($^W) = 0;     my ($caller, @args) = @_;
+
+   my $class = ref($caller) || $caller; #copied from Conway, OOPerl     my
+$self = bless({}, $class);
+
+     my %param = @args;
+     my($verbose) =  ( $param{'-VERBOSE'} || $param{'-verbose'} );
+
+     ## See "Comments" above regarding use of _rearrange().
+     $self->verbose($verbose);
+
+     return $self;
+     }
+
+   # for backwards compatibility sub _initialize {     my($self,@args) =
+@_;     return 1; }
+
+throw
+-----
+
+     Title   : throw
+     Usage   : $obj->throw("throwing exception message")
+     Function: Throws an exception, which, if not caught with an eval brace
+               will provide a nice stack trace to STDERR with the message
+     Returns : nothing
+     Args    : A string giving a descriptive error message
+
+warn
+----
+
+     Title   : warn
+     Usage   : $object->warn("Warning message");
+     Function: Places a warning. What happens now is down to the
+               verbosity of the object  (value of $obj->verbose)
+                verbosity 0 or not set => small warning
+                verbosity -1 => no warning
+                verbosity 1 => warning with stack trace
+                verbosity 2 => converts warnings into throw
+     Example :
+     Returns :
+     Args    :
+
+     =cut
+
+   sub warn{     my ($self,$string) = @_;
+
+     my $verbose = $self->verbose;
+
+     if( $verbose == 2 ) {
+     	$self->throw($string);
+     } elsif( $verbose == -1 ) {
+     	return;
+     } elsif( $verbose == 1 ) {
+     	my $out = "-------------------- WARNING ---------------------\n".
+     		"MSG: ".$string."\n";
+     	$out .= $self->stack_trace_dump;
+     
+     	print STDERR $out;
+     	return;
+     }
+
+     my $out = "-------------------- WARNING ---------------------\n".
+        "MSG: ".$string."\n".
+     	   "---------------------------------------------------\n";
+     print STDERR $out;
+     }
+
+     =head2 verbose
+
+     Title   : verbose
+     Usage   : $self->verbose(1)
+     Function: Sets verbose level for how ->warn behaves
+               -1 = no warning
+                0 = standard, small warning
+                1 = warning with stack trace
+                2 = warning becomes throw
+     Returns : nothing
+     Args    : -1,0,1 or 2
+
+stack_trace_dump
+----------------
+
+     Title   : stack_trace_dump
+     Usage   :
+     Function:
+     Example :
+     Returns :
+     Args    :
+
+stack_trace
+-----------
+
+     Title   : stack_trace
+     Usage   : @stack_array_ref= $self->stack_trace
+     Function: gives an array to a reference of arrays with stack trace info
+               each coming from the caller(stack_number) call
+     Returns : array containing a reference of arrays
+     Args    : none
+
+_rearrange
+----------
+
+     Usage     : $object->_rearrange( array_ref, list_of_arguments)
+     Purpose   : Rearranges named parameters to requested order.
+     Example   : $self->_rearrange([qw(SEQUENCE ID DESC)],@param);
+               : Where @param = (-sequence => $s,
+     	   :                 -id       => $i,
+     	   :	             -desc     => $d);
+     Returns   : @params - an array of parameters in the requested order.
+               : The above example would return ($s, $i, $d)
+     Argument  : $order : a reference to an array which describes the desired
+               :          order of the named parameters.
+               : @param : an array of parameters, either as a list (in
+               :          which case the function simply returns the list),
+               :          or as an associative array with hyphenated tags
+               :          (in which case the function sorts the values
+               :          according to @{$order} and returns that new array.)
+     	   :	      The tags can be upper, lower, or mixed case
+               :          but they must start with a hyphen (at least the
+               :          first one should be hyphenated.)
+     Source    : This function was taken from CGI.pm, written by Dr. Lincoln
+               : Stein, and adapted for use in Bio::Seq by Richard Resnick and
+               : then adapted for use in Bio::Root::Object.pm by Steve A. Chervitz.
+     Comments  : (SAC)
+               : This method may not be appropriate for method calls that are
+               : within in an inner loop if efficiency is a concern.
+               :
+               : Parameters can be specified using any of these formats:
+               :  @param = (-name=>'me', -color=>'blue');
+               :  @param = (-NAME=>'me', -COLOR=>'blue');
+               :  @param = (-Name=>'me', -Color=>'blue');
+               :  @param = ('me', 'blue');
+               : A leading hyphenated argument is used by this function to
+               : indicate that named parameters are being used.
+               : Therefore, the ('me', 'blue') list will be returned as-is.
+               :
+     	   : Note that Perl will confuse unquoted, hyphenated tags as
+               : function calls if there is a function of the same name
+               : in the current namespace:
+               :    -name => 'foo' is interpreted as -&name => 'foo'
+     	   :
+               : For ultimate safety, put single quotes around the tag:
+     	   :    ('-name'=>'me', '-color' =>'blue');
+               : This can be a bit cumbersome and I find not as readable
+               : as using all uppercase, which is also fairly safe:
+     	   :    (-NAME=>'me', -COLOR =>'blue');
+     	   :
+               : Personal note (SAC): I have found all uppercase tags to
+               : be more managable: it involves less single-quoting,
+               : the code is more readable, and there are no method naming conlicts.
+               : Regardless of the style, it greatly helps to line
+     	   : the parameters up vertically for long/complex lists.
+
+   See Also   : `_initialize' in this node()
+
+_register_for_cleanup
+---------------------
+
+     Title   : _register_for_cleanup
+     Usage   : -- internal --
+     Function: Register a method to be called at DESTROY time. This is useful
+               and sometimes essential in the case of multiple inheritance for
+               classes coming second in the sequence of inheritance.
+     Returns :
+     Args    : a reference to a method
+
+
+File: pm.info,  Node: Bio/Root/Utilities,  Next: Bio/Root/Vector,  Prev: Bio/Root/RootI,  Up: Module List
+
+General-purpose utility module
+******************************
+
+NAME
+====
+
+   Bio::Root::Utilities - General-purpose utility module
+
+SYNOPSIS
+========
+
+Object Creation
+---------------
+
+     use Bio::Root::Utilities qw(:obj);
+
+   There is no need to create a new Bio::Root::Utilities.pm object when
+the `:obj' tag is used. This tag will import the static $Util object
+created by Bio::Root::Utilities.pm into your name space. This saves you
+from having to call `new Bio::Root::Utilities'.
+
+   You are free to not use the :obj tag and create the object as you like,
+but a Bio::Root::Utilities object is not configurable; any given script
+only needs a single copy.
+
+     $date_stamp = $Util->date_format('yyy-mm-dd');
+
+     $clean = $Util->untaint($dirty);
+
+     $Util->mail_authority("Something you should know about...");
+
+     ...and other methods. See below.
+
+INSTALLATION
+============
+
+   This module is included with the central Bioperl distribution:
+
+     http://bio.perl.org/Core/Latest
+     ftp://bio.perl.org/pub/DIST
+
+   Follow the installation instructions included in the README file.
+
+DESCRIPTION
+===========
+
+   Provides general-purpose utilities of potential interest to any Perl
+script.  Scripts and modules are expected to use the static $Util object
+exported by this package with the `:obj' tag.
+
+DEPENDENCIES
+============
+
+   *Bio::Root::Utilities.pm* inherits from *Bio::Root::Object.pm*.  It
+also relies on the GNU gzip program for file compression/uncompression.
+
+SEE ALSO
+========
+
+     Bio::Root::Object.pm       - Core object
+     Bio::Root::Global.pm       - Manages global variables/constants
+
+     http://bio.perl.org/Projects/modules.html  - Online module documentation
+     http://bio.perl.org/                       - Bioperl Project Homepage
+
+     FileHandle.pm (included in the Perl distribution or CPAN).
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules.  Send your comments and suggestions preferably to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     bioperl-l@bioperl.org             - General discussion
+     http://bioperl.org/MailList.shtml - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution. Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR
+======
+
+   Steve A. Chervitz, sac@genome.stanford.edu
+
+   See the `FEEDBACK' in this node section for where to send bug reports
+and comments.
+
+VERSION
+=======
+
+   Bio::Root::Utilities.pm, 0.042
+
+ACKNOWLEDGEMENTS
+================
+
+   This module was developed under the auspices of the Saccharomyces Genome
+Database:     http://genome-www.stanford.edu/Saccharomyces
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997-98 Steve A. Chervitz. All Rights Reserved.  This
+module is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+APPENDIX
+========
+
+   Methods beginning with a leading underscore are considered private and
+are intended for internal use by this module. They are not considered part
+of the public interface and are described here for documentation purposes
+only.
+
+date_format
+-----------
+
+     Title     : date_format
+     Usage     : $Util->date_format( [FMT], [DATE])
+     Purpose   : -- Get a string containing the formated date or time
+               :    taken when this routine is invoked.
+               : -- Provides a way to avoid using `date`.
+     	   : -- Provides an interface to localtime().
+               : -- Interconverts some date formats.
+               :
+               : (For additional functionality, use Date::Manip or
+               :  Date::DateCalc available from CPAN).
+     Example   : $Util->date_format();
+               : $date = $Util->date_format('yyyy-mmm-dd', '11/22/92');
+     Returns   : String (unless 'list' is provided as argument, see below)
+               :
+               :   'yyyy-mm-dd'  = 1996-05-03    # default format.
+               :   'yyyy-dd-mm'  = 1996-03-05
+               :   'yyyy-mmm-dd' = 1996-May-03
+               :   'd-m-y'       = 3-May-1996
+               :   'd m y'       = 3 May 1996
+               :   'dmy'         = 3may96
+               :   'mdy'         = May 3, 1996
+               :   'ymd'         = 96may3
+               :   'md'          = may3
+               :   'year'        = 1996
+               :   'hms'         = 23:01:59  # 'hms' can be tacked on to any of the above options
+               :                             # to add the time stamp: eg 'dmyhms'
+               :   'full' | 'unix' = UNIX-style date: Tue May  5 22:00:00 1998
+               :   'list'          = the contents of localtime(time) in an array.
+     Argument  : (all are optional)
+               : FMT  = yyyy-mm-dd | yyyy-dd-mm | yyyy-mmm-dd |
+               :        mdy | ymd | md | d-m-y | hms | hm
+               :        ('hms' may be appended to any of these to
+     	   :        add a time stamp)
+               :
+               : DATE = String containing date to be converted.
+               :        Acceptable input formats:
+               :           12/1/97 (for 1 December 1997)
+               :           1997-12-01
+               :           1997-Dec-01
+     Throws    :
+     Comments  : Relies on the $BASE_YEAR constant exported by Bio:Root::Global.pm.
+               :
+               : If you don't care about formatting or using backticks, you can
+               : always use: $date = `date`;
+               :
+               : For more features, use Date::Manip.pm, (which I should
+               : probably switch to...)
+
+   See Also   : `file_date' in this node(), `month2num' in this node()
+
+month2num
+---------
+
+     Title      : month2num
+     Purpose    : Converts a string containing a name of a month to integer
+                : representing the number of the month in the year.
+     Example    : $Util->month2num("march");  # returns 3
+     Argument   : The string argument must contain at least the first
+                : three characters of the month's name. Case insensitive.
+     Throws     : Exception if the conversion fails.
+
+num2month
+---------
+
+     Title   : num2month
+     Purpose : Does the opposite of month2num.
+             : Converts a number into a string containing a name of a month.
+     Example : $Util->num2month(3);  # returns 'Mar'
+     Throws  : Exception if supplied number is out of range.
+
+compress
+--------
+
+     Title     : compress
+     Usage     : $Util->compress(filename, [tmp]);
+     Purpose   : Compress a file to conserve disk space.
+     Example   : $Util->compress("/usr/people/me/data.txt");
+     Returns   : String (name of compressed file, full path).
+     Argument  : filename = String (name of file to be compressed, full path).
+               :            If the supplied filename ends with '.gz' or '.Z',
+               :            that extension will be removed before attempting to compress.
+               : tmp = boolean,
+               :    If true, (or if user is not the owner of the file)
+               :         the file is compressed to a tmp file
+               :    If false, file is clobbered with the compressed version.
+     Throws    : Exception if file cannot be compressed
+               : If user is not owner of the file, generates a warning
+               :   and compresses to a tmp file.
+               :   To avoid this warning, use the -o file test operator
+               :   and call this function with a true second argument.
+     Comments  : Attempts to compress using gzip (default compression level).
+               : If that fails, will attempt to use compress.
+               : In some situations, the full path to the gzip executable
+               : may be required. This can be specified with the $GNU_PATH
+               : package global variable. When installed, $GNU_PATH is an
+               : empty string.
+
+   See Also   : `uncompress' in this node()
+
+uncompress
+----------
+
+     Title     : uncompress
+     Usage     : $Util->uncompress(filename, [tmp]);
+     Purpose   : Uncompress a file to conserve disk space.
+     Example   : $Util->uncompress("/usr/people/me/data.txt.gz");
+     Returns   : String (name of uncompressed file, full path).
+     Argument  : filename = String (name of file to be uncompressed, full path).
+               :           If the supplied filename does not end with '.gz' or '.Z'
+               :           a '.gz' will be appended before attempting to uncompress.
+               : tmp = boolean,
+               :    If true, (or if user is not the owner of the file)
+               :         the file is uncompressed to a tmp file
+               :    If false, file is clobbered with the uncompressed version.
+     Throws    : Exception if file cannot be uncompressed
+               : If user is not owner of the file, generates a warning
+               :   and uncompresses to a tmp file.
+               :   To avoid this warning, use the -o file test operator
+               :   and call this function with a true second argument.
+     Comments  : Attempts to uncompress using gunzip.
+               : If that fails, will use uncompress.
+               : In some situations, the full path to the gzip executable
+               : may be required. This can be specified with the $GNU_PATH
+               : package global variable. When installed, $GNU_PATH is an
+               : empty string.
+
+   See Also   : `compress' in this node()
+
+file_date
+---------
+
+     Title    : file_date
+     Usage    : $Util->file_date( filename [,date_format])
+     Purpose  : Obtains the date of a given file.
+              : Provides flexible formatting via date_format().
+     Returns  : String = date of the file as: yyyy-mm-dd (e.g., 1997-10-15)
+     Argument : filename = string, full path name for file
+              : date_format = string, desired format for date (see date_format()).
+              :               Default = yyyy-mm-dd
+     Thows    : Exception if no file is provided or does not exist.
+     Comments : Uses the mtime field as obtained by stat().
+
+untaint
+-------
+
+     Title   : untaint
+     Purpose : To remove nasty shell characters from untrusted data
+             : and allow a script to run with the -T switch.
+             : Potentially dangerous shell meta characters:  &;`'\"|*?!~<>^()[]{}$\n\r
+             : Accept only the first block of contiguous characters:
+             :  Default allowed chars = "-\w.', ()"
+             :  If $relax is true  = "-\w.', ()\/=%:^<>*"
+     Usage   : $Util->untaint($value, $relax)
+     Returns : String containing the untained data.
+     Argument: $value = string
+             : $relax = boolean
+     Comments:
+         This general untaint() function may not be appropriate for every situation.
+         To allow only a more restricted subset of special characters
+         (for example, untainting a regular expression), then using a custom
+         untainting mechanism would permit more control.
+
+     Note that special trusted vars (like $0) require untainting.
+
+mean_stdev
+----------
+
+     Title    : mean_stdev
+     Usage    : ($mean, $stdev) = $Util->mean_stdev( @data )
+     Purpose  : Calculates the mean and standard deviation given a list of numbers.
+     Returns  : 2-element list (mean, stdev)
+     Argument : list of numbers (ints or floats)
+     Thows    : n/a
+
+count_files
+-----------
+
+     Title    : count_files
+     Purpose  : Counts the number of files/directories within a given directory.
+              : Also reports the number of text and binary files in the dir
+              : as well as names of these files and directories.
+     Usage    : count_files(\%data)
+              :   $data{-DIR} is the directory to be analyzed. Default is ./
+              :   $data{-PRINT} = 0|1; if 1, prints results to STDOUT, (default=0).
+     Argument : Hash reference (empty)
+     Returns  : n/a;
+              : Modifies the hash ref passed in as the sole argument.
+              :  $$href{-TOTAL}            scalar
+              :  $$href{-NUM_TEXT_FILES}   scalar
+              :  $$href{-NUM_BINARY_FILES} scalar
+              :  $$href{-NUM_DIRS}         scalar
+              :  $$href{-T_FILE_NAMES}     array ref
+              :  $$href{-B_FILE_NAMES}     array ref
+              :  $$href{-DIRNAMES}         array ref
+
+create_filehandle
+-----------------
+
+     Usage     : $object->create_filehandle(<named parameters>);
+     Purpose   : Create a FileHandle object from a file or STDIN.
+               : Mainly used as a helper method by read() and get_newline().
+     Example   : $data = $object->create_filehandle(-FILE =>'usr/people/me/data.txt')
+     Argument  : Named parameters (case-insensitive):
+               :  (all optional)
+               :    -CLIENT  => object reference for the object submitting
+               :                the request. This facilitates use by
+               :                Bio::Root::IOManager::read(). Default = $Util.
+               :    -FILE    => string (full path to file) or a reference
+               :                to a FileHandle object or typeglob. This is an
+               :                optional parameter (if not defined, STDIN is used).
+     Returns   : Reference to a FileHandle object.
+     Throws    : Exception if cannot open a supplied file or if supplied with a
+               : reference that is not a FileHandle ref.
+     Comments  : If given a FileHandle reference, this method simply returns it.
+               : This method assumes the user wants to read ascii data. So, if
+               : the file is binary, it will be treated as a compressed (gzipped)
+               : file and access it using gzip -ce. The problem here is that not
+               : all binary files are necessarily compressed. Therefore,
+               : this method should probably have a -mode parameter to
+               : specify ascii or binary.
+
+   See Also :  `get_newline' in this node(), `Bio::Root::IOManager::read'
+in this node(),
+
+get_newline
+-----------
+
+     Usage     : $object->get_newline(<named parameters>);
+     Purpose   : Determine the character(s) used for newlines in a given file or
+               : input stream. Delegates to Bio::Root::Utilities::get_newline()
+     Example   : $data = $object->get_newline(-CLIENT => $anObj,
+               :                                   -FILE =>'usr/people/me/data.txt')
+     Argument  : Same arguemnts as for create_filehandle().
+     Returns   : Reference to a FileHandle object.
+     Throws    : Propogates and exceptions thrown by Bio::Root::Utilities::get_newline().
+
+   See Also : `taste_file' in this node(), `create_filehandle' in this
+node()
+
+taste_file
+----------
+
+     Usage     : $object->taste_file( <FileHandle> );
+               : Mainly a utility method for get_newline().
+     Purpose   : Sample a filehandle to determine the character(s) used for a newline.
+     Example   : $char = $Util->taste_file($FH)
+     Argument  : Reference to a FileHandle object.
+     Returns   : String containing an octal represenation of the newline character string.
+               :   Unix = "\012"  ("\n")
+               :   Win32 = "\012\015" ("\r\n")
+               :   Mac = "\015"  ("\r")
+     Throws    : Exception if no input is read within $TIMEOUT_SECS seconds.
+               : Exception if argument is not FileHandle object reference.
+               : Warning if cannot determine neewline char(s).
+     Comments  : Based on code submitted by Vicki Brown (vlb@deltagen.com).
+
+   See Also : `get_newline' in this node()
+
+mail_authority
+--------------
+
+     Title    : mail_authority
+     Usage    : $Util->mail_authority( $message )
+     Purpose  : Syntactic sugar to send email to $Bio::Root::Global::AUTHORITY
+
+   See Also  : `send_mail' in this node()
+
+send_mail
+---------
+
+     Title    : send_mail
+     Usage    : $Util->send_mail( named_parameters )
+     Purpose  : Provides an interface to /usr/lib/sendmail
+     Returns  : n/a
+     Argument : Named parameters:  (case-insensitive)
+              :  -TO   => e-mail address to send to
+              :  -SUBJ => subject for message  (optional)
+              :  -MSG  => message to be sent   (optional)
+              :  -CC   => cc: e-mail address   (optional)
+     Thows    : Exception if TO: address appears bad or is missing
+     Comments : Based on  TomC's tip at:
+              :   http://www.perl.com/CPAN-local/doc/FMTEYEWTK/safe_shellings
+              :
+              : Using default 'From:' information.
+              :   sendmail options used:
+              :      -t: ignore the address given on the command line and
+              :          get To:address from the e-mail header.
+              :     -oi: prevents send_mail from ending the message if it
+              :          finds a period at the start of a line.
+
+   See Also  : `mail_authority' in this node()
+
+yes_reply
+---------
+
+     Title   : yes_reply()
+     Usage   : $Util->yes_reply( [query_string]);
+     Purpose : To test an STDIN input value for affirmation.
+     Example : print +( $Util->yes_reply('Are you ok') ? "great!\n" : "sorry.\n" );
+             : $Util->yes_reply('Continue') || die;
+     Returns : Boolean, true (1) if input string begins with 'y' or 'Y'
+     Argument: query_string = string to be used to prompt user (optional)
+             : If not provided, 'Yes or no' will be used.
+             : Question mark is automatically appended.
+
+request_data
+------------
+
+     Title   : request_data()
+     Usage   : $Util->request_data( [value_name]);
+     Purpose : To request data from a user to be entered via keyboard (STDIN).
+     Example : $name = $Util->request_data('Name');
+             : # User will see: % Enter Name:
+     Returns : String, (data entered from keyboard, sans terminal newline.)
+     Argument: value_name = string to be used to prompt user.
+             : If not provided, 'data' will be used, (not very helpful).
+             : Question mark is automatically appended.
+
+verify_version
+--------------
+
+     Purpose : Checks the version of Perl used to invoke the script.
+             : Aborts program if version is less than the given argument.
+     Usage   : verify_version('5.000')
+
+
+File: pm.info,  Node: Bio/Root/Vector,  Next: Bio/Root/Xref,  Prev: Bio/Root/Utilities,  Up: Module List
+
+Interface for managing linked lists of Perl5 objects.
+*****************************************************
+
+NAME
+====
+
+   Bio::Root::Vector - Interface for managing linked lists of Perl5
+objects.
+
+SYNOPSIS
+========
+
+Object Creation
+---------------
+
+   *At present, Vector objects cannot be instantiated.* This package is
+currently designed to be inherited along with another class that provides
+a constructor (e.g., *Bio::Root::Object.pm*).  The Vector provides a set
+of methods that can then be used for managing sets of objects.
+
+   See `USAGE' in this node.
+
+INSTALLATION
+============
+
+   This module is included with the central Bioperl distribution:
+
+     http://bio.perl.org/Core/Latest
+     ftp://bio.perl.org/pub/DIST
+
+   Follow the installation instructions included in the README file.
+
+DESCRIPTION
+===========
+
+   Bio::Root::Vector.pm  provides an interface for creating and
+manipulating dynamic sets (linked lists) of Perl5 objects. This is an
+abstract class (ie., there is no constructor) and as such is expected to
+be inherited along with some other class (see note above).
+
+   Vectors are handy when, for example, an object may contain one or more
+other objects of a certain class. The container object knows only that is
+has at least one such object; the multiplex nature of the contained object
+is managed by the contained object via its Vector interface.  The methods
+for adding, removing, counting, listing, and sorting all objects are
+bundled together in Vector.pm.
+
+   Thus, the current Bio::Root::Vector class is somewhat of a cross
+between an interator and a composite design pattern. At present, a number
+of classes utilize Bio::Root::Vector's composite-like behavior to
+implement a composite pattern (Bio::SeqManager.pm, for example).  This is
+not necessarily ideal and is expected to change.
+
+USAGE
+=====
+
+   For a usage demo of Bio::Root::Vector.pm, see:
+
+     http://bio.perl.org/Core/Examples/Root_object/Vector
+
+DEPENDENCIES
+============
+
+   Bio::Root::Vector.pm does not directly inherit from
+*Bio::Root::Object.pm* but creates an manager object which does.
+
+BUGS/FEATURES
+=============
+
+   By default, all Vectors are doubly-linked lists. This relieves one from
+the burden of worrying about whether a given Vector is single- or
+doubly-linked.  However, when generating lots of Vectors or extremely
+large vectors, memory becomes an issue. In particular, signaling the GC to
+free the memory for an object when you want to remove it. *Until this
+memory issue is resolved, the use of Vector.pm is not recommended for
+large projects.*
+
+   Although it is not required, all objects within a vector are expected
+to derive from the same class (package). Support for heterogeneous Vectors
+has not been explicitly added (but they should work fine, as long as you
+know what you're doing).
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules.  Send your comments and suggestions preferably to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     bioperl-l@bioperl.org             - General discussion
+     http://bioperl.org/MailList.shtml - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution. Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR
+======
+
+   Steve A. Chervitz, sac@genome.stanford.edu
+
+   See the `FEEDBACK' in this node section for where to send bug reports
+and comments.
+
+VERSION
+=======
+
+   Bio::Root::Vector.pm, 0.04
+
+TODO
+====
+
+   * (Maybe) create an container class version of this module
+
+     to permit Vectors to be instantiated. Thus, instead of inherited from
+     both Object.pm and Vector.pm, you could create a Vector.pm object.
+
+   * Improve documentation.
+
+SEE ALSO
+========
+
+     Bio::Root::Object.pm    - Core object
+     Bio::Root::Err.pm       - Error/Exception object
+     Bio::Root::Global.pm    - Manages global variables/constants
+
+     http://bio.perl.org/Projects/modules.html  - Online module documentation
+     http://bio.perl.org/                       - Bioperl Project Homepage
+
+ACKNOWLEDGEMENTS
+================
+
+   This module was developed under the auspices of the Saccharomyces Genome
+Database:     http://genome-www.stanford.edu/Saccharomyces
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1996-98 Steve A. Chervitz. All Rights Reserved.  This
+module is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+APPENDIX
+========
+
+   Methods beginning with a leading underscore are considered private and
+are intended for internal use by this module. They are not considered part
+of the public interface and are described here for documentation purposes
+only.
+
+set_rank
+--------
+
+     Purpose  : To set an object's rank to an arbitrary numeric
+              : value to be used for sorting the objects of the Vector.
+     Usage    : $self->set_rank(-RANK    =>numeric_ranking_data,
+     	  :     	    -RANK_BY =>ranking_criterion_string);
+              : or without the named parameters as (rank, rank_by).
+     Throws   : warning (if rank is set without also setting RANK_BY)
+     Comments : It is redundant for every object to store RANK_BY data.
+              : For this reason, the RANK_BY data is stored with the master
+              : object associated with the vector.
+
+   See Also  : `rank' in this node(), `rank_by' in this node()
+
+clone_vector
+------------
+
+     Purpose  : Call this method to clone the whole vector.
+              : NOT calling this method will extract the vector element.
+     Usage    : $self->clone_vector();
+     Throws   : Exception if argument is not an object reference.
+     Comments : This method is usually called from within a module's
+              : _set_clone() method for modules that inherit from
+              : Bio::Root::Vector.pm.
+
+prev
+----
+
+     Purpose  : Returns the previous object in the Vector or undef
+              : if on first object.
+     Usage    : $self->prev
+
+next
+----
+
+     Purpose  : Returns the next object in the Vector or undef
+              : if on last object.
+     Usage    : $self->next
+
+first
+-----
+
+     Purpose  : Returns the first object in the Vector or $self
+              : if Vector size = 1.
+     Usage    : $self->first
+
+last
+----
+
+     Purpose  : Returns the last object in the Vector or
+              : $self if Vector size = 1.
+     Usage    : $self->last
+
+rank
+----
+
+     Purpose  : Returns the rank of the current object or 1
+              : if rank is not defined.
+     Usage    : $self->rank
+
+   See Also  : `set_rank' in this node()
+
+rank_by
+-------
+
+     Purpose  : Returns the ranking criterion or the string 'order of addition'
+              : if rankBy has not been explicitly set.
+     Usage    : $self->rank_by
+
+   See Also  : `set_rank' in this node()
+
+size
+----
+
+     Purpose  : Returns the number of objects currently in the Vector.
+     Usage    : $self->size
+
+master
+------
+
+     Purpose  : Returns the master object associated with the Vector.
+              : (should probably be a private method).
+     Usage    : $self->master
+
+is_first
+--------
+
+     Purpose  : Test whether the current object is the first in the Vector.
+     Usage    : $self->is_first
+
+is_last
+-------
+
+     Purpose  : Test whether the current object is the last in the Vector.
+     Usage    : $self->is_last
+
+get
+---
+
+     Purpose  : Retrives an object from the Vector given its name.
+              : Returns undef if the object cannot be found.
+     Usage    : $self->get(object_name)
+     Examples : $self->get($obj->name)
+
+   See Also  : `list' in this node()
+
+add
+---
+
+     Purpose  : Add an object to the end of a Vector.
+     Usage    : $self->add(object_reference)
+
+   See also  : `insert' in this node(), `remove' in this node()
+
+remove
+------
+
+     Purpose  : Remove the current object from the Vector.
+     Usage    : $self->remove([-RET=>'first'|'last'|'next'|'prev'], [-UPDATE => 0|1])
+     Returns  : The first, last, next, or previous object in the Vector
+              : depending on the value of the -RET parameter.
+              : Default = next.
+     Argument : Named parameters: (TAGS CAN BE ALL UPPER OR ALL LOWER CASE)
+              :    -RET    => string: 'first', 'last', 'prev' 'next'
+              :               THis indicates the object to be returned.
+              :    -UPDATE => boolean, if non-zero all objects in the vector
+              :               will be re-ranked.
+     Comments : The -UPDATE parameter should be set to true to force a re-updating
+              : of the rank data for each object. (default = 0, no update).
+
+   See Also  : `add' in this node(), `insert' in this node(), `shift' in
+this node(), `chop' in this node()
+
+remove_all
+----------
+
+     Purpose  : Remove all objects currently in the Vector.
+     Usage    : $self->remove_all
+
+   See Also  : `remove' in this node(), `shift' in this node(), `chop' in
+this node()
+
+shift
+-----
+
+     Purpose  : Remove the first object from the Vector.
+              : This is a wrapper for remove().
+     Usage    : $self->shift([-RET=>'first'|'last'|'next'|'prev'])
+     Returns  : The object returned by remove().
+
+   See Also  : `remove' in this node(), `chop' in this node()
+
+chop
+----
+
+     Purpose  : Remove the last object from the Vector.
+              : This is a wrapper for remove().
+     Usage    : $self->chop([-RET=>'first'|'last'|'next'|'prev'])
+     Returns  : The object returned by remove().
+
+   See Also  : `remove' in this node(), `shift' in this node()
+
+insert
+------
+
+     Purpose  : Insert a new object into the vector relative to the current object.
+     Usage    : $self->insert(object_ref, ['before'|'after'])
+     Examples : $self->insert($obj)  # Default insert after $self
+              : $self->insert($obj,'before')
+     Returns  : The new number of objects in the vector (int).
+     Throws   : exception if the first argument is not a reference.
+
+   See Also  : `add' in this node(), `remove' in this node()
+
+list
+----
+
+     Purpose  : Returns objects in the Vector as an array or array slice.
+     Usage    : $self->list([starting_object|'first'] [,ending_object|'last'])
+     Examples : $self->list
+              : $self->list('first',$self->prev)
+
+   See Also  : `get' in this node()
+
+sort
+----
+
+     Purpose  : Sort the objects in the Vector.
+     Usage    : $self->sort(['rank'|'name'], [reverse])
+     Returns  : The last object of the sorted Vector.
+     Argument : First argument can be 'name' or 'rank' to sort on
+              : the object's name or rank data member, respectively.
+              : If reverse is non-zero, sort will be in reverse order.
+     Example  : $self->sort()   #  Default sort by rank, not reverse.
+              : $self->sort('name','reverse')
+
+valid_any
+---------
+
+     Purpose  : Determine if at least one object in the Vector is valid.
+     Usage    : $self->valid_any
+     Status   : Deprecated.
+     Comments : A non-valid object should throw an exception that must be
+              : be caught an dealt with on the spot.
+
+   See Also  : *Bio::Root::Object::valid()*
+
+valid_all
+---------
+
+     Purpose  : Determine if all objects in the Vector are valid.
+     Usage    : $self->valid_all
+     Comments : A non-valid object should throw an exception that must be
+              : be caught an dealt with on the spot.
+
+   See Also  : *Bio::Root::Object::valid()*
+
+FOR DEVELOPERS ONLY
+===================
+
+Data Members
+------------
+
+   Information about the various data members of this module is provided
+for those wishing to modify or understand the code. Two things to bear in
+mind:
+
+  1. Do NOT rely on these in any code outside of this module.  All data
+     members are prefixed with an underscore to signify that they are
+     private.  Always use accessor methods. If the accessor doesn't exist
+     or is inadequate, create or modify an accessor (and let me know,
+     too!).
+
+  2. This documentation may be incomplete and out of date.  It is easy for
+     this documentation to become obsolete as this module is still
+     evolving.  Always double check this info and search for members not
+     described here.
+
+        Bio::Root::Vector.pm objects currently cannot be instantiated.
+Vector.pm must be inherited along with Bio::Root::Object.pm (or an object
+that provides a constructor).  Vector.pm defines the following fields:
+
+     FIELD          VALUE
+     ------------------------------------------------------------------------
+      _prev         Reference to the previous object in the Vector.
+
+     _next         Reference to the next object in the Vector.
+
+     _rank         Rank relative to other objects in the Vector.
+     	        Default rank = chronological order of addition to the Vector.
+
+     _master       A reference to an Bio::Root::Object that acts as a manager for
+      	        the given Vector. There is only one master per Vector.
+      	        A master object is only needed when the Vector size is >1.
+      	        The master object manages the following Vector data:
+
+     _first  - Reference to the first object in the Vector.
+     _last   - Reference to the last object in the Vector.
+     _size   - Total number of objects in the Vector.
+     _rankBy - Criteria used to rank the object.
+              Default: chronological order of addition.
+     _index  - Hash reference for quick access to any object
+              based on its name.
+     Bio::Root::Object{'_err'} - Holds any errors affecting the
+                          Vector as a whole.
+
+
+File: pm.info,  Node: Bio/Root/Xref,  Next: Bio/Search/Hit/Fasta,  Prev: Bio/Root/Vector,  Up: Module List
+
+A generic cross-reference object.
+*********************************
+
+NAME
+====
+
+   Bio::Root::Xref - A generic cross-reference object.
+
+   *WARNING: This module is still in the experimental phase and has not
+been tested.*
+
+SYNOPSIS
+========
+
+Object Creation
+---------------
+
+     use Bio::Root::Object;
+
+     $myObj->xref($object_ref);
+     
+     =head2 Object Manipulation
+     
+     Accessors
+     ---------------------------------------------------------------------
+     obj()         - Get the cross-referenced object.
+     desc()        - Description of the nature of the cross-reference.
+     set_desc()    - Set description.
+     type()        - Symmetric or assymetric.
+     
+     Methods
+     ---------------------------------------------------------------------
+     clear()       - remove all cross-references within the Xref object (not implemented).
+
+DESCRIPTION
+===========
+
+   An instance of *Bio::Root::Xref.pm* manages sets of objects not
+necessarily related by inheritance or composition, but by an arbitrary
+criterion defined by the client. Currently, Bio::Root::Xref inherits from
+both *Bio::Root::Object.pm* and *Bio::Root::Vector.pm*. An Xref object is
+an example of a heterogeneous Vector object since different objects in the
+vector need not all derive from the same base class.
+
+   The two objects involved in the cross-reference typically involve a
+symmetrical relationship in which each will have a Xref object relating it
+to the other object. This relationship is not necessarily transitive,
+however: if A is an xref of B and B is an xref of C, A is not necessarily
+an xref of C. Assymetric Xrefs are also possible.
+
+   The establishment of cross-references is managed by
+*Bio::Root::Object.pm*.  See the xref() method in that module.
+
+   *The API for this module is not complete since the module is under
+development. Caveat emptor.*
+
+SEE ALSO
+========
+
+     Bio::Root::Object.pm       - Core object
+     Bio::Root::Global.pm       - Manages global variables/constants
+
+     http://bio.perl.org/Projects/modules.html  - Online module documentation
+     http://bio.perl.org/                       - Bioperl Project Homepage
+     
+     =head1 FEEDBACK
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules.  Send your comments and suggestions preferably to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     bioperl-l@bioperl.org             - General discussion
+     http://bioperl.org/MailList.shtml - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution. Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR
+======
+
+   Steve A. Chervitz, sac@genome.stanford.edu
+
+   See the `FEEDBACK' in this node section for where to send bug reports
+and comments.
+
+VERSION
+=======
+
+   Bio::Root::Xref.pm, 0.01 pre-alpha
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997-8 Steve A. Chervitz. All Rights Reserved.  This
+module is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+TODO
+====
+
+   Update documentation to work with pod2html from Perl 5.004.
+
+DATA MEMBERS
+============
+
+     _obj   : The object being cross-referenced to the parent.
+     _type  : Symmetric or asymmetric
+     _desc  : Description associated with the cross-reference
+     
+     INHERITED DATA MEMBERS (from Bio::Root::Object)
+
+     _parent : The object receiving the cross-reference.
+     _name   : Descriptive nature of the cross-reference.
+
+
+File: pm.info,  Node: Bio/Search/Hit/Fasta,  Next: Bio/Search/Hit/HitI,  Prev: Bio/Root/Xref,  Up: Module List
+
+Hit object specific for Fasta-generated hits
+********************************************
+
+NAME
+====
+
+   Bio::Search::Hit::Fasta - Hit object specific for Fasta-generated hits
+
+SYNOPSIS
+========
+
+     These objects are generated automatically by Bio::Search::Processor::Fasta,
+     and shouldn't be used directly.
+
+DESCRIPTION
+===========
+
+     Bio::Search::Hit::* objects are data structures that contain information
+     about specific hits obtained during a library search.  Some information will
+     be algorithm-specific, but others will be generally defined, such as the
+     ability to obtain alignment objects corresponding to each hit.
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules. Send your comments and suggestions preferably  to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     bioperl-l@bioperl.org             - General discussion
+     bioperl-guts-l@bioperl.org        - Automated bug and CVS messages
+     http://bioperl.org/MailList.shtml - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.   Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR - Aaron Mackey
+=====================
+
+   Email amackey@virginia.edu
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+
+File: pm.info,  Node: Bio/Search/Hit/HitI,  Next: Bio/Search/Processor,  Prev: Bio/Search/Hit/Fasta,  Up: Module List
+
+Abstract interface for Hit objects
+**********************************
+
+NAME
+====
+
+   Bio::Search::Hit::HitI - Abstract interface for Hit objects
+
+SYNOPSIS
+========
+
+   This is a abstract class meant to define an interface, and nothing more.
+
+DESCRIPTION
+===========
+
+     Bio::Search::Hit::* objects are data structures that contain information
+     about specific hits obtained during a library search.  Some information will
+     be algorithm-specific, but others will be generally defined.
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules. Send your comments and suggestions preferably  to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     bioperl-l@bioperl.org             - General discussion
+     bioperl-guts-l@bioperl.org        - Automated bug and CVS messages
+     http://bioperl.org/MailList.shtml - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.   Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR - Aaron Mackey
+=====================
+
+   Email amackey@virginia.edu
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+get_hit_id
+----------
+
+     Title   : get_hit_id
+     Usage   : $id = $hit->get_hit_id();
+     Function: Used to obtain the id of the matched entity.
+     Returns : a scalar string
+     Args    : <none>
+
+get_hit_desc
+------------
+
+     Title   : get_hit_desc
+     Usage   : $desc = $hit->get_hit_desc();
+     Function: Used to obtain the description of a matched entity
+     Returns : a scalar string
+     Args    : <none>
+
+get_algorithm
+-------------
+
+     Title   : get_algorithm
+     Usage   : $which = $hit->get_algorithm();
+     Function: Used to obtain the algorithm specification used to obtain the hit
+     Returns : a scalar string
+     Args    : <none>
+
+get_raw_score
+-------------
+
+     Title   : get_raw_score
+     Usage   : $score = $hit->get_raw_score();
+     Function: Used to obtain the "raw score" generated by the algorithm.  What
+               this score is exactly will vary from algorithm to algorithm,
+               returning undef if unavailable.
+     Returns : a scalar value
+     Args    : <none>
+
+get_expectation_value
+---------------------
+
+     Title   : get_expectation_value
+     Usage   : $evalue = $hit->get_expectation_value();
+     Function: Used to obtain the E() value of a hit, i.e. the probability that
+               this particular hit was obtained purely by random chance.  If
+               information is not available (nor calculatable from other
+               information sources), return undef.
+     Returns : a scalar value or undef if unavailable
+     Args    : <none>
+
+get_evalue
+----------
+
+     Title   : get_evalue
+     Usage   : $evalue = $hit->get_evalue();
+     Function: same as get_expectation_value (just an alias)
+     Returns : see above
+     Args    : <none>
+
+get_alignments
+--------------
+
+     Title   : get_alignments
+     Usage   : @aligns = $hit->get_alignments()
+     Function: Used to obtain an array of Bio::Alignment objects corresponding to
+               the Hit.
+     Returns : an array of Alignment objects, if more than one Alignments exist and
+               called in wantarray context.  In scalar context will return a
+               reference to an array of Alignment objects, if more than one
+               Alignment objects exist, otherwise will return the unique
+               Alignment object.  If no Alignment objects exist, returns undef
+     Args    :
+
+
+File: pm.info,  Node: Bio/Search/Processor,  Next: Bio/Search/Processor/Fasta,  Prev: Bio/Search/Hit/HitI,  Up: Module List
+
+DESCRIPTION of Object
+*********************
+
+NAME
+====
+
+   Bio::Search::Processor - DESCRIPTION of Object
+
+SYNOPSIS
+========
+
+   Give standard usage here
+
+DESCRIPTION
+===========
+
+   Describe the object here
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules. Send your comments and suggestions preferably  to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     bioperl-l@bioperl.org             - General discussion
+     bioperl-guts-l@bioperl.org        - Automated bug and CVS messages
+     http://bioperl.org/MailList.shtml - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.   Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR - Aaron Mackey
+=====================
+
+   Email amackey@virginia.edu
+
+   Describe contact details here
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+new
+---
+
+     Title   : new
+     Usage   : $proc = new Bio::Search::Processor -file      => $filename,
+                                                  -algorithm => 'Algorithm' ;
+     Function: Used to specify and initialize a data processor of search
+               algorithm results.
+     Returns : A processor specific to the algorithm type, if it exists.
+     Args    : -file => filename
+               -algorithm => algorithm specifier
+               -fh => filehandle to attach to (file or fh required)
+
+

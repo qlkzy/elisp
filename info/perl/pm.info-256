@@ -1,0 +1,1599 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Net/Jabber/Query,  Next: Net/Jabber/Query/Agent,  Prev: Net/Jabber/Protocol,  Up: Module List
+
+Jabber Query Library
+********************
+
+NAME
+====
+
+   Net::Jabber::Query - Jabber Query Library
+
+SYNOPSIS
+========
+
+     Net::Jabber::Query is a companion to the Net::Jabber::IQ module. It
+     provides the user a simple interface to set and retrieve all
+     parts of a Jabber IQ Query.
+
+DESCRIPTION
+===========
+
+     Net::Jabber::Query differs from the other Net::Jabber::* modules in that
+     the XMLNS of the query is split out into more submodules under
+     Query.  For specifics on each module please view the documentation
+     for each Net::Jabber::Query::* module.  The available modules are:
+
+     Net::Jabber::Query::Agent      - Agent Namespace
+     Net::Jabber::Query::Agents     - Supported Agents list from server
+     Net::Jabber::Query::Auth       - Simple Client Authentication
+     Net::Jabber::Query::AutoUpdate - Auto-Update for clients
+     Net::Jabber::Query::Filter     - Messaging Filter
+     Net::Jabber::Query::Fneg       - Feature Negotiation
+     Net::Jabber::Query::Oob        - Out of Bandwidth File Transfers
+     Net::Jabber::Query::Register   - Registration requests
+     Net::Jabber::Query::Roster     - Buddy List management
+     Net::Jabber::Query::Search     - Searching User Directories
+     Net::Jabber::Query::Time       - Client Time
+     Net::Jabber::Query::Version    - Client Version
+
+     Each of these modules provide Net::Jabber::Query with the functions
+     to access the data.  By using delegates and the AUTOLOAD function
+     the functions for each namespace is used when that namespace is
+     active.
+
+     To access a Query object you must create an IQ object and use the
+     access functions there to get to the Query.  To initialize the IQ with
+     a Jabber <iq/> you must pass it the XML::Parser Tree array from the
+     Net::Jabber::Client module.  In the callback function for the iq
+     you can access the query tag by doing the following:
+
+     use Net::Jabber;
+
+     sub iqCB {
+       my $iq = new Net::Jabber::IQ(@_);
+       my $query = $mesage->GetQuery();
+       .
+       .
+       .
+     }
+
+     You now have access to all of the retrieval functions available.
+
+     To create a new iq to send to the server:
+
+     use Net::Jabber;
+
+     my $iq = new Net::Jabber::IQ();
+     $query = $iq->NewQuery("jabber:iq:register");
+
+     Now you can call the creation functions for the Query as defined in the
+     proper namespaces.  See below for the general <query/> functions, and
+     in each query module for those functions.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     $xmlns     = $IQ->GetXMLNS();
+
+     $str       = $IQ->GetXML();
+     @iq        = $IQ->GetTree();
+
+Creation functions
+------------------
+
+     $Query->SetXMLNS("jabber:iq:roster");
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetXMLNS() - returns a string with the namespace of the query that
+                  the <iq/> contains.
+
+     GetXML() - returns the XML string that represents the <iq/>. This
+                is used by the Send() function in Client.pm to send
+                this object as a Jabber IQ.
+
+     GetTree() - returns an array that contains the <iq/> tag in XML::Parser
+                 Tree format.
+
+Creation functions
+------------------
+
+     SetXMLNS(string) - sets the xmlns of the <query/> to the string.
+
+CUSTOM Query MODULES
+====================
+
+     Part of the flexability of this module is that you can write your own
+     module to handle a new namespace if you so choose.  The SetDelegates
+     function is your way to register the xmlns and which module will
+     provide the missing access functions.
+
+     To register your namespace and module, you can either create an IQ
+     object and register it once, or you can use the SetDelegates
+     function in Client.pm to do it for you:
+
+     my $Client = new Net::Jabber::Client();
+     $Client->AddDelegate(namespace=>"blah:blah",
+     			 parent=>"Net::Jabber::Query",
+     			 delegate=>"Blah::Blah");
+     
+       or
+
+     my $Transport = new Net::Jabber::Transport();
+     $Transport->AddDelegate(namespace=>"blah:blah",
+     			    parent=>"Net::Jabber::Query",
+     			    delegate=>"Blah::Blah");
+
+     Once you have the delegate registered you need to define the access
+     functions.  Here is a an example module:
+
+     package Blah::Blah;
+
+     sub new {
+       my $proto = shift;
+       my $class = ref($proto) || $proto;
+       my $self = { };
+       $self->{VERSION} = $VERSION;
+       bless($self, $proto);
+       return $self;
+     }
+
+     sub SetBlah {
+       shift;
+       my $self = shift;
+       my ($blah) = @_;
+       return &Net::Jabber::SetXMLData("single",$self->{QUERY},"blah","$blah",{});
+     }
+
+     sub GetBlah {
+       shift;
+       my $self = shift;
+       return &Net::Jabber::GetXMLData("value",$self->{QUERY},"blah","");
+     }
+
+     1;
+
+     Now when you create a new Query object and call GetBlah on that object
+     it will AUTOLOAD the above function and handle the request.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in May of 2000 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/Query/Agent,  Next: Net/Jabber/Query/Agents,  Prev: Net/Jabber/Query,  Up: Module List
+
+Jabber Query Agent Module
+*************************
+
+NAME
+====
+
+   Net::Jabber::Query::Agent - Jabber Query Agent Module
+
+SYNOPSIS
+========
+
+     Net::Jabber::Query::Agent is a companion to the Net::Jabber::Query
+     module. It provides the user a simple interface to set and retrieve all
+     parts of a Jabber Query Agent.
+
+DESCRIPTION
+===========
+
+     To initialize the Agent with a Jabber <iq/> you must pass it the
+     XML::Parser Tree array from the module trying to access the <iq/>.
+     In the callback function:
+
+     use Net::Jabber;
+
+     sub iqCB {
+       my $iq = new Net::Jabber::IQ(@_);
+       my $agent = $iq->GetQuery();
+       .
+       .
+       .
+     }
+
+     You now have access to all of the retrieval functions available.
+
+     To create a new Agent to send to the server:
+
+     use Net::Jabber;
+
+     $iq = new Net::Jabber::IQ();
+     $agent = $iq->NewQuery("jabber:iq:agent");
+
+     Now you can call the creation functions below.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     $jid         = $agent->GetJID();
+     $name        = $agent->GetName();
+     $description = $agent->GetDescription();
+     $transport   = $agent->GetTransport();
+     $service     = $agent->GetService();
+     $register    = $agent->GetRegister();
+     $search      = $agent->GetSearch();
+     $groupchat   = $agent->GetGroupChat();
+     $agents      = $agent->GetAgents();
+
+Creation functions
+------------------
+
+     $agent->SetAgent(jid=>"users.jabber.org",
+     		     name=>"Jabber User Directory",
+     	             description=>"You may register and create a public
+                                    searchable profile, and search for
+                                    other registered Jabber users.",
+     		     service=>"jud",
+     		     register=>"",
+     		     search=>"");
+
+     $agent->SetJID("icq.jabber.org");
+     $agent->SetName("ICQ Transport");
+     $agent->SetDescription("This is the ICQ Transport");
+     $agent->SetTransport("ICQ#");
+     $agent->SetService("icq");
+     $agent->SetRegister();
+     $agent->SetSearch();
+     $agent->SetGroupChat();
+     $agent->SetAgents();
+
+Test functions       $test = $agent->DefinedJID();     $test = $agent->DefinedName();     $test = $agent->DefinedDescription();     $test = $agent->DefinedTransport();     $test = $agent->DefinedService();     $test = $agent->DefinedRegister();     $test = $agent->DefinedSearch();     $test = $agent->DefinedGroupChat();     $test = $agent->DefinedAgents();
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetJID() - returns a string with the JID of the agent to send
+                messages to.
+
+     GetName() - returns a string with the name of the agent.
+
+     GetDescription() - returns a string with the description of
+                        the agent.
+
+     GetTransport() - returns a string with the transport of the agent.
+
+     GetService() - returns a string with the service name of the agent.
+
+     GetRegister() - returns a 1 if the agent supports registering,
+                     0 if not.
+
+     GetSearch() - returns a 1 if the agent supports searching, 0 if not.
+
+     GetGroupChat() - returns a 1 if the agent supports groupchat, 0 if not.
+
+     GetAgents() - returns a 1 if the agent supports sub-agents, 0 if not.
+
+Creation functions
+------------------
+
+     SetAgent(jid=>string,         - set multiple fields in the <iq/> at one
+              name=>string,          time.  This is a cumulative and over
+              description=>string,   writing action.  If you set the "jid"
+              transport=>string,     attribute twice, the second setting is
+              service=>string,       what is used.  If you set the name, and
+              register=>string,      then set the search then both will be in
+              search=>string,        the <iq/> tag.  For valid settings read the
+              groupchat=>string)     specific Set functions below.
+              agents=>string)
+
+     SetJID(string) - sets the jid="..." of the agent.
+
+     SetName(string) - sets the <name/> of the agent.
+
+     SetDescription(string) - sets the <description/> of the agent.
+
+     SetTransport(string) - sets the <transport/> of the agent.
+
+     SetService(string) - sets the <service/> of the agent.
+
+     SetRegister() - if the function is called then a <search/> is
+                     is put in the <query/> to signify searching is
+                     available.
+
+     SetSearch() - if the function is called then a <search/> is
+                   is put in the <query/> to signify searching is
+                   available.
+
+     SetGroupChat() - if the function is called then a <groupchat/> is
+                      is put in the <query/> to signify groupchat is
+                      available.
+
+     SetAgents() - if the function is called then a <agents/> is
+                   is put in the <query/> to signify sub-agents are
+                   available.
+
+Test functions     DefinedJID() - returns 1 if jid is in the parrent tag,                   0 otherwise.
+--------------------------------------------------------------------------------------------------------
+
+     DefinedName() - returns 1 if <name/> is in the parent tag,
+                     0 otherwise.
+
+     DefinedDescription() - returns 1 if <description/> is in the parent tag,
+                            0 otherwise.
+
+     DefinedTransport() - returns 1 if <transport/> is in the parent tag,
+                          0 otherwise.
+
+     DefinedService() - returns 1 if <service/> is in the parent tag,
+                        0 otherwise.
+
+     DefinedRegister() - returns 1 if <register/> is in the parent tag,
+                         0 otherwise.
+
+     DefinedSearch() - returns 1 if <search/> is in the parent tag,
+                       0 otherwise.
+
+     DefinedGroupChat() - returns 1 if <groupchat/> is in the parent tag,
+                          0 otherwise.
+
+     DefinedAgents() - returns 1 if <agents/> is in the parent tag,
+                       0 otherwise.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in July of 2000 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/Query/Agents,  Next: Net/Jabber/Query/Auth,  Prev: Net/Jabber/Query/Agent,  Up: Module List
+
+Jabber Query Agents Module
+**************************
+
+NAME
+====
+
+   Net::Jabber::Query::Agents - Jabber Query Agents Module
+
+SYNOPSIS
+========
+
+     Net::Jabber::Query::Agents is a companion to the Net::Jabber::Query
+     module. It provides the user a simple interface to set and retrieve all
+     parts of a Jabber Query Agents.
+
+DESCRIPTION
+===========
+
+     To initialize the Agents with a Jabber <iq/> you must pass it the
+     XML::Parser Tree array from the module trying to access the <iq/>.
+     In the callback function:
+
+     use Net::Jabber;
+
+     sub iqCB {
+       my $iq = new Net::Jabber::IQ(@_);
+       my $agents = $iq->GetQuery();
+       .
+       .
+       .
+     }
+
+     You now have access to all of the retrieval functions available.
+
+     To create a new Agents request to send to the server:
+
+     use Net::Jabber;
+
+     $client = new Net::Jabber::Client();
+
+     $iq = new Net::Jabber::IQ();
+     $agents = $iq->NewQuery("jabber:iq:agents");
+
+     $client->Send($iq);
+
+     Or you can call the creation functions below before sending.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     @agents      = $agents->GetAgents();
+     @agentTreess = $agents->GetAgentTrees();
+
+Creation functions
+------------------
+
+     $agent = $agents->NewAgent();
+     $agent = $agents->NewAgent(jid=>"icq.jabber.org",
+     			       name=>"ICQ Transport",
+     			       description=>"This is the ICQ Transport",
+     			       transport=>"ICQ#",
+     			       service=>"icq",
+     			       register=>"",
+     			       search=>"");
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetAgents() - returns an array of Net::Jabber::Query::Agent
+                   objects.  For more info on this object see the
+                   docs for Net::Jabber::Query::Agent.
+
+     GetAgentTrees() - returns an array of XML::Parser objects that
+                       contain the data for each agent.
+
+Creation functions
+------------------
+
+     NewAgent(hash) - creates and returns a new Net::Jabber::Query::Agent
+                      object.  The argument hash is passed to the SetAgent
+                      function.  Check the Net::Jabber::Query::Agent
+                      man page for the valid values.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in May of 2000 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/Query/Auth,  Next: Net/Jabber/Query/AutoUpdate,  Prev: Net/Jabber/Query/Agents,  Up: Module List
+
+Jabber IQ Authentication Module
+*******************************
+
+NAME
+====
+
+   Net::Jabber::Query::Auth - Jabber IQ Authentication Module
+
+SYNOPSIS
+========
+
+     Net::Jabber::Query::Auth is a companion to the Net::Jabber::Query module.
+     It provides the user a simple interface to set and retrieve all parts
+     of a Jabber Authentication query.
+
+DESCRIPTION
+===========
+
+     To initialize the Query with a Jabber <iq/> and then access the auth
+     query you must pass it the XML::Parser Tree array from the
+     Net::Jabber::Client module.  In the callback function for the iq:
+
+     use Net::Jabber;
+
+     sub iqCB {
+       my $iq = new Net::Jabber::IQ(@_);
+       my $auth = $iq->GetQuery();
+       .
+       .
+       .
+     }
+
+     You now have access to all of the retrieval functions available.
+
+     To create a new Query auth to send to the server:
+
+     use Net::Jabber;
+
+     $client = new Net::Jabber::Client();
+     ...
+
+     $iq = new Net::Jabber::IQ();
+     $auth = $iq->NewQuery("jabber:iq:auth");
+     ...
+
+     $client->Send($iq);
+
+     Using $auth you can call the creation functions below to populate the
+     tag before sending it.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     $username = $auth->GetUsername();
+     $password = $auth->GetPassword();
+     $resource = $auth->GetResource();
+     $digest   = $auth->GetDigest();
+     $hash     = $auth->GetHash();
+     $token    = $auth->GetToken();
+     $sequence = $auth->GetSequence();
+
+Creation functions
+------------------
+
+     $auth->SetAuth(resource=>'Anonymous');
+     $auth->SetAuth(username=>'test',
+                    password=>'user',
+                    resource=>'Test Account');
+
+     $auth->SetUsername('bob');
+     $auth->SetPassword('bobrulez');
+     $auth->SetResource('Bob the Great');
+     $auth->SetDigest('');
+
+     $auth->SetToken('some token');
+     $auth->SetSequence(456);
+
+     $auth->SetHash('some hash');
+
+Test functions
+--------------
+
+     $test = $auth->DefinedUsername();
+     $test = $auth->DefinedPassword();
+     $test = $auth->DefinedResource();
+     $test = $auth->DefinedDigest();
+     $test = $auth->DefinedHash();
+     $test = $auth->DefinedToken();
+     $test = $auth->DefinedSequence();
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetUsername() - returns a string with the username in the <query/>.
+
+     GetPassword() - returns a string with the password in the <query/>.
+
+     GetResource() - returns a string with the resource in the <query/>.
+
+     GetDigest() - returns a string with the SHA-1 digest in the <query/>.
+
+     GetHash() - returns a string with the hash in the <query/>.
+
+     GetToken() - returns a string with the token in the <query/>.
+
+     GetSequence() - returns a string with the sequence number in the <query/>.
+
+Creation functions
+------------------
+
+     SetAuth(username=>string, - set multiple fields in the <iq/> at one
+             password=>string,   time.  This is a cumulative and over
+             resource=>string,   writing action.  If you set the "username"
+             digest=>string,     twice, the second setting is what is
+             hash=>string,       used.  If you set the password, and then
+             token=>string,      set the resource then both will be in the
+             sequence=>string)   <query/> tag.  For valid settings read
+                                 the specific Set functions below.
+
+     SetUsername(string) - sets the username for the account you are
+                           trying to connect with.  Leave blank for
+                           an anonymous account.
+
+     SetPassword(string) - sets the password for the account you are
+                           trying to connect with.  Leave blank for
+                           an anonymous account.
+
+     SetResource(string) - sets the resource for the account you are
+                           trying to connect with.  Leave blank for
+                           an anonymous account.
+
+     SetDigest(string) - sets the SHA-1 digest for the account you are
+                         trying to connect with.  Leave blank for
+                         an anonymous account.
+
+     SetHash(string) - sets the SHA-1 digest for the account you are
+                       trying to connect to using 0k.
+
+     SetToken(string) - sets the value for the token that is to be used
+                        for 0k connections.
+
+     SetSequence(string) - sets the sequence number the other side is
+                           supposed to use to connect with 0k.
+
+Test functions
+--------------
+
+     DefinedUsername() - returns 1 if <username/> exists in the <iq/>,
+                         0 otherwise.
+
+     DefinedPassword() - returns 1 if <password/> exists in the <iq/>,
+                         0 otherwise.
+
+     DefinedResource() - returns 1 if <resource/> exists in the <iq/>,
+                         0 otherwise.
+
+     DefinedDigest() - returns 1 if <digest/> exists in the <iq/>,
+                       0 otherwise.
+
+     DefinedHash() - returns 1 if <hash/> exists in the <iq/>,
+                     0 otherwise.
+
+     DefinedToken() - returns 1 if <token/> exists in the <iq/>,
+                      0 otherwise.
+
+     DefinedSequence() - returns 1 if <sequence/> exists in the <iq/>,
+                         0 otherwise.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in July of 2000 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/Query/AutoUpdate,  Next: Net/Jabber/Query/AutoUpdate/Release,  Prev: Net/Jabber/Query/Auth,  Up: Module List
+
+Jabber IQ AutoUpdate Module
+***************************
+
+NAME
+====
+
+   Net::Jabber::Query::AutoUpdate - Jabber IQ AutoUpdate Module
+
+SYNOPSIS
+========
+
+     Net::Jabber::Query::AutoUpdate is a companion to the Net::Jabber::Query
+     module.  It provides the user a simple interface to set and retrieve
+     all parts of a Jabber AutoUpdate query.
+
+DESCRIPTION
+===========
+
+     To initialize the Query with a Jabber <iq/> and then access the autoupdate
+     query you must pass it the XML::Parser Tree array from the
+     Net::Jabber::Client module.  In the callback function for the iq:
+
+     use Net::Jabber;
+
+     sub iqCB {
+       my $iq = new Net::Jabber::IQ(@_);
+       my $autoupdate = $iq->GetQuery();
+       .
+       .
+       .
+     }
+
+     You now have access to all of the retrieval functions available.
+
+     To create a new Query autoupdate to send to the server:
+
+     use Net::Jabber;
+
+     $client = new Net::Jabber::Client();
+     ...
+
+     $iq = new Net::Jabber::IQ();
+     $autoupdate = $iq->NewQuery("jabber:iq:autoupdate");
+     ...
+
+     $client->Send($iq);
+
+     Using $autoupdate you can call the creation functions below to populate the
+     tag before sending it.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     $release     = $autoupdate->GetRelease();
+     $release     = $autoupdate->GetRelease("beta");
+     $release     = $autoupdate->GetRelease("dev");
+
+     @releaseTree = $autoupdate->GetReleaseTree();
+     @releaseTree = $autoupdate->GetReleaseTree("beta");
+     @releaseTree = $autoupdate->GetReleaseTree("dev");
+
+Creation functions
+------------------
+
+     $release = $autoupdate->AddRelease();
+     $release = $autoupdate->AddRelease(type=>"beta",
+                                        version=>"1.0b",
+                                        desc=>"Beta...",
+                                        url=>"http://xxx.yyy/zzz.tar.gz",
+                                        priority=>"optional");
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetRelease(string) - returns a Net::Jabber::Query::AutoUpdate::Release
+                          object that contains the data for that release.
+                          The string determines which release is returned:
+     
+                            release - returns the latest stable release
+                            beta    - returns the latest beta release
+                            dev     - returns the latest dev release in CVS
+     
+                          If string is blank or undefined, then the "release"
+                          version is returned.
+
+     GetReleaseTree(string) - returns an XML::Parser tree that contains the
+                              release specified in string.  If string is
+                              empty or undefined then it defaults to
+                              "release".
+
+Creation functions
+------------------
+
+     AddRelease(type=>string, - created a new Release object and populates
+                hash)           it with the hash.  The has is passed to the
+                                SetRelease function, check the module for
+                                valid settings.  The valid setting for type
+                                are:
+
+     release - to indicate the latest stable
+               release
+     beta    - to indicate the latest beta
+               release
+     dev     - to indicate the latest dev release
+               in CVS
+
+     If type is blank or undefined, then "release"
+     is assumed.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in May of 2000 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/Query/AutoUpdate/Release,  Next: Net/Jabber/Query/Filter,  Prev: Net/Jabber/Query/AutoUpdate,  Up: Module List
+
+Jabber IQ AutoUpdate Release Module
+***********************************
+
+NAME
+====
+
+   Net::Jabber::Query::AutoUpdate::Release - Jabber IQ AutoUpdate Release
+Module
+
+SYNOPSIS
+========
+
+     Net::Jabber::Query::AutoUpdate::Release is a companion to the
+     Net::Jabber::Query::AutoUpdate module.  It provides the user a simple
+     interface to set and retrieve all parts of a Jabber AutoUpdate Release.
+
+DESCRIPTION
+===========
+
+     To initialize the Item with a Jabber <iq/> and then access the auth
+     query you must pass it the XML::Parser Tree array from the
+     Net::Jabber::Client module.  In the callback function for the iq:
+
+     use Net::Jabber;
+
+     sub iq {
+       my $iq = new Net::Jabber::IQ(@_);
+       my $autoupdate = $iq->GetQuery();
+       my $release = $roster->GetRelease();
+       .
+       .
+       .
+     }
+
+     You now have access to all of the retrieval functions available below.
+
+     To create a new IQ Roster Item to send to the server:
+
+     use Net::Jabber;
+
+     $Client = new Net::Jabber::Client();
+     ...
+
+     $iq = new Net::Jabber::IQ();
+     $autoupdate = $iq->NewQuery("jabber:iq:autoupdate");
+     $release = $roster->AddRelease(type=>"beta");
+     ...
+
+     $client->Send($iq);
+
+     Using $release you can call the creation functions below to populate the
+     tag before sending it.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     $version     = $release->GetVersion();
+     $description = $release->GetDesc();
+     $url         = $release->GetURL();
+     $priority    = $release->GetPriority();
+
+     @release     = $release->GetTree();
+     $str          = $release->GetXML();
+
+Creation functions
+------------------
+
+     $release->SetRelease(version=>"1.3.2",
+     		         desc=>"Bob's Client for Jabber",
+     		         url=>"http://www.bobssite.com/client.1.3.2.tar.gz",
+     		         priority=>"optional");
+     $release->SetVersion('5.6');
+     $release->SetDesc('A description of the client');
+     $release->SetURL('http://somesite/path/client.tar.gz');
+     $release->SetPriority("mandatory");
+
+Test functions
+--------------
+
+     $test = $release->DefinedVersion();
+     $test = $release->DefinedDesc();
+     $test = $release->DefinedURL();
+     $test = $release->DefinedPriority();
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetVersion() - returns a string with the version number of this release.
+
+     GetDesc() - returns a string with the description of this release.
+
+     GetURL() - returns a string with the URL for downloading this release.
+
+     GetPriority() - returns a string with the priority of this release.
+
+     optional  - The user can get it if they want to
+     mandatory - The user must get this version
+
+     GetXML() - returns the XML string that represents the <presence/>.
+                This is used by the Send() function in Client.pm to send
+                this object as a Jabber Presence.
+
+     GetTree() - returns an array that contains the <presence/> tag
+                 in XML::Parser Tree format.
+
+Creation functions
+------------------
+
+     SetRelease(version=>string,  - set multiple fields in the release
+                desc=>string,       at one time.  This is a cumulative
+                url=>string,        and overwriting action.  If you
+                priority=>string,   set the "url" twice, the second
+                                    setting is what is used.  If you set
+                                    the desc, and then set the
+                                    priority then both will be in the
+                                    release tag.  For valid settings
+                                    read the specific Set functions below.
+
+     SetVersion(string) - sets the version number of this release.
+
+     SetDesc(string) - sets the description of this release.
+
+     SetURL(string) - sets the url for downloading this release.
+
+     SetPriotity(string) - sets the priority of this release.  If "" or not
+                           "optional" or "mandatory" then this defaults to
+                           "optional".
+
+Test functions
+--------------
+
+     DefinedVersion() - returns 1 if <version/> is defined in the query, 0
+                        otherwise.
+
+     DefinedDesc() -  returns 1 if <desc/> is defined in the query, 0
+                      otherwise.
+
+     DefinedURL() -  returns 1 if <url/> is defined in the query, 0
+                     otherwise.
+
+     DefinedPriority() -  returns 1 if priority is defined in the query, 0
+                          otherwise.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in July of 2000 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/Query/Filter,  Next: Net/Jabber/Query/Filter/Rule,  Prev: Net/Jabber/Query/AutoUpdate/Release,  Up: Module List
+
+Jabber IQ Filter Module
+***********************
+
+NAME
+====
+
+   Net::Jabber::Query::Filter - Jabber IQ Filter Module
+
+SYNOPSIS
+========
+
+     Net::Jabber::Query::Filter is a companion to the Net::Jabber::Query module.
+     It provides the user a simple interface to set and retrieve all parts
+     of a Jabber IQ Filter query.
+
+DESCRIPTION
+===========
+
+     To initialize the IQ with a Jabber <iq/> and then access the filter
+     query you must pass it the XML::Parser Tree array from the
+     Net::Jabber::Client module.  In the callback function for the iq:
+
+     use Net::Jabber;
+
+     sub iq {
+       my $iq = new Net::Jabber::IQ(@_);
+       my $filter = $iq->GetQuery();
+       .
+       .
+       .
+     }
+
+     You now have access to all of the retrieval functions available.
+
+     To create a new IQ filter to send to the server:
+
+     use Net::Jabber;
+
+     $client = new Net::Jabber::Client();
+     ...
+
+     $iq = new Net::Jabber::IQ();
+     $filter = $iq->NewQuery("jabber:iq:filter");
+     ...
+
+     $client->Send($iq);
+
+     Using $filter you can call the creation functions below to populate the
+     tag before sending it.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     @rules     = $filter->GetRules();
+     @ruleTrees = $filter->GetRuleTrees();
+
+Creation functions
+------------------
+
+     $rule   = $filter->AddRule();
+     $rule   = $filter->AddRule(jid=>"bob\@jabber.org",
+                                name=>"Bob",
+                                groups=>["school","friends"]);
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetRules() - returns an array of Net::Jabber::Query::Filter::Rule objects.
+                  These can be modified or accessed with the functions
+                  available to them.
+
+     GetRuleTrees() - returns an array of XML::Parser objects that contain
+                      the data for each rule.
+
+Creation functions
+------------------
+
+     AddRule(hash) - creates and returns a new Net::Jabbber::Query::Filter::Rule
+                     object.  The argument hash is passed to the SetRule
+                     function.  Check the Net::Jabber::Query::Filter::Rule
+                     for valid values.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in June of 2000 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/Query/Filter/Rule,  Next: Net/Jabber/Query/Fneg,  Prev: Net/Jabber/Query/Filter,  Up: Module List
+
+Jabber IQ Filter Rule Module
+****************************
+
+NAME
+====
+
+   Net::Jabber::Query::Filter::Rule - Jabber IQ Filter Rule Module
+
+SYNOPSIS
+========
+
+     Net::Jabber::Query::Filter::Rule is a companion to the
+     Net::Jabber::Query::Filter module.  It provides the user a simple
+     interface to set and retrieve all parts of a Jabber Filter Rule.
+
+DESCRIPTION
+===========
+
+     To initialize the Rule with a Jabber <iq/> and then access the filter
+     query you must pass it the XML::Parser Tree array from the
+     Net::Jabber::Client module.  In the callback function for the iq:
+
+     use Net::Jabber;
+
+     sub iq {
+       my $iq = new Net::Jabber::IQ(@_);
+       my $filter = $iq->GetQuery();
+       my @rules = $filter->GetRules();
+       foreach $rule (@rules) {
+         ...
+       }
+       .
+       .
+       .
+     }
+
+     You now have access to all of the retrieval functions available below.
+
+     To create a new IQ Filter Rule to send to the server:
+
+     use Net::Jabber;
+
+     $Client = new Net::Jabber::Client();
+     ...
+
+     $iq = new Net::Jabber::IQ();
+     $filter = $iq->NewQuery("jabber:iq:filter");
+     $rule = $filter->AddRule();
+     ...
+
+     $client->Send($iq);
+
+     Using $rule you can call the creation functions below to populate the
+     tag before sending it.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     %conditions  = $rule->GetConditions();
+     $body        = $rule->GetBody();
+     $from        = $rule->GetFrom();
+     $resource    = $rule->GetResource();
+     $show        = $rule->GetShow();
+     $size        = $rule->GetSize();
+     $subject     = $rule->GetSubject();
+     $time        = $rule->GetTime();
+     $type        = $rule->GetType();
+     $unavailable = $rule->GetUnavailable();
+
+     %actions     = $rule->GetActions();
+     $drop        = $rule->GetDrop();
+     $edit        = $rule->GetEdit();
+     $error       = $rule->GetError();
+     $reply       = $rule->GetReply();
+     $forward     = $rule->GetForward();
+     $offline     = $rule->GetOffline();
+
+     $continue    = $rule->GetContinue();
+
+Creation functions
+------------------
+
+     $rule->SetRule(unavailable=>1,
+                    offline=>1);
+     $rule->SetRule(from=>"bob\@jabber.org",
+                    forward=>"me\@jabber.org/Pager");
+     $rule->SetRule(from=>"ex-wife\@jabber.org",
+                    reply=>"I don't want to talk you...");
+
+     $rule->SetBody("free");                              # Future condition
+     $rule->SetFrom("bob");                               # Future condition
+     $rule->SetResource("Home");                          # Future condition
+     $rule->SetShow("dnd");                               # Future condition
+     $rule->SetSize(1024);                                # Future condition
+     $rule->SetSubject("sex");                            # Future condition
+     $rule->SetTime("20000502T01:01:01");                 # Future condition
+     $rule->SetType("chat");                              # Future condition
+     $rule->SetUnavailable();
+
+     $rule->SetDrop();
+     $rule->SetEdit();                                    # Future Action
+     $rule->SetError("This JID is not a valid address");
+     $rule->SetForward("foo\@bar.com/FooBar");
+     $rule->SetOffline();
+     $rule->SetReply("I don't want to talk you...");
+
+     $rule->SetContinue();
+
+Defined functions
+-----------------
+
+     $test = $rule->DefinedBody();
+     $test = $rule->DefinedFrom();
+     $test = $rule->DefinedResource();
+     $test = $rule->DefinedShow();
+     $test = $rule->DefinedSize();
+     $test = $rule->DefinedSubject();
+     $test = $rule->DefinedTime();
+     $test = $rule->DefinedType();
+     $test = $rule->DefinedUnavailable();
+
+     $test = $rule->DefinedDrop();
+     $test = $rule->DefinedEdit();
+     $test = $rule->DefinedError();
+     $test = $rule->DefinedForward();
+     $test = $rule->DefinedOffline();
+     $test = $rule->DefinedReply();
+
+     $test = $rule->DefinedContinue();
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetConditions() - returns a hash with the condition name and the value
+                       of the tag as the value in the hash.  For example:
+
+     $conditions{unavailable} = 1;
+     $conditions{resource} = "Pager";
+     $conditions{type} = "chat";
+
+     GetBody() - returns the string that the <rule/> uses to match in the body
+                 for this condition.
+                 **** This condition is still under development ****
+                 **** in mod_filter.                            ****
+
+     GetFrom() - returns the string that the <rule/> uses to match in the from
+                 for this condition.
+                 **** This condition is still under development ****
+                 **** in mod_filter.                            ****
+
+     GetResource() - returns the string that the <rule/> uses to match in the
+                     resource of the to for this condition.
+                     **** This condition is still under development ****
+                     **** in mod_filter.                            ****
+
+     GetShow() - returns the string that the <rule/> uses to match in the show
+                 for this condition.
+                 **** This condition is still under development ****
+                 **** in mod_filter.                            ****
+
+     GetSize() - returns the string that the <rule/> uses to match in the size
+                 for this condition.
+                 **** This condition is still under development ****
+                 **** in mod_filter.                            ****
+
+     GetSubject() - returns the string that the <rule/> uses to match in the
+                    subject for this condition.
+                    **** This condition is still under development ****
+                    **** in mod_filter.                            ****
+
+     GetTime() - returns the string that the <rule/> uses to match the time
+                 for this condition.
+                 **** This condition is still under development ****
+                 **** in mod_filter.                            ****
+
+     GetType() - returns the string that the <rule/> uses to match the type
+                 for this condition.
+                 **** This condition is still under development ****
+                 **** in mod_filter.                            ****
+
+     GetUnavailable() - returns 1 if this condition is set, 0 otherwise.
+                        This condition is used to specify that you are
+                        unavailable.
+
+     GetActions() - returns a hash with the condition name and the value
+                    of the tag as the value in the hash.  For example:
+     
+                       $actions{reply} = "I'm not in the office right now.";
+                       $actions{continue} = 1;
+
+     GetDrop() - returns 1 if the message is to be dropped, 0 otherwise.
+
+     GetEdit() - **** This condition is still under development ****
+                 **** in mod_filter.                            ****
+
+     GetError() - returns the string that the <rule/> uses to return in
+                  error message.
+
+     GetReply() - returns the string that is sent for this action.
+
+     GetForward() - returns the JID of the account to forward the message
+                    to for this action.
+
+     GetOffline() - returns 1 if the message is to go to the offline message
+                    list, 0 otherwise.
+
+     GetContinue() - returns 1 if there is a <continue/> tag in the <rule/>,
+                     0 otherwise.  This allows you to chain multiple actions
+                     in order for one set of conditions.
+
+Creation functions
+------------------
+
+     SetRule(body=>string,      - set multiple fields in the <rule/>
+             from=>string,        at one time.  This is a cumulative
+             resource=>string,    and overwriting action.  If you
+             show=>string,        set the "body" twice, the second
+             size=>string,        setting is what is used.  If you set
+             time=>string,        the show, and then set the
+             type=>string,        offline then both will be in the
+             unavailable=>0|1,    <rule/> tag.  For valid settings
+             edit=>string,        read the specific Set functions below.
+             error=>string,
+             forward=>string,
+             offline=>0|1,
+             reply=>string,
+             continue=>0|1)
+
+     SetBody(string) - sets the string that the <rule/> uses to match against
+                       in the body.
+
+     SetFrom(string) - sets the string that the <rule/> uses to match against
+                       in the from.
+
+     SetResource(string) - sets the string that the <rule/> uses to match
+                           against in the resource of the from JID.
+
+     SetShow(string) - sets the string that the <rule/> uses to match against
+                       in the show.
+
+     SetSize(string) - sets the string that the <rule/> uses to match against
+                       for the size of the message.
+
+     SetSubject(string) - sets the string that the <rule/> uses to match against
+                          in the subject.
+
+     SetTime(string) - sets the string that the <rule/> uses to match against
+                       for the time the message is received.
+
+     SetType(string) - sets the string that the <rule/> uses to match against
+                       for the type of message.
+
+     SetUnavailable() - adds an <unavailable/> to the <rule/> to match if you
+                        are offline.
+
+     SetDrop() - sets that the <rule/> should drop the message from the queue.
+
+     SetEdit(string) - sets the string that the <rule/> uses to execute the edit
+                       action on.
+
+     SetError(string) - sets the string that goes into the error message for
+                        this action.
+
+     SetForward(string) - sets the JID that the message is forwarded to for
+                          this action.
+
+     SetOffline() - sets that the message goes into the offline queue.
+
+     SetReply(string) - sets the string that goes into the reply message for
+                        this action.
+
+     SetContinue() - sets that this <rule/> is continued in the next <rule/>.
+
+Defined functions
+-----------------
+
+     DefinedBody() - returns 1 if there is a <body/> tag in the <rule/>,
+                     0 otherwise.
+
+     DefinedFrom() - returns 1 if there is a <from/> tag in the <rule/>,
+                     0 otherwise.
+
+     DefinedResource() - returns 1 if there is a <resource/> tag in the
+                         <rule/>, 0 otherwise.
+
+     DefinedShow() - returns 1 if there is a <show/> tag in the <rule/>,
+                     0 otherwise.
+
+     DefinedSize() - returns 1 if there is a <size/> tag in the <rule/>,
+                     0 otherwise.
+
+     DefinedSubject() - returns 1 if there is a <subject/> tag in the
+                        <rule/>, 0 otherwise.
+
+     DefinedTime() - returns 1 if there is a <time/> tag in the <rule/>,
+                     0 otherwise.
+
+     DefinedType() - returns 1 if there is a <type/> tag in the <rule/>,
+                     0 otherwise.
+
+     DefinedUnavailable() - returns 1 if there is a <unavailable/> tag
+                            in the <rule/>, 0 otherwise.
+
+     DefinedDrop() - returns 1 if there is a <drop/> tag in the <rule/>,
+                     0 otherwise.
+
+     DefinedEdit() - returns 1 if there is a <edit/> tag in the <rule/>,
+                     0 otherwise.
+
+     DefinedError() - returns 1 if there is a <error/> tag in the <rule/>,
+                     0 otherwise.
+
+     DefinedForward() - returns 1 if there is a <forward/> tag in the <rule/>,
+                     0 otherwise.
+
+     DefinedOffline() - returns 1 if there is a <offline/> tag in the <rule/>,
+                     0 otherwise.
+
+     DefinedReply() - returns 1 if there is a <reply/> tag in the <rule/>,
+                     0 otherwise.
+
+     DefinedContinue() - returns 1 if there is a <continue/> tag in the <rule/>,
+                     0 otherwise.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in June of 2000 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/Query/Fneg,  Next: Net/Jabber/Query/Oob,  Prev: Net/Jabber/Query/Filter/Rule,  Up: Module List
+
+Jabber IQ Feature Negotiotation Module
+**************************************
+
+NAME
+====
+
+   Net::Jabber::Query::Fneg - Jabber IQ Feature Negotiotation Module
+
+SYNOPSIS
+========
+
+     Net::Jabber::Query::Fneg is a companion to the Net::Jabber::Query module.
+     It provides the user a simple interface to set and retrieve all parts
+     of a Jabber Feature Negotiotation query.
+
+DESCRIPTION
+===========
+
+     To initialize the IQ with a Jabber <iq/> and then access the fneg
+     query you must pass it the XML::Parser Tree array from the
+     Net::Jabber::Client module.  In the callback function for the iq:
+
+     use Net::Jabber;
+
+     sub iqCB {
+       my $iq = new Net::Jabber::IQ(@_);
+       my $fneg = $iq->GetQuery();
+       .
+       .
+       .
+     }
+
+     You now have access to all of the retrieval functions available.
+
+     To create a new IQ fneg to send to the server:
+
+     use Net::Jabber;
+
+     $client = new Net::Jabber::Client();
+     ...
+
+     $iq = new Net::Jabber::IQ();
+     $fneg = $iq->NewQuery("jabber:iq:fneg");
+     ...
+
+     $client->Send($iq);
+
+     Using $fneg you can call the creation functions below to populate the
+     tag before sending it.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions     @namespaces = $auth->GetNS();
+-----------------------------------------------------
+
+Creation functions     $auth->AddNS("bar:foo:namespace");
+---------------------------------------------------------
+
+METHODS
+=======
+
+Retrieval functions     GetNS() - returns an array of namespaces that the <query/> contains.
+--------------------------------------------------------------------------------------------
+
+Creation functions     AddNS(string) - adds the single namespace to the list in the <query/>.
+---------------------------------------------------------------------------------------------
+
+AUTHOR
+======
+
+   By Ryan Eatmon in May of 2000 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/Query/Oob,  Next: Net/Jabber/Query/Register,  Prev: Net/Jabber/Query/Fneg,  Up: Module List
+
+Jabber Query Out Of Bandwidth File Transfer Module
+**************************************************
+
+NAME
+====
+
+   Net::Jabber::Query::Oob - Jabber Query Out Of Bandwidth File Transfer
+Module
+
+SYNOPSIS
+========
+
+     Net::Jabber::Query::Oob is a companion to the Net::Jabber::Query module.
+     It provides the user a simple interface to set and retrieve all
+     parts of a Jabber Query Oob.
+
+DESCRIPTION
+===========
+
+     To initialize the Oob with a Jabber <iq/> you must pass it the
+     XML::Parser Tree array from the module trying to access the <iq/>.
+     In the callback function:
+
+     use Net::Jabber;
+
+     sub iqCB {
+       my $iq = new Net::Jabber::IQ(@_);
+       my $oob = $iq->GetQuery();
+       .
+       .
+       .
+     }
+
+     You now have access to all of the retrieval functions available.
+
+     To create a new Oob to send to the server:
+
+     use Net::Jabber;
+
+     $iq = new Net::Jabber::IQ();
+     $oob = $iq->NewQuery("jabber:iq:oob");
+
+     Now you can call the creation functions below.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     $url  = $oob->GetURL();
+     $desc = $oob->GetDesc();
+
+Creation functions
+------------------
+
+     $oob->SetOob(UrL=>"http://my.web.server.com/~me/pics/bob.jpg",
+     	         desc=>"Picture of Bob, the one and only");
+
+     $oob->SetURL("http://my.web.server.com/~me/pics/bobandme.jpg");
+     $oob->SetDesc("Bob and Me at the Open Source conference");
+
+Defined functions
+-----------------
+
+     $test = $oob->DefinedURL();
+     $test = $oob->DefinedDesc();
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetURL() - returns a string with the URL of the file being sent Oob.
+
+     GetDesc() - returns a string with the description of the file being
+                  sent Oob.
+
+Creation functions
+------------------
+
+     SetOob(url=>string,  - set multiple fields in the <iq/> at one
+            desc=>string)   time.  This is a cumulative and over
+                            writing action.  If you set the "url"
+                            attribute twice, the second setting is
+                            what is used.  If you set the url, and
+                            then set the desc then both will be in
+                            the <iq/> tag.  For valid settings read the
+                            specific Set functions below.
+
+     SetURL(string) - sets the URL for the file being sent Oob.
+
+     SetDesc(string) - sets the description for the file being sent Oob.
+
+Defined functions
+-----------------
+
+     DefinedURL() - returns 1 if <url/> is in the <iq/>, 0 otherwise.
+
+     DefinedDesc() - returns 1 if <desc/> is in the <iq/>, 0 otherwise.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in July of 2000 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+

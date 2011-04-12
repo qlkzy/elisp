@@ -1,0 +1,1780 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Mail/Sendmail,  Next: Mail/Stats,  Prev: Mail/Sender,  Up: Module List
+
+Simple platform independent mailer
+**********************************
+
+NAME
+====
+
+   Mail::Sendmail v. 0.78 - Simple platform independent mailer
+
+SYNOPSIS
+========
+
+     use Mail::Sendmail;
+
+     %mail = ( To      => 'you@there.com',
+               From    => 'me@here.com',
+               Message => "This is a very short message"
+              );
+
+     sendmail(%mail) or die $Mail::Sendmail::error;
+
+     print "OK. Log says:\n", $Mail::Sendmail::log;
+
+DESCRIPTION
+===========
+
+   Simple platform independent e-mail from your perl script. Only requires
+Perl 5 and a network connection.
+
+   After struggling for some time with various command-line mailing
+programs which never did exactly what I wanted, I put together this Perl
+only solution.
+
+   Mail::Sendmail contains mainly &sendmail, which takes a hash with the
+message to send and sends it. It is intended to be very easy to setup and
+use.
+
+INSTALLATION
+============
+
+Best
+     perl -MCPAN -e "install Mail::Sendmail"
+
+Traditional
+          perl Makefile.PL
+          make
+          make test
+          make install
+
+Manual
+     Copy Sendmail.pm to Mail/ in your Perl lib directory.
+
+          (eg. c:\Perl\lib\Mail\, c:\Perl\site\lib\Mail\,
+           /usr/lib/perl5/site_perl/Mail/, ... or whatever it
+           is on your system)
+
+ActivePerl's PPM
+     ppm install -location=http://alma.ch/perl/ppm Mail-Sendmail
+
+     But this way you don't get a chance to have a look at other files
+     (Changes, Todo, test.pl, ...) and PPM doesn't run the test script
+     (test.pl).
+
+   At the top of Sendmail.pm, set your default SMTP server, unless you
+specify it with each message, or want to use the default.
+
+   Install MIME::QuotedPrint. This is not required but strongly
+recommended.
+
+FEATURES
+========
+
+   Automatic time zone detection, Date: header, MIME quoted-printable
+encoding (if MIME::QuotedPrint installed), all of which can be overridden.
+
+   Internal Bcc: and Cc: support (even on broken servers)
+
+   Allows real names in From: and To: fields
+
+   Doesn't send unwanted headers, and allows you to send any header(s) you
+want
+
+   Configurable retries and use of alternate servers if your mail server is
+down
+
+   Good plain text error reporting
+
+LIMITATIONS
+===========
+
+   Doesn't work on OpenVMS.
+
+   Headers are not encoded, even if they have accented characters.
+
+   Since the whole message is in memory (twice!), it's not suitable for
+sending very big attached files.
+
+   The SMTP server has to be set manually in Sendmail.pm or in your script,
+unless you have a mail server on localhost.
+
+CONFIGURATION
+=============
+
+Default SMTP server(s)
+     This is probably all you want to configure. It is usually done through
+     *$mailcfg{smtp}*, which you can edit at the top of the Sendmail.pm
+     file.  This is a reference to a list of SMTP servers. You can also
+     set it from your script:
+
+     `unshift @{$Mail::Sendmail::mailcfg{'smtp'}} , 'my.mail.server';'
+
+     Alternatively, you can specify the server in the *%mail* hash you send
+     from your script, which will do the same thing:
+
+     `$mail{smtp} = 'my.mail.server';'
+
+     A future version will try to set useful defaults for you during the
+     Makefile.PL.
+
+Other configuration settings
+     See *%mailcfg* under `"DETAILS"' in this node below for other
+     configuration options.
+
+DETAILS
+=======
+
+sendmail()
+----------
+
+   sendmail is the only thing exported to your namespace by default
+
+   `sendmail(%mail) || print "Error sending mail:
+$Mail::Sendmail::error\n";'
+
+   It takes a hash containing the full message, with keys for all headers,
+body, and optionally for another non-default SMTP server and/or port.
+
+   It returns 1 on success or 0 on error, and rewrites
+$Mail::Sendmail::error and $Mail::Sendmail::log.
+
+   Keys are NOT case-sensitive.
+
+   The colon after headers is not necessary.
+
+   The Body part key can be called 'Body', 'Message' or 'Text'. The SMTP
+server key can be called 'Smtp' or 'Server'.
+
+   The following headers are added unless you specify them yourself:
+
+     Mime-version: 1.0
+     Content-type: 'text/plain; charset="iso-8859-1"'
+
+     Content-transfer-encoding: quoted-printable
+     or (if MIME::QuotedPrint not installed)
+     Content-transfer-encoding: 8bit
+
+     Date: [string returned by time_to_date()]
+
+   The following are not exported by default, but you can still access them
+with their full name, or request their export on the use line like in:
+`use Mail::Sendmail qw($address_rx time_to_date);'
+
+Mail::Sendmail::time_to_date()
+------------------------------
+
+   convert time ( as from `time()' ) to an RFC 822 compliant string for the
+Date header. See also `"%Mail::Sendmail::mailcfg"' in this node.
+
+$Mail::Sendmail::error
+----------------------
+
+   When you don't run with the -w flag, the module sends no errors to
+STDERR, but puts anything it has to complain about in here. You should
+probably always check if it says something.
+
+$Mail::Sendmail::log
+--------------------
+
+   A summary that you could write to a log file after each send
+
+$Mail::Sendmail::address_rx
+---------------------------
+
+   A handy regex to recognize e-mail addresses.
+
+   A correct regex for valid e-mail addresses was written by one of the
+judges in the obfuscated Perl contest... :-) It is quite big. This one is
+an attempt to a reasonable compromise, and should accept all real-world
+internet style addresses. The domain part is required and comments or
+characters that would need to be quoted are not supported.
+
+     Example:
+       $rx = $Mail::Sendmail::address_rx;
+       if (/$rx/) {
+         $address=$1;
+         $user=$2;
+         $domain=$3;
+       }
+
+%Mail::Sendmail::mailcfg
+------------------------
+
+   This hash contains all configuration options. You normally edit it once
+(if ever) in Sendmail.pm and forget about it, but you could also access it
+from your scripts. For readability, I'll assume you have imported it.
+
+   The keys are not case-sensitive: they are all converted to lowercase
+before use. Writing `$mailcfg{Port} = 2525;' is OK: the default
+$mailcfg{port} (25) will be deleted and replaced with your new value of
+2525.
+
+$mailcfg{smtp}
+     `$mailcfg{smtp} = [qw(localhost my.other.mail.server)];'
+
+     This is a reference to a list of smtp servers, so if your main server
+     is down, the module tries the next one. If one of your servers uses a
+     special port, add it to the server name with a colon in front, to
+     override the default port (like in my.special.server:2525).
+
+     Default: localhost. (the previous version also had smtp.site1.csi.com
+     which was an open relay, but it isn't anymore)
+
+$mailcfg{from}
+     `$mailcfg{from} = 'Mailing script me@mydomain.com';'
+
+     From address used if you don't supply one in your script. Should not
+     be of type 'user@localhost' since that may not be valid on the
+     recipient's host.
+
+     Default: undefined.
+
+$mailcfg{mime}
+     `$mailcfg{mime} = 1;'
+
+     Set this to 0 if you don't want any automatic MIME encoding. You
+     normally don't need this, the module should 'Do the right thing'
+     anyway.
+
+     Default: 1;
+
+$mailcfg{retries}
+     `$mailcfg{retries} = 1;'
+
+     How many times should the connection to the same SMTP server be
+     retried in case of a failure.
+
+     Default: 1;
+
+$mailcfg{delay}
+     `$mailcfg{delay} = 1;'
+
+     Number of seconds to wait between retries. This delay also happens
+     before trying the next server in the list, if the retries for the
+     current server have been exhausted. For CGI scripts, you want few
+     retries and short delays to return with a results page before the
+     http connection times out. For unattended scripts, you may want to
+     use many retries and long delays to have a good chance of your mail
+     being sent even with temporary failures on your network.
+
+     Default: 1 (second);
+
+$mailcfg{tz}
+     `$mailcfg{tz} = '+0800';'
+
+     Normally, your time zone is set automatically, from the difference
+     between `time()' and `gmtime()'. This allows you to override
+     automatic detection in cases where your system is confused (such as
+     some Win32 systems in zones which do not use daylight savings time:
+     see Microsoft KB article Q148681)
+
+     Default: undefined (automatic detection at run-time).
+
+$mailcfg{port}
+     `$mailcfg{port} = 25;'
+
+     Port used when none is specified in the server name.
+
+     Default: 25.
+
+$mailcfg{debug}
+     `$mailcfg{debug} =' 0;>
+
+     Prints stuff to STDERR. Not used much, and what is printed may change
+     without notice. Don't count on it.
+
+     Default: 0;
+
+$Mail::Sendmail::VERSION
+------------------------
+
+   The package version number (you can not import this one)
+
+Configuration variables from previous versions
+----------------------------------------------
+
+   The following global variables were used in version 0.74 for
+configuration.  They should still work, but will not in a future version
+(unless you complain loudly). Please use *%mailcfg* if you need to access
+the configuration from your scripts.
+
+$Mail::Sendmail::default_smtp_server
+$Mail::Sendmail::default_smtp_port
+$Mail::Sendmail::default_sender
+$Mail::Sendmail::TZ
+$Mail::Sendmail::connect_retries
+$Mail::Sendmail::retry_delay
+$Mail::Sendmail::use_MIME
+     This one couldn't really be used in the previous version, so I just
+     dropped it.  It is replaced by *$mailcfg{mime}* which works.
+
+ANOTHER EXAMPLE
+===============
+
+     use Mail::Sendmail;
+
+     print "Testing Mail::Sendmail version $Mail::Sendmail::VERSION\n";
+     print "Default server: $Mail::Sendmail::mailcfg{smtp}->[0]\n";
+     print "Default sender: $Mail::Sendmail::mailcfg{from}\n";
+
+     %mail = (
+         #To      => 'No to field this time, only Bcc and Cc',
+         #From    => 'not needed, use default',
+         Bcc     => 'Someone <him@there.com>, Someone else her@there.com',
+         # only addresses are extracted from Bcc, real names disregarded
+         Cc      => 'Yet someone else <xz@whatever.com>',
+         # Cc will appear in the header. (Bcc will not)
+         Subject => 'Test message',
+         'X-Mailer' => "Mail::Sendmail version $Mail::Sendmail::VERSION",
+     );
+
+     $mail{Smtp} = 'special_server.for-this-message-only.domain.com';
+     $mail{'X-custom'} = 'My custom additionnal header';
+     $mail{'mESSaGE : '} = "The message key looks terrible, but works.";
+     # cheat on the date:
+     $mail{Date} = Mail::Sendmail::time_to_date( time() - 86400 ),
+
+     if (sendmail %mail) { print "Mail sent OK.\n" }
+     else { print "Error sending mail: $Mail::Sendmail::error \n" }
+
+     print "\n\$Mail::Sendmail::log says:\n", $Mail::Sendmail::log;
+
+CHANGES
+=======
+
+   Single-letter host names bug fixed since version 0.77. See the Changes
+file for the full history.
+
+AUTHOR
+======
+
+   Milivoj Ivkovic mi@alma.ch or ivkovic@bluewin.ch
+
+NOTES
+=====
+
+   MIME::QuotedPrint is used by default on every message if available. It
+allows reliable sending of accented characters, and also takes care of too
+long lines (which can happen in HTML mails). It is available in the
+MIME-Base64 package at http://www.perl.com/CPAN/modules/by-module/MIME/ or
+through PPM.
+
+   Look at http://alma.ch/perl/Mail-Sendmail-FAQ.htm for additional info
+(CGI, examples of sending attachments, HTML mail etc...)
+
+   You can use it freely. (Someone complained this is too vague. So, more
+precisely: do whatever you want with it, but be warned that terrible things
+will happen to you if you use it badly, like for sending spam, claiming you
+wrote it alone, or ...?)
+
+   I would appreciate a short (or long) e-mail note if you use this (and
+even if you don't, especially if you care to say why). And of course,
+bug-reports and/or suggestions are welcome.
+
+   Last revision: 25.09.2000. Latest version should be available at
+http://alma.ch/perl/mail.htm , and a few days later on CPAN.
+
+
+File: pm.info,  Node: Mail/Stats,  Next: Mail/Stats/Record,  Prev: Mail/Sendmail,  Up: Module List
+
+Perl module for getting quick statistics on procmail generated mailbox files.
+*****************************************************************************
+
+NAME
+====
+
+   Mail::Stats - Perl module for getting quick statistics on procmail
+generated mailbox files.
+
+SYNOPSIS
+========
+
+     use Mail::Stats;
+
+DESCRIPTION
+===========
+
+   This is the beginning of a quick and dirty mbox statistics program.  It
+will be very reworked over the next many moons.  Hopefully it is mildly
+useful in its current format.
+
+   More documentation would be here, but I am getting on a plane to another
+country, and would like to get something out in an alpha state before I
+leave.
+
+AUTHOR     Sean Dague   sean@dague.net   http://dague.net/sean
+==============================================================
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: Mail/Stats/Record,  Next: Mail/TieFolder,  Prev: Mail/Stats,  Up: Module List
+
+Perl module for holding stats about a mailbox
+*********************************************
+
+NAME
+====
+
+   Mail::Stats::Record - Perl module for holding stats about a mailbox
+
+SYNOPSIS
+========
+
+     use Mail::Stats::Record;
+
+DESCRIPTION
+===========
+
+AUTHOR     Sean Dague   sean@dague.net   http://dague.net/sean
+==============================================================
+
+SEE ALSO
+========
+
+   perl(1), Mail::Stats
+
+
+File: pm.info,  Node: Mail/TieFolder,  Next: Mail/Util,  Prev: Mail/Stats/Record,  Up: Module List
+
+Tied hash interface for mail folders
+************************************
+
+NAME
+====
+
+   Mail::TieFolder - Tied hash interface for mail folders
+
+SYNOPSIS
+========
+
+     use Mail::TieFolder;
+
+     # assuming inbox is an MH folder, and the
+     # Mail::TieFolder::mh module is installed:
+     tie (%inbox, 'Mail::TieFolder', 'mh', 'inbox');
+
+     # get list of all message IDs in folder
+     @messageIDs = keys (%inbox);
+
+     # fetch message (as Mail::Internet object) by ID
+     $msg = $inbox{'9287342.2138749@foo.com'};
+
+DESCRIPTION
+===========
+
+   Mail::TieFolder implements a tied hash interface for manipulating
+folder contents.  Messages in the hash are accessed by Message-Id.
+
+   See the Mail::TieFolder::* modules on CPAN for supported folder
+formats.  If the format you're looking for isn't supported, please feel
+free to implement your own module and upload it to CPAN as
+Mail::TieFolder::yourformat.  New formats are by design relatively easy to
+implement - see `"IMPLEMENTING A NEW MAILBOX FORMAT"' in this node for
+guidelines.
+
+COMPARISON WITH OTHER MODULES
+=============================
+
+   As with all things in Perl, There Is More Than One Way To Do It.
+
+   Mail::TieFolder and the Mail::TieFolder::* modules provide a
+lightweight API for manipulating the contents of mail folders in various
+formats.  These modules only put, fetch, create, delete, or refile
+messages in folders, using Message-ID as the message handle.  They don't
+pretend to know anything about the internal formatting of the messages
+themselves (leaving that to Mail::Internet), they don't do indexing,
+searches, address books, or other MUA stuff, nor do they pretend to
+provide any overall management of your folders.  They can, however, be
+used to move or copy messages between folders, and will create a new
+folder if you name a non-existent folder in the tie().
+
+   The Mail::Folder, Mail::Box, and Mail::MsgStore modules also provide
+for managing folders and their contents.  Those modules generally have
+more of a concept of managing your whole mail world of multiple folders,
+including address books, folder searches, indexes, and other MUA tools.  I
+didn't need this, and the additional overhead was prohibitive.  The
+additional capabilities of those modules also mean that implementing
+modules to support new folder formats is a more complex undertaking.
+
+   I went with a tie() interface for Mail::TieFolder because it
+constrained the API to a reasonably small and well-defined set of
+functions.  This lowers the bar of entry for other authors who want to add
+Mail::TieFolder::* modules to support additional folder formats.
+
+   Both Mail::Folder and the Mail::Box::Tie modules use message sequence
+numbers as the primary key into a folder.  Message sequence numbers are
+not fixed attributes uniquely attached to one and only one message, and
+can change as a folder is resorted and packed, and as messages are moved
+between folders.
+
+   For Mail::TieFolder, I instead used Message-ID as the key into a mail
+folder, since it's theoretically a globally unique identifier.  This way
+you can sort, renumber, pack, and so on, and still have safe, immutable,
+persistent handles on individual messages.
+
+   (Note that Mail::Box does support a messageID() method, and if you were
+so inclined, you could use Mail::Box as the backend for a
+Mail::TieFolder::* module, provided that the correct Mail::Box::* module
+exists to support your desired folder format.  This would be putting a
+lightweight and constrained interface on the front of a much more capable
+and heavyweight engine, but might meet your needs.)
+
+IMPLEMENTING A NEW MAILBOX FORMAT
+=================================
+
+   Mail::TieFolder::* modules to support additional mailbox formats are
+easy to implement; you only need to support the API functions for a tied
+hash (TIEHASH, FETCH, FIRSTKEY, NEXTKEY, EXISTS, STORE, and DELETE).  See
+the Perl Cookbook, *Note Perltie: (perl.info)perltie, or the
+Mail::TieFolder::mh module code for examples.  I'd suggest using 'h2xs
+-Xn` to create a template for your module.
+
+   To ensure compatibility with other Mail::TieFolder::* modules, make a
+./t directory under the distribution tree for your new module, then copy
+the test scripts and other data files from the ./t directory of the
+Mail::TieFolder::mh distribution into the ./t directory of your own
+module's tree, and edit them accordingly to get rid of the mh-specific
+stuff and add any setup which your mailbox format needs.
+
+   These test scripts will exercise your new module via the
+Mail::TieFolder module to make sure they are talking to each other
+correctly.
+
+   Make sure when you edit the test scripts that you change the folder
+format in the tie() calls.  You'll also want to delete the dummy ./test.pl
+script which h2xs generated and then re-run 'perl Makefile.PL' to generate
+a Makefile which recognizes the ./t subdirectory.
+
+   If you run into "can't find subroutine" problems, you may not be doing
+the inheritance right - careful, Mail::TieFolder ISA
+Mail::TieFolder::yourformat, not the other way around.  See the TIEHASH
+functions in Mail::TieFolder and Mail::TieFolder::mh - note in particular
+the @ISA stuff in Mail::TieFolder and the ref() calls in the
+Mail::TieFolder::mh bless().  Also make sure you've removed the 'our @ISA'
+line in your new h2xs generated code - it masks the @ISA in
+Mail::TieFolder.
+
+   When you're happy with your module, you'll want to upload it to CPAN -
+see ftp://cpan.org/pub/CPAN/modules/04pause.html.
+
+AUTHOR
+======
+
+   Steve Traugott, stevegt@TerraLuna.Org
+
+SEE ALSO
+========
+
+   *Note Perltie: (perl.info)perltie,, `Mail::TieFolder::mh' in this node,
+*Note Mail/Folder: Mail/Folder,, *Note Mail/MsgStore: Mail/MsgStore,,
+*Note Mail/Box: Mail/Box,
+
+
+File: pm.info,  Node: Mail/Util,  Next: Mail/Vmailmgr,  Prev: Mail/TieFolder,  Up: Module List
+
+mail utility functions
+**********************
+
+NAME
+====
+
+   Mail::Util - mail utility functions
+
+SYNOPSIS
+========
+
+   use Mail::Util qw( ... );
+
+DESCRIPTION
+===========
+
+   This package provides several mail related utility functions. Any
+function required must by explicitly listed on the use line to be exported
+into the calling package.
+
+read_mbox( $file )
+------------------
+
+   Read $file, a binmail mailbox file, and return a list of  references.
+Each reference is a reference to an array containg one message.
+
+maildomain()
+------------
+
+   Attempt to determine the current uers mail domain string via the
+following methods
+
+     Look for a sendmail.cf file and extract DH parameter
+     Look for a smail config file and usr the first host defined in hostname(s)
+     Try an SMTP connect (if Net::SMTP exists) first to mailhost then localhost
+     Use value from Net::Domain::domainname (if Net::Domain exists)
+
+mailaddress()
+-------------
+
+   Return a guess at the current users mail address. The user can force
+the return value by setting `$ENV{MAILADDRESS}'
+
+AUTHOR
+======
+
+   Graham Barr <gbarr@pobox.com>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1995-8 Graham Barr. All rights reserved. This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+
+File: pm.info,  Node: Mail/Vmailmgr,  Next: Mail/XML,  Prev: Mail/Util,  Up: Module List
+
+A Perl module to use Vmailmgr daemon.
+*************************************
+
+NAME
+====
+
+   Mail::Vmailmgr - A Perl module to use Vmailmgr daemon.
+
+SYNOPSIS
+========
+
+   use Mail::Vmailmgr;
+
+   #create a user account martin@mydomain.com vadduser("mydomain.com",
+"my_domain_passwd", "martin");
+
+DESCRIPTION
+===========
+
+   This module allows easy interaction with the vmailmgrd, a daemon
+designed to allow access to all of vmailmgr functions from unprivileged
+accounts, such as CGI scripts usually have.
+
+   It was designed and tested against vmailmgrd version 0.96.9. A major
+rewrite of vmailmgrd is expected, so this module may not work properly
+with newer versions of vmailmgrd.
+
+AUTHOR
+======
+
+   The author and mantainer of this module is Martin Langhoff
+<martin@scim.net>.
+
+   Most of this initial release is based on the PHP version written by
+Mike Bell <mike@mikebell.org>. This module would not be here without
+Mike's help.
+
+Passwords
+=========
+
+   Commands that operate on an existing virtual user account can be
+authorized with either the virtual user account password, or with the
+domain-user password.
+
+   Commands that operate on the virtual domain, such as vadduser, can only
+be authorized with the domain-user password.
+
+Return codes
+============
+
+   In a very un-perlish fashion, all of these functions (with a few
+exceptions) will return an array where the first positions indicates if
+the command succeded or not.
+
+   If the command did not succeed, the error code will be >0. And probably
+you'll find string in the second position of the array, indicating what
+went wrong.
+
+   The success code is "0". This is consistent with the design of the
+vmailmgrd interface, and very inconsistent with the general Perl fashion.
+
+vlistdomain($domain, $password){
+================================
+
+   Returns the user accounts available in the virtual domain.
+
+   Similar to the listvdomain binary, supplied with Vmailmgr.
+
+vlookup($domain, $user, $password)
+==================================
+
+   Returns for a single virtual user what vlistdomain does for an entire
+domain.
+
+vadduser($domain, $password, $username, $userpass, @forwards)
+=============================================================
+
+   Similar to the vadduser binary, supplied with Vmailmgr.
+
+vaddalias($domain, $password, $username, $userpass, @forwards)
+==============================================================
+
+   Similar to the vaddalias binary, supplied with Vmailmgr.
+
+vdeluser($domain, $password, $username)
+=======================================
+
+   Similar to the vdeluser binary, supplied with Vmailmgr.
+
+vchpass($domain, $password, $username, $newpass)
+================================================
+
+   Similar to the vchpassd binary, supplied with Vmailmgr.
+
+vchforward($domain, $password, $username, @forwards)
+====================================================
+
+   Similar to the vchpassd binary, supplied with Vmailmgr.
+
+vchattr($domain, $password, $username, $attr, $value)
+=====================================================
+
+   Change Attribute. Chech attribute list and the possible values with the
+vmailmgr documentation.
+
+vwriteautoresponse($domain, $password, $username, $message)
+===========================================================
+
+   missing explanation
+
+vreadautoresponse($domain, $password, $username, $message)
+==========================================================
+
+   missing explanation
+
+vdisableautoresponse($domain, $password, $username, $message)
+=============================================================
+
+   missing explanation
+
+venableautoresponse($domain, $password, $username, $message)
+============================================================
+
+   missing explanation
+
+vautoresponsestatus($domain, $password, $username, $message)
+============================================================
+
+   missing explanation
+
+SEE ALSO
+========
+
+   vmailmgr(7).
+
+
+File: pm.info,  Node: Mail/XML,  Next: Make,  Prev: Mail/Vmailmgr,  Up: Module List
+
+Adds a toXML() method to Mail::Internet.
+****************************************
+
+NAME
+====
+
+   Mail::XML - Adds a toXML() method to Mail::Internet.
+
+SYNOPSIS
+========
+
+     use Mail::XML;
+     my $mi = new Mail::XML(\@message);
+     print $mi->toXML();
+
+DESCRIPTION
+===========
+
+   All that this module does is provide a toXML() method to
+Mail::Internet.  For all intents and purposes, Mail::XML is Mail::Internet
+plus toXML(), so you are best off reading the Mail::Internet manpage :)
+
+WHY??
+=====
+
+   I had some messy scripts which took messages from a mailing list and
+archived them in XML.  When it came time to maintain my messy scripts, I
+was lost, so I started using Mail::Internet and just supplying my own
+toXML() method.  This module is an evolution of all of that :)
+
+FUTURE PLANS
+============
+
+   I plan on doing something useful with MIME attachments, supplying a
+toMIME() function.  Ideas and contributions are welcome.
+
+   =head1 AUTHOR
+
+   Matthew MacKenzie <matt@xmlglobal.com>
+
+SEE ALSO
+========
+
+   Mail::Internet
+
+
+File: pm.info,  Node: Make,  Next: Math/Amoeba,  Prev: Mail/XML,  Up: Module List
+
+module for processing makefiles
+*******************************
+
+NAME
+====
+
+   Make - module for processing makefiles
+
+SYNOPSIS
+========
+
+     require Make;
+     my $make = Make->new(...);
+     $make->parse($file);
+     $make->Script(@ARGV)
+     $make->Make(@ARGV)
+     $make->Print(@ARGV)
+
+     my $targ = $make->Target($name);
+     $targ->colon([dependancy...],[command...]);
+     $targ->dolon([dependancy...],[command...]);
+     my @depends  = $targ->colon->depend;
+     my @commands = $targ->colon->command;
+
+DESCRIPTION
+===========
+
+   Make->new creates an object if `new(Makefile => $file)' is specified
+then it is parsed. If not the usual makefile Makefile sequence is used.
+(If GNU => 1 is passed to new then GNUmakefile is looked for first.)
+
+   `$make->Make(target...)' 'makes' the target(s) specified (or the first
+'real' target in the makefile).
+
+   `$make->Print' can be used to 'print' to current select'ed stream a
+form of the makefile with all variables expanded.
+
+   `$make->Script(target...)' can be used to 'print' to current select'ed
+stream the equivalent bourne shell script that a make would perform i.e.
+the output of `make -n'.
+
+   There are other methods (used by parse) which can be used to add and
+manipulate targets and their dependants. There is a hierarchy of classes
+which is still evolving. These classes and their methods will be
+documented when they are a little more stable.
+
+   The syntax of makefile accepted is reasonably generic, but I have not
+re-read any documentation yet, rather I have implemented my own mental
+model of how make works (then fixed it...).
+
+   In addition to traditional
+
+     .c.o :
+     	$(CC) -c ...
+
+   GNU make's 'pattern' rules e.g.
+
+     %.o : %.c
+     	$(CC) -c ...
+
+   Likewise a subset of GNU makes $(function arg...) syntax is supported.
+
+   Via pmake Make has built perl/Tk from the MakeMaker generated
+Makefiles...
+
+BUGS
+====
+
+   At present new must always find a makefile, and `$make->parse($file)'
+can only be used to augment that file.
+
+   More attention needs to be given to using the package to write
+makefiles.
+
+   The rules for matching 'dot rules' e.g. .c.o   and/or pattern rules
+e.g. %.o : %.c are suspect. For example give a choice of .xs.o vs .xs.c +
+.c.o behaviour seems a little odd.
+
+   Variables are probably substituted in different 'phases' of the process
+than in make(1) (or even GNU make), so 'clever' uses will probably not
+work.
+
+   UNIXisms abound.
+
+SEE ALSO
+========
+
+   `pmake' in this node
+
+AUTHOR
+======
+
+   Nick Ing-Simmons
+
+
+File: pm.info,  Node: Math/Amoeba,  Next: Math/Approx,  Prev: Make,  Up: Module List
+
+SYNOPSIS
+========
+
+     use Math::Amoeba qw(ConstructVertices EvaluateVertices Amoeba MinimiseND);
+     my ($vertice,$y)=MinimiseND(\@guess,\@scales,\&func,$tol,$itmax);
+     my @vertices=ConstructVertices(\@vector,\@offsets);
+     my @y=EvaluateVertices(\@vertices,\&func);
+     my ($vertice,$y)=Amoeba(\@vertices,\@y,\&func,$tol,$itmax);
+
+DESCRIPTION
+===========
+
+   This is an implimenation of the Downhill Simpex Method in
+Multidimensions (Nelder and Mead) for finding the (local) minimum of a
+function. Doing this in Perl makes it easy for that function to actually
+be the output of another program such as a simulator.
+
+   Arrays and the function are passed by reference to the routines.
+
+   The simplest use is the *MinimiseND* function. This takes a reference
+to an array of guess values for the parameters at the function minimum, a
+reference to an array of scales for these parameters (sensible ranges
+around the guess in which to look), a reference to the function, a
+convergence tolerence for the minimum and the maximum number of iterations
+to be taken. It returns an array consisting of a reference to the function
+parameters at the minimum and the value there.
+
+   The *Amoeba* function is the actual implimentation of the Downhill
+Simpex Method in Multidimensions. It takes a reference to an array of
+references to arrays which are the initial n+1 vertices (where n is the
+number of function parameters), a reference to the function valuation at
+these vertices, a reference to the function, a convergence tolerence for
+the minimum and the maximum number of iterations to be taken. It returns
+an array consisting of a reference to the function parameters at the
+minimum and the value there.
+
+   The *ConstructVertices* is used by *MinimiseND* to construct the
+initial vertices for *Amoeba* as the initial guess plus the parameter
+scale parameters as vectors along the parameter axis.
+
+   The *EvaluateVertices* takes these set of vertices, calling the
+function for each one and returning the vector of results.
+
+EXAMPLE
+=======
+
+     use Math::Amoeba qw(MinimiseND);
+     sub afunc {
+       my ($a,$b)=@_;
+       print "$a\t$b\n";
+       return ($a-7)**2+($b+3)**2;
+     }
+     my @guess=(1,1);
+     my @scale=(1,1);
+     ($p,$y)=MinimiseND(\@guess,\@scale,\&afunc,1e-7,100);
+     print "(",join(',',@{$p}),")=$y\n";
+
+   produces the output
+
+   (6.99978191653352,-2.99981241563247)=1.00000008274829
+
+HISTORY
+=======
+
+   $Log: Amoeba.pm,v $ Revision 1.2  1995/12/24 12:37:46  willijar General
+fixup. Added documentation.
+
+BUGS
+====
+
+   If the function value converges to exactly zero then the condition for
+convergence fails and maximum iterations will be exceeded or there will be
+a divide by zero error. There is no obvious way to test for convergence in
+this case however adding 1 onto the function value gives expected
+behaviour. i.e. replace '\&afunc' with 'sub { 1+afunc(@_); }' when calling
+the routines.
+
+   Let me know.
+
+AUTHOR
+======
+
+   John A.R. Williams <J.A.R.Williams@aston.ac.uk>
+
+SEE ALSO
+========
+
+   "Numerical Recipies: The Art of Scientific Computing" W.H. Press, B.P.
+Flannery, S.A. Teukolsky, W.T. Vetterling.  Cambridge University Press.
+ISBN 0 521 30811 9.
+
+
+File: pm.info,  Node: Math/Approx,  Next: Math/BaseCalc,  Prev: Math/Amoeba,  Up: Module List
+
+Math::Approx
+************
+
+NAME
+====
+
+   Math::Approx
+
+METHODS
+=======
+
+new (constructor)
+-----------------
+
+     Math::Approx->new(\&poly, $degree, %data);
+
+   If the first argument to the constructor is a CODE reference, this is
+used as the function to iterate over the data. Such a function must take
+two arguments: The *degree* and the x value.
+
+   For interpolation with plain polynomials poly can be defined as:
+
+     sub poly {
+         my($n,$x) = @_;
+         return $x ** $n;
+     }
+
+   If the first argument in the constructor is a FALSE value instead of a
+CODE reference, then the above plain polynomial poly is used as the
+iterator function.
+
+   The second argument is the maximum degree which should be used for
+interpolation. Degrees start with 0.
+
+   The rest of the arguments are treated as pairs of x and y samples which
+should be approximated.
+
+   The constructor returns a Math::Approx reference.
+
+approx
+------
+
+     $approximation->approx(17);
+
+   The method returns the approximated  y value for the x value given as
+argument.
+
+fit
+---
+
+     $approximation->fit;
+
+   Returns the medim square error for the data points.
+
+plot
+----
+
+     $approximation->plot("tmp/app");
+
+   Prints all data pairs and the corresponding approximation pairs into
+the filename given as argument. The output is suitable for usage with
+gnuplot(1).
+
+print
+-----
+
+     $approximation->print;
+
+   Prints information about the approximation on STDOUT
+
+EXAMPLE
+=======
+
+     use Math::Approx;
+     
+     sub poly {
+         my($n,$x) = @_;
+         return $x ** $n;
+     }
+     
+     for (1..20) {
+         $x{$_} = sin($_/10)*cos($_/30)+0.3*rand;
+     }
+     
+     $a = new Math::Approx (\&poly, 5, %x);
+     $a->print;
+     $a->plot("math-approx-demo.out");
+     print "Fit: ", $a->fit, "\n";
+
+SEE ALSO
+========
+
+   gnuplot(1).
+
+AUTHOR
+======
+
+   Ulrich Pfeifer <`pfeifer@wait.de'>
+
+
+File: pm.info,  Node: Math/BaseCalc,  Next: Math/Bezier,  Prev: Math/Approx,  Up: Module List
+
+Convert numbers between various bases
+*************************************
+
+NAME
+====
+
+   Math::BaseCalc - Convert numbers between various bases
+
+SYNOPSIS
+========
+
+     use Math::BaseCalc;
+
+     my $calc = new Math::BaseCalc(digits => [0,1]); #Binary
+     my $bin_string = $calc->to_base(65); # Convert 465 to binary
+
+     $calc->digits('oct'); # Octal
+     my $number = $calc->from_base('1574'); # Convert octal 1574 to decimal
+
+DESCRIPTION
+===========
+
+   This module facilitates the conversion of numbers between various
+number bases.  You may define your own digit sets, or use any of several
+predefined digit sets.
+
+   The to_base() and from_base() methods convert between Perl numbers and
+strings which represent these numbers in other bases.  For instance, if
+you're using the binary digit set [0,1], $calc->to_base(5) will return the
+string "101".  $calc->from_base("101") will return the number 5.
+
+   To convert between, say, base 7 and base 36, use the 2-step process of
+first converting to a Perl number, then to the desired base for the result:
+
+     $calc7  = new Math::BaseCalc(digits=>[0..7]);
+     $calc36 = new Math::BaseCalc(digits=>[0..9,'a'..'z'];
+     
+     $in_base_36 = $calc36->to_base( $calc7->from_base('3506') );
+
+   If you just need to handle regular octal & hexdecimal strings, you
+probably don't need this module.  See the sprintf(), oct(), and hex() Perl
+functions.
+
+METHODS
+=======
+
+   * new Math::BaseCalc
+
+   * new Math::BaseCalc(digits=>...)
+
+     Create a new base calculator.  You may specify the digit set to use,
+     by either giving the digits in a list reference (in increasing order,
+     with the 'zero' character first in the list) or by specifying the name
+     of one of the predefined digit sets (see the digit() method below).
+
+   * $calc->to_base(NUMBER)
+
+     Converts a number to a string representing that number in the
+     associated base.  Currently only handles integers.
+
+   * $calc->from_base(STRING)
+
+     Converts a string representing a number in the associated base to a
+     Perl integer.  Currently only handles integers.  The behavior when fed
+     strings with characters not in $calc's digit set is currently
+     undefined.
+
+   * $calc->digits
+
+   * $calc->digits(...)
+
+     Get/set the current digit set of the calculator.  With no arguments,
+     simply returns a list of the characters that make up the current digit
+     set.  To change the current digit set, pass a list reference
+     containing the new digits, or the name of a predefined digit set.
+     Currently the predefined digit sets are:
+
+          bin => [0,1],
+          hex => [0..9,'a'..'f'],
+          HEX => [0..9,'A'..'F'],
+          oct => [0..7],
+          64  => ['A'..'Z','a'..'z',0..9,'+','/'],
+          62  => [0..9,'a'..'z','A'..'Z'],
+          
+           Examples:
+            $calc->digits('bin');
+            $calc->digits([0..7]);
+            $calc->digits([qw(w a l d o)]);
+
+     If any of your "digits" has more than one character, the behavior is
+     currently undefined.
+
+QUESTIONS
+=========
+
+   The '64' digit set is meant to be useful for Base64 encoding.  I took
+it from the MIME::Base64.pm module.  Does it look right?  It's sure in a
+strange order.
+
+AUTHOR
+======
+
+   Ken Williams, ken@forum.swarthmore.edu
+
+COPYRIGHT
+=========
+
+   This is free software in the colloquial nice-guy sense of the word.
+Copyright (c) 1999, Ken Williams.  You may redistribute and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: Math/Bezier,  Next: Math/BigFloat,  Prev: Math/BaseCalc,  Up: Module List
+
+solution of Bezier Curves
+*************************
+
+NAME
+====
+
+   Math::Bezier - solution of Bezier Curves
+
+SYNOPSIS
+========
+
+     use Math::Bezier;
+
+     # create curve passing list of (x, y) control points
+     my $bezier = Math::Bezier->new($x1, $y1, $x2, $y2, ..., $xn, $yn);
+
+     # or pass reference to list of control points
+     my $bezier = Math::Bezier->new([ $x1, $y1, $x2, $y2, ..., $xn, $yn]);
+
+     # determine (x, y) at point along curve, range 0 -> 1
+     my ($x, $y) = $bezier->point(0.5);
+
+     # returns list ref in scalar context
+     my $xy = $bezier->point(0.5);
+
+     # return list of 20 (x, y) points along curve
+     my @curve = $bezier->curve(20);
+
+     # returns list ref in scalar context
+     my $curve = $bezier->curve(20);
+
+DESCRIPTION
+===========
+
+   This module implements the algorithm for the solution of Bezier curves
+as presented by Robert D. Miller in Graphics Gems V, "Quick and Simple
+Bezier Curve Drawing".
+
+   A new Bezier curve is created using the new() constructor, passing a
+list of (x, y) control points.
+
+     use Math::Bezier;
+
+     my @control = ( 0, 0, 10, 20, 30, -20, 40, 0 );
+     my $bezier  = Math::Bezier->new(@control);
+
+   Alternately, a reference to a list of control points may be passed.
+
+     my $bezier  = Math::Bezier->new(\@control);
+
+   The point($theta) method can then be called on the object, passing a
+value in the range 0 to 1 which represents the distance along the curve.
+When called in list context, the method returns the x and y coordinates of
+that point on the Bezier curve.
+
+     my ($x, $y) = $bezier->point(0.5);
+     print "x: $x  y: $y\n
+
+   When called in scalar context, it returns a reference to a list
+containing the x and y coordinates.
+
+     my $point = $bezier->point(0.5);
+     print "x: $point->[0]  y: $point->[1]\n";
+
+   The curve($n) method can be used to return a set of points sampled
+along the length of the curve (i.e. in the range 0 <= $theta <= 1).  The
+parameter indicates the number of sample points required, defaulting to 20
+if undefined.  The method returns a list of ($x1, $y1, $x2, $y2, ..., $xn,
+$yn) points when called in list context, or a reference to such an array
+when called in scalar context.
+
+     my @points = $bezier->curve(10);
+
+     while (@points) {
+     	my ($x, $y) = splice(@points, 0, 2);
+     	print "x: $x  y: $y\n";
+     }
+
+     my $points = $bezier->curve(10);
+
+     while (@$points) {
+     	my ($x, $y) = splice(@$points, 0, 2);
+     	print "x: $x  y: $y\n";
+     }
+
+AUTHOR
+======
+
+   Andy Wardley <abw@kfs.org>
+
+SEE ALSO
+========
+
+   Graphics Gems 5, edited by Alan W. Paeth, Academic Press, 1995, ISBN
+0-12-543455-3.  Section IV.8, 'Quick and Simple Bezier Curve Drawing' by
+Robert D. Miller, pages 206-209.
+
+
+File: pm.info,  Node: Math/BigFloat,  Next: Math/BigInt,  Prev: Math/Bezier,  Up: Module List
+
+Arbitrary length float math package
+***********************************
+
+NAME
+====
+
+   Math::BigFloat - Arbitrary length float math package
+
+SYNOPSIS
+========
+
+     use Math::BigFloat;
+     $f = Math::BigFloat->new($string);
+
+     $f->fadd(NSTR) return NSTR            addition
+     $f->fsub(NSTR) return NSTR            subtraction
+     $f->fmul(NSTR) return NSTR            multiplication
+     $f->fdiv(NSTR[,SCALE]) returns NSTR   division to SCALE places
+     $f->fneg() return NSTR                negation
+     $f->fabs() return NSTR                absolute value
+     $f->fcmp(NSTR) return CODE            compare undef,<0,=0,>0
+     $f->fround(SCALE) return NSTR         round to SCALE digits
+     $f->ffround(SCALE) return NSTR        round at SCALEth place
+     $f->fnorm() return (NSTR)             normalize
+     $f->fsqrt([SCALE]) return NSTR        sqrt to SCALE places
+
+DESCRIPTION
+===========
+
+   All basic math operations are overloaded if you declare your big floats
+as
+
+     $float = new Math::BigFloat "2.123123123123123123123123123123123";
+
+number format
+     canonical strings have the form /[+-]\d+E[+-]\d+/ .  Input values can
+     have embedded whitespace.
+
+Error returns 'NaN'
+     An input parameter was "Not a Number" or divide by zero or sqrt of
+     negative number.
+
+Division is computed to
+     `max($Math::BigFloat::div_scale,length(dividend)+length(divisor))'
+     digits by default.  Also used for default sqrt scale.
+
+Rounding is performed
+     according to the value of `$Math::BigFloat::rnd_mode':
+
+          trunc     truncate the value
+          zero      round towards 0
+          +inf      round towards +infinity (round up)
+          -inf      round towards -infinity (round down)
+          even      round to the nearest, .5 to the even digit
+          odd       round to the nearest, .5 to the odd digit
+
+     The default is `even' rounding.
+
+BUGS
+====
+
+   The current version of this module is a preliminary version of the real
+thing that is currently (as of perl5.002) under development.
+
+   The printf subroutine does not use the value of
+`$Math::BigFloat::rnd_mode' when rounding values for printing.
+Consequently, the way to print rounded values is to specify the number of
+digits both as an argument to `ffround' and in the `%f' printf string, as
+follows:
+
+     printf "%.3f\n", $bigfloat->ffround(-3);
+
+AUTHOR
+======
+
+   Mark Biggar
+
+
+File: pm.info,  Node: Math/BigInt,  Next: Math/BigIntFast,  Prev: Math/BigFloat,  Up: Module List
+
+Arbitrary size integer math package
+***********************************
+
+NAME
+====
+
+   Math::BigInt - Arbitrary size integer math package
+
+SYNOPSIS
+========
+
+     use Math::BigInt;
+     $i = Math::BigInt->new($string);
+
+     $i->bneg return BINT               negation
+     $i->babs return BINT               absolute value
+     $i->bcmp(BINT) return CODE         compare numbers (undef,<0,=0,>0)
+     $i->badd(BINT) return BINT         addition
+     $i->bsub(BINT) return BINT         subtraction
+     $i->bmul(BINT) return BINT         multiplication
+     $i->bdiv(BINT) return (BINT,BINT)  division (quo,rem) just quo if scalar
+     $i->bmod(BINT) return BINT         modulus
+     $i->bgcd(BINT) return BINT         greatest common divisor
+     $i->bnorm return BINT              normalization
+     $i->blsft(BINT) return BINT        left shift
+     $i->brsft(BINT) return (BINT,BINT) right shift (quo,rem) just quo if scalar
+     $i->band(BINT) return BINT         bit-wise and
+     $i->bior(BINT) return BINT         bit-wise inclusive or
+     $i->bxor(BINT) return BINT         bit-wise exclusive or
+     $i->bnot return BINT               bit-wise not
+
+DESCRIPTION
+===========
+
+   All basic math operations are overloaded if you declare your big
+integers as
+
+     $i = new Math::BigInt '123 456 789 123 456 789';
+
+Canonical notation
+     Big integer value are strings of the form `/^[+-]\d+$/' with leading
+     zeros suppressed.
+
+Input
+     Input values to these routines may be strings of the form
+     `/^\s*[+-]?[\d\s]+$/'.
+
+Output
+     Output values always always in canonical form
+
+   Actual math is done in an internal format consisting of an array whose
+first element is the sign (/^[+-]$/) and whose remaining elements are base
+100000 digits with the least significant digit first.  The string 'NaN' is
+used to represent the result when input arguments are not numbers, as well
+as the result of dividing by zero.
+
+EXAMPLES
+========
+
+     '+0'                            canonical zero value
+     '   -123 123 123'               canonical value '-123123123'
+     '1 23 456 7890'                 canonical value '+1234567890'
+
+Autocreating constants
+======================
+
+   After `use Math::BigInt ':constant'' all the integer decimal constants
+in the given scope are converted to Math::BigInt.  This conversion happens
+at compile time.
+
+   In particular
+
+     perl -MMath::BigInt=:constant -e 'print 2**100'
+
+   print the integer value of `2**100'.  Note that without conversion of
+constants the expression 2**100 will be calculated as floating point
+number.
+
+BUGS
+====
+
+   The current version of this module is a preliminary version of the real
+thing that is currently (as of perl5.002) under development.
+
+AUTHOR
+======
+
+   Mark Biggar, overloaded interface by Ilya Zakharevich.
+
+
+File: pm.info,  Node: Math/BigIntFast,  Next: Math/BigInteger,  Prev: Math/BigInt,  Up: Module List
+
+Efficient big integer arithmetic (in C)
+***************************************
+
+NAME
+====
+
+   Math::BigIntFast - Efficient big integer arithmetic (in C)
+
+SYNOPSIS
+========
+
+   See `Bit::Vector(3)' in this node and `Bit::Vector::Overload(3)' in
+this node.
+
+DESCRIPTION
+===========
+
+   See `Bit::Vector(3)' in this node and `Bit::Vector::Overload(3)' in
+this node.
+
+SEE ALSO
+========
+
+   Bit::Vector(3), Bit::Vector::Overload(3), Set::IntRange(3),
+Math::MatrixBool(3), Math::MatrixReal(3), DFA::Kleene(3), Math::Kleene(3),
+Graph::Kruskal(3), Math::Pari(3), PDL(3).
+
+VERSION
+=======
+
+   This man page documents "Math::BigIntFast" version 6.0.
+
+AUTHOR
+======
+
+     Steffen Beyer
+     mailto:sb@engelschall.com
+     http://www.engelschall.com/u/sb/download/
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000 by Steffen Beyer. All rights reserved.
+
+LICENSE
+=======
+
+   This package is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself, i.e., under the terms of the
+"Artistic License" or the "GNU General Public License".
+
+   The C library at the core of this Perl module can additionally be
+redistributed and/or modified under the terms of the "GNU Library General
+Public License".
+
+   Please refer to the files "Artistic.txt", "GNU_GPL.txt" and
+"GNU_LGPL.txt" in this distribution for details!
+
+DISCLAIMER
+==========
+
+   This package is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE.
+
+   See the "GNU General Public License" for more details.
+
+
+File: pm.info,  Node: Math/BigInteger,  Next: Math/Brent,  Prev: Math/BigIntFast,  Up: Module List
+
+Arbitrary length integer extension module for Perl
+**************************************************
+
+NAME
+====
+
+   BigInteger - Arbitrary length integer extension module for Perl
+
+SYNOPSIS
+========
+
+     use Math::BigInteger;
+
+DESCRIPTION
+===========
+
+   The BigInteger extension module gives access to Eric Young's bignum
+library.  This provides a faster alternative to the Math::BigInt library.
+
+   The basic object in this library is a BigInteger.  It is used to hold a
+single large integer.
+
+   It is not intended that this package be used directly, but instead be
+used by a wrapper package, such as the Math::BigInteger class.
+
+FUNCTIONS
+=========
+
+   Many of the following functions can be used in two styles, by calling
+the function on an object, or by calling the function explicitly; for
+example, here are two ways of assigning to $a the sum of $b and $c:
+
+     $a->add($b, $c);
+     or
+
+     BigInteger::add($a, $b, $c);
+
+Creation/Destruction routines.
+------------------------------
+
+new
+          my $bi = new BigInteger;	# Create a new BigInteger object.
+
+clone
+          my $b = $a->clone();
+
+     Create a new BigInteger object from another BigInteger object.
+
+copy
+          copy($a, $b);
+
+     Copy one BigInteger object to another.
+
+save
+          my $data = $bi->save();
+
+     Save a BigInteger object as a MSB-first string.
+
+restore
+          my $bi = restore BigInteger $data;
+
+     Create a new BigInteger object from a MSB-first string.
+
+Comparison functions
+--------------------
+
+ucmp
+          ucmp($a, $b);
+
+     Return -1 if $a is less than $b, 0 if $a and $b are the same and 1 is
+     $a is greater than $b.  This is an *unsigned* comparison.
+
+cmp
+          cmp($a, $b);
+
+     Return -1 if $a is less than $b, 0 if $a and $b are the same and 1 is
+     $a is greater than $b.  This is a *signed* comparison.
+
+Arithmetic Functions
+--------------------
+
+inc 	$bi->inc();
+     Increment $bi by one:
+
+dec 	$bi->dec();
+     Decrement $bi by one:
+
+add
+          $r->add($a, $b);
+
+     Add $a and $b and return the result in $r.
+
+mul
+          $r->mul($a, $b);
+
+     Multiply $a by $b and return the result in $r.  Note that $r must not
+     be the same object as $a or $b.
+
+div
+          div($dv, $rem, $m, $d);
+
+     Divide $m by $d and return the result in $dv and the remainder in
+     $rem.  Either of $dv or $rem can be undef, in which case that value
+     is not returned.
+
+mod
+          $rem->mod($m, $d);
+
+     Find the remainder of $m divided by $d and return it in $rem.  This
+     function is more efficient than div.
+
+lshift
+          $r->lshift($a, $n);
+
+     Shift $a left by $n bits.
+
+lshift1
+          $r->lshift1($a);
+
+     Shift $a left by 1 bit.  This form is more efficient than `lshift($r,
+     $a, 1)'.
+
+rshift
+          $r->rshift($a, $n);
+
+     Shift $a right by $n bits.
+
+rshift1
+          $r->rshift1($a);
+
+     Shift $a right by 1 bit.  This form is more efficient than
+     `rshift($r, $a, 1)'.
+
+mod_exp
+          $r->mod_exp($a, $p, $mod);
+
+     Raise $a to the $p power and return the remainder into $r when
+     divided by $m.
+
+modmul_recip
+          modmul_recip($r, $x, $y, $m, $i, $nb);
+
+     This function is used to perform an efficient `mod_mul' operation.
+     If one is going to repeatedly perform `mod_mul' with the same modulus
+     is worth calculating the reciprocal of the modulus and then using this
+     function.  This operation uses the fact that a/b == a*r where r is the
+     reciprocal of b.  On modern computers multiplication is very fast and
+     big number division is very slow.  $x is multiplied by $y and then
+     divided by $m and the remainder is returned in $r.  $i is the
+     reciprocal of $m and $nb is the number of bits as returned from
+     `reciprocal'.  This function is used in mod_exp.
+
+mul_mod
+          $r->mul_mod($a, $b, $m);
+
+     Multiply $a by $b and return the remainder into $r when divided by $m.
+
+reciprical
+          $r->reciprical($m);
+
+     Return the reciprocal of $m into $r.
+
+Miscellaneous Routines
+----------------------
+
+num_bits
+          my $size = $bi->numbits();
+
+     Return the size (in bits) of the BigInteger.
+
+gcd
+          $r->gcd($a, $b);
+
+     $r has the greatest common divisor of $a and $b.
+
+inverse_modn
+          $r->inverse_modn($a, $n);
+
+     This function creates a new BigInteger and returns it in $r.  This
+     number is the inverse mod $n of $a.  By this it is meant that the
+     returned value $r satisfies (a*r)%n == 1.  This function is used in
+     the generation of RSA keys.
+
+BUGS
+====
+
+   Negative numbers cannot be saved or restored.  To fix this requires
+modification of Eric Young's library.
+
+   The documentation.
+
+COPYRIGHT
+=========
+
+   Systemics Ltd ( http://www.systemics.com/ ).
+
+   Portions copyright Eric Young (eay@mincom.oz.au).
+
+

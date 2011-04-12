@@ -1,0 +1,2512 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: MIDI/Track,  Next: MIME/Base64,  Prev: MIDI/Simple,  Up: Module List
+
+functions and methods for MIDI tracks
+*************************************
+
+NAME
+====
+
+   MIDI::Track - functions and methods for MIDI tracks
+
+SYNOPSIS
+========
+
+     use MIDI; # ...which "use"s MIDI::Track et al
+     $taco_track = MIDI::Track->new;
+     $taco_track->events(
+      ['text_event', 0, "I like tacos!"],
+      ['note_on',    0, 4, 50, 96 ],
+      ['note_off', 300, 4, 50, 96 ],
+     );
+     $opus = MIDI::Opus->new(
+      {  'format' => 0,  'ticks' => 240,  'tracks' => [ $taco_track ] }
+     );
+       ...etc...
+
+DESCRIPTION
+===========
+
+   MIDI::Track provides a constructor and methods for objects representing
+a MIDI track.  It is part of the MIDI suite.
+
+   MIDI tracks have, currently, three attributes: a type, events, and
+data.  Almost all tracks you'll ever deal with are of type "MTrk", and so
+this is the type by default.  Events are what make up an MTrk track.  If a
+track is not of type MTrk, or is an unparsed MTrk, then it has (or better
+have!) data.
+
+   When an MTrk track is encoded, if there is data defined for it, that's
+what's encoded (and "encoding data" means just passing it thru untouched).
+Note that this happens even if the data defined is "" (but it won't
+happen if the data is undef).  However, if there's no data defined for the
+MTrk track (as is the general case), then the track's events are encoded,
+via a call to `MIDI::Event::encode'.
+
+   (If neither events not data are defined, it acts as a zero-length
+track.)
+
+   If a non-MTrk track is encoded, its data is encoded.  If there's no
+data for it, it acts as a zero-length track.
+
+   In other words, 1) events are meaningful only in an MTrk track, 2) you
+probably don't want both data and events defined, and 3) 99.999% of the
+time, just worry about events in MTrk tracks, because that's all you ever
+want to deal with anyway.
+
+CONSTRUCTOR AND METHODS
+=======================
+
+   MIDI::Track provides...
+
+the constructor MIDI::Track->new({ ...options... })
+     This returns a new track object.  By default, the track is of type
+     MTrk, which is probably what you want.  The options, which are
+     optional, is an anonymous hash.  There are four recognized options:
+     data, which sets the data of the new track to the string provided;
+     type, which sets the type of the new track to the string provided;
+     events, which sets the events of the new track to the contents of the
+     list-reference provided (i.e., a reference to a LoL - see *Note
+     Perllol: (perl.info)perllol, for the skinny on LoLs); and `events_r',
+     which is an exact synonym of events.
+
+the method $new_track = $track->copy
+     This duplicates the contents of the given track, and returns the
+     duplicate.  If you are unclear on why you may need this function,
+     consider:
+
+          $funk  = MIDI::Opus->new({'from_file' => 'funk1.mid'});
+          $samba = MIDI::Opus->new({'from_file' => 'samba1.mid'});
+          
+          $bass_track = ( $funk->tracks )[-1]; # last track
+          push(@{ $samba->tracks_r }, $bass_track );
+               # make it the last track
+          
+          &funk_it_up(  ( $funk->tracks )[-1]  );
+               # modifies the last track of $funk
+          &turn_it_out(  ( $samba->tracks )[-1]  );
+               # modifies the last track of $samba
+          
+          $funk->write_to_file('funk2.mid');
+          $samba->write_to_file('samba2.mid');
+          exit;
+
+     So you have your routines funk_it_up and turn_it_out, and they each
+     modify the track they're applied to in some way.  But the problem is
+     that the above code probably does not do what you want - because the
+     last track-object of $funk and the last track-object of $samba are the
+     *same object*.  An object, you may be surprised to learn, can be in
+     different opuses at the same time - which is fine, except in cases
+     like the above code.  That's where you need to do copy the object.
+     Change the above code to read:
+
+          push(@{ $samba->tracks_r }, $bass_track->copy );
+
+     and what you want to happen, will.
+
+     Incidentally, this potential need to copy also occurs with opuses (and
+     in fact any reference-based data structure, altho opuses and tracks
+     should cover almost all cases with MIDI stuff), which is why there's
+     $opus->copy, for copying entire opuses.
+
+     (If you happen to need to copy a single event, it's just $new =
+     [@$old] ; and if you happen to need to copy an event structure (LoL)
+     outside of a track for some reason, use MIDI::Event::copy_structure.)
+
+the method $track->events( @events )
+     Returns the list of events in the track, possibly after having set it
+     to @events, if specified and not empty.  (If you happen to want to set
+     the list of events to an empty list, for whatever reason, you have to
+     use "$track->events_r([])".)
+
+     In other words: $track->events(@events) is how to set the list of
+     events (assuming @events is not empty), and @events = $track->events
+     is how to read the list of events.
+
+the method $track->events_r( $event_r )
+     Returns a reference to the list of events in the track, possibly after
+     having set it to $events_r, if specified.  Actually, "$events_r" can
+     be any listref to a LoL, whether it comes from a scalar as in
+     `$some_events_r', or from something like `[@events]', or just plain
+     old `\@events'
+
+     Originally $track->events was the only way to deal with events, but I
+     added $track->events_r to make possible 1) setting the list of events
+     to (), for whatever that's worth, and 2) so you can directly
+     manipulate the track's events, without having to copy the list of
+     events (which might be tens of thousands of elements long) back and
+     forth.  This way, you can say:
+
+          $events_r = $track->events_r();
+          @some_stuff = splice(@$events_r, 4, 6);
+
+     But if you don't know how to deal with listrefs outside of LoLs,
+     that's OK, just use $track->events.
+
+the method $track->type( 'MFoo' )
+     Returns the type of $track, after having set it to 'MFoo', if
+     provided.  You probably won't ever need to use this method, other
+     than in a context like:
+
+          if( $track->type eq 'MTrk' ) { # The usual case
+            give_up_the_funk($track);
+          } # Else just keep on walkin'!
+
+     Track types must be 4 bytes long; see *Note MIDI/Filespec:
+     MIDI/Filespec, for details.
+
+the method $track->data( $kooky_binary_data )
+     Returns the data from $track, after having set it to
+     $kooky_binary_data, if provided - even if it's zero-length!  You
+     probably won't ever need to use this method.  For your information,
+     $track->data(undef) is how to undefine the data for a track.
+
+the method $track->new_event('event', ...parameters... )
+     This adds the event ('event', ...parameters...) to the end of the
+     event list for $track.  It's just sugar for:
+
+          push( @{$this_track->events_r}, [ 'event', ...params... ] )
+
+     If you want anything other than the equivalent of that, like some
+     kinda splice(), then do it yourself with $track->events_r or
+     $track->events.
+
+the method $track->dump({ ...options... })
+     This dumps the track's contents for your inspection.  The dump format
+     is code that looks like Perlcode you'd use to recreate that track.
+     This routine outputs with just print, so you can use select to change
+     where that'll go.  I intended this to be just an internal routine for
+     use only by the method MIDI::Opus::dump, but I figure it might be
+     useful to you, if you need te dump the code for just a given track.
+     Read the source if you really need to know how this works.
+
+AUTHOR
+======
+
+   Sean M. Burke `sburke@cpan.org'
+
+
+File: pm.info,  Node: MIME/Base64,  Next: MIME/Body,  Prev: MIDI/Track,  Up: Module List
+
+Encoding and decoding of base64 strings
+***************************************
+
+NAME
+====
+
+   MIME::Base64 - Encoding and decoding of base64 strings
+
+SYNOPSIS
+========
+
+     use MIME::Base64;
+
+     $encoded = encode_base64('Aladdin:open sesame');
+     $decoded = decode_base64($encoded);
+
+DESCRIPTION
+===========
+
+   This module provides functions to encode and decode strings into the
+Base64 encoding specified in RFC 2045 - *MIME (Multipurpose Internet Mail
+Extensions)*. The Base64 encoding is designed to represent arbitrary
+sequences of octets in a form that need not be humanly readable. A
+65-character subset ([A-Za-z0-9+/=]) of US-ASCII is used, enabling 6 bits
+to be represented per printable character.
+
+   The following functions are provided:
+
+encode_base64($str, [$eol])
+     Encode data by calling the encode_base64() function.  The first
+     argument is the string to encode.  The second argument is the line
+     ending sequence to use (it is optional and defaults to `"\n"').  The
+     returned encoded string is broken into lines of no more than 76
+     characters each and it will end with $eol unless it is empty.  Pass an
+     empty string as second argument if you do not want the encoded string
+     broken into lines.
+
+decode_base64($str)
+     Decode a base64 string by calling the decode_base64() function.  This
+     function takes a single argument which is the string to decode and
+     returns the decoded data.
+
+     Any character not part of the 65-character base64 subset set is
+     silently ignored.  Characters occuring after a '=' padding character
+     are never decoded.
+
+     If the length of the string to decode (after ignoring non-base64
+     chars) is not a multiple of 4 or padding occurs too ealy, then a
+     warning is generated if perl is running under -w.
+
+   If you prefer not to import these routines into your namespace you can
+call them as:
+
+     use MIME::Base64 ();
+     $encoded = MIME::Base64::encode($decoded);
+     $decoded = MIME::Base64::decode($encoded);
+
+DIAGNOSTICS
+===========
+
+   The following warnings might be generated if perl is invoked with the
+-w switch:
+
+Premature end of base64 data
+     The number of characters to decode is not a multiple of 4.  Legal
+     base64 data should be padded with one or two "=" characters to make
+     its length a multiple of 4.  The decoded result will anyway be as if
+     the padding was there.
+
+Premature padding of base64 data
+     The '=' padding character occurs as the first or second character in
+     a base64 quartet.
+
+EXAMPLES
+========
+
+   If you want to encode a large file, you should encode it in chunks that
+are a multiple of 57 bytes.  This ensures that the base64 lines line up
+and that you do not end up with padding in the middle. 57 bytes of data
+fills one complete base64 line (76 == 57*4/3):
+
+     use MIME::Base64 qw(encode_base64);
+
+     open(FILE, "/var/log/wtmp") or die "$!";
+     while (read(FILE, $buf, 60*57)) {
+         print encode_base64($buf);
+     }
+
+   or if you know you have enough memory
+
+     use MIME::Base64 qw(encode_base64);
+     local($/) = undef;  # slurp
+     print encode_base64(<STDIN>);
+
+   The same approach as a command line:
+
+     perl -MMIME::Base64 -0777 -ne 'print encode_base64($_)' <file
+
+   Decoding does not need slurp mode if all the lines contains a multiple
+of 4 base64 chars:
+
+     perl -MMIME::Base64 -ne 'print decode_base64($_)' <file
+
+COPYRIGHT
+=========
+
+   Copyright 1995-1999, 2001 Gisle Aas.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   Distantly based on LWP::Base64 written by Martijn Koster
+<m.koster@nexor.co.uk> and Joerg Reichelt <j.reichelt@nexor.co.uk> and
+code posted to comp.lang.perl <3pd2lp$6gf@wsinti07.win.tue.nl> by Hans
+Mulder <hansm@wsinti07.win.tue.nl>
+
+   The XS implementation use code from metamail.  Copyright 1991 Bell
+Communications Research, Inc. (Bellcore)
+
+
+File: pm.info,  Node: MIME/Body,  Next: MIME/Decoder,  Prev: MIME/Base64,  Up: Module List
+
+the body of a MIME message
+**************************
+
+NAME
+====
+
+   MIME::Body - the body of a MIME message
+
+SYNOPSIS
+========
+
+   Before reading further, you should see *Note MIME/Tools: MIME/Tools, to
+make sure that you understand where this module fits into the grand scheme
+of things.  Go on, do it now.  I'll wait.
+
+   Ready?  Ok...
+
+Obtaining bodies
+----------------
+
+     ### Get the bodyhandle of a MIME::Entity object:
+     $body = $entity->bodyhandle;
+
+     ### Create a body which stores data in a disk file:
+     $body = new MIME::Body::File "/path/to/file";
+
+     ### Create a body which stores data in an in-core array:
+     $body = new MIME::Body::InCore \@strings;
+
+Opening, closing, and using IO handles
+--------------------------------------
+
+     ### Write data to the body:
+     $IO = $body->open("w")      || die "open body: $!";
+     $IO->print($message);
+     $IO->close                  || die "close I/O handle: $!";
+     
+     ### Read data from the body (in this case, line by line):
+     $IO = $body->open("r")      || die "open body: $!";
+     while (defined($_ = $IO->getline)) {
+         ### do stuff
+     }
+     $IO->close                  || die "close I/O handle: $!";
+
+Other I/O
+---------
+
+     ### Dump the ENCODED body data to a filehandle:
+     $body->print(\*STDOUT);
+     
+     ### Slurp all the UNENCODED data in, and put it in a scalar:
+     $string = $body->as_string;
+     
+     ### Slurp all the UNENCODED data in, and put it in an array of lines:
+     @lines = $body->as_lines;
+
+Working directly with paths to underlying files
+-----------------------------------------------
+
+     ### Where's the data?
+     if (defined($body->path)) {   ### data is on disk:
+         print "data is stored externally, in ", $body->path;
+     }
+     else {                        ### data is in core:
+         print "data is already in core, and is...\n", $body->as_string;
+     }
+     
+     ### Get rid of anything on disk:
+     $body->purge;
+
+DESCRIPTION
+===========
+
+   MIME messages can be very long (e.g., tar files, MPEGs, etc.) or very
+short (short textual notes, as in ordinary mail).  Long messages are best
+stored in files, while short ones are perhaps best stored in core.
+
+   This class is an attempt to define a common interface for objects which
+contain message data, regardless of how the data is physically stored.
+The lifespan of a "body" object usually looks like this:
+
+  1. *Body object is created by a MIME::Parser during parsing.* It's at
+     this point that the actual MIME::Body subclass is chosen, and new()
+     is invoked.  (For example: if the body data is going to a file, then
+     it is at this point that the class MIME::Body::File, and the
+     filename, is chosen).
+
+  2. *Data is written to the body* (usually by the MIME parser) like this:
+     The body is opened for writing, via `open("w")'.  This will trash any
+     previous contents, and return an "I/O handle" opened for writing.
+     Data is written to this I/O handle, via print().  Then the I/O handle
+     is closed, via close().
+
+  3. *Data is read from the body* (usually by the user application) like
+     this: The body is opened for reading by a user application, via
+     `open("r")'.  This will return an "I/O handle" opened for reading.
+     Data is read from the I/O handle, via read(), getline(), or
+     getlines().  Then the I/O handle is closed, via close().
+
+  4. *Body object is destructed.*
+
+        You can write your own subclasses, as long as they follow the
+interface described below.  Implementers of subclasses should assume that
+steps 2 and 3 may be repeated any number of times, and in different orders
+(e.g., 1-2-2-3-2-3-3-3-3-3-2-4).
+
+   In any case, once a MIME::Body has been created, you ask to open it for
+reading or writing, which gets you an "i/o handle": you then use the same
+mechanisms for reading from or writing to that handle, no matter what
+class it is.
+
+   Beware: unless you know for certain what kind of body you have, you
+should not assume that the body has an underlying filehandle.
+
+PUBLIC INTERFACE
+================
+
+new ARGS...
+     *Class method, constructor.* Create a new body.  Any ARGS are sent to
+     init().
+
+init ARGS...
+     *Instance method, abstract, initiallizer.* This is called
+     automatically by new(), with the arguments given to new().  The
+     arguments are optional, and entirely up to the subclass.  The default
+     method does nothing,
+
+as_lines
+     *Instance method.* Return the contents of the body as an array of
+     lines (each terminated by a newline, with the possible exception of
+     the final one).  Returns empty on failure (NB: indistinguishable from
+     an empty body!).
+
+     Note: the default method gets the data via repeated getline() calls;
+     your subclass might wish to override this.
+
+as_string
+     *Instance method.* Return the body data as a string (slurping it into
+     core if necessary).  Best not to do this unless you're *sure* that
+     the body is reasonably small!  Returns empty string for an empty
+     body, and undef on failure.
+
+     Note: the default method uses print(), which gets the data via
+     repeated read() calls; your subclass might wish to override this.
+
+binmode [ONOFF]
+     *Instance method.* With argument, flags whether or not open() should
+     return an I/O handle which has binmode() activated.  With no
+     argument, just returns the current value.
+
+dup
+     *Instance method.* Duplicate the bodyhandle.
+
+     *Beware:* external data in bodyhandles is not copied to new files!
+     Changing the data in one body's data file, or purging that body,
+     *will* affect its duplicate.  Bodies with in-core data probably need
+     not worry.
+
+open READWRITE
+     *Instance method, abstract.* This should do whatever is necessary to
+     open the body for either writing (if READWRITE is "w") or reading (if
+     mode is "r").
+
+     This method is expected to return an "I/O handle" object on success,
+     and undef on error.  An I/O handle can be any object that supports a
+     small set of standard methods for reading/writing data.  See the
+     IO::Handle class for an example.
+
+path [PATH]
+     *Instance method.* If you're storing the body data externally (e.g.,
+     in a disk file), you'll want to give applications the ability to get
+     at that data, for cleanup.  This method should return the path to the
+     data, or undef if there is none.
+
+     Where appropriate, the path should be a simple string, like a
+     filename.  With argument, sets the PATH, which should be undef if
+     there is none.
+
+print FILEHANDLE
+     *Instance method.* Output the body data to the given filehandle, or
+     to the currently-selected one if none is given.
+
+purge
+     *Instance method, abstract.* Remove any data which resides external
+     to the program (e.g., in disk files).  Immediately after a purge(),
+     the path() should return undef to indicate that the external data is
+     no longer available.
+
+SUBCLASSES
+==========
+
+   The following built-in classes are provided:
+
+     Body                 Stores body     When open()ed,
+     class:               data in:        returns:
+     --------------------------------------------------------
+     MIME::Body::File     disk file       IO::Handle
+     MIME::Body::Scalar   scalar          IO::Scalar
+     MIME::Body::InCore   scalar array    IO::ScalarArray
+
+MIME::Body::File
+----------------
+
+   A body class that stores the data in a disk file.  The I/O handle is a
+wrapped filehandle.  Invoke the constructor as:
+
+     $body = new MIME::Body::File "/path/to/file";
+
+   In this case, the path() method would return the given path, so you
+*could* say:
+
+     if (defined($body->path)) {
+     	open BODY, $body->path or die "open: $!";
+     	while (<BODY>) {
+     	    ### do stuff
+         }
+     	close BODY;
+     }
+
+   But you're best off not doing this.
+
+MIME::Body::Scalar
+------------------
+
+   A body class that stores the data in-core, in a simple scalar.  Invoke
+the constructor as:
+
+     $body = new MIME::Body::Scalar \$string;
+
+   A single scalar argument sets the body to that value, exactly as though
+you'd opened for the body for writing, written the value, and closed the
+body again:
+
+     $body = new MIME::Body::Scalar "Line 1\nLine 2\nLine 3";
+
+   A single array reference sets the body to the result of joining all the
+elements of that array together:
+
+     $body = new MIME::Body::Scalar ["Line 1\n",
+                                     "Line 2\n",
+                                     "Line 3"];
+
+   Uses *IO::Scalar* as the I/O handle.
+
+MIME::Body::InCore
+------------------
+
+   A body class that stores the data in-core.  Invoke the constructor as:
+
+     $body = new MIME::Body::InCore \$string;
+     $body = new MIME::Body::InCore  $string;
+     $body = new MIME::Body::InCore \@stringarray
+
+   A simple scalar argument sets the body to that value, exactly as though
+you'd opened for the body for writing, written the value, and closed the
+body again:
+
+   $body = new MIME::Body::InCore "Line 1\nLine 2\nLine 3";
+
+   A single array reference sets the body to the concatenation of all
+scalars that it holds:
+
+     $body = new MIME::Body::InCore ["Line 1\n",
+                                     "Line 2\n",
+                                     "Line 3"];
+
+   Uses *IO::ScalarArray* as the I/O handle.
+
+Defining your own subclasses
+----------------------------
+
+   So you're not happy with files and scalar-arrays?  No problem: just
+define your own MIME::Body subclass, and make a subclass of MIME::Parser
+or MIME::ParserBase which returns an instance of your body class whenever
+appropriate in the `new_body_for(head)' method.
+
+   Your "body" class must inherit from MIME::Body (or some subclass of it),
+and it must either provide (or inherit the default for) the following
+methods...
+
+   The default inherited method *should suffice* for all these:
+
+     new
+     binmode [ONOFF]
+     path
+
+   The default inherited method *may suffice* for these, but perhaps
+there's a better implementation for your subclass.
+
+     init ARGS...
+     as_lines
+     as_string
+     dup
+     print
+     purge
+
+   The default inherited method *will probably not suffice* for these:
+
+     open
+
+NOTES
+=====
+
+   One reason I didn't just use FileHandle or IO::Handle objects for
+message bodies was that I wanted a "body" object to be a form of completely
+encapsulated program-persistent storage; that is, I wanted users to be
+able to write code like this...
+
+     ### Get body handle from this MIME message, and read its data:
+     $body = $entity->bodyhandle;
+     $IO = $body->open("r");
+     while (defined($_ = $IO->getline)) {
+         print STDOUT $_;
+     }
+     $IO->close;
+
+   ...without requiring that they know anything more about how the $body
+object is actually storing its data (disk file, scalar variable, array
+variable, or whatever).
+
+   Storing the body of each MIME message in a persistently-open IO::Handle
+was a possibility, but it seemed like a bad idea, considering that a
+single multipart MIME message could easily suck up all the available file
+descriptors on some systems.  This risk increases if the user application
+is processing more than one MIME entity at a time.
+
+AUTHOR
+======
+
+   Eryq (`eryq@zeegee.com'), ZeeGee Software Inc (`http://www.zeegee.com').
+
+   All rights reserved.  This program is free software; you can
+redistribute it and/or modify it under the same terms as Perl itself.
+
+   Thanks to Achim Bohnet for suggesting that MIME::Parser not be
+restricted to the use of FileHandles.
+
+VERSION
+=======
+
+   $Revision: 5.403 $ $Date: 2000/11/04 19:54:46 $
+
+
+File: pm.info,  Node: MIME/Decoder,  Next: MIME/Decoder/Base64,  Prev: MIME/Body,  Up: Module List
+
+an object for decoding the body part of a MIME stream
+*****************************************************
+
+NAME
+====
+
+   MIME::Decoder - an object for decoding the body part of a MIME stream
+
+SYNOPSIS
+========
+
+   Before reading further, you should see *Note MIME/Tools: MIME/Tools, to
+make sure that you understand where this module fits into the grand scheme
+of things.  Go on, do it now.  I'll wait.
+
+   Ready?  Ok...
+
+Decoding a data stream
+----------------------
+
+   Here's a simple filter program to read quoted-printable data from STDIN
+(until EOF) and write the decoded data to STDOUT:
+
+     use MIME::Decoder;
+     
+     $decoder = new MIME::Decoder 'quoted-printable' or die "unsupported";
+     $decoder->decode(\*STDIN, \*STDOUT);
+
+Encoding a data stream
+----------------------
+
+   Here's a simple filter program to read binary data from STDIN (until
+EOF) and write base64-encoded data to STDOUT:
+
+     use MIME::Decoder;
+     
+     $decoder = new MIME::Decoder 'base64' or die "unsupported";
+     $decoder->encode(\*STDIN, \*STDOUT);
+
+Non-standard encodings
+----------------------
+
+   You can *write and install* your own decoders so that MIME::Decoder
+will know about them:
+
+     use MyBase64Decoder;
+     
+     install MyBase64Decoder 'base64';
+
+   You can also test if a given encoding is supported:
+
+     if (supported MIME::Decoder 'x-uuencode') {
+         ### we can uuencode!
+     }
+
+DESCRIPTION
+===========
+
+   This abstract class, and its private concrete subclasses (see below)
+provide an OO front end to the actions of...
+
+   * Decoding a MIME-encoded stream
+
+   * Encoding a raw data stream into a MIME-encoded stream.
+
+   The constructor for MIME::Decoder takes the name of an encoding
+(base64, 7bit, etc.), and returns an instance of a *subclass* of
+MIME::Decoder whose `decode()' method will perform the appropriate
+decoding action, and whose encode() method will perform the appropriate
+encoding action.
+
+PUBLIC INTERFACE
+================
+
+Standard interface
+------------------
+
+   If all you are doing is using this class, here's all you'll need...
+
+new ENCODING
+     *Class method, constructor.* Create and return a new decoder object
+     which can handle the given ENCODING.
+
+          my $decoder = new MIME::Decoder "7bit";
+
+     Returns the undefined value if no known decoders are appropriate.
+
+best ENCODING
+     *Class method, constructor.* Exactly like new(), except that this
+     defaults any unsupported encoding to "binary", after raising a
+     suitable warning (it's a fatal error if there's no binary decoder).
+
+          my $decoder = best MIME::Decoder "x-gzip64";
+
+     Will either return a decoder, or a raise a fatal exception.
+
+decode INSTREAM,OUTSTREAM
+     *Instance method.* Decode the document waiting in the input handle
+     INSTREAM, writing the decoded information to the output handle
+     OUTSTREAM.
+
+     Read the section in this document on I/O handles for more information
+     about the arguments.  Note that you can still supply old-style
+     unblessed filehandles for INSTREAM and OUTSTREAM.
+
+     Returns true on success, throws exception on failure.
+
+encode INSTREAM,OUTSTREAM
+     *Instance method.* Encode the document waiting in the input
+     filehandle INSTREAM, writing the encoded information to the output
+     stream OUTSTREAM.
+
+     Read the section in this document on I/O handles for more information
+     about the arguments.  Note that you can still supply old-style
+     unblessed filehandles for INSTREAM and OUTSTREAM.
+
+     Returns true on success, throws exception on failure.
+
+encoding
+     *Instance method.* Return the encoding that this object was created
+     to handle, coerced to all lowercase (e.g., `"base64"').
+
+head [HEAD]
+     *Instance method.* Completely optional: some decoders need to know a
+     little about the file they are encoding/decoding; e.g., x-uu likes to
+     have the filename.  The HEAD is any object which responds to messages
+     like:
+
+          $head->mime_attr('content-disposition.filename');
+
+supported [ENCODING]
+     *Class method.* With one arg (an ENCODING name), returns truth if
+     that encoding is currently handled, and falsity otherwise.  The
+     ENCODING will be automatically coerced to lowercase:
+
+          if (supported MIME::Decoder '7BIT') {
+              ### yes, we can handle it...
+          }
+          else {
+              ### drop back six and punt...
+          }
+
+     With no args, returns a reference to a hash of all available decoders,
+     where the key is the encoding name (all lowercase, like '7bit'), and
+     the value is true (it happens to be the name of the class that
+     handles the decoding, but you probably shouldn't rely on that).  You
+     may safely modify this hash; it will not change the way the module
+     performs its lookups.  Only install can do that.
+
+     *Thanks to Achim Bohnet for suggesting this method.*
+
+Subclass interface
+------------------
+
+   If you are writing (or installing) a new decoder subclass, there are
+some other methods you'll need to know about:
+
+decode_it INSTREAM,OUTSTREAM
+     *Abstract instance method.* The back-end of the decode method.  It
+     takes an input handle opened for reading (INSTREAM), and an output
+     handle opened for writing (OUTSTREAM).
+
+     If you are writing your own decoder subclass, you must override this
+     method in your class.  Your method should read from the input handle
+     via `getline()' or read(), decode this input, and print the decoded
+     data to the output handle via print().  You may do this however you
+     see fit, so long as the end result is the same.
+
+     Note that unblessed references and globrefs are automatically turned
+     into I/O handles for you by `decode()', so you don't need to worry
+     about it.
+
+     Your method must return either undef (to indicate failure), or 1 (to
+     indicate success).  It may also throw an exception to indicate
+     failure.
+
+encode_it INSTREAM,OUTSTREAM
+     *Abstract instance method.* The back-end of the encode method.  It
+     takes an input handle opened for reading (INSTREAM), and an output
+     handle opened for writing (OUTSTREAM).
+
+     If you are writing your own decoder subclass, you must override this
+     method in your class.  Your method should read from the input handle
+     via `getline()' or read(), encode this input, and print the encoded
+     data to the output handle via print().  You may do this however you
+     see fit, so long as the end result is the same.
+
+     Note that unblessed references and globrefs are automatically turned
+     into I/O handles for you by encode(), so you don't need to worry
+     about it.
+
+     Your method must return either undef (to indicate failure), or 1 (to
+     indicate success).  It may also throw an exception to indicate
+     failure.
+
+filter IN, OUT, COMMAND...
+     *Class method, utility.* If your decoder involves an external
+     program, you can invoke them easily through this method.  The command
+     must be a "filter": a command that reads input from its STDIN (which
+     will come from the IN argument) and writes output to its STDOUT
+     (which will go to the OUT argument).
+
+     For example, here's a decoder that un-gzips its data:
+
+          sub decode_it {
+              my ($self, $in, $out) = @_;
+              $self->filter($in, $out, "gzip -d -");
+          }
+
+     The usage is similar to IPC::Open2::open2 (which it uses internally),
+     so you can specify COMMAND as a single argument or as an array.
+
+init ARGS...
+     *Instance method.* Do any necessary initialization of the new
+     instance, taking whatever arguments were given to new().  Should
+     return the self object on success, undef on failure.
+
+install ENCODINGS...
+     Class method.  Install this class so that each encoding in ENCODINGS
+     is handled by it:
+
+          install MyBase64Decoder 'base64', 'x-base64super';
+
+     You should not override this method.
+
+uninstall ENCODINGS...
+     Class method.  Uninstall support for encodings.  This is a way to
+     turn off the decoding of "experimental" encodings.  For safety,
+     always use MIME::Decoder directly:
+
+          uninstall MIME::Decoder 'x-uu', 'x-uuencode';
+
+     You should not override this method.
+
+DECODER SUBCLASSES
+==================
+
+   You don't need to "use" any other Perl modules; the following
+"standard" subclasses are included as part of MIME::Decoder:
+
+     Class:                         Handles encodings:
+     ------------------------------------------------------------
+     MIME::Decoder::Binary          binary
+     MIME::Decoder::NBit            7bit, 8bit
+     MIME::Decoder::Base64          base64
+     MIME::Decoder::QuotedPrint     quoted-printable
+
+   The following "non-standard" subclasses are also included:
+
+     Class:                         Handles encodings:
+     ------------------------------------------------------------
+     MIME::Decoder::UU              x-uu, x-uuencode
+     MIME::Decoder::Gzip64          x-gzip64            ** requires gzip!
+
+NOTES
+=====
+
+Input/Output handles
+--------------------
+
+   As of MIME-tools 2.0, this class has to play nice with the new
+MIME::Body class... which means that input and output routines cannot just
+assume that they are dealing with filehandles.
+
+   Therefore, all that MIME::Decoder and its subclasses require (and, thus,
+all that they can assume) is that INSTREAMs and OUTSTREAMs are objects
+which respond to a subset of the messages defined in the IO::Handle
+interface; minimally:
+
+     print
+     getline
+     read(BUF,NBYTES)
+
+   For backwards compatibilty, if you supply a scalar filehandle name
+(like `"STDOUT"') or an unblessed glob reference (like `\*STDOUT') where
+an INSTREAM or OUTSTREAM is expected, this package will automatically wrap
+it in an object that fits these criteria, via IO::Wrap.
+
+   *Thanks to Achim Bohnet for suggesting this more-generic I/O model.*
+
+Writing a decoder
+-----------------
+
+   If you're experimenting with your own encodings, you'll probably want
+to write a decoder.  Here are the basics:
+
+  1. Create a module, like "MyDecoder::", for your decoder.  Declare it to
+     be a subclass of MIME::Decoder.
+
+  2. Create the following instance methods in your class, as described
+     above:
+
+          decode_it
+          encode_it
+          init
+
+  3. In your application program, activate your decoder for one or more
+     encodings like this:
+
+          require MyDecoder;
+
+          install MyDecoder "7bit";   ### use MyDecoder to decode "7bit"
+          install MyDecoder "x-foo";  ### also use MyDecoder to decode "x-foo"
+
+        To illustrate, here's a custom decoder class for the
+`quoted-printable' encoding:
+
+     package MyQPDecoder;
+
+     @ISA = qw(MIME::Decoder);
+     use MIME::Decoder;
+     use MIME::QuotedPrint;
+     
+     ### decode_it - the private decoding method
+     sub decode_it {
+         my ($self, $in, $out) = @_;
+     
+         while (defined($_ = $in->getline)) {
+             my $decoded = decode_qp($_);
+     	    $out->print($decoded);
+         }
+         1;
+     }
+     
+     ### encode_it - the private encoding method
+     sub encode_it {
+         my ($self, $in, $out) = @_;
+     
+         my ($buf, $nread) = ('', 0);
+         while ($in->read($buf, 60)) {
+             my $encoded = encode_qp($buf);
+     	    $out->print($encoded);
+         }
+         1;
+     }
+
+   That's it.  The task was pretty simple because the `"quoted-printable"'
+encoding can easily be converted line-by-line... as can even `"7bit"' and
+`"8bit"' (since all these encodings guarantee short lines, with a max of
+1000 characters).  The good news is: it is very likely that it will be
+similarly-easy to write a MIME::Decoder for any future standard encodings.
+
+   The `"binary"' decoder, however, really required block reads and writes:
+see `"MIME::Decoder::Binary"' in this node for details.
+
+AUTHOR
+======
+
+   Eryq (`eryq@zeegee.com'), ZeeGee Software Inc (`http://www.zeegee.com').
+
+   All rights reserved.  This program is free software; you can
+redistribute it and/or modify it under the same terms as Perl itself.
+
+VERSION
+=======
+
+   $Revision: 5.403 $ $Date: 2000/11/04 19:54:46 $
+
+
+File: pm.info,  Node: MIME/Decoder/Base64,  Next: MIME/Decoder/Binary,  Prev: MIME/Decoder,  Up: Module List
+
+encode/decode a "base64" stream
+*******************************
+
+NAME
+====
+
+   MIME::Decoder::Base64 - encode/decode a "base64" stream
+
+SYNOPSIS
+========
+
+   A generic decoder object; see *Note MIME/Decoder: MIME/Decoder, for
+usage.
+
+DESCRIPTION
+===========
+
+   A *Note MIME/Decoder: MIME/Decoder, subclass for the `"base64"'
+encoding.  The name was chosen to jibe with the pre-existing MIME::Base64
+utility package, which this class actually uses to translate each chunk.
+
+   * When *decoding*, the input is read one line at a time.  The input
+     accumulates in an internal buffer, which is decoded in
+     multiple-of-4-sized chunks (plus a possible "leftover" input chunk,
+     of course).
+
+   * When encoding, the input is read 45 bytes at a time: this ensures
+     that the output lines are not too long.   We chose 45 since it is a
+     multiple of 3 and produces lines under 76 characters, as RFC-1521
+     specifies.
+
+AUTHOR
+======
+
+   Eryq (`eryq@zeegee.com'), ZeeGee Software Inc (`http://www.zeegee.com').
+
+   All rights reserved.  This program is free software; you can
+redistribute it and/or modify it under the same terms as Perl itself.
+
+VERSION
+=======
+
+   $Revision: 5.403 $ $Date: 2000/11/04 19:54:48 $
+
+
+File: pm.info,  Node: MIME/Decoder/Binary,  Next: MIME/Decoder/Gzip64,  Prev: MIME/Decoder/Base64,  Up: Module List
+
+perform no encoding/decoding
+****************************
+
+NAME
+====
+
+   MIME::Decoder::Binary - perform no encoding/decoding
+
+SYNOPSIS
+========
+
+   A generic decoder object; see *Note MIME/Decoder: MIME/Decoder, for
+usage.
+
+DESCRIPTION
+===========
+
+   A MIME::Decoder subclass for the `"binary"' encoding (in other words,
+no encoding).
+
+   The `"binary"' decoder is a special case, since it's ill-advised to
+read the input line-by-line: after all, an uncompressed image file might
+conceivably have loooooooooong stretches of bytes without a `"\n"' among
+them, and we don't want to risk blowing out our core.  So, we
+read-and-write fixed-size chunks.
+
+   Both the *encoder* and *decoder* do a simple pass-through of the data
+from input to output.
+
+AUTHOR
+======
+
+   Eryq (`eryq@zeegee.com'), ZeeGee Software Inc (`http://www.zeegee.com').
+
+   All rights reserved.  This program is free software; you can
+redistribute it and/or modify it under the same terms as Perl itself.
+
+VERSION
+=======
+
+   $Revision: 5.403 $ $Date: 2000/11/04 19:54:48 $
+
+
+File: pm.info,  Node: MIME/Decoder/Gzip64,  Next: MIME/Decoder/NBit,  Prev: MIME/Decoder/Binary,  Up: Module List
+
+decode a "base64" gzip stream
+*****************************
+
+NAME
+====
+
+   MIME::Decoder::Gzip64 - decode a "base64" gzip stream
+
+SYNOPSIS
+========
+
+   A generic decoder object; see *Note MIME/Decoder: MIME/Decoder, for
+usage.
+
+DESCRIPTION
+===========
+
+   A MIME::Decoder::Base64 subclass for a nonstandard encoding whereby
+data are gzipped, then the gzipped file is base64-encoded.  Common
+non-standard MIME encodings for this:
+
+     x-gzip64
+
+   Since this class relies on external programs which may not exist on
+your machine, MIME-tools does not "install" it by default.  To use it, you
+need to say in your main program:
+
+     install MIME::Decoder::Gzip64 'x-gzip64';
+
+   Note: if this class isn't working for you, you may need to change the
+commands it runs.  In your main program, you can do so by setting up the
+two commands which
+
+     use MIME::Decoder::Gzip64;
+     
+     $MIME::Decoder::Gzip64::GZIP   = 'gzip -c';
+     $MIME::Decoder::Gzip64::GUNZIP = 'gzip -d -c';
+
+AUTHOR
+======
+
+   Eryq (`eryq@zeegee.com'), ZeeGee Software Inc (`http://www.zeegee.com').
+
+   All rights reserved.  This program is free software; you can
+redistribute it and/or modify it under the same terms as Perl itself.
+
+VERSION
+=======
+
+   $Revision: 5.403 $ $Date: 2000/11/04 19:54:48 $
+
+
+File: pm.info,  Node: MIME/Decoder/NBit,  Next: MIME/Decoder/PGP,  Prev: MIME/Decoder/Gzip64,  Up: Module List
+
+encode/decode a "7bit" or "8bit" stream
+***************************************
+
+NAME
+====
+
+   MIME::Decoder::NBit - encode/decode a "7bit" or "8bit" stream
+
+SYNOPSIS
+========
+
+   A generic decoder object; see *Note MIME/Decoder: MIME/Decoder, for
+usage.
+
+DESCRIPTION
+===========
+
+   This is a MIME::Decoder subclass for the 7bit and 8bit content transfer
+encodings.  These are not "encodings" per se: rather, they are simply
+assertions of the content of the message.  From RFC-2045 Section 6.2.:
+
+     Three transformations are currently defined: identity, the "quoted-
+     printable" encoding, and the "base64" encoding.  The domains are
+     "binary", "8bit" and "7bit".
+
+     The Content-Transfer-Encoding values "7bit", "8bit", and "binary" all
+     mean that the identity (i.e. NO) encoding transformation has been
+     performed.  As such, they serve simply as indicators of the domain of
+     the body data, and provide useful information about the sort of
+     encoding that might be needed for transmission in a given transport
+     system.
+
+   In keeping with this: as of MIME-tools 4.x, *this class does no
+modification of its input when encoding;* all it does is attempt to
+*detect violations* of the 7bit/8bit assertion, and issue a warning (one
+per message) if any are found.
+
+Legal 7bit data
+---------------
+
+   RFC-2045 Section 2.7 defines legal 7bit data:
+
+     "7bit data" refers to data that is all represented as relatively
+     short lines with 998 octets or less between CRLF line separation
+     sequences [RFC-821].  No octets with decimal values greater than 127
+     are allowed and neither are NULs (octets with decimal value 0).  CR
+     (decimal value 13) and LF (decimal value 10) octets only occur as
+     part of CRLF line separation sequences.
+
+Legal 8bit data
+---------------
+
+   RFC-2045 Section 2.8 defines legal 8bit data:
+
+     "8bit data" refers to data that is all represented as relatively
+     short lines with 998 octets or less between CRLF line separation
+     sequences [RFC-821]), but octets with decimal values greater than 127
+     may be used.  As with "7bit data" CR and LF octets only occur as part
+     of CRLF line separation sequences and no NULs are allowed.
+
+How decoding is done
+--------------------
+
+   The *decoder* does a line-by-line pass-through from input to output,
+leaving the data unchanged except that an end-of-line sequence of CRLF is
+converted to a newline "\n".  Given the line-oriented nature of 7bit and
+8bit, this seems relatively sensible.
+
+How encoding is done
+--------------------
+
+   The *encoder* does a line-by-line pass-through from input to output,
+and simply attempts to detect violations of the 7bit/8bit domain.  The
+default action is to warn once per encoding if violations are detected;
+the warnings may be silenced with the QUIET configuration of *Note
+MIME/Tools: MIME/Tools,.
+
+AUTHOR
+======
+
+   Eryq (`eryq@zeegee.com'), ZeeGee Software Inc (`http://www.zeegee.com').
+
+   All rights reserved.  This program is free software; you can
+redistribute it and/or modify it under the same terms as Perl itself.
+
+VERSION
+=======
+
+   $Revision: 5.403 $ $Date: 2000/11/04 19:54:48 $
+
+
+File: pm.info,  Node: MIME/Decoder/PGP,  Next: MIME/Decoder/QuotedPrint,  Prev: MIME/Decoder/NBit,  Up: Module List
+
+decode a "radix-64" PGP stream
+******************************
+
+NAME
+====
+
+   MIME::Decoder::PGP - decode a "radix-64" PGP stream
+
+SYNOPSIS
+========
+
+   A generic decoder object; see *Note MIME/Decoder: MIME/Decoder, for
+usage.
+
+DESCRIPTION
+===========
+
+   A MIME::Decoder subclass for a nonstandard encoding using the PGP tool.
+Common non-standard MIME encodings for this:
+
+     x-pgp
+
+AUTHOR
+======
+
+   Copyright (c) 1998 by Jochen Wiedmann / joe@ispsoft.de
+
+   Based on MIME::Decoder::Gzip64, which is
+
+   Copyright (c) 1996, 1997 by Eryq / eryq@zeegee.com
+
+   All rights reserved.  This program is free software; you can
+redistribute it and/or modify it under the same terms as Perl itself.
+
+VERSION
+=======
+
+   $Revision: 1.1.1.1 $ $Date: 1999/09/12 13:05:51 $
+
+
+File: pm.info,  Node: MIME/Decoder/QuotedPrint,  Next: MIME/Decoder/UU,  Prev: MIME/Decoder/PGP,  Up: Module List
+
+encode/decode a "quoted-printable" stream
+*****************************************
+
+NAME
+====
+
+   MIME::Decoder::QuotedPrint - encode/decode a "quoted-printable" stream
+
+SYNOPSIS
+========
+
+   A generic decoder object; see *Note MIME/Decoder: MIME/Decoder, for
+usage.
+
+DESCRIPTION
+===========
+
+   A MIME::Decoder subclass for the `"quoted-printable"' encoding.  The
+name was chosen to jibe with the pre-existing MIME::QuotedPrint utility
+package, which this class actually uses to translate each line.
+
+   * The *decoder* does a line-by-line translation from input to output.
+
+   * The *encoder* does a line-by-line translation, breaking lines so that
+     they fall under the standard 76-character limit for this encoding.
+
+   Note: just like MIME::QuotedPrint, we currently use the native `"\n"'
+for line breaks, and not `CRLF'.  This may need to change in future
+versions.
+
+AUTHOR
+======
+
+   Eryq (`eryq@zeegee.com'), ZeeGee Software Inc (`http://www.zeegee.com').
+
+   All rights reserved.  This program is free software; you can
+redistribute it and/or modify it under the same terms as Perl itself.
+
+VERSION
+=======
+
+   $Revision: 5.403 $ $Date: 2000/11/04 19:54:49 $
+
+
+File: pm.info,  Node: MIME/Decoder/UU,  Next: MIME/Entity,  Prev: MIME/Decoder/QuotedPrint,  Up: Module List
+
+decode a "uuencoded" stream
+***************************
+
+NAME
+====
+
+   MIME::Decoder::UU - decode a "uuencoded" stream
+
+SYNOPSIS
+========
+
+   A generic decoder object; see *Note MIME/Decoder: MIME/Decoder, for
+usage.
+
+   Also supports a preamble() method to recover text before the uuencoded
+portion of the stream.
+
+DESCRIPTION
+===========
+
+   A MIME::Decoder subclass for a nonstandard encoding whereby data are
+uuencoded.  Common non-standard MIME encodings for this:
+
+     x-uu
+     x-uuencode
+
+AUTHOR
+======
+
+   Eryq (`eryq@zeegee.com'), ZeeGee Software Inc (`http://www.zeegee.com').
+
+   UU-decoding code lifted from "uuexplode", a Perl script by an unknown
+author...
+
+   All rights reserved.  This program is free software; you can
+redistribute it and/or modify it under the same terms as Perl itself.
+
+VERSION
+=======
+
+   $Revision: 5.403 $ $Date: 2000/11/04 19:54:49 $
+
+
+File: pm.info,  Node: MIME/Entity,  Next: MIME/Field/ConTraEnc,  Prev: MIME/Decoder/UU,  Up: Module List
+
+class for parsed-and-decoded MIME message
+*****************************************
+
+NAME
+====
+
+   MIME::Entity - class for parsed-and-decoded MIME message
+
+SYNOPSIS
+========
+
+   Before reading further, you should see *Note MIME/Tools: MIME/Tools, to
+make sure that you understand where this module fits into the grand scheme
+of things.  Go on, do it now.  I'll wait.
+
+   Ready?  Ok...
+
+     ### Create an entity:
+     $top = MIME::Entity->build(From    => 'me@myhost.com',
+                                To      => 'you@yourhost.com',
+                                Subject => "Hello, nurse!",
+     			       Data    => \@my_message);
+     
+     ### Attach stuff to it:
+     $top->attach(Path     => $gif_path,
+     		 Type     => "image/gif",
+     		 Encoding => "base64");
+     
+     ### Sign it:
+     $top->sign;
+     
+     ### Output it:
+     $top->print(\*STDOUT);
+
+DESCRIPTION
+===========
+
+   A subclass of Mail::Internet.
+
+   This package provides a class for representing MIME message entities,
+as specified in RFC 1521, *Multipurpose Internet Mail Extensions*.
+
+EXAMPLES
+========
+
+Construction examples
+---------------------
+
+   Create a document for an ordinary 7-bit ASCII text file (lots of stuff
+is defaulted for us):
+
+     $ent = MIME::Entity->build(Path=>"english-msg.txt");
+
+   Create a document for a text file with 8-bit (Latin-1) characters:
+
+     $ent = MIME::Entity->build(Path     =>"french-msg.txt",
+                                Encoding =>"quoted-printable",
+                                From     =>'jean.luc@inria.fr',
+                                Subject  =>"C'est bon!");
+
+   Create a document for a GIF file (the description is completely
+optional; note that we have to specify content-type and encoding since
+they're not the default values):
+
+     $ent = MIME::Entity->build(Description => "A pretty picture",
+                                Path        => "./docs/mime-sm.gif",
+                                Type        => "image/gif",
+                                Encoding    => "base64");
+
+   Create a document that you already have the text for, using "Data":
+
+     $ent = MIME::Entity->build(Type        => "text/plain",
+                                Encoding    => "quoted-printable",
+                                Data        => ["First line.\n",
+                                               "Second line.\n",
+                                               "Last line.\n"]);
+
+   Create a multipart message, with the entire structure given explicitly:
+
+     ### Create the top-level, and set up the mail headers:
+     $top = MIME::Entity->build(Type     => "multipart/mixed",
+                                From     => 'me@myhost.com',
+                                To       => 'you@yourhost.com',
+                                Subject  => "Hello, nurse!");
+     
+     ### Attachment #1: a simple text document:
+     $top->attach(Path=>"./testin/short.txt");
+     
+     ### Attachment #2: a GIF file:
+     $top->attach(Path        => "./docs/mime-sm.gif",
+                  Type        => "image/gif",
+                  Encoding    => "base64");
+     
+     ### Attachment #3: text we'll create with text we have on-hand:
+     $top->attach(Data => $contents);
+
+   Suppose you don't know ahead of time that you'll have attachments?  No
+problem: you can "attach" to singleparts as well:
+
+     $top = MIME::Entity->build(From    => 'me@myhost.com',
+     			       To      => 'you@yourhost.com',
+     			       Subject => "Hello, nurse!",
+     			       Data    => \@my_message);
+     if ($GIF_path) {
+     	$top->attach(Path     => $GIF_path,
+     	             Type     => 'image/gif');
+     }
+
+   Copy an entity (headers, parts... everything but external body data):
+
+     my $deepcopy = $top->dup;
+
+Access examples
+---------------
+
+     ### Get the head, a MIME::Head:
+     $head = $ent->head;
+     
+     ### Get the body, as a MIME::Body;
+     $bodyh = $ent->bodyhandle;
+     
+     ### Get the intended MIME type (as declared in the header):
+     $type = $ent->mime_type;
+     
+     ### Get the effective MIME type (in case decoding failed):
+     $eff_type = $ent->effective_type;
+     
+     ### Get preamble, parts, and epilogue:
+     $preamble   = $ent->preamble;          ### ref to array of lines
+     $num_parts  = $ent->parts;
+     $first_part = $ent->parts(0);          ### an entity
+     $epilogue   = $ent->epilogue;          ### ref to array of lines
+
+Manipulation examples
+---------------------
+
+   Muck about with the body data:
+
+     ### Read the (unencoded) body data:
+     if ($io = $ent->open("r")) {
+     	while (defined($_ = $io->getline)) { print $_ }
+     	$io->close;
+     }
+     
+     ### Write the (unencoded) body data:
+     if ($io = $ent->open("w")) {
+     	foreach (@lines) { $io->print($_) }
+     	$io->close;
+     }
+     
+     ### Delete the files for any external (on-disk) data:
+     $ent->purge;
+
+   Muck about with the signature:
+
+     ### Sign it (automatically removes any existing signature):
+     $top->sign(File=>"$ENV{HOME}/.signature");
+     
+     ### Remove any signature within 15 lines of the end:
+     $top->remove_sig(15);
+
+   Muck about with the headers:
+
+     ### Compute content-lengths for singleparts based on bodies:
+     ###   (Do this right before you print!)
+     $entity->sync_headers(Length=>'COMPUTE');
+
+   Muck about with the structure:
+
+     ### If a 0- or 1-part multipart, collapse to a singlepart:
+     $top->make_singlepart;
+     
+     ### If a singlepart, inflate to a multipart with 1 part:
+     $top->make_multipart;
+
+   Delete parts:
+
+     ### Delete some parts of a multipart message:
+     my @keep = grep { keep_part($_) } $msg->parts;
+     $msg->parts(\@keep);
+
+Output examples
+---------------
+
+   Print to filehandles:
+
+     ### Print the entire message:
+     $top->print(\*STDOUT);
+     
+     ### Print just the header:
+     $top->print_header(\*STDOUT);
+     
+     ### Print just the (encoded) body... includes parts as well!
+     $top->print_body(\*STDOUT);
+
+   Stringify... note that `stringify_xx' can also be written
+`xx_as_string'; the methods are synonymous, and neither form will be
+deprecated:
+
+     ### Stringify the entire message:
+     print $top->stringify;              ### or $top->as_string
+     
+     ### Stringify just the header:
+     print $top->stringify_header;       ### or $top->header_as_string
+     
+     ### Stringify just the (encoded) body... includes parts as well!
+     print $top->stringify_body;         ### or $top->body_as_string
+
+   Debug:
+
+     ### Output debugging info:
+     $entity->dump_skeleton(\*STDERR);
+
+PUBLIC INTERFACE
+================
+
+Construction
+------------
+
+new [SOURCE]
+     *Class method.* Create a new, empty MIME entity.  Basically, this
+     uses the Mail::Internet constructor...
+
+     If SOURCE is an ARRAYREF, it is assumed to be an array of lines that
+     will be used to create both the header and an in-core body.
+
+     Else, if SOURCE is defined, it is assumed to be a filehandle from
+     which the header and in-core body is to be read.
+
+     Note: in either case, the body will not be *parsed:* merely read!
+
+add_part ENTITY, [OFFSET]
+     *Instance method.* Assuming we are a multipart message, add a body
+     part (a MIME::Entity) to the array of body parts.  Returns the part
+     that was just added.
+
+     If OFFSET is positive, the new part is added at that offset from the
+     beginning of the array of parts.  If it is negative, it counts from
+     the end of the array.  (An INDEX of -1 will place the new part at the
+     very end of the array, -2 will place it as the penultimate item in the
+     array, etc.)  If OFFSET is not given, the new part is added to the end
+     of the array.  *Thanks to Jason L Tibbitts III for providing support
+     for OFFSET.*
+
+     Warning: in general, you only want to attach parts to entities with a
+     content-type of `multipart/*').
+
+attach PARAMHASH
+     *Instance method.* The real quick-and-easy way to create multipart
+     messages.  The PARAMHASH is used to build a new entity; this method is
+     basically equivalent to:
+
+          $entity->add_part(ref($entity)->build(PARAMHASH, Top=>0));
+
+     Note: normally, you attach to multipart entities; however, if you
+     attach something to a singlepart (like attaching a GIF to a text
+     message), the singlepart will be coerced into a multipart
+     automatically.
+
+build PARAMHASH
+     *Class/instance method.* A quick-and-easy catch-all way to create an
+     entity.  Use it like this to build a "normal" single-part entity:
+
+          $ent = MIME::Entity->build(Type     => "image/gif",
+          		              Encoding => "base64",
+                                     Path     => "/path/to/xyz12345.gif",
+                                     Filename => "saveme.gif",
+                                     Disposition => "attachment");
+
+     And like this to build a "multipart" entity:
+
+          $ent = MIME::Entity->build(Type     => "multipart/mixed",
+                                     Boundary => "---1234567");
+
+     A minimal MIME header will be created.  If you want to add or modify
+     any header fields afterwards, you can of course do so via the
+     underlying head object... but hey, there's now a prettier syntax!
+
+          $ent = MIME::Entity->build(Type          =>"multipart/mixed",
+                                     From          => $myaddr,
+                                     Subject       => "Hi!",
+                                     'X-Certified' => ['SINED',
+                                                       'SEELED',
+                                                       'DELIVERED']);
+
+     Normally, an `X-Mailer' header field is output which contains this
+     toolkit's name and version (plus this module's RCS version).  This
+     will allow any bad MIME we generate to be traced back to us.  You can
+     of course overwrite that header with your own:
+
+          $ent = MIME::Entity->build(Type        => "multipart/mixed",
+                                     'X-Mailer'  => "myprog 1.1");
+
+     Or remove it entirely:
+
+          $ent = MIME::Entity->build(Type       => "multipart/mixed",
+                                     'X-Mailer' => undef);
+
+     OK, enough hype.  The parameters are:
+
+    (FIELDNAME)
+          Any field you want placed in the message header, taken from the
+          standard list of header fields (you don't need to worry about
+          case):
+
+               Bcc           Encrypted     Received      Sender
+               Cc            From          References    Subject
+               Comments	  Keywords      Reply-To      To
+               Content-*	  Message-ID    Resent-*      X-*
+               Date          MIME-Version  Return-Path
+                             Organization
+
+          To give experienced users some veto power, these fields will be
+          set after the ones I set... so be careful: *don't set any MIME
+          fields* (like `Content-type') unless you know what you're doing!
+
+          To specify a fieldname that's not in the above list, even one
+          that's identical to an option below, just give it with a
+          trailing `":"', like `"My-field:"'.  When in doubt, that always
+          signals a mail field (and it sort of looks like one too).
+
+    Boundary
+          *Multipart entities only. Optional.* The boundary string.  As
+          per RFC-1521, it must consist only of the characters
+          `[0-9a-zA-Z'()+_,-./:=?]' and space (you'll be warned, and your
+          boundary will be ignored, if this is not the case).  If you omit
+          this, a random string will be chosen... which is probably safer.
+
+    Charset
+          *Optional.* The character set.
+
+    Data
+          *Single-part entities only. Optional.* An alternative to Path
+          (q.v.): the actual data, either as a scalar or an array
+          reference (whose elements are joined together to make the actual
+          scalar).  The body is opened on the data using
+          MIME::Body::InCore.
+
+    Description
+          *Optional.* The text of the content-description.  If you don't
+          specify it, the field is not put in the header.
+
+    Disposition
+          *Optional.* The basic content-disposition (`"attachment"' or
+          `"inline"').  If you don't specify it, it defaults to "inline"
+          for backwards compatibility.  *Thanks to Kurt Freytag for
+          suggesting this feature.*
+
+    Encoding
+          *Optional.* The content-transfer-encoding.  If you don't specify
+          it, a reasonable default is put in.  You can also give the
+          special value '-SUGGEST', to have it chosen for you in a
+          heavy-duty fashion which scans the data itself.
+
+    Filename
+          *Single-part entities only. Optional.* The recommended filename.
+          Overrides any name extracted from Path.  The information is
+          stored both the deprecated (content-type) and preferred
+          (content-disposition) locations.  If you explicitly want to
+          *avoid* a recommended filename (even when Path is used), supply
+          this as empty or undef.
+
+    Id
+          *Optional.* Set the content-id.
+
+    Path
+          *Single-part entities only. Optional.* The path to the file to
+          attach.  The body is opened on that file using MIME::Body::File.
+
+    Top
+          *Optional.* Is this a top-level entity?  If so, it must sport a
+          MIME-Version.  The default is true.  (NB: look at how `attach()'
+          uses it.)
+
+    Type
+          *Optional.* The basic content-type (`"text/plain"', etc.).  If
+          you don't specify it, it defaults to `"text/plain"' as per
+          RFC-1521.  *Do yourself a favor: put it in.*
+
+dup
+     *Instance method.* Duplicate the entity.  Does a deep, recursive
+     copy, *but beware:* external data in bodyhandles is not copied to new
+     files!  Changing the data in one entity's data file, or purging that
+     entity, *will* affect its duplicate.  Entities with in-core data
+     probably need not worry.
+
+Access
+------
+
+body [VALUE]
+     *Instance method.* Get the *encoded* (transport-ready) body, as an
+     array of lines.  This is a read-only data structure: changing its
+     contents will have no effect.  Its contents are identical to what is
+     printed by `print_body()|' in this node.
+
+     Provided for compatibility with Mail::Internet, so that methods like
+     `smtpsend()' will work.  Note however that if VALUE is given, a fatal
+     exception is thrown, since you cannot use this method to set the
+     lines of the encoded message.
+
+     If you want the raw (unencoded) body data, use the `bodyhandle()|' in
+     this node method to get and use a MIME::Body.  The content-type of
+     the entity will tell you whether that body is best read as text (via
+     getline()) or raw data (via read()).
+
+bodyhandle [VALUE]
+     *Instance method.* Get or set an abstract object representing the
+     body of the message.  The body holds the decoded message data.
+
+     *Note that not all entities have bodies!* An entity will have either
+     a body or parts: not both.  This method will *only* return an object
+     if this entity can have a body; otherwise, it will return undefined.
+     Whether-or-not a given entity can have a body is determined by (1)
+     its content type, and (2) whether-or-not the parser was told to
+     extract nested messages:
+
+          Type:        | Extract nested? | bodyhandle() | parts()
+          -----------------------------------------------------------------------
+          multipart/*  | -               | undef        | 0 or more MIME::Entity
+          message/*    | true            | undef        | 0 or 1 MIME::Entity
+          message/*    | false           | MIME::Body   | empty list
+          (other)      | -               | MIME::Body   | empty list
+
+     If VALUE *is not* given, the current bodyhandle is returned, or undef
+     if the entity cannot have a body.
+
+     If VALUE *is* given, the bodyhandle is set to the new value, and the
+     previous value is returned.
+
+     See `' in this node for more info.
+
+effective_type [MIMETYPE]
+     *Instance method.* Set/get the *effective* MIME type of this entity.
+     This is *usually* identical to the actual (or defaulted) MIME type,
+     but in some cases it differs.  For example, from RFC-2045:
+
+          Any entity with an unrecognized Content-Transfer-Encoding must be
+          treated as if it has a Content-Type of "application/octet-stream",
+          regardless of what the Content-Type header field actually says.
+
+     Why? because if we can't decode the message, then we have to take the
+     bytes as-is, in their (unrecognized) encoded form.  So the message
+     ceases to be a "text/foobar" and becomes a bunch of undecipherable
+     bytes - in other words, an "application/octet-stream".
+
+     Such an entity, if parsed, would have its effective_type() set to
+     `"application/octet_stream"', although the mime_type() and the
+     contents of the header would remain the same.
+
+     If there is no effective type, the method just returns what
+     mime_type() would.
+
+     Warning: the effective type is "sticky"; once set, that
+     effective_type() will always be returned even if the conditions that
+     necessitated setting the effective type become no longer true.
+
+epilogue [LINES]
+     *Instance method.* Get/set the text of the epilogue, as an array of
+     newline-terminated LINES.  Returns a reference to the array of lines,
+     or undef if no epilogue exists.
+
+     If there is a epilogue, it is output when printing this entity;
+     otherwise, a default epilogue is used.  Setting the epilogue to undef
+     (not []!) causes it to fallback to the default.
+
+head [VALUE]
+     *Instance method.* Get/set the head.
+
+     If there is no VALUE given, returns the current head.  If none
+     exists, an empty instance of MIME::Head is created, set, and returned.
+
+     Note: This is a patch over a problem in Mail::Internet, which doesn't
+     provide a method for setting the head to some given object.
+
+is_multipart
+     *Instance method.* Does this entity's effective MIME type indicate
+     that it's a multipart entity?  Returns undef (false) if the answer
+     couldn't be determined, 0 (false) if it was determined to be false,
+     and true otherwise.  Note that this says nothing about whether or not
+     parts were extracted.
+
+     NOTE: we switched to effective_type so that multiparts with bad or
+     missing boundaries could be coerced to an effective type of
+     `application/x-unparseable-multipart'.
+
+mime_type
+     *Instance method.* A purely-for-convenience method.  This simply
+     relays the request to the associated MIME::Head object.  If there is
+     no head, returns undef in a scalar context and the empty array in a
+     list context.
+
+     *Before you use this,* consider using effective_type() instead,
+     especially if you obtained the entity from a MIME::Parser.
+
+open READWRITE
+     *Instance method.* A purely-for-convenience method.  This simply
+     relays the request to the associated MIME::Body object (see
+     MIME::Body::open()).  READWRITE is either 'r' (open for read) or 'w'
+     (open for write).
+
+     If there is no body, returns false.
+
+parts
+parts INDEX
+parts ARRAYREF
+     *Instance method.* Return the MIME::Entity objects which are the sub
+     parts of this entity (if any).
+
+     *If no argument is given,* returns the array of all sub parts,
+     returning the empty array if there are none (e.g., if this is a single
+     part message, or a degenerate multipart).  In a scalar context, this
+     returns you the number of parts.
+
+     *If an integer INDEX is given,* return the INDEXed part, or undef if
+     it doesn't exist.
+
+     *If an ARRAYREF to an array of parts is given,* then this method sets
+     the parts to a copy of that array, and returns the parts.  This can
+     be used to delete parts, as follows:
+
+          ### Delete some parts of a multipart message:
+          $msg->parts([ grep { keep_part($_) } $msg->parts ]);
+
+     Note: for multipart messages, the preamble and epilogue are not
+     considered parts.  If you need them, use the `preamble()' and
+     `epilogue()' methods.
+
+     Note: there are ways of parsing with a MIME::Parser which cause
+     certain message parts (such as those of type `message/rfc822') to be
+     "reparsed" into pseudo-multipart entities.  You should read the
+     documentation for those options carefully: it *is* possible for a
+     diddled entity to not be multipart, but still have parts attached to
+     it!
+
+     See `' in this node for a discussion of parts vs. bodies.
+
+parts_DFS
+     *Instance method.* Return the list of all MIME::Entity objects
+     included in the entity, starting with the entity itself, in
+     depth-first-search order.  If the entity has no parts, it alone will
+     be returned.
+
+     *Thanks to Xavier Armengou for suggesting this method.*
+
+preamble [LINES]
+     *Instance method.* Get/set the text of the preamble, as an array of
+     newline-terminated LINES.  Returns a reference to the array of lines,
+     or undef if no preamble exists (e.g., if this is a single-part
+     entity).
+
+     If there is a preamble, it is output when printing this entity;
+     otherwise, a default preamble is used.  Setting the preamble to undef
+     (not []!) causes it to fallback to the default.
+
+Manipulation
+------------
+
+make_multipart [SUBTYPE], OPTSHASH...
+     *Instance method.* Force the entity to be a multipart, if it isn't
+     already.  We do this by replacing the original [singlepart] entity
+     with a new multipart that has the same non-MIME headers ("From",
+     "Subject", etc.), but all-new MIME headers ("Content-type", etc.).
+     We then create a copy of the original singlepart, *strip out* the
+     non-MIME headers from that, and make it a part of the new multipart.
+     So this:
+
+          From: me
+          To: you
+          Content-type: text/plain
+          Content-length: 12
+          
+          Hello there!
+
+     Becomes something like this:
+
+          From: me
+          To: you
+          Content-type: multipart/mixed; boundary="----abc----"
+          
+          ------abc----
+          Content-type: text/plain
+          Content-length: 12
+          
+          Hello there!
+          ------abc------
+
+     The actual type of the new top-level multipart will be
+     "multipart/SUBTYPE" (default SUBTYPE is "mixed").
+
+     Returns 'DONE'    if we really did inflate a singlepart to a
+     multipart.  Returns 'ALREADY' (and does nothing) if entity is
+     *already* multipart and Force was not chosen.
+
+     If OPTSHASH contains Force=>1, then we always bump the top-level's
+     content and content-headers down to a subpart of this entity, even if
+     this entity is already a multipart.  This is apparently of use to
+     people who are tweaking messages after parsing them.
+
+make_singlepart
+     *Instance method.* If the entity is a multipart message with one
+     part, this tries hard to rewrite it as a singlepart, by replacing the
+     content (and content headers) of the top level with those of the
+     part.  Also crunches 0-part multiparts into singleparts.
+
+     Returns 'DONE'    if we really did collapse a multipart to a
+     singlepart.  Returns 'ALREADY' (and does nothing) if entity is
+     already a singlepart.  Returns '0'       (and does nothing) if it
+     can't be made into a singlepart.
+
+purge
+     *Instance method.* Recursively purge (e.g., unlink) all external
+     (e.g., on-disk) body parts in this message.  See MIME::Body::purge()
+     for details.
+
+     Note: this does not delete the directories that those body parts are
+     contained in; only the actual message data files are deleted.  This
+     is because some parsers may be customized to create intermediate
+     directories while others are not, and it's impossible for this class
+     to know what directories are safe to remove.  Only your application
+     program truly knows that.
+
+     *If you really want to "clean everything up",* one good way is to use
+     `MIME::Parser::file_under()', and then do this before parsing your
+     next message:
+
+          $parser->filer->purge();
+
+     I wouldn't attempt to read those body files after you do this, for
+     obvious reasons.  As of MIME-tools 4.x, each body's path *is*
+     undefined after this operation.  I warned you I might do this; truly
+     I did.
+
+     *Thanks to Jason L. Tibbitts III for suggesting this method.*
+
+remove_sig [NLINES]
+     *Instance method, override.* Attempts to remove a user's signature
+     from the body of a message.
+
+     It does this by looking for a line matching `/^-- $/' within the last
+     `NLINES' of the message.  If found then that line and all lines after
+     it will be removed. If `NLINES' is not given, a default value of 10
+     will be used.  This would be of most use in auto-reply scripts.
+
+     For MIME entity, this method is reasonably cautious: it will only
+     attempt to un-sign a message with a content-type of `text/*'.
+
+     If you send remove_sig() to a multipart entity, it will relay it to
+     the first part (the others usually being the "attachments").
+
+     Warning: currently slurps the whole message-part into core as an
+     array of lines, so you probably don't want to use this on extremely
+     long messages.
+
+     Returns truth on success, false on error.
+
+sign PARAMHASH
+     *Instance method, override.* Append a signature to the message.  The
+     params are:
+
+    Attach
+          Instead of appending the text, add it to the message as an
+          attachment.  The disposition will be inline, and the description
+          will indicate that it is a signature.  The default behavior is
+          to append the signature to the text of the message (or the text
+          of its first part if multipart).  *MIME-specific; new in this
+          subclass.*
+
+    File
+          Use the contents of this file as the signature.  Fatal error if
+          it can't be read.  *As per superclass method.*
+
+    Force
+          Sign it even if the content-type isn't `text/*'.  Useful for
+          non-standard types like `x-foobar', but be careful!
+          *MIME-specific; new in this subclass.*
+
+    Remove
+          Normally, we attempt to strip out any existing signature.  If
+          true, this gives us the NLINES parameter of the remove_sig call.
+          If zero but defined, tells us not to remove any existing
+          signature.  If undefined, removal is done with the default of 10
+          lines.  *New in this subclass.*
+
+    Signature
+          Use this text as the signature.  You can supply it as either a
+          scalar, or as a ref to an array of newline-terminated scalars.
+          *As per superclass method.*
+
+     For MIME messages, this method is reasonably cautious: it will only
+     attempt to sign a message with a content-type of `text/*', unless
+     Force is specified.
+
+     If you send this message to a multipart entity, it will relay it to
+     the first part (the others usually being the "attachments").
+
+     Warning: currently slurps the whole message-part into core as an
+     array of lines, so you probably don't want to use this on extremely
+     long messages.
+
+     Returns true on success, false otherwise.
+
+suggest_encoding
+     *Instance method.* Based on the effective content type, return a good
+     suggested encoding.
+
+     text and message types have their bodies scanned line-by-line for
+     8-bit characters and long lines; lack of either means that the
+     message is 7bit-ok.  Other types are chosen independent of their body:
+
+          Major type:      7bit ok?    Suggested encoding:
+          -----------------------------------------------------------
+          text             yes         7bit
+          text             no          quoted-printable
+          message          yes         7bit
+          message          no          binary
+          multipart        *           binary (in case some parts are bad)
+          image, etc...    *           base64
+
+sync_headers OPTIONS
+     *Instance method.* This method does a variety of activities which
+     ensure that the MIME headers of an entity "tree" are in-synch with
+     the body parts they describe.  It can be as expensive an operation as
+     printing if it involves pre-encoding the body parts; however, the aim
+     is to produce fairly clean MIME.  *You will usually only need to
+     invoke this if processing and re-sending MIME from an outside source.*
+
+     The OPTIONS is a hash, which describes what is to be done.
+
+    Length
+          One of the "official unofficial" MIME fields is "Content-Length".
+          Normally, one doesn't care a whit about this field; however, if
+          you are preparing output destined for HTTP, you may.  The value
+          of this option dictates what will be done:
+
+          *COMPUTE* means to set a `Content-Length' field for every
+          non-multipart part in the entity, and to blank that field out
+          for every multipart part in the entity.
+
+          *ERASE* means that `Content-Length' fields will all be blanked
+          out.  This is fast, painless, and safe.
+
+          *Any false value* (the default) means to take no action.
+
+    Nonstandard
+          Any header field beginning with "Content-" is, according to the
+          RFC, a MIME field.  However, some are non-standard, and may
+          cause problems with certain MIME readers which interpret them in
+          different ways.
+
+          *ERASE* means that all such fields will be blanked out.  This is
+          done before the Length option (q.v.) is examined and acted upon.
+
+          *Any false value* (the default) means to take no action.
+
+     Returns a true value if everything went okay, a false value otherwise.
+
+tidy_body
+     *Instance method, override.* Currently unimplemented for MIME
+     messages.  Does nothing, returns false.
+
+Output
+------
+
+dump_skeleton [FILEHANDLE]
+     *Instance method.* Dump the skeleton of the entity to the given
+     FILEHANDLE, or to the currently-selected one if none given.
+
+     Each entity is output with an appropriate indentation level, the
+     following selection of attributes:
+
+          Content-type: multipart/mixed
+          Effective-type: multipart/mixed
+          Body-file: NONE
+          Subject: Hey there!
+          Num-parts: 2
+
+     This is really just useful for debugging purposes; I make no
+     guarantees about the consistency of the output format over time.
+
+print [OUTSTREAM]
+     *Instance method, override.* Print the entity to the given OUTSTREAM,
+     or to the currently-selected filehandle if none given.  OUTSTREAM can
+     be a filehandle, or any object that reponds to a print() message.
+
+     The entity is output as a valid MIME stream!  This means that the
+     header is always output first, and the body data (if any) will be
+     encoded if the header says that it should be.  For example, your
+     output may look like this:
+
+          Subject: Greetings
+          Content-transfer-encoding: base64
+          
+          SGkgdGhlcmUhCkJ5ZSB0aGVyZSEK
+
+     *If this entity has MIME type "multipart/*",* the preamble, parts,
+     and epilogue are all output with appropriate boundaries separating
+     each.  Any bodyhandle is ignored:
+
+          Content-type: multipart/mixed; boundary="*----*"
+          Content-transfer-encoding: 7bit
+          
+          [Preamble]
+          --*----*
+          [Entity: Part 0]
+          --*----*
+          [Entity: Part 1]
+          --*----*--
+          [Epilogue]
+
+     *If this entity has a single-part MIME type with no attached parts,*
+     then we're looking at a normal singlepart entity: the body is output
+     according to the encoding specified by the header.  If no body
+     exists, a warning is output and the body is treated as empty:
+
+          Content-type: image/gif
+          Content-transfer-encoding: base64
+          
+          [Encoded body]
+
+     *If this entity has a single-part MIME type but it also has parts,*
+     then we're probably looking at a "re-parsed" singlepart, usually one
+     of type `message/*' (you can get entities like this if you set the
+     `parse_nested_messages(NEST)' option on the parser to true).  In this
+     case, the parts are output with single blank lines separating each,
+     and any bodyhandle is ignored:
+
+          Content-type: message/rfc822
+          Content-transfer-encoding: 7bit
+          
+          [Entity: Part 0]
+          
+          [Entity: Part 1]
+
+     In all cases, when outputting a "part" of the entity, this method is
+     invoked recursively.
+
+     Note: the output is very likely not going to be identical to any
+     input you parsed to get this entity.  If you're building some sort of
+     email handler, it's up to you to save this information.
+
+print_body [OUTSTREAM]
+     *Instance method, override.* Print the body of the entity to the
+     given OUTSTREAM, or to the currently-selected filehandle if none
+     given.  OUTSTREAM can be a filehandle, or any object that reponds to
+     a print() message.
+
+     The body is output for inclusion in a valid MIME stream; this means
+     that the body data will be encoded if the header says that it should
+     be.
+
+     Note: by "body", we mean "the stuff following the header".  A printed
+     multipart body includes the printed representations of its subparts.
+
+     Note: The body is *stored* in an un-encoded form; however, the idea
+     is that the transfer encoding is used to determine how it should be
+     *output.* This means that the print() method is always guaranteed to
+     get you a sendmail-ready stream whose body is consistent with its
+     head.  If you want the *raw body data* to be output, you can either
+     read it from the bodyhandle yourself, or use:
+
+          $ent->bodyhandle->print($outstream);
+
+     which uses read() calls to extract the information, and thus will
+     work with both text and binary bodies.
+
+     Warning: Please supply an OUTSTREAM.  This override method differs
+     from Mail::Internet's behavior, which outputs to the STDOUT if no
+     filehandle is given: this may lead to confusion.
+
+print_header [OUTSTREAM]
+     *Instance method, inherited.* Output the header to the given
+     OUTSTREAM.  You really should supply the OUTSTREAM.
+
+stringify
+     *Instance method.* Return the entity as a string, exactly as print
+     would print it.  The body will be encoded as necessary, and will
+     contain any subparts.  You can also use as_string().
+
+stringify_body
+     *Instance method.* Return the *encoded* message body as a string,
+     exactly as print_body would print it.  You can also use
+     `body_as_string()'.
+
+     If you want the *unencoded* body, and you are dealing with a
+     singlepart message (like a "text/plain"), use `bodyhandle()' instead:
+
+          if ($ent->bodyhandle) {
+          	$unencoded_data = $ent->bodyhandle->as_string;
+          }
+          else {
+          	### this message has no body data (but it might have parts!)
+          }
+
+stringify_header
+     *Instance method.* Return the header as a string, exactly as
+     print_header would print it.  You can also use `header_as_string()'.
+
+NOTES
+=====
+
+Under the hood
+--------------
+
+   A *MIME::Entity* is composed of the following elements:
+
+   * A head, which is a reference to a MIME::Head object containing the
+     header information.
+
+   * A bodyhandle, which is a reference to a MIME::Body object containing
+     the decoded body data.  This is only defined if the message is a
+     "singlepart" type:
+
+          application/*
+          audio/*
+          image/*
+          text/*
+          video/*
+
+   * An array of parts, where each part is a MIME::Entity object.  The
+     number of parts will only be nonzero if the content-type is not one
+     of the "singlepart" types:
+
+          message/*        (should have exactly one part)
+          multipart/*      (should have one or more parts)
+
+The "two-body problem"
+----------------------
+
+   MIME::Entity and Mail::Internet see message bodies differently, and
+this can cause confusion and some inconvenience.  Sadly, I can't change
+the behavior of MIME::Entity without breaking lots of code already out
+there.  But let's open up the floor for a few questions...
+
+What is the difference between a "message" and an "entity"?
+     A message is the actual data being sent or received; usually this
+     means a stream of newline-terminated lines.  An entity is the
+     representation of a message as an object.
+
+     This means that you get a "message" when you print an "entity" to a
+     filehandle, and you get an "entity" when you parse a message from a
+     filehandle.
+
+What is a message body?
+     *Mail::Internet:* The portion of the printed message after the header.
+
+     *MIME::Entity:* The portion of the printed message after the header.
+
+How is a message body stored in an entity?
+     *Mail::Internet:* As an array of lines.
+
+     *MIME::Entity:* It depends on the content-type of the message.  For
+     "container" types (`multipart/*', `message/*'), we store the
+     contained entities as an array of "parts", accessed via the `parts()'
+     method, where each part is a complete MIME::Entity.  For "singlepart"
+     types (`text/*', `image/*', etc.), the unencoded body data is
+     referenced via a MIME::Body object, accessed via the `bodyhandle()'
+     method:
+
+          bodyhandle()   parts()
+              Content-type:     returns:       returns:
+              ------------------------------------------------------------
+              application/*     MIME::Body     empty
+              audio/*           MIME::Body     empty
+              image/*           MIME::Body     empty
+              message/*         undef          MIME::Entity list (usually 1)
+              multipart/*       undef          MIME::Entity list (usually >0)
+              text/*            MIME::Body     empty
+              video/*           MIME::Body     empty
+              x-*/*             MIME::Body     empty
+
+     As a special case, `message/*' is currently ambiguous: depending on
+     the parser, a `message/*' might be treated as a singlepart, with a
+     MIME::Body and no parts.  Use bodyhandle() as the final arbiter.
+
+What does the body() method return?
+     *Mail::Internet:* As an array of lines, ready for sending.
+
+     *MIME::Entity:* As an array of lines, ready for sending.
+
+If an entity has a body, does it have a soul as well?
+     The soul does not exist in a corporeal sense, the way the body does;
+     it is not a solid [Perl] object.  Rather, it is a virtual object
+     which is only visible when you print() an entity to a file... in other
+     words, the "soul" it is all that is left after the body is DESTROY'ed.
+
+What's the best way to get at the body data?
+     *Mail::Internet:* Use the body() method.
+
+     *MIME::Entity:* Depends on what you want... the *encoded* data (as it
+     is transported), or the *unencoded* data?  Keep reading...
+
+How do I get the "encoded" body data?
+     *Mail::Internet:* Use the body() method.
+
+     *MIME::Entity:* Use the body() method.  You can also use:
+
+          $entity->print_body()
+          $entity->stringify_body()   ### a.k.a. $entity->body_as_string()
+
+How do I get the "unencoded" body data?
+     *Mail::Internet:* Use the body() method.
+
+     *MIME::Entity:* Use the *bodyhandle()* method!  If bodyhandle()
+     method returns true, then that value is a `MIME::Body|MIME::Body' in
+     this node which can be used to access the data via its open() method.
+     If bodyhandle() method returns an undefined value, then the entity
+     is probably a "container" that has no real body data of its own
+     (e.g., a "multipart" message): in this case, you should access the
+     components via the parts() method.  Like this:
+
+          if ($bh = $entity->bodyhandle) {
+          	$io = $bh->open;
+          	...access unencoded data via $io->getline or $io->read...
+          	$io->close;
+          }
+          else {
+          	foreach my $part (@parts) {
+          	    ...do something with the part...
+          	}
+          }
+
+     You can also use:
+
+          if ($bh = $entity->bodyhandle) {
+          	$unencoded_data = $bh->as_string;
+          }
+          else {
+          	...do stuff with the parts...
+          }
+
+What does the body() method return?
+     *Mail::Internet:* The transport-encoded message body, as an array of
+     lines.
+
+     *MIME::Entity:* The transport-encoded message body, as an array of
+     lines.
+
+What does print_body() print?
+     *Mail::Internet:* Exactly what body() would return to you.
+
+     *MIME::Entity:* Exactly what body() would return to you.
+
+Say I have an entity which might be either singlepart or multipart.       How do I print out just "the stuff after the header"?
+     *Mail::Internet:* Use print_body().
+
+     *MIME::Entity:* Use print_body().
+
+Why is MIME::Entity so different from Mail::Internet?
+     Because MIME streams are expected to have non-textual data...
+     possibly, quite a lot of it, such as a tar file.
+
+     Because MIME messages can consist of multiple parts, which are
+     most-easily manipulated as MIME::Entity objects themselves.
+
+     Because in the simpler world of Mail::Internet, the data of a message
+     and its printed representation are *identical*... and in the MIME
+     world, they're not.
+
+     Because parsing multipart bodies on-the-fly, or formatting multipart
+     bodies for output, is a non-trivial task.
+
+This is confusing.  Can the two classes be made more compatible?
+     Not easily; their implementations are necessarily quite different.
+     Mail::Internet is a simple, efficient way of dealing with a "black
+     box" mail message... one whose internal data you don't care much
+     about.  MIME::Entity, in contrast, cares *very much* about the
+     message contents: that's its job!
+
+Design issues
+-------------
+
+Some things just can't be ignored
+     In multipart messages, the *"preamble"* is the portion that precedes
+     the first encapsulation boundary, and the *"epilogue"* is the portion
+     that follows the last encapsulation boundary.
+
+     According to RFC-1521:
+
+          There appears to be room for additional information prior
+          to the first encapsulation boundary and following the final
+          boundary.  These areas should generally be left blank, and
+          implementations must ignore anything that appears before the
+          first boundary or after the last one.
+
+          NOTE: These "preamble" and "epilogue" areas are generally
+          not used because of the lack of proper typing of these parts
+          and the lack of clear semantics for handling these areas at
+          gateways, particularly X.400 gateways.  However, rather than
+          leaving the preamble area blank, many MIME implementations
+          have found this to be a convenient place to insert an
+          explanatory note for recipients who read the message with
+          pre-MIME software, since such notes will be ignored by
+          MIME-compliant software.
+
+     In the world of standards-and-practices, that's the standard.  Now
+     for the practice:
+
+     *Some "MIME" mailers may incorrectly put a "part" in the preamble*.
+     Since we have to parse over the stuff *anyway*, in the future I may
+     allow the parser option of creating special MIME::Entity objects for
+     the preamble and epilogue, with bogus MIME::Head objects.
+
+     For now, though, we're MIME-compliant, so I probably won't change how
+     we work.
+
+AUTHOR
+======
+
+   Eryq (`eryq@zeegee.com'), ZeeGee Software Inc (`http://www.zeegee.com').
+
+   All rights reserved.  This program is free software; you can
+redistribute it and/or modify it under the same terms as Perl itself.
+
+VERSION
+=======
+
+   $Revision: 5.404 $ $Date: 2000/11/06 11:58:53 $
+
+

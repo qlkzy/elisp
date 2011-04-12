@@ -1,0 +1,1465 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: DBIx/HTMLView/PostSet,  Next: DBIx/HTMLView/Relation,  Prev: DBIx/HTMLView/Post,  Up: Module List
+
+A set posts as in a search result for example
+*********************************************
+
+NAME
+====
+
+     DBIx::HTMLView::PostSet - A set posts as in a search result for example
+
+SYNOPSIS
+========
+
+   my $post_set=$table->list;  # Get a PostSet $post_set->view_html;
+# view it
+
+   $post_set=$table->list;     # Get a new one as the old now is used
+while (defined $post=$self->get_next) {   # Process $post...  }
+
+   $post_set=DBIx::HTMLView::PostSet->new($table) # Create a PostSet in
+save mode $post_set->add($post);
+
+DESCRIPTION
+===========
+
+   This a class representing a set of object as for example a result of a
+search. The object can either be in save mode or in no-save mode. A
+PostSet object in no-save mode will be able to itterate through the posts
+once and then they are gone. The posts are never stored, but retrieved
+from the db when you ask for the next one and then trashed if you don't
+save them. In save mode this class will star by dowbloading all the posts
+from the db into memory to allow more advanced manipulations.
+
+$post_set=DBIx:.HTMLView::PostSet->new($tab, $sth, $save)
+---------------------------------------------------------
+
+   Creates a new PostSet object for posts from the table $tab (a
+DBIx::HTMlView::Table object). If $sth is a reference it's supposed to be
+the result of a DBI execute call with a select command. The posts returned
+from the db will be the ones represented by this set.
+
+   If $save is defined to a false value the object will be created in
+no-save mode, otherview in save mode. See the DESCRIPTION.
+
+$post_set->rows
+---------------
+
+   Returns the number of rows (posts) in this PostSet as reported by the
+$sth->rows DBI function.
+
+$post_set->got_post($post)
+--------------------------
+
+   Returns true if $post has been returned earlier in this set (in which
+case we won't return it again). Or if we are in save mode returns true if
+the post is within the set. $post should be a DBIx::HTMLView::Post object.
+
+$post_set->do_got_post
+----------------------
+
+   Marks $post (a DBIx::HTMLView::Post object) as a returned post. See
+$post_set->got_post.
+
+$post_set->tab
+--------------
+
+   Returns the table (a DBIx::HTMLView::Table object) this set of posts
+belongs to.
+
+$post_set->get_next
+-------------------
+
+   Returns the next post (a DBIx::HTMLView::Post object) in the set. The
+first one will be returned if this method has not been called before.
+
+$post_set->save_mode
+--------------------
+
+   Returns true if we are in save mode.
+
+$post_set->add($post)
+---------------------
+
+   Adds the post $post (a DBIx::HTMLView::Post object) to the set.
+
+$post_set->posts
+----------------
+
+   Returns an array of DBIx::HTMLView::Post object representing the posts
+in the set or dies if there is no posts or if we are not in save mode with
+"No posts!" and "Not in save mode" respectivly.
+
+$post_set->first
+----------------
+
+   Returns the first post of this set, or dies with "No posts!" if there
+is no posts. If we are in no-save mode it can be called once before any
+next_post calls are done, after that it will die with "Not in save mode".
+
+$post_set->view_html
+--------------------
+
+   Returns a string that can be used to view the entire set of posts in
+html format.
+
+$post->view_fmt($fmt_name, $fmt)
+--------------------------------
+
+   Returns a string represeting this set of posts in the format named by
+$fmt_name. as returned by DBIx::HTMLView::list_fmt($fmt_name). If $fmt is
+specified it will be used as the fmt strings instead of looking up a
+default one.
+
+   If the fmt stringit contains a <node>...</node> construct the ... part
+will be repeated once for every post and passed as $fmt param to view_fmt
+of DBIx::HTMLView::Post. Curretly we only support one <node>...</node>
+construct in the fmt. If ... is "", undef will be passed as fmt to the
+Post, thereby using default Post fmts.
+
+   $fmt_name is passed on to the Post objects who the passes it on to the
+fld objects, so it can be used to specify how the flds should be
+represented  even if you use a custom fmt passed to $fmt.
+
+
+File: pm.info,  Node: DBIx/HTMLView/Relation,  Next: DBIx/HTMLView/Selection,  Prev: DBIx/HTMLView/PostSet,  Up: Module List
+
+A relation base class
+*********************
+
+NAME
+====
+
+     DBIx::HTMLView::Relation - A relation base class
+
+SYNOPSIS
+========
+
+     $fld=$post->fld('id');
+     print $fld->view_html;
+
+DESCRIPTION
+===========
+
+   This is a subcalss of DBIx::HTMLView::Fld used to represent relations
+between tables in the databse as well as the data contained in them.  Se
+the DBIx::HTMLView:.Fld manpage for info on the methods of this class.
+
+
+File: pm.info,  Node: DBIx/HTMLView/Selection,  Next: DBIx/HTMLView/Str,  Prev: DBIx/HTMLView/Relation,  Up: Module List
+
+A kriteria used to select posts
+*******************************
+
+NAME
+====
+
+     DBIx::HTMLView::Selection - A kriteria used to select posts
+
+SYNOPSIS
+========
+
+     $sel=DBIx::HTMLView::Selection->new($table, $search_string);
+     print $sel->sql_select
+
+DESCRIPTION
+===========
+
+   This class is used to parse search query strings and generate SQL
+select queries out of them. You usually don't use this class itself, but
+simply pass the strings to methods like list in DBIx::HTMLView::Table,
+which then uses this class to parse them.
+
+   The format of the search strings looks very much like the SQL select
+querys, but with some modifications. All fields are supposed to belong to
+the table $tab passed to the constructor and fields in related posts are
+accessed using the string <relation_name>-><field_name> (eg group->name).
+It's even possible (not yet implemeted though) to access fields through
+several relations (eg rel1->rel2->field).
+
+   Here is a more precise definition of the language useed:
+
+     <expr>       = <bool_value> (("AND" | "OR") <bool_value>)?
+     <bool_value> = <fld_spec> <opperator> <value> | "(" <expr> ")"
+     <fld_spec>   = <fld_name> ("->" <fld_name>)*
+     <fld_name>   = <word>
+     <value>      = <literal>|<fld_spec>
+     <literal>    = \d+ | "'" <string> "'"
+     <string>     = [^']*
+     <word>       = [a-zA-Z0-9_.]+
+     <operator>   = "<" | ">" | "=" | "<=" | ">=" | "<>" | "LIKE" | ...
+
+METHODS =cut
+============
+
+   # FIXME: Multilevel relations searching (rel->rel->fld), update docs
+
+$sel=DBIx::HTMLView::Selection->new($table, $str, $flds, $opps);
+----------------------------------------------------------------
+
+   Creats a new selection for posts in the table $table (a
+DBIx::HTMLView::Table object) selecting posts matching the search string
+$str (in the format described above).
+
+   $flds is for optimisations. If it is definied it is supposed to be a
+reference to an array with the names of the extra fields to select from
+the database server. All fields used in the $str query will ofcourse also
+be selected. If this parameter is not defined, all fields of the table
+will be selected.
+
+   $opps is an array ref listing all the opperations your SQL server
+supports and you wish to be able to use in your search query. Deault is:
+['<', '>', '=', '<=', '>=', '<>', 'LIKE', 'RLIKE', 'CLIKE', 'SLIKE'].
+
+$sel->sql_select
+----------------
+
+   Returns a SQL select query mathing the posts described in the search
+query passed to the constructor.
+
+$sel->sql_count
+---------------
+
+   Returns a SQL select query counting the posts described in the search
+query passed to the constructor.
+
+$sel->tab
+---------
+
+   Returns the table we're selecting posts from (a DBIx::HTMLView::Table
+object).
+
+$sel->add_to_where($str)
+------------------------
+
+   Add $str to the end of the string that will be the where clause of the
+slect query.
+
+$sel->add_fld($field_name)
+--------------------------
+
+   Adds the field named $field_name to the list of fields selected.
+
+$sel->add_tab($table_name)
+--------------------------
+
+   Adds the table named $table_name to the list of tabels selected from.
+
+$sel->opps
+----------
+
+   Returns an array of comparation opperation recognised as specified by
+the $opps parameter to the constructor.
+
+$sel->token
+-----------
+
+   Returns the current token.
+
+$sel->token($kind)
+------------------
+
+   Returns true if the current token is of the kind $kind.
+
+$sel->token($kind,$val)
+-----------------------
+
+   Set $val as the curent token, and $kind as the kind of that token.
+
+$sel->next_token
+----------------
+
+   Get's the next token from the string, determins it's type and makes it
+the current token using $self->token.
+
+$sel->expr =head2 $sel->bool_value =head2 $sel->fld_spec =head2 $sel->value
+---------------------------------------------------------------------------
+
+   All those reads and parsers a specifik sub expretions as defined in the
+description.
+
+
+File: pm.info,  Node: DBIx/HTMLView/Str,  Next: DBIx/HTMLView/Table,  Prev: DBIx/HTMLView/Selection,  Up: Module List
+
+A single line string filed
+**************************
+
+NAME
+====
+
+     DBIx::HTMLView::Str - A single line string filed
+
+SYNOPSIS
+========
+
+     $fld=$post->fld('testf');
+     print $fld->view_html;
+
+DESCRIPTION
+===========
+
+   This is a subcalss of DBIx::HTMLView::Field used to represent string
+fields in the databse as well as the data contained in it. Se the
+DBIx::HTMLView::Field and DBIx::HTMLView:.Fld (the superclass of Field)
+manpage for info on the methods of this class.
+
+
+File: pm.info,  Node: DBIx/HTMLView/Table,  Next: DBIx/HTMLView/Text,  Prev: DBIx/HTMLView/Str,  Up: Module List
+
+A table within a generic DBI databse
+************************************
+
+NAME
+====
+
+     DBIx::HTMLView::Table - A table within a generic DBI databse
+
+SYNOPSIS
+========
+
+   my $table=$dbi->tab('Test');
+
+   # List all posts my $hits=$table->list();
+
+   # Get post with id 7 my $post=$table->get(7);
+
+DESCRIPTION
+===========
+
+   This object is supposed to be created inside a database description as
+described in the DBIx::HTMLView::DB man page to represent a table and it's
+fields and relations. Then it can be used to access the posts of that
+table.
+
+METHODS =cut
+============
+
+   package DBIx::HTMLView::Table; use strict; use Carp;
+
+   require DBIx::HTMLView::Str; require DBIx::HTMLView::Post; require
+DBIx::HTMLView::PostSet;
+
+   require DBIx::HTMLView::Selection;
+
+DBIx::HTMLView::Table->new($name, @flds)
+----------------------------------------
+
+   Creates a new table representation for a table named $name. This has to
+be the same name as the database engine has for the table. @flds is an
+array of DBIx::HTMLView::Fld objects which represent the separate fields
+and relations of the table.
+
+$table->id
+----------
+
+   Returns the DBIx::HTMLView::Fld object that is used as the id field for
+this table.
+
+$table->name
+------------
+
+   Returns the name of this table.
+
+$table->set_db($db)
+-------------------
+
+   Use by the parent DBIx::HTMLView::DB object to inform this object which
+databse it belongs to ($db). It should not be used elsewhere.
+
+$table->set_viewer($db)
+-----------------------
+
+   To inform the table about ...  To have links to the cgi script inside
+the table =cut
+
+   sub set_viewer {   my ($self, $viewer)=@_;   $self->{'viewer'}=$viewer;
+}
+
+$table->list($search, $extra, $flds)
+------------------------------------
+
+   Returns a DBIx::HTMLView::PostSet object with the posts matching the
+$search string (see the DBIx::HTMLView::Selection man page for a
+description of the search language, it is close to SQL). $extra will be
+apended to the SQL select command before it is sent to the databse it can
+be used to specify a ORDER BY clause for example.
+
+   $flds is for optimisations. If it is not defined all fileds of the
+posts are retrieved from the datbase. If it is an array ref only the
+fields who's names are listed in there are retrieved. If a search string
+is specied the fields used in that string will also be retrieved.
+
+   The PostSet object return is placed in no-save mode, which means that
+you will be able to itterate through the posts once and then they are
+gone. This is becaue there can be quite a lot of data returned from the
+database server and there is usualy no reason to store it all in memory.
+
+   To create a PostSet object in save mode with the result you could do
+something like:
+
+   $post_set=$table->list; $post_set_save=DBIx::HTMLView::PostSet->new;
+while (defined $post=$self->get_next) {   $post_set_save->add($post); } '
+
+$table->count($search, $extra)
+------------------------------
+
+   Counts the numbers of posts matching the $search string (see the
+DBIx::HTMLView::Selection man page for a description of the search
+language, it is close to SQL). $extra will be apended to the SQL select
+command before it is sent to the databse.
+
+$table->noid_list($search, $extra, $flds)    Works in a similar way to $table->list, but it will not add the id field to flds select, and it will do a distinct select. The posts returned are some kind of pseudo posts. If you try to modify and update  them and the new posts will be added to the db as they have no id.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+   Will currently not work with relations (FIXME). It will never work with
+N2N relations as they require the id selected in order to find the related
+posts.
+
+$table->sql_list($select)
+-------------------------
+
+   Sends $select, which should be a select clause on this table,to the
+database and turns the result into a DBIx::HTMLView::PostSet object.  You
+should use the list method insted. It gives you a smoother interface.
+
+$table->new_post(...)
+---------------------
+
+   Creates a new DBIx::HTMLView::Post object linked to this table (all
+posts must be linked to a table). All arguments are passed on to the new
+method.
+
+$table->new_fld($fld,$val)
+--------------------------
+
+   Creates a copy of the DBIx::HTMLView::Fld object named $fld and gives
+it the value $val. It is used by the DBIx::HTMLView::Post objects to
+create objects representing the diffrent values of the fields and does not
+make much sense elsewhere.
+
+   For fields data ($val) is specified as a string or as the first item of
+a array referenced to by $val. Relations are represented as a reference to
+an array of the id's of the posts being related to.
+
+$table->fld_names
+-----------------
+
+   Returns an array of the names of all the fields and relation in this
+table.
+
+$table->fld($fld)
+-----------------
+
+   Returns the DBIx::HTMLView::Fld object of the field or relation named
+$fld.
+
+$table->got_fld($fld)
+---------------------
+
+   Returns true if this table has a field or relation named $fld.
+
+$table->fld($fld)
+-----------------
+
+   Returns an array of DBIx::HTMLView::Fld objects of all the fields and
+relations in this table.
+
+$table->db
+----------
+
+   Returns the DBIx::HTMLView::DB object this table belongs to.
+
+$table->viewer
+--------------
+
+   Returns the DBIx::HTMLView::DB object this table belongs to.
+
+$table->del($id)
+----------------
+
+   Deletes the post with id $id.
+
+$table->update($post) =head2 $table->change($post)
+--------------------------------------------------
+
+   Updates the data in the database of the post represented by $post (a
+DBIx::HTMLView::Post object) with the data contained in the object.
+
+$table->add($post) =head2 $table->insert($post)
+-----------------------------------------------
+
+   Inserts the post $post (a DBIx::HTMLView::Post object) into the
+database.
+
+$table->get($id)
+----------------
+
+   Returns a DBIx::HTMLView::Post object representing the post with id $id.
+
+$table->msql_create
+-------------------
+
+   Will create the tabel using SQL commands that works with msql.
+
+$table->post_fmt($kind)
+-----------------------
+
+   Returns a fmt for viewing a post from this table in the $kind format.
+It can be specified in ... FIXME: where?
+
+$table->list_fmt($kind, $butt, $flds)
+-------------------------------------
+
+   Returns a fmt for viewing a set of posts from this table in the $kind
+format. It can be specified in ... FIXME: where?
+
+   The default fmt will consist of a table with one colume per Fld
+specified in the arrayref $flds. If it is not defined all Fld will be
+viewed.
+
+   $butt can be used to specify the contents of an extra colum to the right
+of the rest. To for example contain the view, edit and delete buttons.
+
+
+File: pm.info,  Node: DBIx/HTMLView/Text,  Next: DBIx/HTMLView/Tree,  Prev: DBIx/HTMLView/Table,  Up: Module List
+
+A multi line string filed
+*************************
+
+NAME
+====
+
+     DBIx::HTMLView::Text - A multi line string filed
+
+SYNOPSIS
+========
+
+     $fld=$post->fld('testf');
+     print $fld->view_html;
+
+DESCRIPTION
+===========
+
+   This is a subclass of DBIx::HTMLView::Str used to represent larger
+texts. The main difference from a Str is that the default edit_html editor
+uses a <textarea>...</textarea> construct instead of an <input ...> tag.
+
+   This fld also has two parameters that are specified in the $data hash
+passed to the constructor (see the DBIx::HTMLView::Fld manpage). They are
+'width', the width of the <textarea> editor in characters (defaults is 80)
+and 'height', the height of the <textarea> editor in characters (default
+is 50).
+
+   Except for the methods described in the superclasses
+(DBIx::HTMLView::Fld, DBIx::HTMLView::Field, DBIx::HTMLView::Str) there
+are also the following methods.
+
+METHODS =cut
+============
+
+   package DBIx::HTMLView::Text; use strict; use Carp;
+
+   use vars qw(@ISA); require DBIx::HTMLView::Text;  @ISA =
+qw(DBIx::HTMLView::Str);
+
+$fld->width
+-----------
+
+   Returns the witdh in characters of the default edit_html editor.
+
+$fld->height
+------------
+
+   Returns the height in characters of the default edit_html editor.
+
+
+File: pm.info,  Node: DBIx/HTMLView/Tree,  Next: DBIx/HTMLView/msqlDB,  Prev: DBIx/HTMLView/Text,  Up: Module List
+
+DBIx::HTMLView::Tree
+********************
+
+NAME
+====
+
+     DBIx::HTMLView::Tree
+
+SYNOPSIS
+========
+
+DESCRIPTION
+===========
+
+$fld->to_tab_name
+-----------------
+
+   Returns the name of the to table.
+
+$fld->to_tab
+------------
+
+   Returns the DBIx::HTMLView::Table object representing the to table.
+
+$fld->view_fmt_edit_html($postfmt_name, $postfmt)
+-------------------------------------------------
+
+   Used by the default edit_html fmt. It will returns a string containing
+"<input type=radio ...>" constructs to allow the user to specify which
+post (chunk in the tree) we should be related to. All posts in the to
+table (tree) will be listed here in a hierarchically list showing the tree
+structure and viewed with view_fmt($postfmt_name,$postfmt).
+
+   $postfmt_name will default to 'view_html'. If $postfmt isn't defined
+some decent default is tried to be derived from the 'view' fmt or if
+that's not defined, the default fmt.
+
+   The $postfmt should contain a <Var Edit> tag that will be raplaced by
+the radio button.
+
+$fld->view_fmt($fmt_name, $fmt)
+-------------------------------
+
+   Will call view_fmt($fmt_name, $fmt) on the post this relation is
+pointing to and return the result, se DBIx::HTMLView::Post for info on the
+$fmt format.
+
+   If $fmt is not defined the fmt parameter named $fmt_name specified in
+the $data parameter to the constructor will be used as fmt string.
+
+   If the fmt string starts with "<InRel>", the rest of the fmt will be
+handled by this method instead of calling the PostSet version.  Current
+the only supported construct here is <perl>...</perl> which will be
+replaced by the returnvalue of eval(...).
+
+
+File: pm.info,  Node: DBIx/HTMLView/msqlDB,  Next: DBIx/HTMLView/mysqlDB,  Prev: DBIx/HTMLView/Tree,  Up: Module List
+
+interface for msql databases through DBI
+****************************************
+
+NAME
+====
+
+     DBIx::HTMLView::msqlDB - interface for msql databases through DBI
+
+SYNOPSIS
+========
+
+   use DBIx::HTMLView; my $dbi=my $dbi=msqlDB("DBI:msql:HTMLViewTester",
+"", "",                    Table ('Test', Id('id'), Str('testf'))); my
+$list=$dbi->tab('Test')->list();
+
+DESCRIPTION
+===========
+
+   This is a customized DB object for msql databases.  Most methods are
+inherited from the superclass: DBIx::HTMLView::DB - only those that are
+specific to msql are overridden.
+
+METHODS =cut
+============
+
+   package DBIx::HTMLView::msqlDB; use strict;
+
+   use DBI; use Carp;
+
+   use vars qw(@ISA); require DBIx::HTMLView::DB;  @ISA =
+qw(DBIx::HTMLView::DB);
+
+   sub insert {   my ($self, $tab, $post)=@_;   my $id=$self->send('select
+_seq from ' . $tab->name)->fetchrow_arrayref->[0];
+$post->set($tab->id->name, $id);
+
+     DBIx::HTMLView::DB::insert($self, $tab, $post);
+     }
+
+   sub sql_create_table {   my ($self, $table)=@_;
+DBIx::HTMLView::DB::sql_create_table($self, $table);
+$self->send("CREATE UNIQUE  INDEX idx1 ON " . $table->name . "(" .
+      $table->id->name . ")");   $self->send("CREATE SEQUENCE ON " .
+$table->name . " STEP 1"); }
+
+   # Local Variables: # mode:              perl # tab-width:         8 #
+perl-indent-level: 2 # End:
+
+
+File: pm.info,  Node: DBIx/HTMLView/mysqlDB,  Next: DBIx/HTMLinterface,  Prev: DBIx/HTMLView/msqlDB,  Up: Module List
+
+interface for mysql databases through DBI
+*****************************************
+
+NAME
+====
+
+     DBIx::HTMLView::mysqlDB - interface for mysql databases through DBI
+
+SYNOPSIS
+========
+
+   use DBIx::HTMLView; my $dbi=my $dbi=mysqlDB("DBI:mysql:HTMLViewTester",
+"", "",                    Table ('Test', Id('id'), Str('testf'))); my
+$list=$dbi->tab('Test')->list();
+
+DESCRIPTION
+===========
+
+   This is a customized DB object for mysql databases.  Most methods are
+inherited from the superclass: DBIx::HTMLView::DB - only those that are
+specific to mysql are overridden.
+
+METHODS
+=======
+
+
+File: pm.info,  Node: DBIx/HTMLinterface,  Next: DBIx/KwIndex,  Prev: DBIx/HTMLView/mysqlDB,  Up: Module List
+
+Class for creating a CGI interface to a database
+************************************************
+
+NAME
+====
+
+   DBIx::HTMLinterface - Class for creating a CGI interface to a database
+
+SYNOPSIS
+========
+
+     use CGI;
+     use DBI;
+     use DBIx::HTMLinterface;
+
+     $cgi			= new CGI;
+     $dbh			= DBI->connect("DBI:mysql:[DATABASE]:[HOSTNAME]","[USERNAME]","[PASSWORD]") );
+     $DBinterface	= new DBIx::HTMLinterface ($cgi, $dbh, "[INFOTABLE NAME]");
+
+     # Below here is only executed if a HTMLinterface action was not taken, so print a menu
+
+     print $cgi->header;
+     print "<A HREF=" . $cgi->url . "?HTMLinterface-table=[TABLENAME]&HTMLinterface-action=add>Add</A>\n<BR>";
+     print "<A HREF=" . $cgi->url . "?HTMLinterface-table=[TABLENAME]&HTMLinterface-action=search>Search</A>\n";
+
+DESCRIPTION
+===========
+
+   The `DBIx::HTMLinterface' class allows a CGI interface to a database.
+It enables a CGI interface to a database to be created, supporting record
+addition, modification, deletion and searching. It provides a user
+friendly interface with descriptions of fields provided. The field
+descriptions along with information on whether the field is visible,
+hidden or excluded are extracted from a table, allowing easy modification
+and addition of fields and tables without having to edit code.
+
+Features
+--------
+
+Simple database administration
+     Forms are created automatically on demand, SQL statements are
+     generated as needed and processed.  The module contains enough
+     autonomy to potentially run with only wrapper perl code placed around
+     it.
+
+Full form configuration
+     Forms can be modified to add descriptions and extra information to
+     fields, making it easy to change output without having to edit code.
+
+Control
+     Extensive callback procedures and configuration options allow output,
+     password protection and logging to be configured as desired.
+
+Full HTML customisation
+     HTML output and table formats can be customised easily by the user.
+
+METHODS
+=======
+
+Main Methods
+------------
+
+*$DBinterface = new DBIx::HTMLinterface (*CGI DBI *Infotable Name* *[Suppress paramcheck]**);*
+     Constructs a new `DBIx::HTMLinterface' object. You must pass a
+     reference to a CGI object which will be used to get the script's
+     parameters and a database handle (Returned from a `DBI->connect'
+     function) which will be used to communicate with the database. The
+     third parameter defines the name of the *info table* which is used to
+     determine hidden/excluded fields, field names and descriptions as
+     described below in INFOTABLE FORMAT. After initialisation, the CGI
+     object is checked for a 'HTMLinterface-action' parameter.  If this is
+     present, control is taken from the script and the specified action is
+     performed on the specified table. This parameter is set when an
+     action which requires further processing is in progress.
+
+     The final parameter, suppress paramcheck, is optional and when set to
+     1 will cause the script NOT to perform the parameter check. You MUST
+     then call the check_params function in your code or forms will not
+     work. Overriding the script in this way is not recommended unless
+     necessary for error handler or security check handler setting.
+
+Optional Methods
+----------------
+
+   Optional methods which can be called to directly jump to a script
+function, for example to directly initiate a delete or modify on a record.
+
+check_params *();*
+          # Check form parameters
+          $DBinterface->check_params;
+
+     Causes the HTMLinterface-action parameter to be rechecked. If it
+     contains the value 'add','modify','delete' or 'search', the
+     respective function will be called
+     ('exec_add','exec_modify','exec_delete' or 'exec_search').  this
+     function is essential to the correct functioning of the interfaces
+     with two and three part forms, and is called automatically when a
+     HTMLinterface object is created, unless the 'suppress paramcheck'
+     parameter is set to 1.
+
+exec_search *();*
+          # Now set the 'HTMLinterface-table' parameter so the script knows
+          # what table to deal with
+          $cgi->param(-name=>'HTMLinterface-table',-value=>'mytable');
+
+          # Now call the function
+          $DBinterface->exec_search;
+
+     Searches the table named in the CGI parameter 'HTMLinterface-table'.
+     The user will be presented with a blank form with the fields of the
+     table.  They press submit to search the table (Wildcards can be
+     used). They are then returned a table with a modify and delete button
+     and the fields for each record found.
+
+exec_modify *();*
+          # Assume $cgi->param has been set to indicate the primary keys
+          # for the table being modified, i.e 'Primary Key Name' = 'Primary
+          # Key Value'
+
+          # Now set the 'HTMLinterface-table' parameter so the script knows
+          # what table to deal with
+          $cgi->param(-name=>'HTMLinterface-table',-value=>'mytable');
+
+          # Now call the function
+          $DBinterface->exec_modify;
+
+     Modifies a record from the table named in the CGI parameter
+     'HTMLinterface-table' where the CGI parameters which have the same
+     name as a table column. For example for a table called 'data' with an
+     'ID' column containing the primary keys for that table, set the
+     'HTMLinterface-table' parameter to 'data' and set the 'ID' parameter
+     to the ID number of the record you want to modify. The user will then
+     be presented with a form containing the data in the table for them to
+     modify.  They then press submit to commit the data
+
+exec_add *();*
+          # Now set the 'HTMLinterface-table' parameter so the script knows
+          # what table to deal with
+          $cgi->param(-name=>'HTMLinterface-table',-value=>'mytable');
+
+          # Now call the function
+          $DBinterface->exec_add;
+
+     Adds a record to the table named in the CGI parameter
+     'HTMLinterface-table'.  The user will be presented with a empty form
+     containing just the defaults for the values of that table (Defined in
+     the SQL). They then press submit to commit the data to the table.
+
+exec_delete *();*
+          # Assume $cgi->param has been set to indicate the primary keys
+          # for the table being modified, i.e 'Primary Key Name' = 'Primary
+          # Key Value'
+
+          # Now set the 'HTMLinterface-table' parameter so the script knows
+          # what table to deal with
+          $cgi->param(-name=>'HTMLinterface-table',-value=>'mytable');
+
+          # Now call the function
+          $DBinterface->exec_delete;
+
+     Deletes a record from the table named in the CGI parameter
+     'HTMLinterface-table' where the CGI parameters which have the same
+     name as a table column. For example for a table called 'data' with an
+     'ID' column containing the primary keys for that table, set the
+     'HTMLinterface-table' parameter to 'data' and set the 'ID' parameter
+     to the ID number of the record you want to delete.
+
+     This function will output a confirmation page requiring users to
+     confirm the delete or press their browser's back button to cancel. To
+     skip confirmation, set the 'confirm' parameter to 'Y'.
+
+Optional Customisation Methods
+------------------------------
+
+   Optional methods which can be called to alter the behaviour of the
+script or enable features such as logging.
+
+set_logcallback (*Callback function address**);*
+          sub log_callback {
+              my $description = shift;
+              my $sql         = shift;
+
+          open (LOG,">>$logfile")
+          print LOG "$description (Executing $sql)";
+          close(LOG);
+            }
+            $DBinterface = new DBIx::HTMLinterface ($cgi, $dbh, $table, 1);
+            $DBinterface->set_logcallback(\&log_callback);
+            $DBinterface->check_params();
+
+     Enables logging of SQL changes to the database via the user defined
+     routine. The first parameter passed is a description, such as 'Record
+     added to mytable' and the second parameter is the SQL statement which
+     was used.
+
+     NOTE: check_params() MUST be called or HTMLinterface will not
+     function correctly.
+
+set_logfile (*Logfile name**);*   $DBinterface = new DBIx::HTMLinterface ($cgi, $dbh, $table, 1);   $DBinterface->set_logfile("/usr/local/logs/mydb-log");   $DBinterface->check_params();
+     Enables logging of SQL changes to the database automatically without
+     providing a callback. The script will open the file specified, with
+     no locking (Althoughthis might be added in future). The file must be
+     writeable to the CGI, on UNIX you normally need to *chmod 666
+     mydb-log*. However this may differ depending on your system and what
+     operating system you have.
+
+     NOTE: check_params() MUST be called or HTMLinterface will not
+     function correctly.
+
+set_errhandler (*Error handler function address**);*
+          sub errorhandler {
+              my $errstr  = shift;
+
+          print "<h1>Fatal Error</h1>";
+          print $errstr;
+
+          exit;
+            }
+            $DBinterface = new DBIx::HTMLinterface ($cgi, $dbh, $table, 1);
+            $DBinterface->set_errorhandler(\&errorhandler);
+            $DBinterface->check_params();
+
+     Transfers error handling in the script from the *die()* procedure to
+     the subroutine passed as the argument. The errorhandling routine
+     should not return, and should terminate the program after the error
+     has been output.
+
+     NOTE: check_params() MUST be called or HTMLinterface will not
+     function correctly.
+
+set_accesscallback
+          sub checkaccess {
+              if ($cgi->param("password") eq "letmein") { # Example security check
+                 return; # Valid password - return to allow function to continue
+              } else {
+                 die ("Incorrect password"); # Incorrect - die to stop execution
+              }
+          }
+          $DBinterface = new DBIx::HTMLinterface ($cgi, $dbh, $table, 1);
+          $DBinterface->set_accesscallback(\&errorhandler);
+          $DBinterface->check_params();
+
+     Enables a security check function to approve or deny access. The
+     function is called before changes to the database are made. The
+     function should return to allow an action to complete or die to
+     terminate the program and prevent access.
+
+     NOTE: check_params() MUST be called or HTMLinterface will not
+     function correctly.
+
+set_timezone (*UseGMT (1/0)**,* *Time change (hours)**);*
+          $DBinterface->set_timezone(1, 0);  # Set time to GMT +0000
+          $DBinterface->set_timezone(0, -5); # Set time to server time -0500
+          $DBinterface->set_timezone(1, -8); # Set time to GMT -0800
+          $DBinterface->set_timezone(0, 2);  # Set time to server time +0200
+
+     Changes the time zone used for timestamps inserted into database
+     records. The first parameter specifies whether to use GMT time or to
+     use the server time, i.e the computer running this script's internal
+     clock. The second parameter allows time to be added or subtracted in
+     hours.
+
+Optional HTML Customisation Methods
+-----------------------------------
+
+Future Additions
+     In a later version, callbacks to print table cells, start and finish
+     tables, print form fields, print back links and add user defined form
+     parameters to allow state keeping such as password protection etc.
+
+set_printheader
+          sub printheader {
+              my $title    = shift;
+              my $headtext = shift;
+
+          print $cgi->start_html(-title=>"$title_txt");
+
+          if ($headtext ne "") {
+              print $cgi->h3($headtext);
+          }
+            }
+            $DBinterface->set_printheader(\&printheader);
+
+     Transfers the header HTML outputting function to a user defined
+     function to allow HTML customisation.
+
+set_printfooter
+          sub printfooter {
+              print $cgi->end_html;
+          }
+          $DBinterface->set_printfooter(\&printfooter);
+
+     Transfers the footer HTML outputting function to a user defined
+     function to allow HTML customisation.
+
+INFOTABLE FORMAT
+================
+
+   The correct SQL structure for the infotable is shown below, in MySQL
+format. If another database is being used, an equivalent SQL structure
+should work correctly providing the field names remain the same. User
+defined fields can be safely appended to the table and will be ignored by
+HTMLinterface.
+
+     CREATE TABLE [infotable name] (
+       TableID varchar(200) DEFAULT '' NOT NULL,         # SQL name of table
+       TableName tinytext DEFAULT '' NOT NULL,           # User friendly name of table
+       NameHash text DEFAULT '' NOT NULL,                # 'name=value&name2=value2' style entry for names of fields
+       LabelHash text DEFAULT '' NOT NULL,               # 'name=value&name2=value2' style entry for labels of fields
+       LookupHash text DEFAULT '' NOT NULL,              # 'name=select Thing from Table&name2=select Somethingelse from Table' style entry for value lookup
+       ExtraHash text DEFAULT '' NOT NULL,               # 'name=extra_info&name2=extrainfo' style entry containing extra information. Currently recognised values
+                                                         #        include 'encryptpassword' which causes SQL statements to encrypt this field with the mysql 'PASSWORD'
+                                                         #        function.
+       Hidden text DEFAULT '' NOT NULL,                  # 'name&name2' style entry for hidden columns
+       Exclude text DEFAULT '' NOT NULL,                 # 'name&name2' style entry for excluded columns
+       AdditionalWhere text DEFAULT '' NOT NULL,         # Additional SQL 'where' clause for search modes, e.g to exclude items from searches
+       # Add any user defined fields here
+       PRIMARY KEY (TableID)
+     );
+
+   A description of each field follows:
+
+TableID
+     The table's identifier. This should exactly match the table's name in
+     the database. For example:
+
+          users
+
+TableName
+     A user friendly name for the table, shown in the output. For example:
+
+          Registered Users
+
+NameHash
+     A string containing user-friendly names for the fields in the table.
+     Formatted similar to a HTML query string, although no form of
+     escaping is available at the moment. For example:
+
+          name=User Name&dob=User's Date of Birth&occupation=User's Occupation&password=User's Password
+
+LabelHash
+     Similar to NameHash, contains a description for each field that is
+     displayed below any form input fields. For example:
+
+          name=Enter the user's name&dob=Enter the user's date of birth in the format DDMMYY&occupation=Select the user's occupation&password=The user's password
+
+LookupHash
+     Used to create dropdown lists, such as in the current example, an
+     additional table called 'occupations' can be created and filled with
+     a list of possible occupations. In editing modes, a drop down list of
+     all available occupations can then be created. LookupHash should
+     contain a select statement to associate with a field. The select
+     statement should return one or two fields. If it returns two, the
+     first will be used as the value of the form element, the value that
+     will be placed in the database and the second will be used as the
+     value displayed to the user, i.e a select box will be created with
+     the syntax:
+
+          <option value="[FIRSTFIELD]">[SECONDFIELD]
+
+     If only one field is returned, it is used as both the value displayed
+     and the value of the form element.
+
+     For example:
+
+          occupation=select ID, Name from occupations order by Name
+
+     If other lookups are needed they can be joined using the usual '&'
+     syntax.
+
+ExtraHash
+     Used to pass additional information to HTMLinterface. Currently only
+     one value is supported, 'encryptpassword' which causes any entries in
+     the field to be encrypted using the MySQL PASSWORD() function. For
+     example:
+
+          password=encryptpassword
+
+Hidden
+     Used to hide fields from the user, for example primary key ID fields
+     should be hidden. Simply a list of each hidden field, separated by
+     '&'. Hidden fields are printed as 'hidden' input fields.  For example
+     to hide 'id' and 'secretdata':
+
+          id&secretdata
+
+Exclude
+     Completely removes fields from forms, formatted in the same way as
+     Hidden. For example:
+
+          invisiblefield&invisiblefield2
+
+AdditionalWhere
+     Additional SQL clause to be appended to the select statement used in
+     search modes, for example:
+
+          AND NOT name = 'Fred'
+
+     could be used to exclude 'Fred' from searches. Also, order by clauses
+     can be appended to sort output.
+
+     NOTE: appending to the where clause requires the statement to begin
+     with 'AND'.
+
+KNOWN BUGS
+==========
+
+   * Hidden and exclude arrays are nonfunctional due to array handling
+     problems...
+
+     [TODO - Believed to be fixed, awaiting testing]
+
+   * Code may be too MySQL specific and not function on other databases.
+     This needs to be tested.
+
+   * Currently may allow users to manipulate tables not defined in the
+     infotable depending on database in use. This will be switchable in
+     the next version.
+
+AUTHOR
+======
+
+   James Furness, furn@base6.com
+
+   Parts based upon *mysql-lib.pl* by Ron Crisco <ronsolo@ronsolo.com>.
+
+SEE ALSO
+========
+
+   *Note CGI: CGI, `DBI' in this node
+
+COPYRIGHT
+=========
+
+   Copyright (c)1999 James Furness <furn@base6.com>. All Rights Reserved.
+This module is free software; it may be used freely and redistributed for
+free providing this copyright header remains part of the module. You may
+not charge for the redistribution of this module. Selling this code without
+James Furness' written permission is expressly forbidden.
+
+   This module may not be modified without first notifying James Furness
+<furn@base6.com> (This is to enable me to track modifications). In all
+cases the copyright header should remain fully intact in all modifications.
+
+   This code is provided on an "As Is" basis, without warranty, expressed
+or implied. The author disclaims all warranties with regard to this
+software, including all implied warranties of merchantability and fitness,
+in no event shall the author, James Furness be liable for any special,
+indirect or consequential damages or any damages whatsoever including but
+not limited to loss of use, data or profits. By using this module you
+agree to indemnify James Furness from any liability that might arise from
+it's use.  Should this code prove defective, you assume the cost of any
+and all necessary repairs, servicing, correction and any other costs
+arising directly or indrectly from it's use.
+
+   The copyright notice must remain fully intact at all times.  Use of
+this program or its output constitutes acceptance of these terms.
+
+   Parts of this module are based upon mysql-lib.pl by Ron Crisco.
+
+Acknowledgments
+---------------
+
+   Thanks to Ron Crisco, Richard Smith and Stephen Heaslip without who I
+would probably have not written this. Thanks to Tom Christiansen for his
+*Note Perltoot: (perl.info)perltoot, manpage which was useful in writing
+this module in addition to the *Note Perlmod: (perl.info)perlmod,, *Note
+Perlmodlib: (perl.info)perlmodlib, and Tim Bunce's modules file (Available
+on CPAN).
+
+
+File: pm.info,  Node: DBIx/KwIndex,  Next: DBIx/Lookup/Field,  Prev: DBIx/HTMLinterface,  Up: Module List
+
+create and maintain keyword indices in DBI tables
+*************************************************
+
+NAME
+====
+
+   DBIx::KwIndex - create and maintain keyword indices in DBI tables
+
+SYNOPSIS
+========
+
+     package MyKwIndex;
+     use DBIx::KwIndex;
+
+     sub document_sub { ... }
+
+     package main;
+     $kw = DBIx::KwIndex->new({dbh => $dbh, index_name => 'myindex'})
+       or die "can't create index";
+
+     $kw->add_document   ([1,2,3,...]) or die $kw->{ERROR};
+     $kw->remove_document([1,2,3,...]) or die $kw->{ERROR};
+     $kw->update_document([1,2,3,...]) or die $kw->{ERROR};
+
+     $docs = $kw->search({ words=>'upset stomach' });
+     $docs = $kw->search({ words=>'upset stomach', boolean=>'AND' });
+     $docs = $kw->search({ words=>'upset stomach', start=>11, num=>10 });
+     $docs = $kw->search({ words=>['upset','(bite|stomach)'], re=>1 });
+
+     $kw->add_stop_word(['the','an','am','is','are']) or die $kw->{ERROR};
+     $words = $kw->common_word(85);
+     $kw->remove_word(['gingko', 'bibola']) or die $kw->{ERROR};
+
+     $ndocs  = $kw->document_count();
+     $nwords = $kw->word_count();
+     $ndocs  = $kw->match_count({ words=>'upset stomach', boolean=>'OR' });
+
+     $kw->remove_index or die $kw->{ERROR};
+     $kw->empty_index  or die $kw->{ERROR};
+
+DESCRIPTION
+===========
+
+   DBIx::KwIndex is a keyword indexer. It indexes documents and stores the
+index data in database tables. You can tell DBIx::KwIndex to index [lots]
+of documents and later on show you which ones contain a certain word.  The
+typical application of DBIx::KwIndex is in a search engine.
+
+   How to use this module:
+
+  1. Provide a database handle.
+          use DBI;
+          my $dbh = DBI->connect(...) or die $DBI::errstr;
+
+  2. Subclass DBIx::KwIndex and provide a `document_sub' method to
+     retrieve documents referred by an integer id. The method should
+     accept a list of document ids in an array reference and return the
+     documents in an array reference. In this way, you can index any kind
+     of documents that you want: text files, HTML files, BLOB columns,
+     etc., as long as you provide the suitable document_sub() to retrieve
+     the documents. The one thing to remember is that the documents must
+     be referred by unique integer number. Below is a sample of a
+     document_sub() that retrieves document from the 'content' field of a
+     database table.
+          package MyKwIndex;
+          require DBIx::KwIndex;
+          use base 'DBIx::KwIndex';
+
+          sub document_sub {
+             my ($self, $ary_ref) = @_;
+          	my $dbh = $self->{dbh};
+
+          my $result = $dbh->selectall_arrayref(
+          'SELECT id,content FROM documents
+           WHERE id IN ('. join(',',@$ary_ref). ')');
+          
+          # if retrieval fails, you should return undef
+          defined($result) or return undef;
+          
+          # now returns the content field in the order of the id's
+          # requested. remember to return the documents exactly
+          # in the order requested!
+          my %tmp = map { $_->[0] => $_->[1] } @$result;
+          return [ @tmp{ @$ary_ref } ];
+           }
+
+  3. Create the indexer object.
+          my $kw = MyKwIndex->new({
+                   dbh => $dbh,
+                   index_name => 'article_index',
+                   # other options...
+                   });
+
+     dbh is the database handle. *index_name* is the name of the index,
+     DBIx::KwIndex will create several tables which are all prefixed with
+     the index_name. The default index_name is 'kwindex'. Other options
+     include: *max_word_length* (default 32).
+
+  4. Index some documents. You can index one document at a time, e.g.
+          $kw->add_document([1]) or die $kw->{ERROR};
+          $kw->add_document([2]) or die $kw->{ERROR};
+
+     or small batches of documents at a time:
+
+          $kw->add_document([1..10])  or die $kw->{ERROR};
+          $kw->add_document([11..20]) or die $kw->{ERROR};
+
+     or large batches of documents at a time:
+
+          $kw->add_document([1..300])   or die $kw->{ERROR};
+          $kw->add_document([301..600]) or die $kw->{ERROR};
+
+     Which one to choose is a matter of memory-speed trade-off. Larger
+     batches will increase the speed of indexing, but with increased
+     memory usage.
+
+     Note: DBIx::KwIndex ignores single-character words, numbers, and words
+     longer than 'max_word_length'.
+
+  5. If you want to search the index, use the search() method.
+          $docs = $kw->search({ words => 'upset stomach' });
+          die "can't search" if !defined($docs);
+
+     The search() method will return an ARRAY ref containing the document
+     ids that matches the criteria. Other parameter include: num =>
+     maximum number of results to retrieve; start => starting position (1
+     = from the beginning); boolean => 'AND' or 'OR' (default is 'OR'); re
+     => use regular expression, 1 or 0.
+
+     Note: num and start uses the `LIMIT' clause (which is quite unique to
+     MySQL). re uses the `REGEXP' clause. Do not use these options if your
+     database server does not support them.
+
+     Also note: Searching is entirely done from the index. No documents
+     will be retrieved while searching. A simple 'relevancy' ranking is
+     used. Search is case-insensitive and there is no phrase-search
+     support yet.
+
+     Some examples:
+
+          # retrieve only the 11th-20th result.
+          $docs = $kw->search({ words=>'upset stomach', start=>11, num=>10 });
+          die "can't search" if !defined($docs);
+
+          # find documents which contains all the words.
+          $docs = $kw->search({ words=>'upset stomach', boolean=>'AND' });
+          die "can't search" if !defined($docs);
+
+     If you just want to know how many documents match your query, use the
+     match_count() method. If you want to retrieve all the matches anyway,
+     to know how many documents match just find out the size of the match
+     array.  That will save you from extra index access.
+
+          # find the number of documents that match the query
+          $ndocs = $kw->match_count({ words=>'halitosis' });
+
+          # find the number of matches and retrieve only the first twenty of them
+          $query = { words=>'halitosis', num=>20 };
+          $ndocs = $kw->match_count($query);
+          $docs  = $kw->search($query);
+
+          # search and get the matches. get the number of matches from the
+          # result set itself.
+          $docs  = $kw->match_count({ words=>'halitosis' });
+          $ndocs = @$docs;
+
+  6. Now suppose some documents change, and you need to update the index
+     to reflect that. Just use the methods below.    # if you want to
+     remove documents from index   $kw->remove_document([90..100]) or die
+     $kw->{ERROR};
+          # if you want to update the index
+          $kw->update_document([90..100]) or die $kw->{ERROR};
+
+
+SOME UTILITY METHODS
+====================
+
+   If you want to exclude some words (usually very common words, or "stop
+words") from being indexed, do this before you index any document:
+
+     $kw->add_stop_word(['the','an','am','is','are'])
+       or die "can't add stop words";
+
+   Adding stop words is a good thing to do, as stop words are not very
+useful for your index. They occur in a large proportion of documents (they
+do not help searches differentiate documents) and they increase the size
+your index (slowing the searches).
+
+   But which words are common in your collection? you can use the
+common_word method:
+
+     $words = $kw->common_word(85);
+
+   This will return an array reference containing all the words that occur
+in at least 85% of all documents (default is 80%).
+
+   If you want to delete some words from the index:
+
+     $kw->remove_word(['common','cold']);
+       or die "can't remove words";
+
+   To get some statistics about your index:
+
+     # the number of documents
+     $ndocs = $kw->document_count();
+     # the number of words
+     $nwords = $kw->word_count();
+
+   Last, if you got bored with the index and want to delete it:
+
+     $kw->remove_index or die $kw->{ERROR};
+
+   This will delete the database tables. Or, if you just want to empty the
+index and start all over:
+
+     $kw->empty_index or die $kw->{ERROR};
+
+AUTHOR
+======
+
+   Steven Haryanto &lt;steven@haryan.to&gt;
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000 Steven Haryanto. All rights reserved.
+
+   You may distribute under the terms of either the GNU General Public
+License or the Artistic License, as specified in the Perl README file.
+
+BUGS/CAVEATS/TODOS
+==================
+
+   Enable the module to use other database server (besides MySQL).
+MySQL-specific SQL bits that need to be adjusted include, but not limited
+to: LIMIT clause, LOCK/UNLOCK TABLES statements, REPLACE INTO/INSERT IGNORE
+statements, COUNT(DISTINCT ...) group function, AUTO_INCREMENT and
+INT/UNSIGNED. (Don't you just hate SQL? `:-)' Thanks to Edwin Pratomo for
+pointing these out). Currently I do not need this feature, since I only use
+MySQL for current projects. Any volunteer?
+
+   Use a more correct search sorting (the current one is kinda bogus :).
+
+   Probably implement phrase-searching (but this will require a larger
+vectorlist).
+
+   Probably, maybe, implement English/Indonesian stemming.
+
+   Any safer, non database-specific way to test existence of tables other
+than $dbh->tables?
+
+NOTES
+=====
+
+   At least three other Perl extensions exist for creating keyword indices
+and storing them in a database: DBIx::TextIndex, MyConText,
+DBIx::FullTextSearch. You might want to take a look at them before you
+decide which one better suits your need. Personally I develop DBIx::KwIndex
+because I want to have a module that: a) is simple and convenient to use;
+b) supports updating the index without rebuilding it from scratch.
+
+   Incidentally, these three extensions and DBIx::KwIndex itself use MySQL
+specifically. One that could use Interbase or Postgres would perhaps be
+nice.
+
+   Advices/comments/patches welcome.
+
+HISTORY
+=======
+
+   0001xx=first draft,satunet.com. 000320=words->scalar.
+000412=0.01/documentation/cpan. 000902=update doc/fixes(see Changes)
+
+

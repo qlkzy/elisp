@@ -1,0 +1,1728 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Net/SSH/Perl/Auth/Rhosts_RSA,  Next: Net/SSH/Perl/Buffer,  Prev: Net/SSH/Perl/Auth/Rhosts,  Up: Module List
+
+Perform Rhosts-RSA authentication
+*********************************
+
+NAME
+====
+
+   Net::SSH::Perl::Auth::Rhosts_RSA - Perform Rhosts-RSA authentication
+
+SYNOPSIS
+========
+
+     use Net::SSH::Perl::Auth;
+     my $auth = Net::SSH::Perl::Auth->new('Rhosts_RSA', $ssh);
+     print "Valid auth" if $auth->authenticate;
+
+DESCRIPTION
+===========
+
+   *Net::SSH::Perl::Auth::Rhosts_RSA* performs Rhosts with RSA
+authentication with a remote sshd server. This is standard Rhosts
+authentication, plus a challenge-response phase where the server
+RSA-authenticates the client based on its host key. When you create a new
+Rhosts_RSA auth object, you give it an *$ssh* object, which should contain
+an open connection to an ssh daemon, as well as any data that the
+authentication module needs to proceed. In this case, the *$ssh* object
+must contain the name of the user trying to open the connection.
+
+   Note that the sshd server will require two things from your client:
+
+  1. Privileged Port sshd will require your client to be running on a
+     privileged port (below 1024); this will, in turn, likely require your
+     client to be running as root. If your client is not running on a
+     privileged port, the Rhosts-RSA authentication request will be denied.
+
+     If you're running as root, *Net::SSH::Perl* should automatically
+     detect that and try to start up on a privileged port. If for some
+     reason that isn't happening, take a look at the *Net::SSH::Perl* docs.
+
+  2. Private Host Key In order to do RSA-authentication on your host key,
+     your client must be able to read the host key. This will likely be
+     impossible unless you're running as root, because the private host
+     key file (`/etc/ssh_host_key') is readable only by root.
+
+        With that aside, to use Rhosts-RSA authentication the client sends
+a request to the server to authenticate it, including the name of the user
+trying to authenticate, as well as the public parts of the host key. The
+server first ensures that the host can be authenticated using standard
+Rhosts authentication (*shosts.equiv*, *hosts.equiv*, etc.).  If the
+client passes this test, the server sends an encrypted challenge to the
+client. The client must decrypt this challenge using its private host key,
+then respond to the server with its response.
+
+   Once the response has been sent, the server responds with success or
+failure.
+
+AUTHOR & COPYRIGHTS
+===================
+
+   Please see the Net::SSH::Perl manpage for author, copyright, and
+license information.
+
+
+File: pm.info,  Node: Net/SSH/Perl/Buffer,  Next: Net/SSH/Perl/Cipher,  Prev: Net/SSH/Perl/Auth/Rhosts_RSA,  Up: Module List
+
+Low-level read/write buffer class
+*********************************
+
+NAME
+====
+
+   Net::SSH::Perl::Buffer - Low-level read/write buffer class
+
+SYNOPSIS
+========
+
+     use Net::SSH::Perl::Buffer;
+     my $buffer = Net::SSH::Perl::Buffer->new;
+
+     ## Add a 32-bit integer.
+     $buffer->put_int32(10932930);
+
+     ## Get it back.
+     my $int = $buffer->get_int32;
+
+DESCRIPTION
+===========
+
+   *Net::SSH::Perl::Buffer* implements the low-level binary buffer needed
+by the *Net::SSH::Perl* suite. Specifically, a *Net::SSH::Perl::Buffer*
+object is what makes up the data segment of a packet transferred between
+server and client (a *Net::SSH::Perl::Packet* object).
+
+   Buffers contain integers, strings, characters, etc. Because of the use
+of GMP integers in SSH, buffers can also contain multiple-precision
+integers (represented internally by *Math::GMP* objects).
+
+   Note: the method documentation here is in what some might call a
+slightly backwards order. The reason for this is that the get and put
+methods (listed first) are probably what most users/developers of
+*Net::SSH::Perl* need to care about; they're high-level methods used to
+get/put data from the buffer. The other methods (LOW-LEVEL METHODS) are
+much more low-level, and typically you won't need to use them explicitly.
+
+GET AND PUT METHODS
+===================
+
+   All of the *get_** and *put_** methods respect the internal offset
+state in the buffer object. This means that, for example, if you call
+*get_int16* twice in a row, you can be ensured that you'll get the next two
+16-bit integers in the buffer. You don't need to worry about the number of
+bytes a certain piece of data takes up, for example.
+
+$buffer->get_int8
+-----------------
+
+   Returns the next 8-bit integer from the buffer (which is really just
+the ASCII code for the next character/byte in the buffer).
+
+$buffer->put_int8
+-----------------
+
+   Appends an 8-bit integer to the buffer (which is really just the
+character corresponding to that integer, in ASCII).
+
+$buffer->get_int16
+------------------
+
+   Returns the next 16-bit integer from the buffer.
+
+$buffer->put_int16($integer)
+----------------------------
+
+   Appends a 16-bit integer to the buffer.
+
+$buffer->get_int32
+------------------
+
+   Returns the next 32-bit integer from the buffer.
+
+$buffer->put_int32($integer)
+----------------------------
+
+   Appends a 32-bit integer to the buffer.
+
+$buffer->get_char
+-----------------
+
+   More appropriately called *get_byte*, perhaps, this returns the next
+byte from the buffer.
+
+$buffer->put_char($bytes)
+-------------------------
+
+   Appends a byte (or a sequence of bytes) to the buffer.  There is no
+restriction on the length of the byte string $bytes; if it makes you
+uncomfortable to call put_char to put multiple bytes, you can instead call
+this method as *put_chars*. It's the same thing.
+
+$buffer->get_str
+----------------
+
+   Returns the next "string" from the buffer. A string here is represented
+as the length of the string (a 32-bit integer) followed by the string
+itself.
+
+$buffer->put_str($string)
+-------------------------
+
+   Appends a string (32-bit integer length and the string itself) to the
+buffer.
+
+$buffer->get_mp_int
+-------------------
+
+   Returns a *Math::GMP* object representing a multiple precision integer
+read from the buffer. In the buffer itself, an mp_int is represented by a
+16-bit integer (the number of bits in the integer), and the integer itself.
+
+$buffer->put_mp_int($mp_int)
+----------------------------
+
+   Appends a multiple precision integer (16-bit integer bit count and the
+integer itself) to the buffer.
+
+LOW-LEVEL METHODS
+=================
+
+Net::SSH::Perl::Buffer->new
+---------------------------
+
+   Creates a new buffer object and returns it. The buffer is empty.
+
+   This method takes no arguments.
+
+$buffer->append($bytes)
+-----------------------
+
+   Appends raw data $bytes to the end of the in-memory buffer. Generally
+you don't need to use this method unless you're initializing an empty
+buffer, because when you need to add data to a buffer you should generally
+use one of the *put_** methods.
+
+$buffer->empty
+--------------
+
+   Empties out the buffer object.
+
+$buffer->bytes([ $offset [, $length [, $replacement ]]])
+--------------------------------------------------------
+
+   Behaves exactly like the substr built-in function, except on the buffer
+*$buffer*. Given no arguments, bytes returns the entire buffer; given one
+argument $offset, returns everything from that position to the end of the
+string; given $offset and $length, returns the segment of the buffer
+starting at $offset and consisting of $length bytes; and given all three
+arguments, replaces that segment with *$replacement*.
+
+   This is a very low-level method, and you generally won't need to use it.
+
+   Also be warned that you should not intermix use of this method with use
+of the *get_** and *put_** methods; the latter classes of methods maintain
+internal state of the buffer offset where arguments will be gotten from
+and put, respectively. The bytes method gives no thought to this internal
+offset state.
+
+$buffer->length
+---------------
+
+   Returns the length of the buffer object.
+
+$buffer->offset
+---------------
+
+   Returns the internal offset state.
+
+   If you insist on intermixing calls to bytes with calls to the *get_**
+and *put_** methods, you'll probably want to use this method to get some
+status on that internal offset.
+
+$buffer->dump
+-------------
+
+   Returns a hex dump of the buffer.
+
+$buffer->insert_padding
+-----------------------
+
+   A helper method: pads out the buffer so that the length of the
+transferred packet will be evenly divisible by 8, which is a requirement
+of the SSH protocol.
+
+AUTHOR & COPYRIGHTS
+===================
+
+   Please see the Net::SSH::Perl manpage for author, copyright, and
+license information.
+
+
+File: pm.info,  Node: Net/SSH/Perl/Cipher,  Next: Net/SSH/Perl/Cipher/Blowfish,  Prev: Net/SSH/Perl/Buffer,  Up: Module List
+
+Base cipher class, plus utility methods
+***************************************
+
+NAME
+====
+
+   Net::SSH::Perl::Cipher - Base cipher class, plus utility methods
+
+SYNOPSIS
+========
+
+     use Net::SSH::Perl::Cipher;
+
+     # Get list of supported cipher IDs.
+     my $supported = Net::SSH::Perl::Cipher::supported();
+
+     # Translate a cipher name into an ID.
+     my $id = Net::SSH::Perl::Cipher::id($name);
+
+     # Translate a cipher ID into a name.
+     my $name = Net::SSH::Perl::Cipher::name($id);
+
+DESCRIPTION
+===========
+
+   *Net::SSH::Perl::Cipher* provides a base class for each of the
+encryption cipher classes. In addition, it defines a set of utility
+methods that can be called either as functions or object methods.
+
+UTILITY METHODS
+===============
+
+supported( [ $ciph_id [, $server_supports ] ])
+----------------------------------------------
+
+   Without arguments, returns a reference to an array of ciphers supported
+by *Net::SSH::Perl*. These are ciphers that have working
+Net::SSH::Perl::Cipher:: implementations, essentially.
+
+   With one argument *$ciph_id*, returns a true value if that cipher is
+supported by *Net::SSH::Perl*, and false otherwise.
+
+   With two arguments, *$ciph_id* and *$server_supports*, returns true if
+the cipher represented by *$ciph_id* is supported both by *Net::SSH::Perl*
+and by the sshd server. The list of ciphers supported by the server should
+be in *$server_supports*, a bit mask sent from the server during the
+session identification phase.
+
+   Can be called either as a non-exported function, i.e.
+
+     my $i_support = Net::SSH::Perl::Cipher::supported();
+
+   or as an object method of a *Net::SSH::Perl::Cipher* object, or an
+object of a subclass:
+
+     if ($ciph->supported($server_supports)) {
+         print "Server supports cipher $ciph";
+     }
+
+id( [ $cipher_name ] )
+----------------------
+
+   Translates a cipher name into a cipher ID.
+
+   If given *$cipher_name* translates that name into the corresponding ID.
+If called as an object method, translates the object's cipher class name
+into the ID.
+
+name( [ $cipher_id ] )
+----------------------
+
+   Translates a cipher ID into a cipher name.
+
+   If given *$cipher_id* translates that ID into the corresponding name.
+If called as an object method, returns the (stripped) object's cipher
+class name; for example, if the object were of type
+*Net::SSH::Perl::Cipher::IDEA*, name would return IDEA.
+
+CIPHER USAGE
+============
+
+Net::SSH::Perl::Cipher->new($cipher_name, $key)
+-----------------------------------------------
+
+   Instantiates a new cipher object of the type *$cipher_name* with the
+key $key; returns the cipher object, which will be blessed into the actual
+cipher subclass.
+
+   If *$cipher_name* is the special type *'None'* (no encryption cipher),
+the object will actually be blessed directly into the base class, and text
+to be encrypted and decrypted will be passed through without change.
+
+$cipher->encrypt($text)
+-----------------------
+
+   Encrypts $text and returns the encrypted string.
+
+$cipher->decrypt($text)
+-----------------------
+
+   Decrypts $text and returns the decrypted string.
+
+CIPHER DEVELOPMENT
+==================
+
+   Classes implementing an encryption cipher must implement the following
+three methods:
+
+   * $class->new($key)
+
+     Given a key $key, should construct a new cipher object and bless it
+     into $class, presumably.
+
+   * $cipher->encrypt($text)
+
+     Given plain text $text, should encrypt the text and return the
+     encrypted string.
+
+   * $cipher->decrypt($text)
+
+     Given encrypted text $text, should decrypt the text and return the
+     decrypted string.
+
+AUTHOR & COPYRIGHTS
+===================
+
+   Please see the Net::SSH::Perl manpage for author, copyright, and
+license information.
+
+
+File: pm.info,  Node: Net/SSH/Perl/Cipher/Blowfish,  Next: Net/SSH/Perl/Cipher/CBC,  Prev: Net/SSH/Perl/Cipher,  Up: Module List
+
+Wrapper for SSH Blowfish support
+********************************
+
+NAME
+====
+
+   Net::SSH::Perl::Cipher::Blowfish - Wrapper for SSH Blowfish support
+
+SYNOPSIS
+========
+
+     use Net::SSH::Cipher;
+     my $cipher = Net::SSH::Cipher->new('Blowfish', $key);
+     print $cipher->encrypt($plaintext);
+
+DESCRIPTION
+===========
+
+   *Net::SSH::Perl::Cipher::Blowfish* provides Blowfish encryption support
+for *Net::SSH::Perl*. To do so it wraps around either *Crypt::Blowfish* or
+*Crypt::Blowfish_PP*; the former is a C/XS implementation of the blowfish
+algorithm, and the latter is a Perl implementation.
+*Net::SSH::Perl::Cipher::Blowfish* prefers to use *Crypt::Blowfish*,
+because it's faster, so we try to load that first. If it fails, we fall
+back to *Crypt::Blowfish_PP*.  Note that, when using *Crypt::Blowfish_PP*,
+you'll experience a very noticeable decrease in performance.
+
+   The blowfish used here is in CBC filter mode with a key length of 32
+bytes.
+
+   SSH adds an extra wrinkle with respect to its blowfish algorithm:
+before and after encryption/decryption, we have to swap the bytes in the
+string to be encrypted/decrypted. The byte-swapping is done four bytes at
+a time, and within each of those four-byte blocks we reverse the bytes.
+So, for example, the string `foobarba' turns into `boofabra'. We swap the
+bytes in this manner in the string before we encrypt/decrypt it, and swap
+the encrypted/decrypted string again when we get it back.
+
+AUTHOR & COPYRIGHTS
+===================
+
+   Please see the Net::SSH::Perl manpage for author, copyright, and
+license information.
+
+
+File: pm.info,  Node: Net/SSH/Perl/Cipher/CBC,  Next: Net/SSH/Perl/Cipher/CFB,  Prev: Net/SSH/Perl/Cipher/Blowfish,  Up: Module List
+
+CBC Implementation
+******************
+
+NAME
+====
+
+   Net::SSH::Perl::Cipher::CBC - CBC Implementation
+
+SYNOPSIS
+========
+
+     use Net::SSH::Cipher::CBC;
+     my $cbc = Net::SSH::Cipher::CBC->new($cipher_obj);
+     print $cbc->encrypt($plaintext);
+
+DESCRIPTION
+===========
+
+   *Net::SSH::Perl::Cipher::CBC* provides a CBC (cipher block chaining)
+implementation for SSH encryption ciphers.
+
+AUTHOR & COPYRIGHTS
+===================
+
+   This code is based in part on the *Crypt::CBC* code originally
+developed by Systemics Ltd.
+
+   Please see the Net::SSH::Perl manpage for author, copyright, and
+license information.
+
+
+File: pm.info,  Node: Net/SSH/Perl/Cipher/CFB,  Next: Net/SSH/Perl/Cipher/DES,  Prev: Net/SSH/Perl/Cipher/CBC,  Up: Module List
+
+CFB Implementation
+******************
+
+NAME
+====
+
+   Net::SSH::Perl::Cipher::CFB - CFB Implementation
+
+SYNOPSIS
+========
+
+     use Net::SSH::Cipher::CFB;
+     my $cbc = Net::SSH::Cipher::CFB->new($cipher_obj);
+     print $cbc->encrypt($plaintext);
+
+DESCRIPTION
+===========
+
+   *Net::SSH::Perl::Cipher::CFB* provides a CFB (cipher feedback)
+implementation for SSH encryption ciphers.
+
+AUTHOR & COPYRIGHTS
+===================
+
+   This code is based in part on the *Crypt::CFB* code originally
+developed by Systemics Ltd.
+
+   Please see the Net::SSH::Perl manpage for author, copyright, and
+license information.
+
+
+File: pm.info,  Node: Net/SSH/Perl/Cipher/DES,  Next: Net/SSH/Perl/Cipher/DES3,  Prev: Net/SSH/Perl/Cipher/CFB,  Up: Module List
+
+Wrapper for SSH DES support
+***************************
+
+NAME
+====
+
+   Net::SSH::Perl::Cipher::DES - Wrapper for SSH DES support
+
+SYNOPSIS
+========
+
+     use Net::SSH::Cipher;
+     my $cipher = Net::SSH::Cipher->new('DES', $key);
+     print $cipher->encrypt($plaintext);
+
+DESCRIPTION
+===========
+
+   *Net::SSH::Perl::Cipher::DES* provides DES encryption support for
+*Net::SSH::Perl*. To do so it wraps around *Crypt::DES*, a C/XS
+implementation of the DES algorithm.
+
+   The DES algorithm used here is in CBC filter mode with a key length of
+8 bytes.
+
+AUTHOR & COPYRIGHTS
+===================
+
+   Please see the Net::SSH::Perl manpage for author, copyright, and
+license information.
+
+
+File: pm.info,  Node: Net/SSH/Perl/Cipher/DES3,  Next: Net/SSH/Perl/Cipher/IDEA,  Prev: Net/SSH/Perl/Cipher/DES,  Up: Module List
+
+Wrapper for SSH 3DES support
+****************************
+
+NAME
+====
+
+   Net::SSH::Perl::Cipher::DES3 - Wrapper for SSH 3DES support
+
+SYNOPSIS
+========
+
+     use Net::SSH::Cipher;
+     my $cipher = Net::SSH::Cipher->new('DES3', $key);
+     print $cipher->encrypt($plaintext);
+
+DESCRIPTION
+===========
+
+   *Net::SSH::Perl::Cipher::DES3* provides 3DES encryption support for
+*Net::SSH::Perl*. To do so it wraps around *Crypt::DES*, a C/XS
+implementation of the DES algorithm.
+
+   The 3DES (three-key triple-DES) algorithm used here is in CBC mode with
+a key length of 24 bytes.
+
+   The first 8 bytes of the key are used as the first DES key, the second
+8 bytes for the second key, etc. If the key $key that you pass to new is
+only 16 bytes, the first 8 bytes of $key will be used as the key for both
+the first and third DES ciphers.
+
+AUTHOR & COPYRIGHTS
+===================
+
+   Please see the Net::SSH::Perl manpage for author, copyright, and
+license information.
+
+
+File: pm.info,  Node: Net/SSH/Perl/Cipher/IDEA,  Next: Net/SSH/Perl/Config,  Prev: Net/SSH/Perl/Cipher/DES3,  Up: Module List
+
+Wrapper for SSH IDEA support
+****************************
+
+NAME
+====
+
+   Net::SSH::Perl::Cipher::IDEA - Wrapper for SSH IDEA support
+
+SYNOPSIS
+========
+
+     use Net::SSH::Cipher;
+     my $cipher = Net::SSH::Cipher->new('IDEA', $key);
+     print $cipher->encrypt($plaintext);
+
+DESCRIPTION
+===========
+
+   *Net::SSH::Perl::Cipher::IDEA* provides IDEA encryption support for
+*Net::SSH::Perl*. To do so it wraps around *Crypt::IDEA*, a C/XS
+implementation of the IDEA algorithm.
+
+   The IDEA algorithm used here is in CFB filter mode with a key length of
+16 bytes.
+
+AUTHOR & COPYRIGHTS
+===================
+
+   Please see the Net::SSH::Perl manpage for author, copyright, and
+license information.
+
+
+File: pm.info,  Node: Net/SSH/Perl/Config,  Next: Net/SSH/Perl/Constants,  Prev: Net/SSH/Perl/Cipher/IDEA,  Up: Module List
+
+Load and manage SSH configuration
+*********************************
+
+NAME
+====
+
+   Net::SSH::Perl::Config - Load and manage SSH configuration
+
+SYNOPSIS
+========
+
+     use Net::SSH::Perl::Config;
+     my $cfg = Net::SSH::Perl::Config->new($host, foo => 'bar');
+     $cfg->read_config($config_file);
+     my $v = $cfg->get('foo');
+
+DESCRIPTION
+===========
+
+   *Net::SSH::Perl::Config* manages configuration data for
+*Net::SSH::Perl*. It merges options handed to it at object construction
+with options read from configuration files.  Just as in the actual ssh
+program, the first obtained value of a configuration parameter is the
+value that's used; in other words, values given in the original parameter
+list will always override values read from configuration files.
+
+   The configuration files should be in the same format used for the ssh
+command line program; see the ssh manpage for information on this format.
+*Net::SSH::Perl::Config* understands a subset of the configuration
+directives that can live in these files; this subset matches up with the
+functionality that *Net::SSH::Perl* can support. Unknown keywords will
+simply be skipped.
+
+USAGE
+=====
+
+Net::SSH::Perl::Config->new($host, %args)
+-----------------------------------------
+
+   Constructs a new configuration container object and returns that
+object. $host is the host to which you're applying this configuration; you
+can leave it out (pass in an undefined or empty argument) if it's not
+applicable to you.
+
+   $host is needed for parsing the host-specific sections of the
+configuration files; the Host keyword restricts a set of directives as
+applying to a particular host (or set of hosts). When it encounters such a
+section, *Net::SSH::Perl::Config* will skip all of the directives in the
+section unless the host matches $host.
+
+   *%args* can contain the same arguments that you can pass to the new
+method of *Net::SSH::Perl*-those arguments are eventually passed through
+to this method when setting up the SSH object. The elements in *%args*
+override values in the configuration files.
+
+$cfg->read_config($file)
+------------------------
+
+   Reads in the configuration file $file and adds any appropriate
+configuration data to the settings maintained by the *$cfg* object. If
+$file is unreadable, simply returns quietly.
+
+   As stated above, values read from the configuration files are overriden
+by those passed in to the constructor.  Furthermore, if you're reading
+from several config files in sequence, values read from the first files
+will override those read from the second, third, fourth, etc. files.
+
+$cfg->merge_directive($line)
+----------------------------
+
+   Merges the directive option *$line* into the configuration settings in
+*$cfg*. *$line* should be an option in the format used in the config file,
+eg. *"BatchMode yes"*. This is useful for merging in directives that are
+not necessarily in the config file, similar to how the -o option works in
+the ssh command line program.
+
+$cfg->get($key)
+---------------
+
+   Returns the value of the configuration parameter $key, and undefined if
+that parameter has not been set.
+
+$cfg->set($key, $value)
+-----------------------
+
+   Sets the value of the parameter $key to $value, and returns the new
+value.
+
+AUTHOR & COPYRIGHTS
+===================
+
+   Please see the Net::SSH::Perl manpage for author, copyright, and
+license information.
+
+
+File: pm.info,  Node: Net/SSH/Perl/Constants,  Next: Net/SSH/Perl/Packet,  Prev: Net/SSH/Perl/Config,  Up: Module List
+
+Exportable constants
+********************
+
+NAME
+====
+
+   Net::SSH::Perl::Constants - Exportable constants
+
+SYNOPSIS
+========
+
+     use Net::SSH::Perl::Constants qw( constants );
+
+DESCRIPTION
+===========
+
+   *Net::SSH::Perl::Constants* provides a list of common and useful
+constants for use in communicating with an sshd server, etc.
+
+   None of the constants are exported by default; you have to explicitly
+ask for them. Some of the constants are grouped into bundles that you can
+grab all at once, or you can just take the individual constants, one by
+one.
+
+   If you wish to import a group, your use statement should look something
+like this:
+
+     use Net::SSH::Perl::Constants qw( :group );
+
+   Here are the groups:
+
+   * msg
+
+     All of the MSG constants. In the SSH packet layer protocol, each
+     packet is identified by its type; for example, you have a packet type
+     for starting RSA authentication, a different type for sending a
+     command, etc. The MSG constants are used when creating a new packet,
+     then:
+
+          my $packet = $ssh->packet_start( I<msg_constant> );
+
+     See the *Net::SSH::Perl::Packet* and *Net::SSH::Perl* docs for
+     details.
+
+     *Net::SSH::Perl* doesn't support all of the features of the ssh
+     client, so it doesn't need all of its MSG constants. For a full list
+     of such constants, and an explanation of each, see the SSH RFC.
+
+     Here's the list of MSG constants supported by *Net::SSH::Perl*:
+     SSH_MSG_NONE, SSH_MSG_DISCONNECT, SSH_SMSG_PUBLIC_KEY,
+     SSH_CMSG_SESSION_KEY, SSH_CMSG_USER, SSH_CMSG_AUTH_RHOSTS,
+     SSH_CMSG_AUTH_RSA, SSH_SMSG_AUTH_RSA_CHALLENGE,
+     SSH_CMSG_AUTH_RSA_RESPONSE, SSH_CMSG_AUTH_PASSWORD,
+     SSH_CMSG_EXEC_SHELL, SSH_CMSG_EXEC_CMD, SSH_SMSG_SUCCESS,
+     SSH_SMSG_FAILURE, SSH_CMSG_STDIN_DATA, SSH_SMSG_STDOUT_DATA,
+     SSH_SMSG_STDERR_DATA, SSH_CMSG_EOF, SSH_SMSG_EXITSTATUS,
+     SSH_MSG_IGNORE, SSH_CMSG_EXIT_CONFIRMATION, SSH_CMSG_AUTH_RHOSTS_RSA,
+     SSH_MSG_DEBUG, SSH_CMSG_REQUEST_COMPRESSION.
+
+   * hosts
+
+     The HOST constants: HOST_OK, HOST_NEW, and HOST_CHANGED.  These are
+     returned from the `_check_host_in_hostfile' routine in
+     *Net::SSH::Perl::Util*. See that docs for that routine for an
+     explanation of the meaning of these constants.
+
+   Other exportable constants, not belonging to a group, are:
+
+   * PROTOCOL_MAJOR
+
+   * PROTOCOL_MINOR
+
+     These two constants describe the version of the protocol supported by
+     this SSH client (ie., *Net::SSH::Perl*).  They're used when
+     identifying the client to the server and vice versa.
+
+   * PRIVATE_KEY_ID_STRING
+
+     A special ID string written to private key files; if the ID string in
+     the file doesn't match this, we stop reading the private key file.
+
+   * MAX_PACKET_SIZE
+
+     The maximum size of a packet in the packet layer.
+
+AUTHOR & COPYRIGHTS
+===================
+
+   Please see the Net::SSH::Perl manpage for author, copyright, and
+license information.
+
+
+File: pm.info,  Node: Net/SSH/Perl/Packet,  Next: Net/SSH/Perl/Util,  Prev: Net/SSH/Perl/Constants,  Up: Module List
+
+Packet layer of SSH protocol
+****************************
+
+NAME
+====
+
+   Net::SSH::Perl::Packet - Packet layer of SSH protocol
+
+SYNOPSIS
+========
+
+     use Net::SSH::Perl::Packet;
+
+     # Send a packet to an ssh daemon.
+     my $pack = Net::SSH::Perl::Packet->new($ssh, type => SSH_MSG_NONE);
+     $pack->send;
+
+     # Receive a packet.
+     my $pack = Net::SSH::Perl::Packet->read($ssh);
+
+DESCRIPTION
+===========
+
+   *Net::SSH::Perl::Packet* implements the packet-layer piece of the SSH
+protocol. Messages between server and client are sent as binary data
+packets, which are encrypted (once the two sides have agreed on the
+encryption cipher, that is).
+
+   Packets are made up primarily of a packet type, which describes the
+type of message and data contained therein, and the data itself. In
+addition, each packet: indicates its length in a 32-bit unsigned integer;
+contains padding to pad the length of the packet to a multiple of 8 bytes;
+and is verified by a 32-bit crc checksum.
+
+   Refer to the SSH RFC for more details on the packet protocol and the
+SSH protocol in general.
+
+USAGE
+=====
+
+Net::SSH::Perl::Packet->new($ssh, %params)
+------------------------------------------
+
+   Creates/starts a new packet in memory. *$ssh* is a *Net::SSH::Perl*
+object, which should already be connected to an ssh daemon. *%params* can
+contain the following keys:
+
+   * type
+
+     The message type of this packet. This should be one of the values
+     exported by *Net::SSH::Perl::Constants* from the msg tag; for
+     example, *SSH_MSG_NONE*.
+
+   * data
+
+     A *Net::SSH::Perl::Buffer* object containing the data in this packet.
+     Realistically, there aren't many times you'll need to supply this
+     argument: when sending a packet, it will be created automatically;
+     and when receiving a packet, the read method (see below) will create
+     the buffer automatically, as well.
+
+Net::SSH::Perl::Packet->read($ssh)
+----------------------------------
+
+   Reads a packet from the ssh daemon and returns that packet.
+
+   This method will block until an entire packet has been read.  The
+socket itself is non-blocking, but the method waits (using select) for
+data on the incoming socket, then processes that data when it comes in. If
+the data makes up a complete packet, the packet is returned to the caller.
+Otherwise read continues to try to read more data.
+
+Net::SSH::Perl::Packet->read_poll($ssh)
+---------------------------------------
+
+   Checks the data that's been read from the sshd to see if that data
+comprises a complete packet. If so, that packet is returned. If not,
+returns undef.
+
+   This method does not block.
+
+Net::SSH::Perl::Packet->read_expect($ssh, $type)
+------------------------------------------------
+
+   Reads the next packet from the daemon and dies if the packet type does
+not match $type. Otherwise returns the read packet.
+
+$packet->send([ $data ])
+------------------------
+
+   Sends a packet to the ssh daemon. $data is optional, and if supplied
+specifies the buffer to be sent in the packet (should be a
+*Net::SSH::Perl::Buffer* object).  In addition, $data, if specified, must
+include the packed message type.
+
+   If $data is not specified, send sends the buffer internal to the
+packet, which you've presumably filled by calling the *put_** methods (see
+below).
+
+$packet->type
+-------------
+
+   Returns the message type of the packet *$packet*.
+
+$packet->data
+-------------
+
+   Returns the message buffer from the packet *$packet*; a
+*Net::SSH::Perl::Buffer* object.
+
+Net::SSH::Perl::Buffer methods
+------------------------------
+
+   Calling methods from the *Net::SSH::Perl::Buffer* class on your
+*Net::SSH::Perl::Packet* object will automatically invoke those methods on
+the buffer object internal to your packet object (which is created when
+your object is constructed). For example, if you executed the following
+code:
+
+     my $packet = Net::SSH::Perl::Packet->new($ssh, type => SSH_CMSG_USER);
+     $packet->put_str($user);
+
+   this would construct a new packet object *$packet*, then fill its
+internal buffer by calling the *put_str* method on it.
+
+   Refer to the *Net::SSH::Perl::Buffer* documentation (the GET AND PUT
+METHODS section) for more details on those methods.
+
+AUTHOR & COPYRIGHTS
+===================
+
+   Please see the Net::SSH::Perl manpage for author, copyright, and
+license information.
+
+
+File: pm.info,  Node: Net/SSH/Perl/Util,  Next: Net/Server,  Prev: Net/SSH/Perl/Packet,  Up: Module List
+
+Shared utility functions
+************************
+
+NAME
+====
+
+   Net::SSH::Perl::Util - Shared utility functions
+
+SYNOPSIS
+========
+
+     use Net::SSH::Perl::Util qw( ... );
+
+DESCRIPTION
+===========
+
+   *Net::SSH::Perl::Util* contains a variety of exportable utility
+functions used by the various *Net::SSH::Perl* modules. These range from
+hostfile routines, to RSA encryption routines, etc.
+
+   The routines are exportable by themselves, ie.
+
+     use Net::SSH::Perl::Util qw( routine_name );
+
+   In addition, some of the routines are grouped into bundles that you can
+pull in by export tag, ie.
+
+     use Net::SSH::Perl::Util qw( :bundle );
+
+   The groups are:
+
+   * hosts
+
+     Routines associated with hostfile-checking, addition, etc.  Contains
+     `_check_host_in_hostfile' and `_add_host_to_hosfile'.
+
+   * rsa
+
+     Routines associated with RSA encryption, decryption, and
+     authentication. Contains `_rsa_public_encrypt',
+     `_rsa_private_decrypt', and `_respond_to_rsa_challenge'.
+
+   * mp
+
+     Routines associated with multiple-precision integers and the
+     generation and manipulation of same. Contains `_mp_linearize' and
+     `_compute_session_id'.
+
+   * all
+
+     All routines. Contains all of the routines listed below.
+
+FUNCTIONS
+=========
+
+_crc32($data)
+-------------
+
+   Returns a CRC32 checksum of $data. This uses *String::CRC32* internally
+to do its magic, with the caveat that the "init state" of the checksum is
+`0xFFFFFFFF', and the result is xor-ed with `0xFFFFFFFF'.
+
+_compute_session_id($check_bytes, $host_key, $public_key)
+---------------------------------------------------------
+
+   Given the check bytes (*$check_bytes*) and the server host and public
+keys (*$host_key* and *$public_key*, respectively), computes the session
+ID that is then used to uniquely identify the session between the server
+and client.
+
+   *$host_key* and *$public_key* should be hash references with three
+keys: bits, n, and e. n and e should be multiple-precision integers
+(*Math::GMP* objects).
+
+   Returns the session ID.
+
+_mp_linearize($length, $key)
+----------------------------
+
+   Converts a multiple-precision integer $key into a byte string.  $length
+should be the number of bytes to linearize, which is generally the number
+of bytes in the key.
+
+   Note that, unlike the key arguments to `_compute_session_id', $key here
+is just the multiple-precision integer, not the hash reference.
+
+   Returns the linearized string.
+
+_check_host_in_hostfile($host, $host_file, $host_key)
+-----------------------------------------------------
+
+   Looks up $host in *$host_file* and checks the stored host key against
+*$host_key* to determine the status of the host.
+
+   If the host is not found, returns HOST_NEW.
+
+   If the host is found, and the keys match, returns HOST_OK.
+
+   If the host is found, and the keys don't match, returns HOST_CHANGED,
+which generally indicates a problem.
+
+_add_host_to_hostfile($host, $host_file, $host_key)
+---------------------------------------------------
+
+   Opens up the known hosts file *$host_file* and adds an entry for $host
+with host key *$host_key*. Dies if *$host_file* can't be opened for
+writing.
+
+_load_public_key($key_file)
+---------------------------
+
+   Given the location of a public key file *$key_file*, reads the public
+key from that file.
+
+   If called in list context, returns the key and the comment associated
+with the key. If called in scalar context, returns only the key.
+
+   Dies if: the key file *$key_file* can't be opened for reading; or the
+key file is "bad" (the ID string in the file doesn't match the
+PRIVATE_KEY_ID_STRING constant).
+
+   The key returned is in the form of a public key-a hash reference with
+three keys: bits, n, and e. n and e and multiple-precision integers
+(*Math::GMP* objects).
+
+_load_private_key($key_file, $passphrase)
+-----------------------------------------
+
+   Given the location of a private key file *$key_file*, and an optional
+passphrase to decrypt the key, reads the private key from that file.
+
+   If called in list context, returns the key and the comment associated
+with the key. If called in scalar context, returns only the key.
+
+   Dies if: the key file *$key_file* can't be opened for reading; the key
+file is "bad" (the ID string in the file doesn't match the
+PRIVATE_KEY_ID_STRING constant); the file is encrypted using an
+unsupported encryption cipher; or the passphrase *$passphrase* is
+incorrect.
+
+   The key returned is in the form of a private key-a hash reference with
+there keys: bits, n, e, d, u, p, and q. All but bits are multiple-precision
+integers (*Math::GMP* objects).
+
+_read_passphrase($prompt)
+-------------------------
+
+   Uses Term::ReadKey with echo off to read a passphrase, after issuing
+the prompt *$prompt*. Echo is restored once the passphrase has been read.
+
+_respond_to_rsa_challenge($ssh, $challenge, $key)
+-------------------------------------------------
+
+   Decrypts the RSA challenge *$challenge* using $key, then the response
+(MD5 of decrypted challenge and session ID) to the server, using the
+*$ssh* object, in an RSA response packet.
+
+_rsa_public_encrypt($data, $key)
+--------------------------------
+
+   Encrypts the multiple-precision integer $data (a *Math::GMP* object)
+using $key.
+
+   Returns the encrypted data, also a *Math::GMP* object.
+
+_rsa_private_decrypt($data, $key)
+---------------------------------
+
+   Decrypts the multiple-precision integer $data (a *Math::GMP* object)
+using $key.
+
+   Returns the decrypted data, also a *Math::GMP* object.
+
+AUTHOR & COPYRIGHTS
+===================
+
+   Please see the Net::SSH::Perl manpage for author, copyright, and
+license information.
+
+
+File: pm.info,  Node: Net/Server,  Next: Net/Server/Fork,  Prev: Net/SSH/Perl/Util,  Up: Module List
+
+Extensible, general Perl server engine
+**************************************
+
+NAME
+====
+
+   Net::Server - Extensible, general Perl server engine
+
+SYNOPSIS
+========
+
+     package MyPackage;
+
+     use Net::Server;
+     @ISA = qw(Net::Server);
+
+     sub process_request {
+        #...code...
+     }
+
+     MyPackage->run();
+
+FEATURES
+========
+
+     * Single Server Mode
+     * Inetd Server Mode
+     * Preforking Mode
+     * Forking Mode
+     * Multi port accepts on Single, Preforking, and Forking modes
+     * User customizable hooks
+     * Chroot ability after bind
+     * Change of user and group after bind
+     * Basic allow/deny access control
+     * Taint clean
+     * Written in Perl
+     * Protection against buffer overflow
+     * Clean process flow
+     * Extensibility
+
+DESCRIPTION
+===========
+
+   `Net::Server' is an extensible, generic Perl server engine.
+`Net::Server' combines the good properties from `Net::Daemon' (0.34),
+`NetServer::Generic' (1.03), and `Net::FTPServer' (1.0), and also from
+various concepts in the Apache Webserver.
+
+   `Net::Server' attempts to be a generic server as in `Net::Daemon' and
+`NetServer::Generic'.  It includes with it the ability to run as an inetd
+process (`Net::Server::INET'), a single connection server (`Net::Server'
+or `Net::Server::Single'), a forking server (`Net::Server::Fork'), or as a
+preforking server (`Net::Server::PreFork').  In all but the inetd type, the
+server provides the ability to connect to one or to multiple server ports.
+
+   `Net::Server' uses ideologies of `Net::FTPServer' in order to provide
+extensibility.  The additional server types are made possible via
+"personalities" or sub classes of the `Net::Server'.  By moving the
+multiple types of servers out of the main `Net::Server' class, the
+`Net::Server' concept is easily extended to other types (in the near
+future, we would like to add a "Thread" personality).
+
+   `Net::Server' borrows several concepts from the Apache Webserver.
+`Net::Server' uses "hooks" to allow custom servers such as SMTP, HTTP,
+POP3, etc. to be layered over the base `Net::Server' class.  In addition
+the `Net::Server::PreFork' class borrows concepts of min_start_servers,
+max_servers, and min_waiting servers.  `Net::Server::PreFork' also uses
+the concept of an flock serialized accept when accepting on multiple ports.
+
+PERSONALITIES
+=============
+
+   `Net::Server' is built around a common class (Net::Server) and is
+extended using sub classes, or `personalities'.  Each personality
+inherits, overrides, or enhances the base methods of the base class.
+
+   Included with the Net::Server package are several basic personalities,
+each of which has their own use.
+
+Fork
+     Found in the module Net/Server/Fork.pm (see *Note Net/Server/Fork:
+     Net/Server/Fork,).  This server binds to one or more ports and then
+     waits for a connection.  When a client request is received, the
+     parent forks a child, which then handles the client and exits.  This
+     is good for moderately hit services.
+
+INET
+     Found in the module Net/Server/INET.pm (see *Note Net/Server/INET:
+     Net/Server/INET,).  This server is designed to be used with inetd.
+     The `pre_bind', bind, accept, and `post_accept' are all overridden as
+     these services are taken care of by the INET daemon.
+
+MultiType
+     Found in the module Net/Server/MultiType.pm (see *Note
+     Net/Server/MultiType: Net/Server/MultiType,).  This server has no
+     server functionality of its own.  It is designed for servers which
+     need a simple way to easily switch between different personalities.
+     Multiple server_type parameters may be given and
+     Net::Server::MultiType will cycle through until it finds a class that
+     it can use.
+
+PreFork
+     Found in the module Net/Server/PreFork.pm (see *Note
+     Net/Server/PreFork: Net/Server/PreFork,).  This server binds to one
+     or more ports and then forks min_servers child process.  The server
+     will make sure that at any given time there are spare_servers
+     available to receive a client request, up to max_servers.  Each of
+     these children will process up to max_requests client connections.
+     This type is good for a heavily hit site, and should scale well for
+     most applications.  (Multi port accept is accomplished using flock to
+     serialize the children).
+
+Single
+     All methods fall back to Net::Server.  This personality is provided
+     only as parallelism for Net::Server::MultiType.
+
+   `Net::Server' was partially written to make it easy to add new
+personalities.  Using separate modules built upon an open architecture
+allows for easy addition of new features, a separate development process,
+and reduced code bloat in the core module.
+
+SAMPLE
+======
+
+   The following is a very simple server.  The main functionality occurs
+in the process_request method call as shown below.  Notice the use of
+timeouts to prevent Denial of Service while reading.  (Other examples of
+using `Net::Server' can, or will, be included with this distribution).
+
+     #!/usr/bin/perl -w -T
+     #--------------- file test.pl ---------------
+
+     package MyPackage;
+
+     use strict;
+     use vars qw(@ISA);
+     use Net::Server::PreFork; # any personality will do
+
+     @ISA = qw(Net::Server::PreFork);
+
+     MyPackage->run();
+     exit;
+
+     ### over-ridden subs below
+
+     sub process_request {
+       my $self = shift;
+       eval {
+
+     local $SIG{ALRM} = sub { die "Timed Out!\n" };
+     my $timeout = 30; # give the user 30 seconds to type a line
+
+     my $previous_alarm = alarm($timeout);
+     while( <STDIN> ){
+       s/\r?\n$//;
+       print "You said \"$_\"\r\n";
+       alarm($timeout);
+     }
+     alarm($previous_alarm);
+
+     };
+
+     if( $@=~/timed out/i ){
+       print STDOUT "Timed Out.\r\n";
+       return;
+     }
+
+     }
+
+     1;
+
+     #--------------- file test.pl ---------------
+
+   Playing this file from the command line will invoke a Net::Server using
+the PreFork personality.  When building a server layer over the
+Net::Server, it is important to use features such as timeouts to prevent
+Denial of Service attacks.
+
+ARGUMENTS
+=========
+
+   There are four possible ways to pass arguments to Net::Server.  They
+are *passing on command line*, *using a conf file*, *passing parameters to
+run*, or *using a pre-built object to call the run method*.
+
+   Arguments consist of key value pairs.  On the commandline these pairs
+follow the POSIX fashion of `--key value' or `--key=value', and also
+`key=value'.  In the conf file the parameter passing can best be shown by
+the following regular expression: ($key,$val)=~/^(\w+)\s+(\S+?)\s+$/.
+Passing arguments to the run method is done as follows:
+`Net::Server-'run(key1 => 'val1')>.  Passing arguments via a prebuilt
+object can best be shown in the following code:
+
+     #!/usr/bin/perl -w -T
+     #--------------- file test2.pl ---------------
+     package MyPackage;
+     use strict;
+     use vars (@ISA);
+     use Net::Server;
+     @ISA = qw(Net::Server);
+
+     my $server = bless {
+       key1 => 'val1',
+       }, 'MyPackage';
+
+     $server->run();
+     #--------------- file test.pl ---------------
+
+   All four methods for passing arguments may be used at the same time.
+Once an argument has been set, it is not over written if another method
+passes the same argument.  `Net::Server' will look for arguments in the
+following order:
+
+     1) Arguments contained in the prebuilt object.
+     2) Arguments passed on command line.
+     3) Arguments passed to the run method.
+     4) Arguments passed via a conf file.
+
+   Key/value pairs used by the server are removed by the configuration
+process so that server layers on top of `Net::Server' can pass and read
+their own parameters.  Currently, Getopt::Long is not used. The following
+arguments are available in the default `Net::Server' or
+`Net::Server::Single' modules.  (Other personalities may use additional
+parameters and may optionally not use parameters from the base class.)
+
+     Key               Value            Default
+     conf_file         "filename"       undef
+
+     log_level         0-5              1
+     log_file          "filename"       undef
+     pid_file          "filename"       undef
+
+     port              \d+              20203
+     host              "host"           "localhost"
+     proto             "proto"          "tcp"
+     listen            \d+              10
+
+     reverse_lookups   1                undef
+     allow             /regex/          none
+     deny              /regex/          none
+
+     chroot            "directory"      undef
+     user              (uid|username)   "nobody"
+     group             (gid|group)      "nobody"
+     background        1                undef
+
+conf_file
+     Filename from which to read additional key value pair arguments for
+     starting the server.  Default is undef.
+
+log_level
+     Ranges from 0 to 5 in level.  Specifies what level of error will be
+     logged.  "O" means logging is off.  "5" means very verbose.  These
+     levels should be able to correlate to syslog levels.  Default is 1.
+
+log_file
+     Name of log file to be written to.  If no name is given and hook is
+     not overridden, log goes to STDERR.  Default is undef.
+
+pid_file
+     Filename to store pid of parent process.  Generally applies only to
+     forking servers.  Default is none (undef).
+
+port
+     Local port on which to bind.  If low port, process must start as
+     root.  If multiple ports are given, all will be bound at server
+     startup.  May be of the form `host:port/proto', `host:port', or port,
+     where host represents a hostname residing on the local box, where
+     port represents either the number of the port (eg. "80") or the
+     service designation (eg.  "http"), and where proto represents the
+     protocol to be used.  If the protocol is not specified, proto will
+     default to the proto specified in the arguments.  If proto is not
+     specified there it will default to "tcp".  If host is not specified,
+     host will default to host specified in the arguments.  If host is not
+     specified there it will default to "localhost".  Default port is
+     20203.
+
+host
+     Local host or addr upon which to bind port.  See *Note IO/Socket:
+     IO/Socket,.
+
+proto
+     Protocol to use when binding ports.  See *Note IO/Socket: IO/Socket,.
+
+listen
+          See L<IO::Socket>
+
+reverse_lookups
+     Specify whether to lookup the hostname of the connected IP.
+     Information is cached in server object under peerhost property.
+     Default is to not use reverse_lookups (undef).
+
+allow/deny
+     May be specified multiple times.  Contains regex to compare to
+     incoming peeraddr or peerhost (if reverse_lookups has been enabled).
+     If allow or deny options are given, the incoming client must match an
+     allow and not match a deny or the client connection will be closed.
+     Defaults to empty array refs.
+
+chroot
+     Directory to chroot to after bind process has taken place and the
+     server is still running as root.  Defaults to undef.
+
+user
+     Userid or username to become after the bind process has occured.
+     Defaults to "nobody."  If you would like the server to run as root,
+     you will have to specify user equal to "root".
+
+group
+     Groupid or groupname to become after the bind process has occured.
+     Defaults to "nobody."  If you would like the server to run as root,
+     you will have to specify group equal to "root".
+
+background
+     Specifies whether or not the server should fork after the bind method
+     to release itself from the command line.  Defaults to undef.
+
+PROPERTIES
+==========
+
+   All of the ARGUMENTS listed above become properties of the server
+object under the same name.  These properties, as well as other internal
+properties, are available during hooks and other method calls.
+
+   The structure of a Net::Server object is shown below:
+
+     $self = bless( {
+                      'server' => {
+                                    'key1' => 'val1',
+                                    # more key/vals
+                                  }
+                    }, 'Net::Server' );
+
+   This structure was chosen so that all server related properties are
+grouped under a single key of the object hashref.  This is so that other
+objects could layer on top of the Net::Server object class and still have
+a fairly clean namespace in the hashref.
+
+   You may get and set properties in two ways.  The suggested way is to
+access properties directly via
+
+     my $val = $self->{server}->{key1};
+
+   Accessing the properties directly will speed the server process.  A
+second way has been provided for object oriented types who believe in
+methods.  The second way consists of the following methods:
+
+     my $val = $self->get_property( 'key1' );
+     my $self->set_property( key1 => 'val1' );
+
+   Properties are allowed to be changed at any time with caution (please
+do not undef the sock property or you will close the client connection).
+
+CONFIGURATION FILE
+==================
+
+   `Net::Server' allows for the use of a configuration file to read in
+server parameters.  The format of this conf file is simple key value
+pairs.  Comments and white space are ignored.
+
+     #-------------- file test.conf --------------
+
+     ### user and group to become
+     user        somebody
+     group       everybody
+
+     ### logging ?
+     log_file    /var/log/server.log
+     log_level   3
+     pid_file    /tmp/server.pid
+
+     ### access control
+     allow       .+\.(net|com)
+     allow       domain\.com
+     deny        a.+
+
+     ### background the process?
+     background  1
+
+     ### ports to bind (this should bind
+     ### 127.0.0.1:20205 and localhost:20204)
+     host        127.0.0.1
+     port        localhost:20204
+     port        20205
+
+     ### reverse lookups ?
+     # reverse_lookups on
+     
+     #-------------- file test.conf --------------
+
+PROCESS FLOW
+============
+
+   The process flow is written in an open, easy to override, easy to hook,
+fashion.  The basic flow is shown below.
+
+     $self->configure_hook;
+
+     $self->configure(@_);
+
+     $self->post_configure;
+
+     $self->post_configure_hook;
+
+     $self->pre_bind;
+
+     $self->bind;
+
+     $self->post_bind_hook;
+
+     $self->post_bind;
+
+     $self->pre_loop_hook;
+
+     $self->loop;
+
+     ### routines inside a standard $self->loop
+     # $self->accept;
+     # $self->run_client_connection;
+     # $self->done;
+
+     $self->pre_server_close_hook;
+
+     $self->server_close;
+
+   The server then exits.
+
+   During the client processing phase (`$self->run_client_connection'),
+the following represents the program flow:
+
+     $self->post_accept;
+
+     $self->get_client_info;
+
+     $self->post_accept_hook;
+
+     if( $self->allow_deny
+
+     && $self->allow_deny_hook ){
+     
+         $self->process_request;
+
+     }else{
+
+     $self->request_denied_hook;
+
+     }
+
+     $self->post_process_request_hook;
+
+     $self->post_process_request;
+
+   The process then loops and waits for the next connection.  For a more
+in depth discussion, please read the code.
+
+HOOKS
+=====
+
+   `Net::Server' provides a number of "hooks" allowing for servers layered
+on top of `Net::Server' to respond at different levels of execution.
+
+`$self->configure_hook()'
+     This hook takes place immediately after the `->run()' method is
+     called.  This hook allows for setting up the object before any built
+     in configuration takes place.  This allows for custom configurability.
+
+`$self->post_configure_hook()'
+     This hook occurs just after the reading of configuration parameters
+     and initiation of logging and pid_file creation.  It also occurs
+     before the `->pre_bind()' and `->bind()' methods are called.  This
+     hook allows for verifying configuration parameters.
+
+`$self->post_bind_hook()'
+     This hook occurs just after the bind process and just before any
+     chrooting, change of user, or change of group occurs.  At this point
+     the process will still be running as the user who started the server.
+
+`$self->pre_loop_hook()'
+     This hook occurs after chroot, change of user, and change of group
+     has occured.  It allows for preparation before looping begins.
+
+`$self->post_accept_hook()'
+     This hook occurs after a client has connected to the server.  At this
+     point STDIN and STDOUT are mapped to the client socket.  This hook
+     occurs before the processing of the request.
+
+`$self->allow_deny_hook()'
+     This hook allows for the checking of ip and host information beyond
+     the `$self->allow_deny()' routine.  If this hook returns 1, the
+     client request will be processed, otherwise, the request will be
+     denied processing.
+
+`$self->request_denied_hook()'
+     This hook occurs if either the `$self->allow_deny()' or
+     `$self->allow_deny_hook()' have taken place.
+
+`$self->post_process_request_hook()'
+     This hook occurs after the processing of the request, but before the
+     client connection has been closed.
+
+`$self->pre_server_close_hook()'
+     This hook occurs before the server begins shutting down.
+
+`$self->write_to_log_hook'
+     This hook handles writing to log files.  The default hook is to write
+     to STDERR, or to the filename contained in the parameter log_file.
+     The arguments passed are a log level of 0 to 5 (5 being very
+     verbose), and a log line.  If it is desired to use the syslog, a
+     customized hook may be put in place.  (A future version may include
+     this as a configurable option).
+
+`$self->fatal_hook'
+     This hook occurs when the server has encountered an unrecoverable
+     error.  Arguments passed are the error message, the package, file,
+     and line number.  The hook may close the server, but it is suggested
+     that it simply return and use the built in shut down features.
+
+TO DO
+=====
+
+   There are several tasks to perform before the alpha label can be
+removed from this software:
+
+Use It
+     The best way to further the status of this project is to use it.
+     There are immediate plans to use this as a base class in implementing
+     some mail servers and banner servers on a high hit site.
+
+Thread Personality
+     Some servers offer a threaded server.  Create `Net::Server::Thread'
+     as a new personality.
+
+Other Personalities
+     Explore any other personalities
+
+Sig Handling
+     Solidify which signals are handled by base class.  Possibly catch
+     more that are ignored currently.
+
+`HUP'
+     Allow for a clean hup allowing for re-exec and re-read of
+     configuration files.  This includes multiport mode.
+
+Net::HTTPServer, etc
+     Create various types of servers.  Possibly, port exising servers to
+     user Net::Server as a base layer.
+
+More documentation
+     Show more examples and explain process flow more.
+
+Better Tests
+     Do better tests during "make test"
+
+FILES
+=====
+
+     The following files are installed as part of this
+     distribution.
+
+     Net/Server.pm
+     Net/Server/Fork.pm
+     Net/Server/INET.pm
+     Net/Server/MultiType.pm
+     Net/Server/PreFork.pm
+     Net/Server/Single.pm
+
+AUTHOR
+======
+
+   Paul T. Seamons paul@seamons.com
+
+THANKS
+======
+
+   Thanks to Rob Brown for help with miscellaneous concepts such as
+tracking down the serialized select via flock ala Apache.  Thanks to
+Jonathan J. Miner for patching a blatant problem in the reverse lookups.
+
+SEE ALSO
+========
+
+   Please see also *Note Net/Server/Fork: Net/Server/Fork,, *Note
+Net/Server/INET: Net/Server/INET,, *Note Net/Server/PreFork:
+Net/Server/PreFork,, *Note Net/Server/MultiType: Net/Server/MultiType,,
+*Note Net/Server/Single: Net/Server/Single,
+
+COPYRIGHT
+=========
+
+     Copyright (C) 2001, Paul T Seamons
+                         paul@seamons.com
+     
+     This package may be distributed under the terms of either the
+     GNU General Public License
+       or the
+     Perl Artistic License
+
+     All rights reserved.
+
+

@@ -1,0 +1,1723 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Apache/RedirectDBI,  Next: Apache/RedirectLogFix,  Prev: Apache/RandomLocation,  Up: Module List
+
+Redirect requests to different directories based on the existence of a user in one or more database tables
+**********************************************************************************************************
+
+NAME
+====
+
+   Apache::RedirectDBI - Redirect requests to different directories based
+on the existence of a user in one or more database tables
+
+SYNOPSIS
+========
+
+   # in httpd.conf
+
+   PerlModule Apache::DBI Apache::RedirectDBI
+
+   <Location /path/to/virtual/directory>     SetHandler perl-script
+PerlHandler Apache::RedirectDBI     PerlAuthenHandler Apache::AuthenDBI
+
+     PerlSetVar Auth_DBI_data_source     dbi:Oracle:CERT
+     # :
+     # and other Auth_DBI_* variables
+     # :
+
+     PerlSetVar RedirectDBI_data_source dbi:Oracle:CERT
+     PerlSetVar RedirectDBI_username    nobody
+     PerlSetVar RedirectDBI_password    nobody
+     PerlSetVar RedirectDBI_location    /path/to/virtual/directory
+     PerlSetVar RedirectDBI_default     /path/to/virtual/directory.1
+     PerlSetVar RedirectDBI_table2uri   "t1 /directory.2 t2 /directory.3"
+
+     AuthName "Realm"
+     AuthType Basic
+     Require  valid-user
+     </Location>
+
+DESCRIPTION
+===========
+
+   `Apache::RedirectDBI' allows you to create a virtual path in your
+document hierarchy.
+
+   All requests for access to this virtual path should require a username
+and password to access. When the user attempts to access this virtual path
+their username is looked up in one or more database tables. The table in
+which the username is found in determines the physical path from which
+files are served.
+
+   Files are served to the user *without* the URL changing, so they never
+know that they have been redirected elsewhere.
+
+   The user is redirected to a default location if they are not in any of
+the database tables.
+
+CONFIGURATION
+=============
+
+   First, define the virtual location that a user will see. You must also
+create other directories from which files will be served.
+
+   For example, specify /dir as the virtual directory, and have
+$DOCROOT/dir.1, $DOCROOT/dir.2 and $DOCROOT/dir.3 as three possible
+directories that files will be served from, depending on the table that
+lists the user.
+
+     <Location /dir>
+         ...
+     </Location>
+     
+     The different configuration directives in httpd.conf have the following
+     meanings;
+
+RedirectDBI_data_source
+     A DBI identifier for the data source that contains the tables that
+     will be used to determine which directory to send the user to.
+
+RedirectDBI_username
+     The username to use when connecting to the data source.
+
+RedirectDBI_password
+     The password to use when connecting to the data source.
+
+RedirectDBI_location
+     The same path as used in the <Location ...> section of this
+     configuration.
+
+RedirectDBI_default
+     Path (relative to the document root) from which files will be served
+     if the user does not exist in any of the database files.
+
+RedirectDBI_table2uri
+     A string containing white space seperated elements. Each element is
+     part of a pair. The first element in each pair is the name of the
+     table in the data source that contains a list of usernames. The
+     second element is the directory (relative to the document root) from
+     which files will be served if the user is in this table.
+
+CREATING YOUR TABLES
+====================
+
+   The tables listed in the RedirectDBI_table2uri string must contain one
+or more columns. One of these columns must be called name, and must
+contain the usernames.
+
+   These tables do not necessarily have to be real tables. If the backend
+database supports it then they could be views. This allows for a lot of
+flexibility in specifying the criteria for the inclusion of a user in the
+table.
+
+BUGS AND LIMITATIONS
+====================
+
+   * The column that contains the usernames must be called name. If your
+     tables do not have a column with this name, create a view of the table
+     that renames the appropriate column to name and use the view when
+     configuring this module.
+
+   * If the same username exists in more than one of the listed tables, the
+     location for the first table they are found in is used. Tables are
+     searched in the same order as they are listed in the configuration
+     file.
+
+   * It is assumed that the database connection to read the tables will
+     always succeed.
+
+SEE ALSO
+========
+
+   perl(1), Apache(3), Apache::DBI(3)
+
+AUTHORS
+=======
+
+Mike Smith (mjs@iii.co.uk)
+     Original Apache module
+
+Nik Clayton (nik@freebsd.org)
+     Original CGI scripts which this replaces, and this documentation.
+
+
+File: pm.info,  Node: Apache/RedirectLogFix,  Next: Apache/RefererBlock,  Prev: Apache/RedirectDBI,  Up: Module List
+
+Properly set redirect status for loggers
+****************************************
+
+NAME
+====
+
+   Apache::RedirectLogFix - Properly set redirect status for loggers
+
+SYNOPSIS
+========
+
+   PerlLogHandler Apache::RedirectLogFix
+
+DESCRIPTION
+===========
+
+   Due the nature of how mod_perl handles redirects, the status code is
+not properly logged.  This module works around that bug until mod_perl can
+deal with this.
+
+
+File: pm.info,  Node: Apache/RefererBlock,  Next: Apache/Registry,  Prev: Apache/RedirectLogFix,  Up: Module List
+
+block request based upon referer header
+***************************************
+
+NAME
+====
+
+   Apache::RefererBlock - block request based upon referer header
+
+SYNOPSIS
+========
+
+   In your Apache configuration file, add something like
+
+     PerlModule Apache::RefererBlock
+     PerlFixupHandler Apache::RefererBlock
+     RefBlockMimeTypes image/gif image/jpeg
+     RefBlockAllowed http://www.mydomaine.com http://mydomaine.com
+     RefBlockRedirect http://www.badguyse.com http://www.badguyse.com/images/bigpicture.gif
+     RefBlockRedirect http://www.realbadguyse.com http://www.xxx.xxx/samples/tts.jpg
+     RefBlockDebug On
+
+   All directives are optional.
+
+DESCRIPTION
+===========
+
+   Apache::RefererBlock will examine each request. If the MIME type of the
+requested file is one of those listed in RefBlockMimeTypes, it will check
+the request's "Referer" header.  If the referrer starts with one of the
+strings listed in RefBlockAllowed, access is granted.  Otherwise, if
+there's a RefBlockRedirect directive for the referrer, a redirect is
+issued.  Otherwise, a "Forbidden" (403) error is returned.
+
+   Requests with an empty Referer header will be granted, to accomodate
+old browsers.
+
+AVAILABILITY
+============
+
+   The latest version can be fetched from
+<http://www.logilune.com/eric/RefererBlock.html>.
+
+AUTHOR
+======
+
+   Eric Cholet, <cholet@logilune.com>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1998 Eric Cholet.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Apache/Registry,  Next: Apache/RegistryFilter,  Prev: Apache/RefererBlock,  Up: Module List
+
+Run unaltered CGI scrips under mod_perl
+***************************************
+
+NAME
+====
+
+   Apache::Registry - Run unaltered CGI scrips under mod_perl
+
+SYNOPSIS
+========
+
+     #in httpd.conf
+
+     Alias /perl/ /perl/apache/scripts/ #optional
+     PerlModule Apache::Registry
+
+     <Location /perl>
+       SetHandler perl-script
+       PerlHandler Apache::Registry
+       Options ExecCGI
+     </Location>
+
+DESCRIPTION
+===========
+
+   URIs in the form of `http://www.host.com/perl/file.pl' will be compiled
+as the body of a perl subroutine and executed.  Each server process or
+'child' will compile the subroutine once and store it in memory. It will
+recompile it whenever the file is updated on disk.  Think of it as an
+object oriented server with each script implementing a class loaded at
+runtime.
+
+   The file looks much like a "normal" script, but it is compiled or
+'evaled' into a subroutine.
+
+   Here's an example:
+
+     my $r = Apache->request;
+     $r->content_type("text/html");
+     $r->send_http_header;
+     $r->print("Hi There!");
+
+   This module emulates the CGI environment, allowing programmers to write
+scripts that run under CGI or mod_perl without change.  Existing CGI
+scripts may require some changes, simply because a CGI script has a very
+short lifetime of one HTTP request, allowing you to get away with "quick
+and dirty" scripting.  Using mod_perl and Apache::Registry requires you to
+be more careful, but it also gives new meaning to the word "quick"!
+
+   Be sure to read all mod_perl related documentation for more details,
+including instructions for setting up an environment that looks exactly
+like CGI:
+
+     print "Content-type: text/html\n\n";
+     print "Hi There!";
+
+   Note that each httpd process or "child" must compile each script once,
+so the first request to one server may seem slow, but each request there
+after will be faster.  If your scripts are large and/or make use of many
+Perl modules, this difference should be noticeable to the human eye.
+
+SECURITY
+========
+
+   Apache::Registry::handler will preform the same checks as mod_cgi
+before running the script.
+
+ENVIRONMENT
+===========
+
+   The Apache function `exit' overrides the Perl core built-in function.
+
+   The environment variable GATEWAY_INTERFACE is set to `CGI-Perl/1.1'.
+
+COMMANDLINE SWITCHES IN FIRST LINE
+==================================
+
+   Normally when a Perl script is run from the command line or under CGI,
+arguments on the `#!' line are passed to the perl interpreter for
+processing.
+
+   Apache::Registry currently only honors the -w switch and will turn on
+warnings using the $^W global variable.  Another common switch used with
+CGI scripts is -T to turn on taint checking.  This can only be enabled
+when the server starts with the configuration directive:
+
+     PerlTaintCheck On
+
+   However, if taint checking is not enabled, but the -T switch is seen,
+Apache::Registry will write a warning to the error_log.
+
+DEBUGGING
+=========
+
+   You may set the debug level with the $Apache::Registry::Debug bitmask
+
+     1 => log recompile in errorlog
+     2 => Apache::Debug::dump in case of $@
+     4 => trace pedantically
+
+CAVEATS
+=======
+
+   Apache::Registry makes things look just the CGI environment, however,
+you must understand that this *is not CGI*.  Each httpd child will compile
+your script into memory and keep it there, whereas CGI will run it once,
+cleaning out the entire process space.  Many times you have heard "always
+use -w, always use -w and 'use strict'".  This is more important here than
+anywhere else!
+
+   Your scripts cannot contain the __END__ or __DATA__ token to terminate
+compilation.
+
+SEE ALSO
+========
+
+   perl(1), mod_perl(3), Apache(3), Apache::Debug(3)
+
+AUTHORS
+=======
+
+   Andreas J. Koenig and Doug MacEachern
+
+
+File: pm.info,  Node: Apache/RegistryFilter,  Next: Apache/RegistryLexInfo,  Prev: Apache/Registry,  Up: Module List
+
+run Perl scripts in an Apache::Filter chain
+*******************************************
+
+NAME
+====
+
+   Apache::RegistryFilter - run Perl scripts in an Apache::Filter chain
+
+SYNOPSIS
+========
+
+     #in httpd.conf
+
+     PerlModule Apache::RegistryFilter
+
+     # Run the output of scripts through Apache::SSI
+     <Files ~ "\.pl$">
+      PerlSetVar Filter on
+      SetHandler perl-script
+      PerlHandler Apache::RegistryFilter Apache::SSI
+     </Files>
+
+     # Generate some Perl code using templates, then execute it
+     <Files ~ "\.tmpl$">
+      PerlSetVar Filter on
+      SetHandler perl-script
+      PerlHandler YourModule::GenCode Apache::RegistryFilter
+     </Files>
+
+DESCRIPTION
+===========
+
+   This module is a subclass of Apache::RegistryNG, and contains all of its
+functionality.  The only difference between the two is that this module
+can be used in conjunction with the Apache::Filter module, whereas
+Apache::RegistryNG cannot.
+
+   For information on how to set up filters, please see the codumentation
+for Apache::Filter.
+
+INCOMPATIBILITIES
+=================
+
+   At this point the only changes you might have to make to your Registry
+scripts are quite minor and obscure.  That is, unless I haven't thought of
+something.  Please let me know if any other changes are needed.
+
+   * Don't call send_fd()
+
+     If you call Apache's $r->send_fd($filehandle) method, the output will
+     be sent directly to the browser instead of filtered through the filter
+     chain.  This is okay if your script is the last filter in the chain,
+     but clearly it won't work otherwise.
+
+CAVEATS
+=======
+
+   This is a subclass of Apache::RegistryNG, not Apache::Registry (which
+is not easily subclassible).  Apache::RegistryNG is supposed to be
+functionally equivalent to Apache::Registry, but it's a little less
+well-tested.
+
+SEE ALSO
+========
+
+   perl(1), mod_perl(3), Apache::Filter(3)
+
+AUTHOR
+======
+
+   Ken Williams <ken@forum.swarthmore.edu>
+
+
+File: pm.info,  Node: Apache/RegistryLexInfo,  Next: Apache/RegistryLoader,  Prev: Apache/RegistryFilter,  Up: Module List
+
+Diff Apache::Registry script padlists
+*************************************
+
+NAME
+====
+
+   Apache::RegistryLexInfo - Diff Apache::Registry script padlists
+
+SYNOPSIS
+========
+
+     Alias /lexinfo /same/path/as/for/apache/registry/scripts
+
+     PerlModule Apache::RegistryLexInfo
+     <Location /lexinfo>
+      SetHandler perl-script
+      PerlHandler Apache::RegistryLexInfo->handler
+      Options +ExecCGI
+     </Location>
+
+DESCRIPTION
+===========
+
+   *Apache::RegistryLexInfo* is a subclass of *Apache::RegistryNG* which
+takes snapshots of the handler padlist before and after it is run.  The
+differences (if any) and the before/after snapshots are printed to the
+HTTP stream after the script has run.
+
+SEE ALSO
+========
+
+   The Apache::Status StatusLexInfo option.
+
+   Apache::RegistryNG(3), B::LexInfo(3)
+
+AUTHOR
+======
+
+   Doug MacEachern
+
+
+File: pm.info,  Node: Apache/RegistryLoader,  Next: Apache/Reload,  Prev: Apache/RegistryLexInfo,  Up: Module List
+
+Compile Apache::Registry scripts at server startup
+**************************************************
+
+NAME
+====
+
+   Apache::RegistryLoader - Compile Apache::Registry scripts at server
+startup
+
+SYNOPSIS
+========
+
+     #in PerlScript
+
+     use Apache::RegistryLoader ();
+
+     my $r = Apache::RegistryLoader->new;
+
+     $r->handler($uri, $filename);
+
+     $r->handler($uri, $filename, $virtual_hostname);
+
+DESCRIPTION
+===========
+
+   This modules allows compilation of Apache::Registry scripts at server
+startup.  The script's handler routine is compiled by the parent server,
+of which children get a copy.  The *Apache::RegistryLoader* handler method
+takes arguments of `uri' and the filename.  URI to filename translation
+normally doesn't happen until HTTP request time, so we're forced to roll
+our own translation.
+
+   If filename is omitted and a trans routine was not defined, the loader
+will try using the *uri* relative to *ServerRoot*.  Example:
+
+     #in httpd.conf
+     ServerRoot /opt/www/apache
+     Alias /perl/ /opt/www/apache/perl
+
+     #in PerlScript
+     use Apache::RegistryLoader ();
+
+     #/opt/www/apache/perl/test.pl
+     #is the script loaded from disk here:
+     Apache::RegistryLoader->new->handler("/perl/test.pl");
+
+   To make the loader smarter about the uri->filename translation, you may
+provide the new method with a trans function to translate the uri to
+filename.
+
+   The following example will pre-load all files ending with `.pl' in the
+*perl-scripts/* directory relative to *ServerRoot*.  The example code
+assumes the Location URI `/perl' is an Alias to this directory.
+
+     {
+         use Cwd ();
+         use Apache::RegistryLoader ();
+         use DirHandle ();
+         use strict;
+
+     my $dir = Apache->server_root_relative("perl-scripts/");
+
+     my $rl = Apache::RegistryLoader->new(trans => sub {
+     	 my $uri = shift;
+         $uri =~ s:^/perl/:/perl-scripts/:;
+     	 return Apache->server_root_relative($uri);
+     });
+
+     my $dh = DirHandle->new($dir) or die $!;
+
+     for my $file ($dh->read) {
+     	 next unless $file =~ /\.pl$/;
+     	 $rl->handler("/perl/$file");
+     }
+      }
+
+AUTHORS
+=======
+
+   Doug MacEachern
+
+   Stas Bekman (Rewrote the handler() to report and handle all the possible
+erroneous conditions)
+
+SEE ALSO
+========
+
+   Apache::Registry(3), Apache(3), mod_perl(3)
+
+
+File: pm.info,  Node: Apache/Reload,  Next: Apache/Request,  Prev: Apache/RegistryLoader,  Up: Module List
+
+Reload changed modules
+**********************
+
+NAME
+====
+
+   Apache::Reload - Reload changed modules
+
+SYNOPSIS
+========
+
+   In httpd.conf:
+
+     PerlInitHandler Apache::Reload
+     PerlSetVar ReloadAll Off
+
+   Then your module:
+
+     package My::Apache::Module;
+
+     use Apache::Reload;
+     
+     sub handler { ... }
+     
+     1;
+
+DESCRIPTION
+===========
+
+   This module is two things. First it is an adaptation of Randal
+Schwartz's Stonehenge::Reload module that attempts to be a little more
+intuitive and makes the usage easier. Stonehenge::Reload was written by
+Randal to make specific modules reload themselves when they changed.
+Unlike Apache::StatINC, Stonehenge::Reload only checked the change time of
+modules that registered themselves with Stonehenge::Reload, thus reducing
+stat() calls. Apache::Reload also offers the exact same functionality as
+Apache::StatINC, and is thus designed to be a drop-in replacement.
+Apache::Reload only checks modules that register themselves with
+Apache::Reload if you explicitly turn off the StatINC emulation method
+(see below). Like Apache::StatINC, Apache::Reload must be installed as an
+Init Handler.
+
+StatINC Replacement
+-------------------
+
+   To use as a StatINC replacement, simply add the following configuration
+to your httpd.conf:
+
+     PerlInitHandler Apache::Reload
+
+Register Modules Implicitly
+---------------------------
+
+   To only reload modules that have registered with Apache::Reload, add
+the following to the httpd.conf:
+
+     PerlInitHandler Apache::Reload
+     PerlSetVar ReloadAll Off
+     # ReloadAll defaults to On
+
+   Then any modules with the line:
+
+     use Apache::Reload;
+
+   Will be reloaded when they change.
+
+Register Modules Explicitly
+---------------------------
+
+   You can also register modules explicitly in your httpd.conf file that
+you want to be reloaded on change:
+
+     PerlInitHandler Apache::Reload
+     PerlSetVar ReloadAll Off
+     PerlSetVar ReloadModules "My::Foo My::Bar Foo::Bar::Test"
+
+   Note that these are split on whitespace, but the module list must be in
+quotes, otherwise Apache tries to parse the parameter list.
+
+Special "Touch" File
+--------------------
+
+   You can also set a file that you can touch() that causes the reloads to
+be performed. If you set this, and don't touch() the file, the reloads
+don't happen. This can be a great boon in a live environment:
+
+     PerlSetVar ReloadTouchFile /tmp/reload_modules
+
+   Now when you're happy with your changes, simply go to the command line
+and type:
+
+     touch /tmp/reload_modules
+
+   And your modules will be magically reloaded on the next request. This
+option works in both StatINC emulation mode and the registered modules
+mode.
+
+PSUEDOHASHES
+============
+
+   The short summary of this is: Don't use psuedohashes. Use an array with
+constant indexes. Its faster in the general case, its more guaranteed, and
+generally, it works.
+
+   The long summary is that I've done some work to get this working with
+modules that use psuedo hashes, but its still broken in the case of a
+single module that contains multiple packages that all use psuedohashes.
+
+   So don't do that.
+
+AUTHOR
+======
+
+   Matt Sergeant, matt@sergeant.org
+
+SEE ALSO
+========
+
+   Apache::StatINC, Stonehenge::Reload
+
+
+File: pm.info,  Node: Apache/Request,  Next: Apache/RequestNotes,  Prev: Apache/Reload,  Up: Module List
+
+Methods for dealing with client request data
+********************************************
+
+NAME
+====
+
+   Apache::Request - Methods for dealing with client request data
+
+SYNOPSIS
+========
+
+     use Apache::Request ();
+     my $apr = Apache::Request->new($r);
+
+DESCRIPTION
+===========
+
+   *Apache::Request* is a subclass of the Apache class, which adds methods
+for parsing GET requests and POST requests where *Content-type* is one of
+*application/x-www-form-urlencoded* or *multipart/form-data*. See the
+libapreq(3) manpage for more details.
+
+Apache::Request METHODS
+=======================
+
+new
+---
+
+   Create a new *Apache::Request* object with an Apache request_rec object:
+
+     my $apr = Apache::Request->new($r);
+
+   All methods from the Apache class are inherited.
+
+   The following attributes are optional:
+
+POST_MAX
+     Limit the size of POST data.  *Apache::Request::parse* will return an
+     error code if the size is exceeded:
+
+          my $apr = Apache::Request->new($r, POST_MAX => 1024);
+          my $status = $apr->parse;
+
+          if ($status) {
+              my $errmsg = $apr->notes("error-notes");
+              ...
+              return $status;
+          }
+
+DISABLE_UPLOADS
+     Disable file uploads.  *Apache::Request::parse* will return an error
+     code if a file upload is attempted:
+
+          my $apr = Apache::Request->new($r, DISABLE_UPLOADS => 1);
+          my $status = $apr->parse;
+
+          if ($status) {
+              my $errmsg = $apr->notes("error-notes");
+              ...
+              return $status;
+          }
+
+instance
+--------
+
+   The instance() class method allows Apache::Request to be a singleton.
+This means that whenever you call Apache::Request->instance() within a
+single request you always get the same Apache::Request object back.  This
+solves the problem with creating the Apache::Request object twice within
+the same request - the symptoms being that the second Apache::Request
+object will not contain the form parameters because they have already been
+read and parsed.
+
+     my $apr = Apache::Request->instance($r, DISABLE_UPLOADS => 1);
+
+   Note that `instance()' call will take the same parameters as the above
+call to new(), however the parameters will only have an effect the first
+time `instance()' is called within a single request. Extra parameters will
+be ignored on subsequent calls to `instance()' within the same request.
+
+   Subrequests receive a new Apache::Request object when they call
+instance() - the parent request's Apache::Request object is not copied
+into the subrequest.
+
+   Also note that it is unwise to use the parse() method when using
+`instance()' because you may end up trying to call it twice, and detecting
+errors where there are none.
+
+parse
+-----
+
+   The parse method does the actual work of parsing the request.  It is
+called for you by the accessor methods, so it is not required but can be
+useful to provide a more user-friendly message should an error occur:
+
+   my $r = shift;     my $apr = Apache::Request->new($r);
+
+   my $status = $apr->parse;     unless ($status == OK) {
+$apr->custom_response($status, $apr->notes("error-notes")); 	return
+$status;     }
+
+param
+-----
+
+   Get or set request parameters:
+
+     my $value = $apr->param('foo');
+     my @values = $apr->param('foo');
+     my @params = $apr->param;
+     $apr->param('foo' => [qw(one two three)]);
+
+upload
+------
+
+   Returns a single *Apache::Upload* object in a scalar context or all
+*Apache::Upload* objects in an array context:
+
+     my $upload = $apr->upload;
+     my $fh = $upload->fh;
+     my $lines = 0;
+     while(<$fh>) {
+         ++$lines;
+         ...
+     }
+
+   An optional name parameter can be passed to return the *Apache::Upload*
+object associated with the given name:
+
+     my $upload = $apr->upload($name);
+
+Apache::Upload METHODS
+======================
+
+name
+----
+
+   The name of the filefield parameter:
+
+     my $name = $upload->name;
+
+filename
+--------
+
+   The filename of the uploaded file:
+
+     my $filename = $upload->filename;
+
+fh
+--
+
+   The filehandle pointing to the uploaded file:
+
+     my $fh = $upload->fh;
+     while (<$fh>) {
+     	...
+     }
+
+size
+----
+
+   The size of the file in bytes:
+
+     my $size = $upload->size;
+
+info
+----
+
+   The additional header information for the uploaded file.  Returns a
+hash reference tied to the Apache::Table class.  An optional key argument
+can be passed to return the value of a given header rather than a hash
+reference.  Examples:
+
+     my $info = $upload->info;
+     while (my($key, $val) = each %$info) {
+     	...
+     }
+
+     my $val = $upload->info("Content-type");
+
+type
+----
+
+   Returns the *Content-Type* for the given *Apache::Upload* object:
+
+     my $type = $upload->type;
+     #same as
+     my $type = $upload->info("Content-Type");
+
+next
+----
+
+   As an alternative to using the *Apache::Request* upload method in an
+array context:
+
+     for (my $upload = $apr->upload; $upload; $upload = $upload->next) {
+     	...
+     }
+
+     #functionally the same as:
+
+     for my $upload ($apr->upload) {
+     	...
+     }
+
+SEE ALSO
+========
+
+   libapreq(3)
+
+CREDITS
+=======
+
+   This interface is based on the original pure Perl version by Lincoln
+Stein.
+
+AUTHOR
+======
+
+   Doug MacEachern
+
+
+File: pm.info,  Node: Apache/RequestNotes,  Next: Apache/Resource,  Prev: Apache/Request,  Up: Module List
+
+pass form and cookie data around in pnotes
+******************************************
+
+NAME
+====
+
+   Apache::RequestNotes - pass form and cookie data around in pnotes
+
+SYNOPSIS
+========
+
+   httpd.conf:
+
+     PerlInitHandler Apache::RequestNotes
+     PerlSetVar MaxPostSize 1024
+     PerlSetVar DisableUploads On
+
+     MaxPostSize is in bytes and defaults to 1024, thus is optional.
+     DisableUploads defaults to On, and likewise is optional.
+
+DESCRIPTION
+===========
+
+   Apache::RequestNotes provides a simple interface allowing all phases of
+the request cycle access to cookie or form input parameters in a
+consistent manner.  Behind the scenes, it uses libapreq functions to parse
+request data and puts references to the data objects in pnotes.
+
+EXAMPLE
+=======
+
+   httpd.conf:
+
+     PerlInitHandler Apache::RequestNotes
+
+   some Perl*Handler or Registry script:
+
+     my $input      = $r->pnotes('INPUT');   # Apache::Table reference
+     my $uploads    = $r->pnotes('UPLOADS'); # Apache::Upload array ref
+     my $cookies    = $r->pnotes('COOKIES'); # hash reference
+     
+     # GET and POST data
+     my $foo        = $input->get('foo');
+
+     # uploaded files
+     foreach my $upload (@$uploads) {
+       my $name     = $upload->name'
+       my $fh       = $upload->fh;
+       my $size     = $upload->size;
+     }
+
+     # cookie data
+     my $bar        = $cookies->{'bar'};
+
+   After using Apache::RequestNotes:   o $cookies contains a reference to
+a hash with the names and values     of all cookies sent back to your
+domain and path.
+
+     o $input contains a reference to an Apache::Table object and can be
+       accessed via Apache::Table methods - if a form contains both GET
+       and POST data, both are available via $input.
+
+     o $uploads contains a reference to an array containing all the
+       Apache::Upload objects for the request, which can be used to
+       access uploaded file information.
+
+   Once Apache::RequestNotes has been called, all other phases can have
+access to the form input and cookie data without parsing it themselves.
+This relieves some strain, especially when the GET or POST data is
+required by numerous handlers along the way.
+
+NOTES
+=====
+
+   It should be noted that Apache::Request 0.3103 and above now offers the
+Apache::Request->instance() method, which offers the ability to access the
+same Apache::Request object over and over again.  While the availability
+of instance() does absorb the problems that prompted Apache::RequestNotes,
+namely the ability to read from POST more than once, you still have to
+parse the various data yourself.  Thus, the utility of
+Apache::RequestNotes is now simply the ability to have a common API for
+all your handlers to use.
+
+   Apache::RequestNotes can really be called from just about any request
+phase.  Thus, if you need to postpone data parsing until after uri
+translation, using RequestNotes as a PerlFixupHandler should work just
+fine.  Keep in mind that Apache::RequestNotes returns OK, which would
+preclude it's use in conjuction with other PerlTransHandlers and
+PerlTypeHandlers (but it doesn't really belong there anyway).
+
+   MaxPostSize applies to file uploads as well as POST data, so if you
+plan on uploading files bigger than 1K, you will need to the override the
+default value.
+
+   $Apache::RequestNotes:err is set if libapreq reports a problem parsing
+the form data, thus it can be used to verify whether $input and $uploads
+contain valid objects.  Apache::RequestNotes will _not_ return
+SERVER_ERROR in the event libapreq encounters an error.  This may change
+in future releases.
+
+   Verbose debugging is enabled by setting the variable
+$Apache::RequestNotes::DEBUG to 1 or greater. To turn off all debug
+information, set your apache LogLevel above info level.
+
+   This is alpha software, and as such has not been tested on multiple
+platforms or environments.  It requires PERL_INIT=1, PERL_LOG_API=1, and
+maybe other hooks to function properly. Doug MacEachern's libapreq is also
+required - you can get it from CPAN under the Apache tree.
+
+FEATURES/BUGS
+=============
+
+   Since POST data cannot be read more than once per request, it is
+improper to both use this module and try to gather form data again via
+CGI.pm or by reading it yourself from a cgi script or handler later in the
+request cycle.  Unlike versions of RequestNotes prior to 0.06, however,
+you can call Apache::Request->instance($r) without impunity -
+Apache::Request->new($r) is off limits, though.
+
+SEE ALSO
+========
+
+   perl(1), mod_perl(1), Apache(3), Apache::Request(3), libapreq(1),
+Apache::Table(3)
+
+AUTHOR
+======
+
+   Geoffrey Young <geoff@cpan.org>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000, Geoffrey Young.  All rights reserved.
+
+   This module is free software.  It may be used, redistributed and/or
+modified under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Apache/Resource,  Next: Apache/ReverseProxy,  Prev: Apache/RequestNotes,  Up: Module List
+
+Limit resources used by httpd children
+**************************************
+
+NAME
+====
+
+   Apache::Resource - Limit resources used by httpd children
+
+SYNOPSIS
+========
+
+     PerlModule Apache::Resource
+     #set child memory limit in megabytes
+     #default is 64 Meg
+     PerlSetEnv PERL_RLIMIT_DATA 32:48
+
+     #linux does not honor RLIMIT_DATA
+     #RLIMIT_AS (address space) will work to limit the size of a process
+     PerlSetEnv PERL_RLIMIT_AS 32:48
+
+     #set child cpu limit in seconds
+     #default is 360 seconds
+     PerlSetEnv PERL_RLIMIT_CPU 120
+
+     PerlChildInitHandler Apache::Resource
+
+DESCRIPTION
+===========
+
+   *Apache::Resource* uses the *BSD::Resource* module, which uses the C
+function setrlimit to set limits on system resources such as memory and
+cpu usage.
+
+   Any *RLIMIT* operation available to limit on your system can be set by
+defining that operation as an environment variable with a `PERL_' prefix.
+See your system setrlimit manpage for available resources which can be
+limited.
+
+   The following limit values are in megabytes: DATA, `RSS', `STACK',
+`FSIZE', `CORE', `MEMLOCK'; all others are treated as their natural unit.
+
+   If the value of the variable is of the form `S:H', S is treated as the
+soft limit, and H is the hard limit.  If it is just a single number, it is
+used for both soft and hard limits.
+
+DEFAULTS
+========
+
+   To set reasonable defaults for all RLIMITs, add this to your httpd.conf:
+
+     PerlSetEnv PERL_RLIMIT_DEFAULTS On
+     PerlModule Apache::Resource
+
+AUTHOR
+======
+
+   Doug MacEachern
+
+SEE ALSO
+========
+
+   BSD::Resource(3), setrlimit(2)
+
+
+File: pm.info,  Node: Apache/ReverseProxy,  Next: Apache/RewritingProxy,  Prev: Apache/Resource,  Up: Module List
+
+An Apache mod_perl reverse proxy
+********************************
+
+NAME
+====
+
+   Apache::ReverseProxy - An Apache mod_perl reverse proxy
+
+SYNOPSIS
+========
+
+     # In Apache config file
+     <Location />
+     SetHandler perl-script
+     PerlHandler Apache::ReverseProxy
+     PerlSetVar ReverseProxyConfig /usr/local/apache/conf/rproxy.conf
+     </Location>
+
+   # In rproxy.conf  / http://www.cpan.org/
+
+DESCRIPTION
+===========
+
+   This is a reverse proxy module for Apache with mod_perl.  It is intended
+to replace Apache::ProxyPass.  Given a list of URI mappings, this module
+will translate an incoming URI, retrieve the contents for the translated
+URI, and return the contents to the original requestor.  This module
+allows you to specify exact matching (instead of regular expression
+matching) and handles query string translations.
+
+CONFIGURATION
+=============
+
+   You will need to set the ReverseProxyConfig perl variable in Apache to
+the path of the reverse proxy mapping file.  For example:
+
+     <Location />
+     SetHandler perl-script
+     PerlHandler Apache::ReverseProxy
+     PerlSetVar ReverseProxyConfig /usr/local/apache/conf/rproxy.conf
+
+     # Optional configuration items:
+     #PerlSetVar ReverseProxyChain http://proxy.mycompany.com:8888/
+     #PerlSetVar ReverseProxyNoChain mycompany.com
+     </Location>
+
+   *ReverseProxyChain* specifies a proxy server to use.  This is sometimes
+called *proxy chaining* when one proxy server uses another proxy server.
+The *ReverseProxyNoChain* directive can specify a domain to not use proxy
+chaining on.
+
+   Reverse proxy configuration files have three fields, each separated by
+white space.  The first field is the uri to look for, the second field is
+the replacement uri, and the third field is optional and allows you to
+specify comma separated options for the mapping.  The only option that is
+currently supported is the *exact* parameter, which will make the reverse
+proxy use exact matching for the first parameter instead of using regular
+expressions.  This feature is convenient when the first parameter contains
+characters that may need to be escaped or quotemeta'ed.  Exact options are
+evaluated first.  If there isn't an exact match, regular expression
+matches are performed.  Configuration files may contain comments, which
+start with a pound sign.  For example:
+
+     /news/ http://www.news.com/
+     / http://www.perl.com/
+     /stats http://localhost/stats exact
+     # /stats maps exactly to http://localhost/stats
+     # /stats/b maps to http://www.perl.com/stats/b
+     /french/news http://www.news.com/?language=french
+     # /french/news/index -> http://www.news.com/index?language=french
+     # /french/news/index?a=b -> http://www.news.com/index?language=french&a=b
+
+TO-DO
+=====
+
+     1. Cookie header translation.
+     2. Verbose/debug logging.
+
+REQUIREMENTS
+============
+
+     This module requires LWP, available at:
+     http://www.cpan.org/modules/by-module/LWP/
+
+AUTHOR
+======
+
+     Clinton Wong, clintdw@netcom.com
+
+COPYRIGHT
+=========
+
+     Copyright (c) 1999 Clinton Wong. Additional modifications copyright
+     (c) 2000 David Jao. All rights reserved.
+     This program is free software; you can redistribute it
+     and/or modify it under the same terms as Perl itself.
+
+     This module is based on Apache::ProxyPass, by Michael
+     Smith <mjs@iii.co.uk>, which is based on Apache::ProxyPassThru.
+
+
+File: pm.info,  Node: Apache/RewritingProxy,  Next: Apache/SIG,  Prev: Apache/ReverseProxy,  Up: Module List
+
+proxy that works by rewriting requested documents with no client proxy config needed.
+*************************************************************************************
+
+NAME
+====
+
+   Apache::RewritingProxy - proxy that works by rewriting requested
+documents with no client proxy config needed.
+
+SYNOPSIS
+========
+
+   # Configuration in httpd.conf
+
+   <Location /foo> SetHandler perl-script PerlHandler
+Apache::RewritingProxy Options ExecCGI PerlSendHeader On </Location>
+
+   requests to /foo/http://domain.dom/ will return the resource located at
+http://domain.dom with all links pointing to /foo/http://otherlink.dom
+
+DESCRIPTION
+===========
+
+   This module allows proxying of web sites without any configuration
+changes on the client's part.  The client is simply pointed to a URL using
+this module and it fetches the resource and rewrites all links to continue
+using this proxy.
+
+INSTALLATION
+============
+
+   perl Makefile.PL; make; make install;
+
+REQUIREMENTS
+============
+
+   You need the following modules installed for this module to work:
+
+     LWP::UserAgent
+     HTML::TokeParser
+     URI::URL
+     Of course, mod_perl and Apache would also help greatly.
+
+TODO
+====
+
+   Make cookies work
+
+   Fix occasional query string munging for redirected requests
+
+   Add caching or incorporate some other caching mechanism
+
+   Enable this module to at least print scripts that occur within comments
+
+   Add an external script to enable this to be called as a cgi or a
+mod_perl module (for testing)
+
+SEE ALSO
+========
+
+   mod_perl(3), Apache(3), LWP::UserAgent(3)
+
+AUTHOR
+======
+
+   Apache::RewritingProxy by Ken Hagan <ken.hagan@louisville.edu>
+
+COPYRIGHT
+=========
+
+   The Apache::RewritingProxy module is free software; you can redistribute
+it and/or modify it under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Apache/SIG,  Next: Apache/SOAP,  Prev: Apache/RewritingProxy,  Up: Module List
+
+Override apache signal handlers with Perl's
+*******************************************
+
+NAME
+====
+
+   Apache::SIG - Override apache signal handlers with Perl's
+
+SYNOPSIS
+========
+
+     PerlFixupHandler Apache::SIG
+
+DESCRIPTION
+===========
+
+   When a client drops a connection and apache is in the middle of a
+write, a timeout will occur and httpd sends a *SIGPIPE*.  When apache's
+SIGPIPE handler is used, Perl may be left in the middle of it's eval
+context, causing bizarre errors during subsequent requests are handled by
+that child.  When Apache::SIG is used, it installs a different SIGPIPE
+handler which rewinds the context to make sure Perl is back to normal
+state, preventing these bizarre errors.
+
+   If you would like to log when a request was cancelled by a SIGPIPE in
+your Apache access_log, you can declare Apache::SIG as a handler (any
+Perl*Handler will do, as long as it is run before PerlHandler, e.g.
+PerlFixupHandler), and you must also define a custom LogFormat in your
+httpd.conf, like so:
+
+   PerlFixupHandler Apache::SIG LogFormat "%h %l %u %t \"%r\" %s %b
+%{SIGPIPE}e"
+
+   If the server has noticed that the request was cancelled via a SIGPIPE,
+then the log line will end with 1, otherwise it will just be a dash.
+
+CAVEATS
+=======
+
+   The signal handler in this package uses the subprocess_env table of the
+main request object to supply the 'SIGPIPE' "environment variable" to the
+log handler. If you already use the key 'SIGPIPE' in your subprocess_env
+table, then you can redefine the key like this:
+
+   $Apache::SIG::PipeKey = 'my_SIGPIPE';
+
+   and log it like this:
+
+   LogFormat "%h %l %u %t \"%r\" %s %b %{my_SIGPIPE}e"
+
+AUTHORS
+=======
+
+   Doug MacEachern and Doug Bagley
+
+SEE ALSO
+========
+
+   perlvar(1)
+
+
+File: pm.info,  Node: Apache/SOAP,  Next: Apache/SSI,  Prev: Apache/SIG,  Up: Module List
+
+Provide SOAP server functionality with simple configuration
+***********************************************************
+
+NAME
+====
+
+   Apache::SOAP - Provide SOAP server functionality with simple
+configuration
+
+SYNOPSIS
+========
+
+httpd.conf (Location), directory-based access
+          <Location /mod_soap>
+            SetHandler perl-script
+            PerlHandler Apache::SOAP
+            PerlSetVar dispatch_to "/Your/Path/To/Deployed/Modules, Module::Name, Module::method"
+            PerlSetVar options "compress_threshold => 10000"
+          </Location>
+
+httpd.conf (Files), file-based access
+          <FilesMatch "\.soap$">
+            SetHandler perl-script
+            PerlHandler Apache::SOAP
+            PerlSetVar dispatch_to "/Your/Path/To/Deployed/Modules, Module::Name, Module::method"
+            PerlSetVar options "compress_threshold => 10000"
+          </FilesMatch>
+
+.htaccess, directory-based access
+          SetHandler perl-script
+          PerlHandler Apache::SOAP
+          PerlSetVar dispatch_to "/Your/Path/To/Deployed/Modules, Module::Name, Module::method"
+          PerlSetVar options "compress_threshold => 10000"
+
+DESCRIPTION
+===========
+
+   This Apache Perl module provides the ability to add support for SOAP
+(Simple Object Access Protocol) protocol with easy configuration (either
+in .conf or in .htaccess file). This functionality should give you
+lightweight option for hosting SOAP services and greatly simplify
+configuration aspects. This module inherites functionality from
+SOAP::Transport::HTTP::Apache component of SOAP::Lite module.
+
+   =head1 CONFIGURATION
+
+   The module can be placed in <Location>, <Directory>, <Files>,
+<FilesMatch> directives in main server configuration areas or directly in
+.htaccess file.
+
+   All parameters should be quoted and can be separated with commas or
+spaces for lists ("a, b, c") and with 'wide arrows' and commas for hash
+parameters ("key1 => value1, key2 => value2").
+
+   All options that you can find in SOAP::Transport::HTTP::Apache component
+are available for configuration. Here is the description of most important
+ones.
+
+dispatch_to (LIST)
+     Specifies path to directory that contains Perl modules you'd like to
+     give access to, or just list of modules (for preloaded modules).
+
+          PerlSetVar dispatch_to "/Your/Path/To/Deployed/Modules, Module::Name, Module::method"
+
+options (HASH)
+     Specifies list of options for your module, for example threshold for
+     compression. Future versions will support more options. See
+     SOAP::Transport::HTTP documentation for other options.
+
+          PerlSetVar options "compress_threshold => 10000"
+
+DEPENDENCIES
+============
+
+     SOAP::Lite
+     mod_perl
+
+SEE ALSO
+========
+
+     SOAP::Transport::HTTP::Apache for implementation details,
+     SOAP::Lite for general information, and
+     F<examples/server/mod_soap.htaccess> for .htaccess example
+
+COPYRIGHT
+=========
+
+   Copyright (C) 2000-2001 Paul Kulchenko. All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+AUTHOR
+======
+
+   Paul Kulchenko (paulclinger@yahoo.com)
+
+
+File: pm.info,  Node: Apache/SSI,  Next: Apache/SSIChain,  Prev: Apache/SOAP,  Up: Module List
+
+Implement Server Side Includes in Perl
+**************************************
+
+NAME
+====
+
+   Apache::SSI - Implement Server Side Includes in Perl
+
+SYNOPSIS
+========
+
+   In httpd.conf:
+
+     <Files *.phtml>  # or whatever
+     SetHandler perl-script
+     PerlHandler Apache::SSI
+     </Files>
+
+   You may wish to subclass Apache::SSI for your own extensions.  If so,
+compile mod_perl with PERL_METHOD_HANDLERS=1 (so you can use
+object-oriented inheritance), and create a module like this:
+
+     package MySSI;
+     use Apache::SSI ();
+     @ISA = qw(Apache::SSI);
+
+     #embedded syntax:
+     #<!--#something param=value -->
+     sub ssi_something {
+        my($self, $attr) = @_;
+        my $cmd = $attr->{param};
+        ...
+        return $a_string;
+     }
+     
+      Then in httpd.conf:
+     
+     <Files *.phtml>
+      SetHandler perl-script
+      PerlHandler MySSI
+     </Files>
+
+DESCRIPTION
+===========
+
+   Apache::SSI implements the functionality of mod_include for handling
+server-parsed html documents.  It runs under Apache's mod_perl.
+
+   In my mind, there are two main reasons you might want to use this
+module: you can sub-class it to implement your own custom SSI directives,
+and/or you can parse the output of other mod_perl handlers, or send the
+SSI output through another handler (use Apache::Filter to do this).
+
+   Each SSI directive is handled by an Apache::SSI method with the prefix
+"ssi_".  For example, <!-#printenv-> is handled by the ssi_printenv method.
+attribute=value pairs inside the SSI tags are parsed and passed to the
+method in a hash reference.
+
+   'Echo' directives are handled by the ssi_echo method, which delegates
+lookup to methods with the prefix "echo_".  For instance, <!-#echo
+var=DOCUMENT_NAME-> is handled by the echo_DOCUMENT_NAME method.
+
+   You can customize behavior by inheriting from Apache::SSI and
+overriding 'ssi_*' and 'echo_*' methods, or writing new ones.
+
+SSI Directives
+--------------
+
+   This module supports the same directives as mod_include.  At least,
+that's the goal. =)  For methods listed below but not documented, please
+see mod_include's online documentation at http://www.apache.org/ .
+
+   * config
+
+   * echo
+
+   * exec
+
+   * fsize
+
+   * flastmod
+
+   * include
+
+   * printenv
+
+   * set
+
+   * perl
+
+     There are two ways to call a Perl function, and two ways to supply it
+     with arguments.  The function can be specified either as an anonymous
+     subroutine reference, or as the name of a function defined elsewhere:
+
+          <!--#perl sub="sub { localtime() }"-->
+          <!--#perl sub="time::now"-->
+
+     If the 'sub' argument matches the regular expression /^\s*sub[^\w:]/,
+     it is assumed to be a subroutine reference.  Otherwise it's assumed to
+     be the name of a function.  In the latter case, the string "main::"
+     will be prepended to the function name if the name doesn't contain
+     "::" (this forces the function to be in the main package, or a package
+     you specify).  Note that it's a pretty bad idea to put your code in
+     the main package, so I only halfheartedly endorse this feature.
+
+     In general, it will be slower to use anonymous subroutines, because
+     each one has to be eval()'ed and there is no caching.  For best
+     results, pre-load any code you need in the parent process, then call
+     it by name.
+
+     If you're calling a subroutine like "&Package::SubPack::handler", you
+     can omit the "handler" portion, making your directive like this:
+
+          <!--#perl sub="Package::Subpack"-->
+
+     If you want to supply a list of arguments to the function, you use
+     either the "arg" or the "args" parameter:
+
+          <!--#perl sub="sub {$_[0] * 7}" arg=7-->
+          <!--#perl sub=holy::matrimony arg=Hi arg=Lois-->
+          <!--#perl sub=holy::matrimony args=Hi,Lois-->
+
+     The "args" parameter will simply split on commas, meaning that
+     currently there's no way to embed a comma in arguments passed via the
+     "args" parameter.  Use the "arg" parameter for this.
+
+     If you give a key-value pair and the key is not 'sub', 'arg', 'args',
+     or 'pass_request' (see below), then your routine will be passed both
+     the key and the value.  This lets you pass a hash of key-value pairs
+     to your function:
+
+          <!--#perl sub=holy::matrimony groom=Hi bride=Lois-->
+          Will call &holy::matrimony('groom', 'Hi', 'bride', 'Lois');
+
+     As of version 1.95, we pass the current Apache request object ($r) as
+     the first argument to the function.  To turn off this behavior, give
+     the key-value pair 'pass_request=no', or put 'PerlSetVar
+     SSIPerlPass_Request no' in your server's config file.
+
+     See `http://perl.apache.org/src/mod_perl.html' for more information
+     on Perl SSI calls.
+
+   * if
+
+   * elif
+
+   * else
+
+   * endif
+
+     These four directives can be used just like in `mod_include', with
+     one important difference: the boolean expression is evaluated using
+     Perl's eval().  This means you use `==' or eq instead of = to test
+     equality.  It also means you can use pre-loaded Perl subroutines in
+     the conditions:
+
+          <!--#if expr="&Movies::is_by_Coen_Brothers($MOVIE)"-->
+           This movie is by the Coen Brothers.
+          <!--#else-->
+           This movie is not by the Coen Brothers.
+          <!--#endif-->
+
+     It can't handle very sophistocated Perl though, because it manually
+     looks for variables (of the form $var or ${var}, just like
+     `mod_include'), and will get tripped up on expressions like
+     $object->method or $hash{'key'}.  I'll welcome any suggestions for
+     how to allow arbitrary Perl expressions while still filling in Apache
+     variables.
+
+CHAINING HANDLERS
+=================
+
+   There are two fairly simple ways for this module to exist in a stacked
+handler chain.  The first uses `Apache::Filter', and your httpd.conf would
+look something like this:
+
+     PerlModule Apache::Filter
+     PerlModule Apache::SSI
+     PerlModule My::BeforeSSI
+     PerlModule My::AfterSSI
+     <Files ~ "\.ssi$">
+      SetHandler perl-script
+      PerlSetVar Filter On
+      PerlHandler My::BeforeSSI Apache::SSI My::AfterSSI
+     </Files>
+
+   The `"PerlSetVar Filter On"' directive tells the three stacked handlers
+that they should use their filtering mode.  It's mandatory.
+
+   The second uses `Apache::OutputChain', and your httpd.conf would look
+something like this:
+
+     PerlModule Apache::OutputChain
+     PerlModule Apache::SSIChain
+     PerlModule My::BeforeSSI
+     PerlModule My::AfterSSI
+     <Files ~ "\.ssi$">
+      SetHandler perl-script
+      PerlHandler Apache::OutputChain My::AfterSSI Apache::SSIChain My::BeforeSSI
+     </Files>
+
+   Note that the order of handlers is reversed in the two different
+methods.  One reason I wrote `Apache::Filter' is to get the order to be
+more intuitive.  Another reason is that `Apache::SSI' itself can be used
+in a handler stack using `Apache::Filter', whereas it needs to be wrapped
+in `Apache::SSIChain' to be used with `Apache::OutputChain'.
+
+   Please see the documentation for `Apache::OutputChain' and
+`Apache::Filter' for more specific information.  And look at the note in
+CAVEATS too.
+
+CAVEATS
+=======
+
+   * When chaining handlers via Apache::Filter, if you use <!-#include
+...-> or <!-#exec cgi=...->, then Apache::SSI must be the last filter in
+the chain.  This is because Apache::SSI uses $r->lookup_uri(...)->run to
+include the files, and this sends the output through C's stdout rather
+than Perl's STDOUT.  Thus Apache::Filter can't catch it and filter it.
+
+   If Apache::SSI is the last filter in the chain, or if you stick to
+simpler SSI directives like <!-#fsize->, <!-#flastmod->, etc. you'll be
+fine.
+
+   * Currently, the way <!-#echo var=whatever-> looks for variables is to
+first try $r->subprocess_env, then try %ENV, then the five extra
+environment variables mod_include supplies.  Is this the correct order?
+
+TO DO
+=====
+
+   Revisit http://www.apache.org/docs/mod/mod_include.html and see what
+else there I can implement.
+
+   It would be nice to have a "PerlSetVar ASSI_Subrequests 0|1" option that
+would let you choose between executing a full-blown subrequest when
+including a file, or just opening it and printing it.
+
+   I'd like to know how to use Apache::test for the real.t test.
+
+SEE ALSO
+========
+
+   mod_include, mod_perl(3), Apache(3), HTML::Embperl(3), Apache::ePerl(3),
+Apache::OutputChain(3)
+
+AUTHOR
+======
+
+   Ken Williams ken@forum.swarthmore.edu
+
+   Concept based on original version by Doug MacEachern dougm@osf.org .
+Implementation different.
+
+COPYRIGHT
+=========
+
+   Copyright 1998 Swarthmore College.  All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+

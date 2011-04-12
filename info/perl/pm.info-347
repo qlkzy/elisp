@@ -1,0 +1,2738 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Speech/Audio/FileWave,  Next: Speech/Speech/Festival,  Prev: Spectrum/CLI,  Up: Module List
+
+Simple waveform abstraction for use with Audio::TTS
+***************************************************
+
+NAME
+====
+
+   Audio::FileWave - Simple waveform abstraction for use with Audio::TTS
+
+SYNOPSIS
+========
+
+     $wave = new Audio::FileWave $type, $data;
+
+     set_play_command Audio::FileWave $type $command;
+
+     play $wave;
+
+     free $wave;
+
+DESCRIPTION
+===========
+
+   This is a simple class which represents a waveform. It is designed for
+use by the `Festival::TTS|Festival::TTS' in this node module, if you want
+to play waveforms some other way you need to supply another class which
+implements this interface.
+
+   This class maintains a table mapping file types to play commands. When
+the command is called the string `*WAVE*' is replaced by the filename of
+the data. If you don't set up a command for the waveform type
+`Festival::TTS|Festival::TTS' in this node requests, the default command
+`*na_play WAVE*' is used. The `na_play|na_play' in this node command is
+part of the *Edinburgh Speech Tools* and so if you have festival you
+should also have it.
+
+set_play_command Festival::FileWave $type $command;
+     Sets the play command to be used for files of the given type.
+
+$wave = new Festival::FileWave $type, $data;
+     Create a waveform from the given data which is of type $type. Actually
+     saves it to a file.
+
+free $wave;
+     Free the resources used for the waveform. (unlinks the file).
+
+play $wave;
+     Play the waveform. Calls the command associated with the file type.
+
+AUTHOR
+======
+
+   Richard Caley, R.Caley@ed.ac.uk
+
+SEE ALSO
+========
+
+   `Festival::TTS' in this node, perl(1), festival(1), Festival
+Documentation
+
+
+File: pm.info,  Node: Speech/Speech/Festival,  Next: Speech/Speech/Festival/Synthesiser,  Prev: Speech/Audio/FileWave,  Up: Module List
+
+Communicate with a festival server process.
+*******************************************
+
+NAME
+====
+
+   Speech::Festival - Communicate with a festival server process.
+
+SYNOPSIS
+========
+
+     use Festival;
+     $festival = new Festival -host => 'serverhost', -port => 1314;
+
+     conn $festival;
+     disconnect $festival;
+
+     request $festival '(some scheme)';
+     request $festival '(some scheme)', \&result_handler, $args, $for, $handler;
+
+     if (result_waiting $festival) { # process it }
+     wait_for_result $festival, $timeout;
+     ($type, $data) = get_result $festival;
+
+DESCRIPTION
+===========
+
+   This package provides a simple interface to an instance of the festival
+speech synthesis system running as a server on some machine. If you want a
+simple speech-ouput module using this interface see `Speech::Synthesis' in
+this node.
+
+   Since festival can return an unpredictable number of results from a
+single request, and since it is useful to process them as they arrive,
+something a little more complex than a simple remote-procedure-call
+interface is needed.
+
+   There are basicly three ways to organise your application's interaction
+with festival. In the simplest cases you can pass a result handling
+procedure along with your request. For more control you can process one
+value at a time by using `result_waiting|' in this node to poll for
+results or `wait for result|' in this node to block until a result is
+available.
+
+   In any case results consist of a type and some data. The types are
+
+$Speech::Festival::SCHEME
+     The data is a Scheme expression, for instance a number or a list.
+
+$Speech::Festival::WAVE
+     The data is a waveform. what format this is in willbe determined by
+     what you have previously told festival.
+
+$Speech::Festival::OK
+     All the results for this request have been sent. No data.
+
+$Speech::Festival::ERROR
+     Festival has reported an error. No data. Unfortunatly festival doesn't
+     sen any information about the error, so for details you will have to
+     check the server's log.
+
+   A single festival session (between calls to `conn|' in this node and
+`disconnect|' in this node) talks to a single Scheme interpreter in
+festival, and hence state will be remembered between requests.
+
+$festival = new Festival 'serverhost', 1314;
+     Create a new festival session which will connect to the given host and
+     port. If ommitted these default to *localhost* and *1314*.
+
+conn $festival;
+     Connect to festival. Returns true if all is well, false otherwise. In
+     the event of an error the variable *$speech_error* conatains a
+     description of it.
+
+disconnect $festival;
+     Disconnect from festival. The connection mat be reopened later with
+     `conn|' in this node, but any state will have been lost.
+
+request $festival '(some scheme)';
+     Send the given Scheme to festival. You should use `result_waiting|'
+     in this node, `wait_for_result|' in this node and `get_result|' in
+     this node to process the results of the request.
+
+request $festival '(some scheme)', \&result_handler, $args, $for, $handler;
+     Send the given Scheme to festival asking it to call *&result_handler*
+     on each result returned. The handler is called as:
+
+     result_handler($type, $data, $args, $for, $handler)
+
+if (*result_waiting* $festival) { # process it }
+     Look to see if there are any results waiting to be processed. This
+     only guarantees that the start of the result has arrived, so a
+     subsequent call to `get_result|' in this node may not return
+     instantly, but should not block for an extended time.
+
+wait_for_result $festival, $timeout;
+     Blocks until festival sends a result. Timeout is in seconds, if can be
+     omitted, in which case the call waits for an unbounded time. Returns
+     false if he call timed out, true if there is a request waiting. Again,
+     this only guarantees that a result has started to arrive.
+
+($type, $data) = get_result $festival;
+     Reads a single result.
+
+EXAMPLES
+========
+
+   The code below does some arithmatic the hard way.
+
+     use Speech::Festival;
+     $festival = new Speech::Festival -host => 'festival-server.mynet';
+
+     conn $festival
+     	 || die "can't talk to festival - $speech_error";
+
+     request $festival '(+ 123 456)',
+     	    sub {
+     		my ($type, $data) = @_;
+
+     print "Scheme Result=$data"
+     	if $type eq $Speech::Festival::SCHEME;
+     print "ERROR!\n"
+             if $type eq $Speech::Festival::ERROR;
+     	    };
+
+AUTHOR
+======
+
+   Richard Caley, R.Caley@ed.ac.uk
+
+SEE ALSO
+========
+
+   `Speech::Synthesis' in this node, `Speech::Festival::Synthesis' in this
+node, perl(1), festival(1), Festival Documentation
+
+
+File: pm.info,  Node: Speech/Speech/Festival/Synthesiser,  Next: Speech/Speech/Synthesiser,  Prev: Speech/Speech/Festival,  Up: Module List
+
+Simple text-to-speech using festival.
+*************************************
+
+NAME
+====
+
+   Speech::Festival::Synthesiser - Simple text-to-speech using festival.
+
+SYNOPSIS
+========
+
+     use Speech::Speech::Festival::Synthesiser;
+     $festival = new Speech::Festival::Synthesiser 'serverhost', 1314;
+
+     start $festival;
+     stop $festival;
+
+     @voices = voice_list $festival;
+     voice $festival "myvoice";
+     voice_description $festival;
+
+     synth_description $festival;
+     speak $festival $text;
+
+DESCRIPTION
+===========
+
+   `Speech::Festival::Synthesiser' in this node provides a simple way to
+add speech to a perl application. It is a sub-class of `Speech::Festival'
+in this node and so you can use any of the methods in that class to
+manipulate festival if necessary.
+
+   This package conform to the interface defined by `Speech::Synthesiser'
+in this node and so provides a synthesiser for use throughthat interface.
+
+   Actual sound output is provided by an auiliary class, by default
+`Audio::FileWave' in this node which runs an external program to play
+sound, but you can replace it with another class if you have a better way
+of playing sounds (eg a perl extension providing sound output), see the
+documentation for `Audio::FileWave' in this node for the interface an
+alternative should provide should implement.
+
+   If you do use `Audio::FileWave' in this node you may need to set up the
+command it uses to play sounds, see the documentation for
+`Audio::FileWave' in this node.
+
+$festival = new Speech::Festival::Synthesiser -host => 'serverhost', -port => 1314, ...
+     Create a new festival session which will connect to the given host and
+     port. If ommitted these default to *localhost* and *1314*.
+
+start $festival;
+     Connect to festival and inistilise the session. Returns true if all is
+     well, false otherwise. In the event of an error the variable
+     *$festival_error* conatains a description of it.
+
+stop $festival;
+     Disconnect from festival. The connection may be reopened later with
+     `' in this node, but any state will have been lost.
+
+@voices = *voice_list* $festival;
+     Return a list of the voices available from this server.
+
+voice $festival "myvoice";
+     Select a voice.
+
+voice_description $festival;
+     Returns the description of the current voice.
+
+synth_description $festival;
+     Synthesize the standard festival introductory text.
+
+speak $festival $text;
+     Speak the given text.
+
+AUTHOR
+======
+
+   Richard Caley, R.Caley@ed.ac.uk
+
+SEE ALSO
+========
+
+   `Speech::Synthesiser' in this node, `Speech::Festival' in this node,
+`Audio::FileWave' in this node, perl(1), festival(1), Festival
+Documentation
+
+
+File: pm.info,  Node: Speech/Speech/Synthesiser,  Next: Spread,  Prev: Speech/Speech/Festival/Synthesiser,  Up: Module List
+
+Generic speech syntheiser interface
+***********************************
+
+NAME
+====
+
+   Speech::Synthesiser - Generic speech syntheiser interface
+
+SYNOPSIS
+========
+
+     use Speech::Synthesiser;
+     $synth = new Speech::Synthesiser
+     		-type => 'SynthName',
+                   # other args
+     		;
+
+     start $synth;
+     stop $synth;
+
+     @voices = voice_list $synth;
+     voice $synth "myvoice";
+
+     intro $synth;
+     speak $synth $text;
+
+DESCRIPTION
+===========
+
+   `Speech::Synthesiser' in this node provides a simple way to add speech
+to a perl application. It is a generic class which can be used to talk to
+any speech synthesiser given a suitable interface module.
+
+   Actual sound output is provided by an auiliary class, by default
+`Audio::FileWave' in this node which runs an external program to play
+sound, but you can replace it with another class if you have a better way
+of playing sounds (eg a perl extension providing sound output), see the
+documentation for `Speech::FileWave' in this node for the interface an
+alternative should provide should implement.
+
+   If you do use `Speech::FileWave' in this node you may need to set up
+the command it uses to play sounds, see the documentation for
+`Audio::FileWave' in this node.
+
+$synth = new Speech::Synthesiser -type => 'SynthName', ARGS;
+     Create a synthesiser of the named type. Looks for a package
+     `Speech::SynthName::Synthesiser'. All arguments are passed to the
+     creation function for that class.
+
+     The following arguments have special meaning to the
+     `Speech::Synthesiser' new method.
+
+    -waveimp CLASS
+          CLASS is the name of a perl package which implements wave
+          playing. If not given it defaults to `Audio::FileWave'.
+
+    -waveargs [ @ARGS ]
+          @ARGS are passed to the new method of the wave class. For
+          `Audio::FileWave' this defaults to `( "riff" )'.
+
+start $synth;
+     Do whatever is ncecessary to prepar ethe synthesiser fo work. Returns
+     true if all is well, false otherwise. In the event of an error the
+     variable *$synth_error* conatains a description of it.
+
+stop $synth;
+     Close down the synthesiser, releasing any resources it holds. The
+     synthesiser may be restarted with `' in this node, but any state may
+     have been lost.
+
+@voices = *voice_list* $synth;
+     Return a list of the voices available from this synthesiser.
+
+voice $synth "myvoice";
+     Select a voice.
+
+voice_description $synth;
+     Returns a description of the voice.
+
+synth_description $synth;
+     Synthesize a description of the synthesiser,
+
+speak $synth $text;
+     Speak the given text. Not much more to be said really:-).
+
+EXAMPLE
+=======
+
+   The following should talk to you, all else being equal. Uses the
+festival synthesiser, so you will need to run a festival server on the
+named machine.
+
+     use Speech::Synthesiser;
+
+     $synth = new Speech::Synthesiser
+     		-type => 'Festival',
+     		-host => 'festival-server.mynet';
+
+     start $synth
+     	 || die "can't talk to festival - $synth_error";
+
+     speak $synth "We are perl, prepare for assimilation.";
+
+AUTHOR
+======
+
+   Richard Caley, R.Caley@ed.ac.uk
+
+SEE ALSO
+========
+
+   `Speech::Festival' in this node, `Speech::Festival::Synthesiser' in
+this node, `Audio::FileWave' in this node, perl(1), festival(1), Festival
+Documentation
+
+
+File: pm.info,  Node: Spread,  Next: Spreadsheet/BIFFwriter,  Prev: Speech/Speech/Synthesiser,  Up: Module List
+
+Perl extension for the Spread group communication system
+********************************************************
+
+NAME
+====
+
+   Spread - Perl extension for the Spread group communication system
+
+SYNOPSIS
+========
+
+     use Spread;
+
+     # Connect
+     my($mailbox, $private_group) = Sread::connect(
+     	spread_name => '4444@host.domain.com',
+     	private_name => 'mrcool',
+     	);
+
+     # Join and leave groups
+     my(@group_to_join) = ( 'GroupA', 'GroupB', 'GroupC' );
+     my(@joined_groups) = grep( Spread::join($mbox, $_), @group_to_join );
+     print "Spread::join -- $sperrorno"
+     	unless (Spread::leave($mbox, 'GroupC'));
+
+     # Multicast to group(s)
+     Spread::multicast($mbox, AGREED_MESS, 'GroupB', 0, "Hey you!");
+     Spread::multicast($mbox, SAFE_MESS, @joined_groups, 0, "Hey yall!");
+
+     # Poll mailbox
+     my($messsize) = Spread::poll($mbox);
+     if(defined($messsize)) { print "Next message: $messsize bytes\n"; }
+     else { print "Spread::poll $sperrno\n"; }
+
+     # Receive messages (see spread's man pages for more description)
+     my($sevice_type, $sender, $groups, $mess_type, $endian, $message) =
+     	Spread::receive($mbox);
+     my($sevice_type, $sender, $groups, $mess_type, $endian, $message) =
+     	Spread::receive($mbox, 1.789);  # 1.789 second timeout on receive
+
+     # Disconnect
+     if(Spread::disconnect($mbox)) { print "Successful disconnect\n"; }
+     else { print "Spread::disconnect -- $sperrorno\n"; }
+
+DESCRIPTION
+===========
+
+   Understanding through practice ;)
+
+   See man pages for SP_connect, SP_join, SP_multicast, SP_receive,
+SP_poll, SP_error, SP_leave, SP_disconnect.
+
+   $sperror holds either the integer spread error or a descriptive string
+depending on the context in which $sperror is used.
+
+Exported constants
+==================
+
+   The predefined groups of exports in the use statements are as follows:
+
+   use Spread qw(:SP);
+
+   Exports the Spread::connect, Spread::join, Spread::multicast,
+Spread::receive, Spread::poll, Spread::error, Spread::leave, and
+Spread::disconnect as SP_connect, SP_join, SP_multicast, SP_receive,
+SP_poll, SP_error, SP_leave, and SP_disconnect, respectively.
+
+   use Spread qw(:ERROR);
+
+   Exports all of the error conditions.  Please refer to the SP_* C man
+pages as the "RETURN VALUES" there have both identical spellings and
+meanings.
+
+   use Spread qw(:MESS);
+
+   Exports all of the message types (this is returned as service type by
+the Spread::receive function and is the request service type of the
+Spread::multicast function).  The actual meaning of these orderings and
+assurances are not simple to explain without a basic understanding of
+group communication systems.  For more information on this topic, please
+visit the Spread web site at http://www.spread.org/
+
+   All constants in alphabetical order:
+
+     ACCEPT_SESSION
+     AGREED_MESS
+     BUFFER_TOO_SHORT
+     CAUSAL_MESS
+     CAUSED_BY_DISCONNECT
+     CAUSED_BY_JOIN
+     CAUSED_BY_LEAVE
+     CAUSED_BY_NETWORK
+     CONNECTION_CLOSED
+     COULD_NOT_CONNECT
+     FIFO_MESS
+     HIGH_PRIORITY
+     ILLEGAL_GROUP
+     ILLEGAL_MESSAGE
+     ILLEGAL_SERVICE
+     ILLEGAL_SESSION
+     ILLEGAL_SPREAD
+     LOW_PRIORITY
+     MAX_SCATTER_ELEMENTS
+     MEDIUM_PRIORITY
+     MEMBERSHIP_MESS
+     REGULAR_MESS
+     REG_MEMB_MESS
+     REJECT_ILLEGAL_NAME
+     REJECT_NOT_UNIQUE
+     REJECT_NO_NAME
+     REJECT_QUOTA
+     REJECT_VERSION
+     RELIABLE_MESS
+     SAFE_MESS
+     SELF_DISCARD
+     TRANSITION_MESS
+     UNRELIABLE_MESS
+
+AUTHOR
+======
+
+   Theo Schlossnagle <jesus@cnds.jhu.edu>
+
+SEE ALSO
+========
+
+   Various spread documentation at http://www.spread.org/.
+
+
+File: pm.info,  Node: Spreadsheet/BIFFwriter,  Next: Spreadsheet/Format,  Prev: Spread,  Up: Module List
+
+Abstract base class for Excel workbooks and worksheets.
+*******************************************************
+
+NAME
+====
+
+   BIFFwriter - Abstract base class for Excel workbooks and worksheets.
+
+SYNOPSIS
+========
+
+   See the documentation for Spreadsheet::WriteExcel
+
+DESCRIPTION
+===========
+
+   This module is used in conjuction with Spreadsheet::WriteExcel.
+
+AUTHOR
+======
+
+   John McNamara jmcnamara@cpan.org
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000, John McNamara. All Rights Reserved. This module is
+free software. It may be used, redistributed and/or modified under the
+same terms as Perl itself.
+
+
+File: pm.info,  Node: Spreadsheet/Format,  Next: Spreadsheet/OLEwriter,  Prev: Spreadsheet/BIFFwriter,  Up: Module List
+
+Class for defining Excel formatting.
+************************************
+
+NAME
+====
+
+   Format - Class for defining Excel formatting.
+
+SYNOPSIS
+========
+
+   See the documentation for Spreadsheet::WriteExcel
+
+DESCRIPTION
+===========
+
+   This module is used in conjuction with Spreadsheet::WriteExcel.
+
+AUTHOR
+======
+
+   John McNamara jmcnamara@cpan.org
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000, John McNamara. All Rights Reserved. This module is
+free software. It may be used, redistributed and/or modified under the
+same terms as Perl itself.
+
+
+File: pm.info,  Node: Spreadsheet/OLEwriter,  Next: Spreadsheet/ParseExcel,  Prev: Spreadsheet/Format,  Up: Module List
+
+Writes BIFF data into a OLE compound storage file.
+**************************************************
+
+NAME
+====
+
+   OLEwriter - Writes BIFF data into a OLE compound storage file.
+
+SYNOPSIS
+========
+
+   See the documentation for Spreadsheet::WriteExcel
+
+DESCRIPTION
+===========
+
+   This module is used in conjuction with Spreadsheet::WriteExcel.
+
+AUTHOR
+======
+
+   John McNamara jmcnamara@cpan.org
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000, John McNamara. All Rights Reserved. This module is
+free software. It may be used, redistributed and/or modified under the
+same terms as Perl itself.
+
+
+File: pm.info,  Node: Spreadsheet/ParseExcel,  Next: Spreadsheet/ParseExcel/Utility,  Prev: Spreadsheet/OLEwriter,  Up: Module List
+
+Get information from Excel file
+*******************************
+
+NAME
+====
+
+   Spreadsheet::ParseExcel - Get information from Excel file
+
+SYNOPSIS
+========
+
+     use strict;
+     use Spreadsheet::ParseExcel;
+     my $oExcel = new Spreadsheet::ParseExcel;
+
+     #1.1 Normal Excel97
+     my $oBook = $oExcel->Parse('Excel/Test97.xls');
+     my($iR, $iC, $oWkS, $oWkC);
+     print "FILE  :", $oBook->{File} , "\n";
+     print "COUNT :", $oBook->{SheetCount} , "\n";
+     print "AUTHOR:", $oBook->{Author} , "\n";
+     for(my $iSheet=0; $iSheet < $oBook->{SheetCount} ; $iSheet++) {
+         $oWkS = $oBook->{Worksheet}[$iSheet];
+         print "--------- SHEET:", $oWkS->{Name}, "\n";
+         for(my $iR = $oWkS->{MinRow} ;
+                 defined $oWkS->{MaxRow} && $iR <= $oWkS->{MaxRow} ; $iR++) {
+             for(my $iC = $oWkS->{MinCol} ;
+                             defined $oWkS->{MaxCol} && $iC <= $oWkS->{MaxCol} ; $iC++) {
+                 $oWkC = $oWkS->{Cells}[$iR][$iC];
+                 print "( $iR , $iC ) =>", $oWkC->Value, "\n" if($oWkC);
+             }
+         }
+     }
+
+DESCRIPTION
+===========
+
+   Spreadsheet::ParseExcel makes you to get information from Excel95,
+Excel97, Excel2000 file.
+
+Functions
+---------
+
+new
+     *$oExcel* = new Spreadsheet::ParseExcel;
+
+     Constructor.
+
+Parse
+     *$oWorkbook* = $oParse->Parse($sFileName [, $oFmt]);
+
+     return `Workbook' in this node object.  if error occurs, returns
+     undef.
+
+    $sFileName
+          name of the file to parse
+
+          From 0.12 (with OLE::Storage_Lite v.0.06), scalar reference of
+          file contents (ex. \$sBuff) or IO::Handle object (inclucdng
+          IO::File etc.) are also available.
+
+    $oFmt
+          `Formatter Class' in this node to format the value of cells.
+
+Workbook
+--------
+
+   *Spreadsheet::ParseExcel::Workbook*
+
+   Workbook class has these properties :
+
+File
+     Name of the file
+
+Author
+     Author of the file
+
+Flag1904
+     If this flag is on, date of the file count from 1904.
+
+Version
+     Version of the file
+
+SheetCount
+     Numbers of `Worksheet' in this node s in that Workbook
+
+Worksheet[SheetNo]
+     Array of `Worksheet' in this nodes class
+
+Worksheet
+---------
+
+   *Spreadsheet::ParseExcel::Worksheet*
+
+   Worksheet class has these properties:
+
+Name
+     Name of that Worksheet
+
+DefRowHeight
+     Default height of rows
+
+DefColWidth
+     Default width of columns
+
+RowHeight[Row]
+     Array of row height
+
+ColHeight[Col]
+     Array of column width (undef means DefColWidth)
+
+Cells[Row][Col]
+     Array of `Cell' in this nodes infomation in the worksheet
+
+Cell
+----
+
+   *Spreadsheet::ParseExcel::Cell*
+
+   Cell class has these properties:
+
+Value
+     Method Formatted value of that cell
+
+Val
+     Original Value of that cell
+
+Type
+     Kind of that cell ('Text', 'Numeric', 'Date')
+
+Code
+     Character code of that cell (undef, 'ucs2', '_native_') undef tells
+     that cell seems to be ascii.  '_native_' tells that cell seems to be
+     'sjis' or something like that.
+
+Formatter class
+===============
+
+   *Spreadsheet::ParseExcel::Fmt**
+
+   Formatter class will convert cell data.
+
+   Spreadsheet::ParseExcel includes 2 formatter classes: FmtDefault and
+FmtJapanese.  You can create your own FmtClass as you like.
+
+   Formatter class(Spreadsheet::ParseExcel::Fmt*) should provide these
+functions:
+
+ChkType($oSelf, $iNumeric, $iFmtIdx)
+     tells type of the cell that has specified value.
+
+    $oSelf
+          Formatter itself
+
+    $iNumeric
+          If on, the value seems to be number
+
+    $iFmtIdx
+          Format index number of that cell
+
+TextFmt($oSelf, $sText, $sCode)
+     converts original text into applicatable for Value.
+
+    $oSelf
+          Formatter itself
+
+    $sText
+          Original text
+
+    $sCode
+          Character code of Original text
+
+ValFmt($oSelf, $oCell, $oBook)
+     converts original value into applicatable for Value.
+
+    $oSelf
+          Formatter itself
+
+    $oCell
+          Cell object
+
+    $oBook
+          Workbook object
+
+AUTHOR
+======
+
+   Kawai Takanori (Hippo2000) kwitknr@cpan.org
+
+     http://member.nifty.ne.jp/hippo2000/            (Japanese)
+     http://member.nifty.ne.jp/hippo2000/index_e.htm (English)
+
+SEE ALSO
+========
+
+   XLHTML, OLE::Storage, Spreadsheet::WriteExcel, OLE::Storage_Lite
+
+   This module is based on herbert within OLE::Storage and XLHTML.
+
+COPYRIGHT
+=========
+
+   The Spreadsheet::ParseExcel module is Copyright (c) 2000,2001 Kawai
+Takanori. Japan.  All rights reserved.
+
+   You may distribute under the terms of either the GNU General Public
+License or the Artistic License, as specified in the Perl README file.
+
+ACKNOWLEDGEMENTS
+================
+
+   First of all, I would like to acknowledge valuable program and modules :
+XHTML, OLE::Storage and Spreadsheet::WriteExcel.
+
+   In no particular order: Yamaji Haruna, Simamoto Takesi, Noguchi Harumi,
+Ikezawa Kazuhiro, Suwazono Shugo, Hirofumi Morisada, Michael Edwards, Kim
+Namusk and many many people + Kawai Mikako.
+
+
+File: pm.info,  Node: Spreadsheet/ParseExcel/Utility,  Next: Spreadsheet/Workbook,  Prev: Spreadsheet/ParseExcel,  Up: Module List
+
+Utility function for Spreadsheet::ParseExcel
+********************************************
+
+NAME
+====
+
+   Spreadsheet::ParseExcel::Utility - Utility function for
+Spreadsheet::ParseExcel
+
+SYNOPSIS
+========
+
+     use strict;
+     #Declare
+     use Spreadsheet::ParseExcel::Utility qw(ExcelFmt ExcelLocaltime LocaltimeExcel);
+     
+     #Convert localtime ->Excel Time
+     my $iBirth = LocaltimeExcel(11, 10, 12, 23, 2, 64);
+                                # = 1964-3-23 12:10:11
+     print $iBirth, "\n";       # 23459.5070717593
+     
+     #Convert Excel Time -> localtime
+     my @aBirth = ExcelLocaltime($iBirth, undef);
+     print join(":", @aBirth), "\n";   # 11:10:12:23:2:64:1:0
+     
+     #Formatting
+     print ExcelFmt('yyyy-mm-dd', $iBirth), "\n"; #1964-3-23
+     print ExcelFmt('m-d-yy', $iBirth), "\n";     # 3-23-64
+     print ExcelFmt('#,##0', $iBirth), "\n";      # 23,460
+     print ExcelFmt('#,##0.00', $iBirth), "\n";   # 23,459.51
+     print ExcelFmt('"My Birthday is (m/d):" m/d', $iBirth), "\n";
+                                       # My Birthday is (m/d): 3/23
+
+DESCRIPTION
+===========
+
+   Spreadsheet::ParseExcel::Utility exports utility functions concerned
+with Excel format setting.
+
+Functions
+=========
+
+   This module can export 3 functions: ExcelFmt, ExcelLocaltime and
+LocaltimeExcel.
+
+ExcelFmt
+--------
+
+   $sTxt = ExcelFmt($sFmt, $iData [, $i1904]);
+
+   *$sFmt* is a format string for Excel. *$iData* is the target value.  If
+*$flg1904* is true, this functions assumes that epoch is 1904.  *$sTxt* is
+the result.
+
+   For more detail and examples, please refer sample/chkFmt.pl in this
+distribution.
+
+   ex.
+
+   =head2 ExcelLocaltime
+
+   ($iSec, $iMin, $iHour, $iDay, $iMon, $iYear, $iwDay, $iMSec) =
+  ExcelLocaltime($iExTime [, $flg1904]);
+
+   *ExcelLocaltime* converts time information in Excel format into Perl
+localtime format.  *$iExTime* is a time of Excel. If *$flg1904* is true,
+this functions assumes that epoch is 1904.  *$iSec*, *$iMin*, *$iHour*,
+*$iDay*, *$iMon*, *$iYear*, *$iwDay* are same as localtime.  *$iMSec*
+means 1/1,000,000 seconds(ms).
+
+LocaltimeExcel
+--------------
+
+   *$iExTime* = LocaltimeExcel($iSec, $iMin, $iHour, $iDay, $iMon, $iYear
+[,$iMSec] [,$flg1904])
+
+   LocaltimeExcel converts time information in Perl localtime format into
+Excel format .  *$iSec*, *$iMin*, *$iHour*, *$iDay*, *$iMon*, *$iYear* are
+same as localtime.
+
+   If *$flg1904* is true, this functions assumes that epoch is 1904.
+*$iExTime* is a time of Excel.
+
+AUTHOR
+------
+
+   Kawai Takanori (Hippo2000) kwitknr@cpan.org
+
+     http://member.nifty.ne.jp/hippo2000/            (Japanese)
+     http://member.nifty.ne.jp/hippo2000/index_e.htm (English)
+
+SEE ALSO
+========
+
+   Spreadsheet::ParseExcel, Spreadsheet::WriteExcel
+
+COPYRIGHT
+=========
+
+   This module is part of the Spreadsheet::ParseExcel distribution.
+
+
+File: pm.info,  Node: Spreadsheet/Workbook,  Next: Spreadsheet/Worksheet,  Prev: Spreadsheet/ParseExcel/Utility,  Up: Module List
+
+A writer class for Excel Workbooks.
+***********************************
+
+NAME
+====
+
+   Workbook - A writer class for Excel Workbooks.
+
+SYNOPSIS
+========
+
+   See the documentation for Spreadsheet::WriteExcel
+
+DESCRIPTION
+===========
+
+   This module is used in conjuction with Spreadsheet::WriteExcel.
+
+AUTHOR
+======
+
+   John McNamara jmcnamara@cpan.org
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000, John McNamara. All Rights Reserved. This module is
+free software. It may be used, redistributed and/or modified under the
+same terms as Perl itself.
+
+
+File: pm.info,  Node: Spreadsheet/Worksheet,  Next: Spreadsheet/WriteExcel,  Prev: Spreadsheet/Workbook,  Up: Module List
+
+A writer class for Excel Worksheets.
+************************************
+
+NAME
+====
+
+   Worksheet - A writer class for Excel Worksheets.
+
+SYNOPSIS
+========
+
+   See the documentation for Spreadsheet::WriteExcel
+
+DESCRIPTION
+===========
+
+   This module is used in conjuction with Spreadsheet::WriteExcel.
+
+AUTHOR
+======
+
+   John McNamara jmcnamara@cpan.org
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000, John McNamara. All Rights Reserved. This module is
+free software. It may be used, redistributed and/or modified under the
+same terms as Perl itself.
+
+
+File: pm.info,  Node: Spreadsheet/WriteExcel,  Next: Spreadsheet/WriteExcel/BIFFwriter,  Prev: Spreadsheet/Worksheet,  Up: Module List
+
+Write to a cross-platform Excel binary file.
+********************************************
+
+NAME
+====
+
+   Spreadsheet::WriteExcel - Write to a cross-platform Excel binary file.
+
+VERSION
+=======
+
+   This document refers to version 0.30 of Spreadsheet::WriteExcel,
+released February 26, 2001.
+
+SYNOPSIS
+========
+
+   To write a string, a formatted string, a number and a formula to the
+first worksheet in an Excel workbook called perl.xls:
+
+     use Spreadsheet::WriteExcel;
+
+     # Create a new Excel workbook
+     my $workbook = Spreadsheet::WriteExcel->new("perl.xls");
+     $worksheet   = $workbook->addworksheet(); # Add a worksheet
+     $format      = $workbook->addformat();    # Add a format
+     
+     # Define the format
+     $format->set_bold();
+     $format->set_color('red');
+     $format->set_align('center');
+     
+     # Row and column are zero indexed
+     $col = 0;
+     $row = 0;
+
+     $worksheet->write($row,  $col, "Hi Excel!");
+     $worksheet->write(1,     $col, "Hi Excel!", $format);
+     $worksheet->write(2,     $col, 1.2345);
+     $worksheet->write(3,     $col, '=SIN(PI()/4)');
+
+DESCRIPTION
+===========
+
+   The Spreadsheet::WriteExcel module can be used create a cross-platform
+Excel binary file. Multiple worksheets can be added to a workbook and
+formatting can be applied to cells. Text, numbers, formulas and hyperlinks
+can be written to the cells.
+
+   The Excel file produced by this module is compatible with Excel 5, 95,
+97 and 2000.
+
+   The module will work on the majority of Windows, UNIX and Macintosh
+platforms. Generated files are also compatible with the Linux/UNIX
+spreadsheet applications OpenOffice, Gnumeric and XESS. The generated
+files are not compatible with MS Access.
+
+WORKBOOK METHODS
+================
+
+   The Spreadsheet::WriteExcel module provides an object oriented
+interface to a new Excel workbook. The following methods are available
+through a new workbook.
+
+   If you are unfamiliar with object oriented interfaces or the way that
+they are implemented in Perl have a look at `perlobj' and `perltoot' in
+the main Perl documentation.
+
+new()
+-----
+
+   A new Excel workbook is created using the new() constructor as follows:
+
+     my $workbook = Spreadsheet::WriteExcel->new("filename.xls");
+
+   Although my is not specifically required it defines the scope of the
+new workbook variable and, in the majority of cases, ensures that the
+workbook is closed properly without explicitly calling the close() method.
+
+   You can redirect the output to STDOUT using the special Perl filehandle
+`"-"'. This can be useful for CGIs which have a Content-type of
+`application/vnd.ms-excel', for example:
+
+     #!/usr/bin/perl -w
+
+     use strict;
+     use Spreadsheet::WriteExcel;
+
+     # Set the filename and send the content type and disposition
+     my $filename ="cgitest.xls";
+
+     print "Content-type: application/vnd.ms-excel\n";
+     print "Content-Disposition: attachment; filename=$filename\n";
+     print "\n";
+
+     my $workbook  = Spreadsheet::WriteExcel->new("-");
+     my $worksheet = $workbook->addworksheet();
+     
+     $workbook->write(0, 0, "Hi Excel!");
+
+close()
+-------
+
+   The close() method can be called to explicitly close an Excel file.
+
+     $workbook->close();
+
+   An explicit close() is required if the file must be closed prior to
+performing some external action on it such as copying or reading its size.
+
+   In addition, close() may be required if the scope of the Workbook,
+Worksheet or Format objects cannot be determined by perl. Situations where
+this can occur are:
+
+   * If my() was not used to declare the scope of a workbook variable
+     created using new().
+
+   * If the `addworksheet()' or addformat() methods are called in
+     subroutines.
+
+   The reason for this is that Spreadsheet::WriteExcel relies on Perl's
+DESTROY subroutine to trigger destructor methods in a specific sequence.
+This will not happen if the scope of the variables cannot be determined.
+
+   In general, if you create a file with a size of 0 bytes you need to
+call close().
+
+addworksheet($sheetname)
+------------------------
+
+   At least one worksheet should be added to a new workbook:
+
+     $worksheet1 = $workbook->addworksheet();          # Sheet1
+     $worksheet2 = $workbook->addworksheet('Foglio2'); # Foglio2
+     $worksheet3 = $workbook->addworksheet('Data');    # Data
+     $worksheet4 = $workbook->addworksheet();          # Sheet4
+
+   If `$sheetname' is not specified the default Excel convention will be
+followed, i.e. Sheet1, Sheet2, etc.
+
+addformat()
+-----------
+
+   The addformat() method can be used to create new Format objects which
+are used to apply formatting to a cell:
+
+     $format1 = $workbook->addformat();
+     $format2 = $workbook->addformat();
+
+   See the `FORMAT METHODS' in this node section for details.
+
+worksheets()
+------------
+
+   The worksheets() method returns a reference to the array of worksheets
+in a workbook. This can be useful if you want to repeat an operation on
+each worksheet in a workbook or if you wish to refer to a worksheet by its
+index:
+
+     foreach $worksheet (@{$workbook->worksheets()}) {
+        $worksheet->write(0, 0, "Hello");
+     }
+     
+     # or:
+     
+     $worksheets = $workbook->worksheets();
+     @$worksheets[0]->write(0, 0, "Hello");
+
+   References are explained in detail in `perlref' and `perlreftut' in the
+main Perl documentation.
+
+set_1904()
+----------
+
+   Excel stores dates as real numbers where the integer part stores the
+number of days since the epoch and the fractional part stores the
+percentage of the day. The epoch can be either 1900 or 1904. Excel for
+Windows uses 1900 and Excel for Macintosh uses 1904. However, Excel on
+either platform will convert automatically between one system and the
+other.
+
+   Spreadsheet::WriteExcel stores dates in the 1900 format by default. If
+you wish to change this you can call the set_1904() workbook method. You
+can query the current value by calling the `get_1904()' workbook method.
+This returns 0 for 1900 and 1 for 1904.
+
+   In general you probably won't need to use set_1904().
+
+WORKSHEET METHODS
+=================
+
+   The following methods are available through a new worksheet. A new
+worksheet is created by calling the `addworksheet()' method from a
+workbook object:
+
+     $worksheet1 = $workbook->addworksheet();
+     $worksheet2 = $workbook->addworksheet();
+
+write($row, $column, $token, $format)
+-------------------------------------
+
+   The write() method is a general alias for one of several methods of
+writing to a cell in Excel. write() calls one of the following methods
+depending on the value of $token:
+
+   `write_number()' if $token is a number based on the following regex:
+`$token =~ /^([+-]?)(?=\d|\.\d)\d*(\.\d*)?([Ee]([+-]?\d+))?$/'.
+
+   `write_blank()' if $token is a blank string: "" or ".
+
+   `write_url()' if $token is a URL based on the following regex: `$token
+=~ m|[fh]tt?p://|'.
+
+   `write_formula()' if the first character of $token is =.
+
+   `write_string()' if none of the previous conditions apply.
+
+   Here are some examples:
+
+     $worksheet->write(0, 0, "Hello"                 );  # write_string()
+     $worksheet->write(1, 0, 'One'                   );  # write_string()
+     $worksheet->write(2, 0,  2                      );  # write_number()
+     $worksheet->write(3, 0,  3.00001                );  # write_number()
+     $worksheet->write(4, 0,  ""                     );  # write_blank()
+     $worksheet->write(5, 0,  ''                     );  # write_blank()
+     $worksheet->write(6, 0,  'http://www.perl.com/' );  # write_url()
+     $worksheet->write(7, 0,  'ftp://ftp.cpan.org/'  );  # write_url()
+     $worksheet->write(8, 0,  '=A3 + 3*A4'           );  # write_formula()
+     $worksheet->write(9, 0,  '=SIN(PI()/4)'         );  # write_formula()
+
+   The `$format' argument is optional. It should be a valid Format object,
+see `FORMAT METHODS' in this node:
+
+     my $format = $workbook->addformat();
+     $format->set_bold();
+     $format->set_color('red');
+     $format->set_align('center');
+
+     $worksheet->write(4, 0, "Hello", $format ); # Formatted string
+
+   It should be noted that `$row' and `$column' are zero indexed cell
+locations for the write methods. Thus, Cell A1 is (0, 0) and Cell AD2000
+is (1999, 29). Cells can be written to in any order but for forward
+compatibility it is probably best to write them in row-column order when
+possible.
+
+   The write methods return:
+
+     0 for success.
+        -1 for insufficient number of arguments.
+        -2 for row or column out of bounds.
+        -3 for string too long.
+
+write_number($row, $column, $number, $format)
+---------------------------------------------
+
+   Write an integer or a float to the cell specified by `$row' and
+`$column':
+
+     $worksheet->write_number(0, 0,  1     );
+     $worksheet->write_number(1, 0,  2.3451);
+
+   The `$format' argument is optional.
+
+write_string($row, $column, $string, $format)
+---------------------------------------------
+
+   Write a string to the cell specified by `$row' and `$column':
+
+     $worksheet->write_string(0, 0, "Your text here" );
+
+   The maximum string size is 255 characters. The `$format' argument is
+optional.
+
+write_formula($row, $column, $formula, $format)
+-----------------------------------------------
+
+   Write a formula or function to the cell specified by `$row' and
+`$column':
+
+     $worksheet->write_formula(0, 0, '=$B$3 + B4'  );
+     $worksheet->write_formula(1, 0, '=SIN(PI()/4)');
+     $worksheet->write_formula(2, 0, '=SUM(B1:B5)');
+     $worksheet->write_formula(3, 0, '=IF(A3>1,"Yes", "No")');
+     $worksheet->write_formula(4, 0, '=AVERAGE(1, 2, 3, 4)');
+     $worksheet->write_formula(5, 0, '=DATEVALUE("1-Jan-2001")');
+
+   For more information about writing Excel formulas see `FORMULAS AND
+FUNCTIONS IN EXCEL' in this node
+
+write_blank($row, $column, $format)
+-----------------------------------
+
+   Write a blank cell specified by `$row' and `$column':
+
+     $worksheet->write_blank(0, 0, $format);
+
+   This method is useful for adding formatting to a cell which doesn't
+contain a string or number value.
+
+write_url($row, $col, $url, $string, $format)
+---------------------------------------------
+
+   Write a hyperlink to a URL in the cell specified by `$row' and
+`$column'. The hyperlink is comprised of two elements: the visible label
+and the invisible link. The visible label is the same as the link unless
+an alternative string is specified. The alternative $string and the
+`$format' are optional.
+
+     $worksheet->write_url(0, 0, 'http://www.perl.com/'                 );
+     $worksheet->write_url(1, 0, 'http://www.perl.com/', 'Perl home'    );
+     $worksheet->write_url(2, 0, 'http://www.perl.com/', undef, $format );
+
+   The label is written using the `write_string()' method. Therefore the
+255 characters string limit applies to the label: the URL can be any
+length. Use undef if you wish to specify a format without specifying an
+alternative string.
+
+   Note: Hyperlinks are not available in Excel 5. They will appear as a
+string only.
+
+activate()
+----------
+
+   The activate() method is used to specify which worksheet is initially
+selected in a multi-sheet workbook:
+
+     $worksheet1 = $workbook->addworksheet('To');
+     $worksheet2 = $workbook->addworksheet('the');
+     $worksheet3 = $workbook->addworksheet('wind');
+
+     $worksheet3->activate();
+
+   This is similar to the Excel VBA activate method. The default value is
+the first worksheet.
+
+set_first_sheet()
+-----------------
+
+   The activate() method determines which worksheet is initially selected.
+However, if there are a large number of worksheets the selected worksheet
+may not appear on the screen. To avoid this you can select which is the
+leftmost visible worksheet using set_first_sheet():
+
+     for (1..20) {
+         $workbook->addworksheet;
+     }
+
+     $worksheet21 = $workbook->addworksheet();
+     $worksheet22 = $workbook->addworksheet();
+
+     $worksheet21->set_first_sheet();
+     $worksheet22->activate();
+
+   This method is not required very often. The default value is the first
+worksheet.
+
+set_selection($first_row, $first_col, $last_row, $last_col);
+------------------------------------------------------------
+
+   This method can be used to specify which cell or cells are selected in
+a worksheet. The most common requirement is to select a single cell, in
+which case `$last_row' and `$last_col' are not required. The active cell
+within a selected range is determined by the order in which `$first' and
+`$last' are specified:
+
+     $worksheet1->set_selection(3, 3);       # Cell D4
+     $worksheet2->set_selection(3, 3, 6, 6); # Cells D4 to G7
+     $worksheet3->set_selection(6, 6, 3, 3); # Cells G7 to D4
+
+   The default is cell (0, 0).
+
+set_row($row, $height, $format);
+--------------------------------
+
+   This method can be used to specify the height of a row. The `$format'
+argument is optional, for additional information, see `FORMAT METHODS' in
+this node.
+
+     $worksheet->set_row(0, 20); # Row 1 height set to 20
+
+   If you wish to set the format without changing the height you can pass
+undef as the height parameter:
+
+     $worksheet->set_row(0, undef, $height);
+
+set_column($first_col, $last_col, $width, $format);
+---------------------------------------------------
+
+   This method can be used to specify the width of a single column or a
+range of columns. If the method is applied to a single column the value of
+`$first_col' and `$last_col' should be the same:
+
+     $worksheet->set_column(0, 0, 20); # Column A width set to 20
+     $worksheet->set_column(1, 3, 30); # Columns B-D width set to 30
+
+   The width corresponds to the column width value that is specified in
+Excel. It is approximately equal to the length of a string in the default
+font of Arial 10. The `$format' argument is optional, for additional
+information, see `FORMAT METHODS' in this node.
+
+   If you wish to set the format without changing the width you can pass
+undef as the width parameter:
+
+     $worksheet->set_column(0, 0, undef, $format);
+
+FORMAT METHODS
+==============
+
+   This section describes the methods that are available through a Format
+object. Format objects are created by calling the workbook addformat()
+method as follows:
+
+     my $heading1 = $workbook->addformat();
+     my $heading2 = $workbook->addformat();
+
+   The format object holds all the formatting properties that can be
+applied to a cell, a row or a column. The following table shows the Excel
+format categories, the formatting properties that can be applied and the
+relevant object method to do so:
+
+     Category        Property            Method Name
+     --------        --------            -----------
+     Font            Font type           set_font()
+                     Font size           set_size()
+                     Font color          set_color()
+                     Bold                set_bold()
+                     Italic              set_italic()
+                     Underline           set_underline()
+                     Strikeout           set_font_strikeout()
+                     Super/Subscript     set_font_script()
+                     Outline             set_font_outline()
+                     Shadow              set_font_shadow()
+     
+     Number          Numeric format      set_num_format()
+     
+     Alignment       Horizontal align    set_align()
+                     Vertical align      set_align()
+                     Rotation            set_rotation()
+                     Text wrap           set_text_wrap()
+                     Justify last        set_text_justlast()
+                     Merge               set_merge()
+     
+     Pattern         Cell pattern        set_pattern()
+                     Background color    set_bg_color()
+                     Foreground color    set_fg_color()
+     
+     Border          Cell border         set_border()
+                     Bottom border       set_bottom()
+                     Top border          set_top()
+                     Left border         set_left()
+                     Right border        set_right()
+                     Border color        set_border_color()
+                     Bottom color        set_bottom_color()
+                     Top color           set_top_color()
+                     Left color          set_left_color()
+                     Right color         set_right_color()
+
+   The default format is Arial 10 with all other properties off. In
+general a method call without an argument will turn a property on, for
+example:
+
+     my $format1 = $workbook->addformat();
+     $format1->set_bold();  # Turns bold on
+     $format1->set_bold(1); # Also turns bold on
+     $format1->set_bold(0); # Turns bold off
+
+   More than one property can be applied to a format:
+
+     my $format2 = $workbook->addformat();
+     $format2->set_bold();
+     $format2->set_italic();
+     $format2->set_color('red');
+
+   Once a Format object has been constructed it can be passed as an
+argument to the worksheet write methods as follows:
+
+     $worksheet->write(0, 0, "One", $format);
+     $worksheet->write_string(1, 0, "Two", $format);
+     $worksheet->write_number(2, 0, 3, $format);
+     $worksheet->write_blank(3, 0, $format);
+
+   Formats can also be passed to the worksheet `set_row()' and
+`set_column()' methods to define the default property for a row or column.
+
+     $worksheet->set_row(0, 15, $format);
+     $worksheet->set_column(0, 0, 15, $format);
+
+   However, the `set_row()' and `set_column()' methods will not set the
+format for individual cells written by WriteExcel, they only have an
+effect on cells written after the workbook is opened in Excel.
+
+   It is important to understand that a Format is applied to a cell not in
+its current state but in its final state. Consider the following example:
+
+     my $format = $workbook->addformat();
+     $format->set_bold();
+     $format->set_color('red');
+     $worksheet->write(0, 0, "Cell A1", $format);
+     $format->set_color('green');
+     $worksheet->write(0, 1, "Cell B1", $format);
+
+   Cell A1 is assigned the Format `$format' which is initially set to the
+colour red. However, the colour is subsequently set to green. When Excel
+displays Cell A1 it will display the final state of the Format which in
+this case will be the colour green.
+
+   The Format object methods are described in more detail in the following
+sections. In addition, there is a Perl program called `formats.pl' in the
+examples directory of the WriteExcel distribution. This program creates an
+Excel workbook called `formats.xls' which contains examples of almost all
+the format types.
+
+copy($format)
+-------------
+
+   This is the only method of a Format object that doesn't apply directly
+to a property. It is used to copy all of the properties from one Format
+object to another:
+
+     my $lorry1 = $workbook->addformat();
+     $lorry1->set_bold();
+     $lorry1->set_italic();
+     $lorry1->set_color('red');    # lorry1 is bold, italic and red
+
+     my $lorry2 = $workbook->addformat();
+     $lorry2->copy($lorry1);
+     $lorry2->set_color('yellow'); # lorry2 is bold, italic and yellow
+
+   This can be useful when you are setting up several complex but similar
+formats. It is also useful if you want to use a format in more than one
+workbook:
+
+     # Create the workbooks
+     my $workbook1   = Spreadsheet::WriteExcel->new("workbook1.xls");
+     my $workbook2   = Spreadsheet::WriteExcel->new("workbook2.xls");
+     my $worksheet1  = $workbook->addworksheet();
+     my $worksheet2  = $workbook->addworksheet();
+     my $format1     = $workbook->addformat();
+     my $format2     = $workbook->addformat();
+     
+     # Create a global format object that isn't tied to a workbook
+     my $global      = Spreadsheet::WriteExcel::Format->new();
+     $global->set_color('blue');
+     
+     # Copy the global format properties to the worksheet formats
+     $format1->copy($global);
+     $format2->copy($global);
+
+   Note: this is not a copy constructor, both objects must exist prior to
+copying.
+
+set_font($fontname)
+-------------------
+
+     Default state:      Font is Arial
+     Default action:     None
+     Valid args:         Any valid font name
+
+   Specify the font used:
+
+     $format->set_font('Times New Roman');
+
+   Excel can only display fonts that are installed on the system that it
+is running on. Therefore it is best to use the fonts that come as standard
+such as 'Arial', 'Times New Roman' and 'Courier New'. See also the Fonts
+worksheet created by formats.pl
+
+set_size()
+----------
+
+     Default state:      Font size is 10
+     Default action:     Set font size to 1
+     Valid args:         Integer values from 1 to as big as your screen.
+
+   Set the font size. Excel adjusts the height of a row to accommodate the
+largest font size in the row. You can also explicitly specify the height
+of a row using the set_row() worksheet method.
+
+     my $format = $workbook->addformat();
+     $format->set_size(30);
+
+set_color()
+-----------
+
+     Default state:      Excels default color, usually black
+     Default action:     Set the default color
+     Valid args:         Integers form 8..63 or the following strings:
+                         'aqua'
+                         'black'
+                         'blue'
+                         'fuchsia'
+                         'gray'
+                         'green'
+                         'lime'
+                         'navy'
+                         'orange'
+                         'purple'
+                         'red'
+                         'silver'
+                         'white'
+                         'yellow'
+
+   Set the font colour. The set_color() method is used as follows:
+
+     my $format = $workbook->addformat();
+     $format->set_color('red');
+     $worksheet->write(0, 0, "wheelbarrow", $format);
+
+   Note: The set_color() method is used to set the colour of the font in a
+cell. To set the colour of a cell use the set_fg_color() and set_pattern()
+methods.
+
+   For additional examples see the 'Named colors' and 'Standard colors'
+worksheets created by formats.pl
+
+set_bold()
+----------
+
+     Default state:      bold is off
+     Default action:     Turn bold on
+     Valid args:         0, 1 [1]
+
+   Set the bold property of the font:
+
+     $format->set_bold();  # Turn bold on
+
+   [1] Actually, values in the range 100..1000 are also valid. 400 is
+normal, 700 is bold and 1000 is very bold indeed. It is probably best to
+set the value to 1 and use normal bold.
+
+set_italic()
+------------
+
+     Default state:      Italic is off
+     Default action:     Turn italic on
+     Valid args:         0, 1
+
+   Set the italic property of the font.
+
+set_underline()
+---------------
+
+     Default state:      Underline is off
+     Default action:     Turn on single underline
+     Valid args:         0  = No underline
+                         1  = Single underline
+                         2  = Double underline
+                         33 = Single accounting underline
+                         34 = Double accounting underline
+
+   Set the underline property of the font.
+
+set_strikeout()
+---------------
+
+     Default state:      Strikeout is off
+     Default action:     Turn strikeout on
+     Valid args:         0, 1
+
+   Set the strikeout property of the font.
+
+set_script()
+------------
+
+     Default state:      Super/Subscript is off
+     Default action:     Turn Superscript on
+     Valid args:         0  = Normal
+                         1  = Superscript
+                         2  = Subscript
+
+   Set the superscript/subscript property of the font. This format is
+currently not very useful.
+
+set_outline()
+-------------
+
+     Default state:      Outline is off
+     Default action:     Turn outline on
+     Valid args:         0, 1
+
+   Macintosh only.
+
+set_shadow()
+------------
+
+     Default state:      Shadow is off
+     Default action:     Turn shadow on
+     Valid args:         0, 1
+
+   Macintosh only.
+
+set_num_format()
+----------------
+
+     Default state:      General format
+     Default action:     Format index 1
+     Valid args:         See the following table
+
+   This method is used to define the numerical format of a number in
+Excel. It controls whether a number is displayed as an integer, a floating
+point number, a date, a currency value or some other user defined format.
+
+   The numerical format of a cell can be specified by using a format
+string or an index to one of Excel's built-in formats:
+
+     my $format1 = $workbook->addformat();
+     my $format2 = $workbook->addformat();
+     $format1->set_num_format('d mmm yyyy'); # Format string
+     $format2->set_num_format(0x0f);         # Format index
+     
+     $worksheet->write(0, 0, 36892.521, $format1);      # 1 Jan 2001
+     $worksheet->write(0, 0, 36892.521, $format2);      # 1-Jan-01
+
+   Using format strings you can define very sophisticated formatting of
+numbers.
+
+     $format01->set_num_format('0.000');
+     $worksheet->write(0,  0, 3.1415926, $format01);    # 3.142
+
+     $format02->set_num_format('#,##0');
+     $worksheet->write(1,  0, 1234.56,   $format02);    # 1,235
+
+     $format03->set_num_format('#,##0.00');
+     $worksheet->write(2,  0, 1234.56,   $format03);    # 1,234.56
+
+     $format04->set_num_format('$0.00');
+     $worksheet->write(3,  0, 49.99,     $format04);    # $49.99
+
+     $format05->set_num_format('£0.00');
+     $worksheet->write(4,  0, 49.99,     $format05);    # £49.99
+
+     $format06->set_num_format('¥0.00');
+     $worksheet->write(5,  0, 49.99,     $format06);    # ¥49.99
+
+     $format07->set_num_format('mm/dd/yy');
+     $worksheet->write(6,  0, 36892.521, $format07);    # 01/01/01
+
+     $format08->set_num_format('mmm d yyyy');
+     $worksheet->write(7,  0, 36892.521, $format08);    # Jan 1 2001
+
+     $format09->set_num_format('d mmmm yyyy');
+     $worksheet->write(8,  0, 36892.521, $format09);    # 1 January 2001
+
+     $format10->set_num_format('dd/mm/yyyy hh:mm AM/PM');
+     $worksheet->write(9,  0, 36892.521, $format10);    # 01/01/2001 12:30 AM
+
+     $format11->set_num_format('0 "dollar and" .00 "cents"');
+     $worksheet->write(10, 0, 1.87,      $format11);    # 1 dollar and .87 cents
+
+     # Conditional formatting
+     $format12->set_num_format('[Green]General;[Red]-General;General');
+     $worksheet->write(11, 0, 123,       $format12);    # > 0 Green
+     $worksheet->write(12, 0, -45,       $format12);    # < 0 Red
+     $worksheet->write(13, 0, 0,         $format12);    # = 0 Default colour
+
+   The colour format should have one of the following values:
+
+     [Black] [Blue] [Cyan] [Green] [Magenta] [Red] [White] [Yellow]
+
+   Alternatively you can specify the colour based on a colour index as
+follows: `[Color n]', where n is a standard Excel colour index - 7. See
+the 'Standard colors' worksheet created by formats.pl.
+
+   For more information refer to the documentation on formatting in the
+doc directory of the Spreadsheet::WriteExcel distro, the Excel on-line
+help or to the tutorial at:
+http://support.microsoft.com/support/Excel/Content/Formats/default.asp and
+http://support.microsoft.com/support/Excel/Content/Formats/codes.asp
+
+   You should ensure that the format string is valid in Excel prior to
+using it in WriteExcel.
+
+   One of the most common uses of the set_num_format() is to format a
+number as a date. Excel stores dates as a real number where the integer
+part of the number stores the number of days since the epoch and the
+fractional part stores the percentage of the day. The epoch can be either
+1900 or 1904. Excel for Windows uses 1900 and Excel for Macintosh uses
+1904. However, Excel on either platform will convert automatically between
+one system and the other. For an example of how to convert between
+UNIX/Perl time and Excel time have a look at the `ms_time.pl' program in
+the examples directory of the WriteExcel distribution.
+
+   Excel's built-in formats are shown in the following table:
+
+     Index   Index   Format String
+     0       0x00    General
+     1       0x01    0
+     2       0x02    0.00
+     3       0x03    #,##0
+     4       0x04    #,##0.00
+     5       0x05    ($#,##0_);($#,##0)
+     6       0x06    ($#,##0_);[Red]($#,##0)
+     7       0x07    ($#,##0.00_);($#,##0.00)
+     8       0x08    ($#,##0.00_);[Red]($#,##0.00)
+     9       0x09    0%
+     10      0x0a    0.00%
+     11      0x0b    0.00E+00
+     12      0x0c    # ?/?
+     13      0x0d    # ??/??
+     14      0x0e    m/d/yy
+     15      0x0f    d-mmm-yy
+     16      0x10    d-mmm
+     17      0x11    mmm-yy
+     18      0x12    h:mm AM/PM
+     19      0x13    h:mm:ss AM/PM
+     20      0x14    h:mm
+     21      0x15    h:mm:ss
+     22      0x16    m/d/yy h:mm
+     ..      ....    ...........
+     37      0x25    (#,##0_);(#,##0)
+     38      0x26    (#,##0_);[Red](#,##0)
+     39      0x27    (#,##0.00_);(#,##0.00)
+     40      0x28    (#,##0.00_);[Red](#,##0.00)
+     41      0x29    _(* #,##0_);_(* (#,##0);_(* "-"_);_(@_)
+     42      0x2a    _($* #,##0_);_($* (#,##0);_($* "-"_);_(@_)
+     43      0x2b    _(* #,##0.00_);_(* (#,##0.00);_(* "-"??_);_(@_)
+     44      0x2c    _($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)
+     45      0x2d    mm:ss
+     46      0x2e    [h]:mm:ss
+     47      0x2f    mm:ss.0
+     48      0x30    ##0.0E+0
+     49      0x31    @
+
+   For examples of these formatting codes see the 'Numerical formats'
+worksheet created by formats.pl.
+
+   Note 1. Numeric formats 23 to 36 are not documented by Microsoft and
+may differ in international versions.
+
+   Note 2. In Excel 5 the dollar sign appears as a dollar sign. In Excel
+97-2000 it appears as the defined local currency symbol.
+
+   Note 3. The red negative numeric formats display slightly differently
+in Excel 5 and Excel 97-2000.
+
+set_align()
+-----------
+
+     Default state:      Alignment is off
+     Default action:     Left alignment
+     Valid args:         'left'              Horizontal
+                         'center'
+                         'right'
+                         'fill'
+                         'justify'
+                         'merge'
+     
+                         'top'               Vertical
+                         'vcenter'
+                         'bottom'
+                         'vjustify'
+
+   This method is used to set the horizontal and vertical text alignment
+within a cell. Vertical and horizontal alignments can be combined. The
+method is used as follows:
+
+     my $format = $workbook->addformat();
+     $format->set_align('center');
+     $format->set_align('vcenter');
+     $worksheet->set_row(0, 30);
+     $worksheet->write(0, 0, "X", $format);
+
+   Text can be aligned across two or more adjacent cells using the merge
+property. See also, the set_merge() method.
+
+   The `vjustify' (vertical justify) option can be used to provide
+automatic text wrapping in a cell. The height of the cell will be adjusted
+to accommodate the wrapped text. To specify where the text wraps use the
+set_text_wrap() method.
+
+   For further examples see the 'Alignment' worksheet created by
+formats.pl.
+
+set_merge()
+-----------
+
+     Default state:      Cell merging is off
+     Default action:     Turn cell merging on
+     Valid args:         1
+
+   Text can be aligned across two or more adjacent cells using the
+set_merge() method. This is an alias for the unintuitive
+`set_align('merge')' method call.
+
+   Only one cell should contain the text, the other cells should be blank:
+
+     my $format = $workbook->addformat();
+     $format->set_merge();
+
+     $worksheet->write(1, 1, 'Merged cells', $format);
+     $worksheet->write_blank(1, 2, $format);
+
+   See also the `merge1.pl' and `merge2.pl' programs in the examples
+directory.
+
+set_text_wrap()
+---------------
+
+     Default state:      Text wrap is off
+     Default action:     Turn text wrap on
+     Valid args:         0, 1
+
+   Here is an example using the text wrap property, the escape character
+\n is used to indicate the end of line:
+
+     my $format = $workbook->addformat();
+     $format->set_text_wrap();
+     $worksheet->write(0, 0, "It's\na bum\nwrap", $format);
+
+   Excel will adjust the height of the row to accommodate the wrapped
+text. A similar effect can be obtained without newlines using the
+`set_align('vjustify')' method. See the `textwrap.pl' program in the
+examples directory.
+
+set_rotation()
+--------------
+
+     Default state:      Text rotation is off
+     Default action:     Rotation style 1
+     Valid args:         0 No rotation
+                         1 Letters run from top to bottom
+                         2 90° anticlockwise
+                         3 90° clockwise
+
+   Set the rotation of the text in a cell. See the 'Alignment' worksheet
+created by formats.pl.
+
+set_text_justlast()
+-------------------
+
+     Default state:      Justify last is off
+     Default action:     Turn justify last on
+     Valid args:         0, 1
+
+   Only applies to Far Eastern versions of Excel.
+
+set_pattern()
+-------------
+
+     Default state:      Pattern is off
+     Default action:     Solid fill is on
+     Valid args:         0 .. 31
+
+   Examples of the available patterns are shown in the 'Patterns'
+worksheet created by formats.pl. However, it is unlikely that you will
+ever need anything other than Pattern 1 which is a solid fill of the
+foreground color.
+
+set_fg_color()
+--------------
+
+     Also applies to:    set_bg_color
+     
+     Default state:      Color is off
+     Default action:     Undefined
+     Valid args:         See set_color()
+
+   Note, the foreground and background colours will only have an effect if
+the cell pattern has been set. In the most common case you can specify the
+solid fill pattern and the foreground colour as follows:
+
+     my $format = $workbook->addformat();
+     $format->set_pattern();         # Set pattern to 1, i.e. solid fill
+     $format->set_fg_color('green'); # Note foreground and not background
+     $worksheet->write(0, 0, "Ray", $format);
+
+set_border()
+------------
+
+     Also applies to:    set_bottom()
+                         set_top()
+                         set_left()
+                         set_right()
+     
+     Default state:      Border is off
+     Default action:     Set border type 1
+     Valid args:         0 No border
+                         1 Thin single border
+                         2 Medium single border
+                         3 Dashed border
+                         4 Dotted border
+                         5 Thick single border
+                         6 Double line border
+                         7 Hair border
+
+   A cell border is comprised of a border on the bottom, top, left and
+right. These can be set to the same value using set_border() or
+individually using the relevant method calls shown above. Examples of the
+available border styles are shown in the 'Borders' worksheet created by
+formats.pl.
+
+set_border_color()
+------------------
+
+     Also applies to:    set_bottom_color()
+                         set_top_color()
+                         set_left_color()
+                         set_right_color()
+     
+     Default state:      Color is off
+     Default action:     Undefined
+     Valid args:         See set_color()
+
+   Set the colour of the cell borders.
+
+FORMULAS AND FUNCTIONS IN EXCEL
+===============================
+
+   The first thing to note is that there are still some outstanding issues
+with the implementation of formulas and functions:
+
+     * Writing a formula is much slower than writing the equivalent string.
+     * Unary minus isn't supported.
+     * You cannot reference cells outside of the current worksheet.
+     * You cannot use arrays constants, i.e. {1;2;3}, in functions.
+     * You cannot use embedded double quotes in strings.
+     * Whitespace is not preserved around operators.
+
+   However, these constraints will be removed in future versions. They are
+here because of a trade-off between features and time.
+
+   The following is a brief introduction to formulas and functions in
+Excel and Spreadsheet::WriteExcel.
+
+   A formula is a string that begins with an equal sign:
+
+     '=A1+B1'
+     '=AVERAGE(1, 2, 3)'
+
+   The formula can contain numbers, strings, boolean values, cell
+references, cell ranges and functions. Formulas should be written as they
+appear in Excel, that is cells and functions must be in uppercase.
+
+   Cells in Excel are referenced using the A1 notation system where the
+column is designated by a letter and the row by a number. Columns range
+from A to IV i.e. 0 to 255, rows range from 1 to 16384. This system is
+different from the zero indexed row and column syntax used by the
+Spreadsheet::WriteExcel write() methods where, for example, the cell `C7'
+would be referred to as `(6,2)'. In the examples directory of the distro
+there is program called `A1convert.pl' which contains functions to help
+you convert between the two systems.
+
+   The Excel `$' notation in cell references is also supported. This
+allows you to specify whether a row or column is relative or absolute.
+This only has an effect if the cell is copied. The following examples show
+relative and absolute values.
+
+     '=A1'   # Column and row are relative
+     '=$A1'  # Column is absolute and row is relative
+     '=A$1'  # Column is relative and row is absolute
+     '=$A$1' # Column and row are absolute
+
+   The following table lists the operators that are available in Excel
+functions. The majority of the operators are the same as Perl's.
+Differences are indicated.
+
+     Arithmetic operators:
+     =====================
+     Operator    Meaning                     Example
+     
+        +        Addition                    1+2
+        -        Subtraction                 2-1
+        *        Multiplication              2*3
+        /        Division                    1/4
+        ^        Exponentiation              2^3     # Equivalent to **
+        -        Unary minus                 -(1+2)  # Not yet supported
+        %        Percent (Not modulus)       13%     # Not supported, Note [1]
+     
+     
+     Comparison operators:
+     =====================
+     Operator    Meaning                     Example
+         =       Equal to                    A1 =  B1    # Equivalent to ==
+         <>      Not equal to                A1 <> B1    # Equivalent to !=
+         >       Greater than                A1 >  B1
+         <       Less than                   A1 <  B1
+         >=      Greater than or equal to    A1 > =B1
+         <=      Less than or equal to       A1 <= B1
+     
+     
+     String operator:
+     ================
+     Operator    Meaning                     Example
+     
+         &       Concatenation               "Hello " & "World!"  # Note [2]
+     
+     
+     Reference operators:
+     ====================
+     Operator    Meaning                     Example
+         :       Range operator              A1:A4               # Note [3]
+         ,       Union operator              SUM(1, 2+2, B3)     # Note [4]
+     
+     
+     Note [1]: You can get a percentage with formatting and modulus with MOD().
+     Note [2]: Equivalent to ("Hello " . "World!") in Perl.
+     Note [3]: This range is equivalent to cells A1, A2, A3 and A4.
+     Note [4]: The comma behaves like the list separator in Perl.
+
+   The range and comma operators can have different symbols in non-English
+versions of Excel. These will be supported in a later version of
+Spreadsheet::WriteExcel.
+
+   The following table lists all of the core functions supported by Excel
+5 and Spreadsheet::WriteExcel. Any additional functions that are available
+through the "Analysis ToolPak" or other add-ins are not supported.
+
+     ABS           DB            INDIRECT      NORMINV       SLN
+     ACOS          DCOUNT        INFO          NORMSDIST     SLOPE
+     ACOSH         DCOUNTA       INT           NORMSINV      SMALL
+     ADDRESS       DDB           INTERCEPT     NOT           SQRT
+     AND           DEGREES       IPMT          NOW           STANDARDIZE
+     AREAS         DEVSQ         IRR           NPER          STDEV
+     ASIN          DGET          ISBLANK       NPV           STDEVP
+     ASINH         DMAX          ISERR         ODD           STEYX
+     ATAN          DMIN          ISERROR       OFFSET        SUBSTITUTE
+     ATAN2         DOLLAR        ISLOGICAL     OR            SUBTOTAL
+     ATANH         DPRODUCT      ISNA          PEARSON       SUM
+     AVEDEV        DSTDEV        ISNONTEXT     PERCENTILE    SUMIF
+     AVERAGE       DSTDEVP       ISNUMBER      PERCENTRANK   SUMPRODUCT
+     BETADIST      DSUM          ISREF         PERMUT        SUMSQ
+     BETAINV       DVAR          ISTEXT        PI            SUMX2MY2
+     BINOMDIST     DVARP         KURT          PMT           SUMX2PY2
+     CALL          ERROR.TYPE    LARGE         POISSON       SUMXMY2
+     CEILING       EVEN          LEFT          POWER         SYD
+     CELL          EXACT         LEN           PPMT          T
+     CHAR          EXP           LINEST        PROB          TAN
+     CHIDIST       EXPONDIST     LN            PRODUCT       TANH
+     CHIINV        FACT          LOG           PROPER        TDIST
+     CHITEST       FALSE         LOG10         PV            TEXT
+     CHOOSE        FDIST         LOGEST        QUARTILE      TIME
+     CLEAN         FIND          LOGINV        RADIANS       TIMEVALUE
+     CODE          FINV          LOGNORMDIST   RAND          TINV
+     COLUMN        FISHER        LOOKUP        RANK          TODAY
+     COLUMNS       FISHERINV     LOWER         RATE          TRANSPOSE
+     COMBIN        FIXED         MATCH         REGISTER.ID   TREND
+     CONCATENATE   FLOOR         MAX           REPLACE       TRIM
+     CONFIDENCE    FORECAST      MDETERM       REPT          TRIMMEAN
+     CORREL        FREQUENCY     MEDIAN        RIGHT         TRUE
+     COS           FTEST         MID           ROMAN         TRUNC
+     COSH          FV            MIN           ROUND         TTEST
+     COUNT         GAMMADIST     MINUTE        ROUNDDOWN     TYPE
+     COUNTA        GAMMAINV      MINVERSE      ROUNDUP       UPPER
+     COUNTBLANK    GAMMALN       MIRR          ROW           VALUE
+     COUNTIF       GEOMEAN       MMULT         ROWS          VAR
+     COVAR         GROWTH        MOD           RSQ           VARP
+     CRITBINOM     HARMEAN       MODE          SEARCH        VDB
+     DATE          HLOOKUP       MONTH         SECOND        VLOOKUP
+     DATEVALUE     HOUR          N             SIGN          WEEKDAY
+     DAVERAGE      HYPGEOMDIST   NA            SIN           WEIBULL
+     DAY           IF            NEGBINOMDIST  SINH          YEAR
+     DAYS360       INDEX         NORMDIST      SKEW          ZTEST
+
+   Function names in other European languages will be supported in a later
+version of Spreadsheet::WriteExcel. For a general introduction to Excel's
+formulas and an explanation of the functions have a look at the Excel help
+files or the following links:
+http://msdn.microsoft.com/library/default.asp?URL=/library/officedev/office97/s88f2.htm
+and
+http://msdn.microsoft.com/library/default.asp?URL=/library/officedev/office97/s992f.htm
+
+   If your formula doesn't work in Spreadsheet::WriteExcel try the
+following:
+
+     1. Verify that the formula works in Excel (or Gnumeric or OpenOffice).
+     2. Ensure that it isn't on the TODO list at the start of this section.
+     3. Ensure that cell references and cell names are in uppercase.
+     4. Ensure that you are using the U.S. style range and union operators.
+     5. Ensure the function is in the above table.
+
+   If you go through steps 1-5 and you still have a problem, mail me.
+
+EXAMPLES
+========
+
+   There are additional examples in the examples directory of the
+Spreadsheet::WriteExcel distro.
+
+Example 1
+---------
+
+   The following example shows some of the basic features of
+Spreadsheet::WriteExcel.
+
+     #!/usr/bin/perl -w
+     
+     use strict;
+     use Spreadsheet::WriteExcel;
+
+     # Create a new workbook called simple.xls and add a worksheet
+     my $workbook  = Spreadsheet::WriteExcel->new("simple.xls");
+     my $worksheet = $workbook->addworksheet();
+
+     # The general syntax is write($row, $column, $token). Note that row and
+     # column are zero indexed
+
+     # Write some text
+     $worksheet->write(0, 0,  "Hi Excel!");
+
+     # Write some numbers
+     $worksheet->write(2, 0,  3);          # Writes 3
+     $worksheet->write(3, 0,  3.00000);    # Writes 3
+     $worksheet->write(4, 0,  3.00001);    # Writes 3.00001
+     $worksheet->write(5, 0,  3.14159);    # TeX revision no.?
+
+     # Write some formulas
+     $worksheet->write(7, 0,  '=A3 + A6');
+     $worksheet->write(8, 0,  '=IF(A5>3,"Yes", "No")');
+
+     # Write a hyperlink
+     $worksheet->write(10, 0, 'http://www.perl.com/');
+
+Example 2
+---------
+
+   The following is a general example which demonstrates some features of
+working with multiple worksheets.
+
+     #!/usr/bin/perl -w
+     
+     use strict;
+     use Spreadsheet::WriteExcel;
+     
+     # Create a new Excel workbook
+     my $workbook = Spreadsheet::WriteExcel->new("regions.xls");
+     
+     # Add some worksheets
+     my $north = $workbook->addworksheet("North");
+     my $south = $workbook->addworksheet("South");
+     my $east  = $workbook->addworksheet("East");
+     my $west  = $workbook->addworksheet("West");
+     
+     # Add a Format
+     my $format = $workbook->addformat();
+     $format->set_bold();
+     $format->set_color('blue');
+     
+     # Add a caption to each worksheet
+     foreach my $worksheet (@{$workbook->worksheets()}) {
+         $worksheet->write(0, 0, "Sales", $format);
+     }
+     
+     # Write some data
+     $north->write(0, 1, 200000);
+     $south->write(0, 1, 100000);
+     $east->write (0, 1, 150000);
+     $west->write (0, 1, 100000);
+     
+     # Set the active worksheet
+     $south->activate();
+     
+     # Set the width of the first column
+     $south->set_column(0, 0, 20);
+     
+     # Set the active cell
+     $south->set_selection(0, 1);
+
+Example 3
+---------
+
+   This example shows how to use a conditional numerical format with
+colours to indicate if a share price has gone up or down.
+
+     use strict;
+     use Spreadsheet::WriteExcel;
+
+     # Create a new workbook and add a worksheet
+     my $workbook  = Spreadsheet::WriteExcel->new("stocks.xls");
+     my $worksheet = $workbook->addworksheet();
+
+     # Set the column width for columns 1, 2, 3 and 4
+     $worksheet->set_column(0, 3, 15);
+
+     # Create a format for the column headings
+     my $header = $workbook->addformat();
+     $header->set_bold();
+     $header->set_size(12);
+     $header->set_color('blue');
+
+     # Create a format for the stock price
+     my $f_price = $workbook->addformat();
+     $f_price->set_align('left');
+     $f_price->set_num_format('$0.00');
+
+     # Create a format for the stock volume
+     my $f_volume = $workbook->addformat();
+     $f_volume->set_align('left');
+     $f_volume->set_num_format('#,##0');
+
+     # Create a format for the price change. This is an example of a conditional
+     # format. The number is formatted as a percentage. If it is positive it is
+     # formatted in green, if it is negative it is formatted in red and if it is
+     # zero it is formatted as the default font colour (in this case black).
+     # Note: the [Green] format produces an unappealing lime green. Try
+     # [Color 10] instead for a dark green.
+     #
+     my $f_change = $workbook->addformat();
+     $f_change->set_align('left');
+     $f_change->set_num_format('[Green]0.0%;[Red]-0.0%;0.0%');
+
+     # Write out the data
+     $worksheet->write(0, 0, 'Company',$header);
+     $worksheet->write(0, 1, 'Price',  $header);
+     $worksheet->write(0, 2, 'Volume', $header);
+     $worksheet->write(0, 3, 'Change', $header);
+
+     $worksheet->write(1, 0, 'Damage Inc.'       );
+     $worksheet->write(1, 1, 30.25,    $f_price ); # $30.25
+     $worksheet->write(1, 2, 1234567,  $f_volume); # 1,234,567
+     $worksheet->write(1, 3, 0.085,    $f_change); # 8.5% in green
+
+     $worksheet->write(2, 0, 'Dump Corp.'        );
+     $worksheet->write(2, 1, 1.56,     $f_price ); # $1.56
+     $worksheet->write(2, 2, 7564,     $f_volume); # 7,564
+     $worksheet->write(2, 3, -0.015,   $f_change); # -1.5% in red
+
+     $worksheet->write(3, 0, 'Rev Ltd.'          );
+     $worksheet->write(3, 1, 0.13,     $f_price ); # $0.13
+     $worksheet->write(3, 2, 321,      $f_volume); # 321
+     $worksheet->write(3, 3, 0,        $f_change); # 0 in the font color (black)
+
+Example 4
+---------
+
+   The following is a simple example of using functions.
+
+     #!/usr/bin/perl -w
+     
+     use strict;
+     use Spreadsheet::WriteExcel;
+
+     # Create a new workbook and add a worksheet
+     my $workbook  = Spreadsheet::WriteExcel->new("stats.xls");
+     my $worksheet = $workbook->addworksheet('Test data');
+
+     # Set the column width for columns 1
+     $worksheet->set_column(0, 0, 20);
+
+     # Create a format for the headings
+     my $format = $workbook->addformat();
+     $format->set_bold();
+
+     # Write the sample data
+     $worksheet->write(0, 0, 'Sample', $format);
+     $worksheet->write(0, 1, 1);
+     $worksheet->write(0, 2, 2);
+     $worksheet->write(0, 3, 3);
+     $worksheet->write(0, 4, 4);
+     $worksheet->write(0, 5, 5);
+     $worksheet->write(0, 6, 6);
+     $worksheet->write(0, 7, 7);
+     $worksheet->write(0, 8, 8);
+
+     $worksheet->write(1, 0, 'Length', $format);
+     $worksheet->write(1, 1, 25.4);
+     $worksheet->write(1, 2, 25.4);
+     $worksheet->write(1, 3, 24.8);
+     $worksheet->write(1, 4, 25.0);
+     $worksheet->write(1, 5, 25.3);
+     $worksheet->write(1, 6, 24.9);
+     $worksheet->write(1, 7, 25.2);
+     $worksheet->write(1, 8, 24.8);
+
+     # Write some statistical functions
+     $worksheet->write(4,  0, 'Count', $format);
+     $worksheet->write(4,  1, '=COUNT(B1:I1)');
+
+     $worksheet->write(5,  0, 'Sum', $format);
+     $worksheet->write(5,  1, '=SUM(B2:I2)');
+
+     $worksheet->write(6,  0, 'Average', $format);
+     $worksheet->write(6,  1, '=AVERAGE(B2:I2)');
+
+     $worksheet->write(7,  0, 'Min', $format);
+     $worksheet->write(7,  1, '=MIN(B2:I2)');
+
+     $worksheet->write(8,  0, 'Max', $format);
+     $worksheet->write(8,  1, '=MAX(B2:I2)');
+
+     $worksheet->write(9,  0, 'Standard Deviation', $format);
+     $worksheet->write(9,  1, '=STDEV(B2:I2)');
+
+     $worksheet->write(10, 0, 'Kurtosis', $format);
+     $worksheet->write(10, 1, '=KURT(B2:I2)');
+
+Example 5
+---------
+
+   The following example converts a tab separated file called `tab.txt'
+into an Excel file called `tab.xls'.
+
+     #!/usr/bin/perl -w
+
+     use strict;
+     use Spreadsheet::WriteExcel;
+     
+     open (TABFILE, "tab.txt") or die "tab.txt: $!";
+     
+     my $workbook  = Spreadsheet::WriteExcel->new("tab.xls");
+     my $worksheet = $workbook->addworksheet();
+     
+     # Row and column are zero indexed
+     my $row = 0;
+     
+     while (<TABFILE>) {
+         chomp;
+         # Split on single tab
+         my @Fld = split('\t', $_);
+     
+         my $col = 0;
+         foreach my $token (@Fld) {
+             $worksheet->write($row, $col, $token);
+             $col++;
+         }
+         $row++;
+     }
+
+LIMITATIONS
+===========
+
+   The following limits are imposed by Excel or the version of the BIFF
+file that has been implemented:
+
+     Description                          Limit   Source
+     -----------------------------------  ------  -------
+     Maximum number of chars in a string  255     Excel 5
+     Maximum number of columns            256     Excel 5, 97
+     Maximum number of rows in Excel 5    16384   Excel 5
+     Maximum number of rows in Excel 97   65536   Excel 97
+
+   Note: the maximum row reference in a formula is the Excel 5 row limit
+of 16384.
+
+   The minimum file size is 6K due to the OLE overhead. The maximum file
+size is approximately 7MB (7087104 bytes) of BIFF data. This can be
+extended by using Takanori Kawai's OLE::Storage_Lite module
+http://search.cpan.org/search?dist=OLE-Storage_Lite see the `big.pl'
+example in the examples directory of the distro.
+
+REQUIREMENTS
+============
+
+   This module requires Perl 5.005 (or later) and Parse::RecDescent:
+http://search.cpan.org/search?dist=Parse-RecDescent
+
+PORTABILITY
+===========
+
+   Spreadsheet::WriteExcel.pm will work on the majority of Windows, UNIX
+and Macintosh platforms. Specifically, the module will work on any system
+where perl packs floats in the 64 bit IEEE format. The float must also be
+in little-endian format but WriteExcel.pm will reverse it as necessary.
+Thus:
+
+     print join(" ", map { sprintf "%#02x", $_ } unpack("C*", pack "d", 1.2345)), "\n";
+
+   should give (or in reverse order):
+
+     0x8d 0x97 0x6e 0x12 0x83 0xc0 0xf3 0x3f
+
+   In general, if you don't know whether your system supports a 64 bit
+IEEE float or not, it probably does. If your system doesn't, WriteExcel
+will `croak()' with the message given in the `DIAGNOSTICS' in this node
+section. You can check which platforms the module has been tested on at
+the CPAN testers site:
+http://testers.cpan.org/search?request=dist&dist=Spreadsheet-WriteExcel
+
+DIAGNOSTICS
+===========
+
+Filename required in WriteExcel('Filename')
+     A filename must be given in the constructor.
+
+Can't open filename. It may be in use.
+     The file cannot be opened for writing. The directory that you are
+     writing to  may be protected or the file may be in use by another
+     program.
+
+Required floating point format not supported on this platform.
+     Operating system doesn't support 64 bit IEEE float or it is
+     byte-ordered in a way unknown to WriteExcel.
+
+Unable to create tmp files via IO::File->new_tmpfile().
+     This is a -w warning. You will see it if you are using
+     Spreadsheet::WriteExcel in an environment where temporary files
+     cannot be created, in which case all data will be stored in memory.
+     The warning is for information only: it does not affect execution but
+     it may effect the speed of execution for large files.
+
+Maximum file size, 7087104, exceeded.
+     The current OLE implementation only supports a maximum BIFF file of
+     this size. This limit can be extended, see the `LIMITATIONS' in this
+     node section.
+
+Can't locate Parse/RecDescent.pm in @INC ...
+     Spreadsheet::WriteExcel requires the Parse::RecDescent module.
+     Download it from CPAN:
+     http://search.cpan.org/search?dist=Parse-RecDescent
+
+Couldn't parse formula ...
+     There are a large number of warnings which relate to badly formed
+     formulas and functions. See the `FORMULAS AND FUNCTIONS IN EXCEL' in
+     this node section for suggestions on how to avoid these errors.
+
+THE EXCEL BINARY FORMAT
+=======================
+
+   Excel data is stored in the "Binary Interchange File Format" (BIFF)
+file format. Details of this format are given in the Excel SDK, the "Excel
+Developer's Kit" from Microsoft Press. It is also included in the MSDN CD
+library but is no longer available on the MSDN website. An older version
+of the BIFF documentation is available at
+http://www.cubic.org/source/archive/fileform/misc/excel.txt
+
+   Issues relating to the Excel SDK are discussed, occasionally, at
+news://microsoft.public.excel.sdk
+
+   The BIFF portion of the Excel file is comprised of contiguous binary
+records that have different functions and that hold different types of
+data. Each BIFF record is comprised of the following three parts:
+
+     Record name;   Hex identifier, length = 2 bytes
+     Record length; Length of following data, length = 2 bytes
+     Record data;   Data, length = variable
+
+   The BIFF data is stored along with other data in an OLE Compound File.
+This is a structured storage which acts like a file system within a file.
+A Compound File is comprised of storages and streams which, to follow the
+file system analogy, are like directories and files.
+
+   The documentation for the OLE::Storage module,
+http://user.cs.tu-berlin.de/~schwartz/pmh/guide.html , contains one of the
+few descriptions of the OLE Compound File in the public domain.
+
+   For a open source implementation of the OLE library see the 'cole'
+library at http://arturo.directmail.org/filtersweb/
+
+   The source code for the Excel plugin of the Gnumeric spreadsheet also
+contains information relevant to the Excel BIFF format and the OLE
+container, http://www.gnumeric.org/gnumeric
+
+   In addition the source code for OpenOffice is available at
+http://www.openoffice.org/
+
+   An article describing Spreadsheet::WriteExcel and how it works appears
+in Issue #19 of The Perl Journal, http://www.itknowledge.com/tpj/ It is
+reproduced, by kind permission, in the doc directory of the distro.
+
+   Please note that the provision of this information does not constitute
+an invitation to start hacking at the BIFF or OLE file formats. There are
+more interesting ways to waste your time. ;-)
+
+WRITING EXCEL FILES
+===================
+
+   Depending on your requirements, background and general sensibilities
+you may prefer one of the following methods of getting data into Excel:
+
+   * CSV, comma separated variables or text. If the file extension is csv,
+Excel will open and convert this format automatically. Generating a valid
+CSV file isn't as easy as it seems. Have a look at the DBD::RAM, DBD::CSV
+and Text::CSV_XS modules.
+
+   * DBI with DBD::ADO or DBD::ODBC. Excel files contain an internal index
+table that allows them to act like a database file. Using one of the
+standard Perl database modules you can connect to an Excel file as a
+database.
+
+   * Win32::OLE module and office automation. This requires a Windows
+platform and an installed copy of Excel. This is the most powerful and
+complete method for interfacing with Excel. See
+http://velocity.activestate.com/docs/ActivePerl/site/lib/Win32/OLE/TPJ.html
+,
+http://velocity.activestate.com/docs/ActivePerl/faq/Windows/ActivePerl-Winfaq12.html
+and
+http://velocity.activestate.com/docs/ActivePerl/site/lib/Win32/OLE.html If
+your main platform is UNIX but you have the resources to set up a separate
+Win32/MSOffice server, you can convert office documents to text,
+postscript or PDF using Win32::OLE. For a demonstration of how to do this
+using Perl see Docserver:
+http://search.cpan.org/search?mode=module&query=docserver
+
+   * HTML tables. This is an easy way of adding formatting.
+
+   * XML, the Excel XML and HTML file specification are available from
+http://msdn.microsoft.com/library/officedev/ofxml2k/ofxml2k.htm
+
+READING EXCEL FILES
+===================
+
+   To read data from Excel files try:
+
+   * Spreadsheet::ParseExcel. This uses the OLE::Storage-Lite module to
+extract data from an Excel file.
+http://search.cpan.org/search?dist=Spreadsheet-ParseExcel
+
+   * OLE::Storage, aka LAOLA. This is a Perl interface to OLE file
+formats. In particular, the distro contains an Excel to HTML converter
+called Herbert, http://user.cs.tu-berlin.de/~schwartz/pmh/ There is also
+an open source C/C++ project based on the LAOLA work. Try the Filters
+Project http://arturo.directmail.org/filtersweb/ and the Excel to HTML
+converter at the xlHtml Project http://www.xlhtml.org/
+
+   * HTML tables. If the files are saved from Excel in a HTML format the
+data can be accessed using HTML::TableExtract
+http://search.cpan.org/search?dist=HTML-TableExtract
+
+   * DBI with DBD::ADO or DBD::ODBC. See, the section `WRITING EXCEL
+FILES' in this node.
+
+   * Win32::OLE module and office automation. See, the section `WRITING
+EXCEL FILES' in this node.
+
+   If you wish to view Excel files on a UNIX/Linux platform check out the
+excellent Gnumeric spreadsheet application at
+http://www.gnumeric.org/gnumeric or OpenOffice at
+http://www.openoffice.org/
+
+   If you wish to view Excel files on a Windows platform which doesn't
+have Excel installed you can use the free Microsoft Excel Viewer
+http://officeupdate.microsoft.com/2000/downloaddetails/xlviewer.htm
+
+BUGS
+====
+
+   Orange isn't.
+
+   Formulas are formulae.
+
+   OpenOffice: Numerical formats are not displayed due to some missing
+records in Spreadsheet::WriteExcel. Someone with a good knowledge of C++,
+and possibly of German, might help me to track this down in the OpenOffice
+source. URLs are not displayed as links.
+
+   Gnumeric: Some formatting is not displayed correctly. URLs are not
+displayed as links.
+
+   MS Access: The Excel files that are produced by this module are not
+compatible with MS Access. Use DBI or ODBC instead.
+
+   QuickView: If you wish to write files that are fully compatible with
+QuickView it is necessary to write the cells in a sequential row by row
+order.
+
+   The lack of a portable way of writing a little-endian 64 bit IEEE float.
+
+TO DO
+=====
+
+   Read a book, see a film or two.
+
+ACKNOWLEDGEMENTS
+================
+
+   The following people contributed to the debugging and testing of
+Spreadsheet::WriteExcel:
+
+   Arthur@ais, Artur Silveira da Cunha, Cedric Bouvier, CPAN testers,
+Daniel Gardner, Harold Bamford, James Holmes, Johan Ekenberg, John Wren,
+Kenneth Stacey, Michael Buschauer, Mike Blazer, Paul J. Falbe, Paul
+Medynski, Shenyu Zheng, Rich Sorden.
+
+   The following people contributed code or examples:
+
+   Andrew Benham, Marco Geri, Sam Kington, Takanori Kawai.
+
+   Thanks to Damian Conway for the excellent Parse::RecDescent. Thanks to
+Michael Meeks for Gnumeric.
+
+AUTHOR
+======
+
+   John McNamara jmcnamara@cpan.org
+
+     Lana Turner has collapsed!
+     I was trotting along and suddenly
+     it started raining and snowing
+     and you said it was hailing
+     but hailing hits you on the head
+     hard so it was really snowing and
+     raining and I was in such a hurry
+     to meet you but the traffic
+     was acting exactly like the sky
+     and suddenly I see a headline
+     LANA TURNER HAS COLLAPSED!
+     there is no snow in Hollywood
+     there is no rain in California
+     I have been to lots of parties
+     and acted perfectly disgraceful
+     but I never actually collapsed
+     oh Lana Turner we love you get up
+         --Frank O'Hara
+
+COPYRIGHT
+=========
+
+   © MM-MMI, John McNamara.
+
+   All Rights Reserved. This module is free software. It may be used,
+redistributed and/or modified under the same terms as Perl itself.
+
+

@@ -1,0 +1,1559 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: B/C,  Next: B/CC,  Prev: B/Bytecode,  Up: Module List
+
+Perl compiler's C backend
+*************************
+
+NAME
+====
+
+   B::C - Perl compiler's C backend
+
+SYNOPSIS
+========
+
+     perl -MO=C[,OPTIONS] foo.pl
+
+DESCRIPTION
+===========
+
+   This compiler backend takes Perl source and generates C source code
+corresponding to the internal structures that perl uses to run your
+program. When the generated C source is compiled and run, it cuts out the
+time which perl would have taken to load and parse your program into its
+internal semi-compiled form. That means that compiling with this backend
+will not help improve the runtime execution speed of your program but may
+improve the start-up time.  Depending on the environment in which your
+program runs this may be either a help or a hindrance.
+
+OPTIONS
+=======
+
+   If there are any non-option arguments, they are taken to be names of
+objects to be saved (probably doesn't work properly yet).  Without extra
+arguments, it saves the main program.
+
+*-ofilename*
+     Output to filename instead of STDOUT
+
+-v
+     Verbose compilation (currently gives a few compilation statistics).
+
+-
+     Force end of options
+
+*-uPackname*
+     Force apparently unused subs from package Packname to be compiled.
+     This allows programs to use eval "foo()" even when sub foo is never
+     seen to be used at compile time. The down side is that any subs which
+     really are never used also have code generated. This option is
+     necessary, for example, if you have a signal handler foo which you
+     initialise with `$SIG{BAR} = "foo"'.  A better fix, though, is just
+     to change it to `$SIG{BAR} = \&foo'. You can have multiple -u
+     options. The compiler tries to figure out which packages may possibly
+     have subs in which need compiling but the current version doesn't do
+     it very well. In particular, it is confused by nested packages (i.e.
+     of the form `A::B') where package A does not contain any subs.
+
+-D
+     Debug options (concatenated or separate flags like `perl -D').
+
+*-Do*
+     OPs, prints each OP as it's processed
+
+*-Dc*
+     COPs, prints COPs as processed (incl. file & line num)
+
+*-DA*
+     prints AV information on saving
+
+*-DC*
+     prints CV information on saving
+
+*-DM*
+     prints MAGIC information on saving
+
+-f
+     Force optimisations on or off one at a time.
+
+*-fcog*
+     Copy-on-grow: PVs declared and initialised statically.
+
+*-fno-cog*
+     No copy-on-grow.
+
+*-On*
+     Optimisation level (n = 0, 1, 2, ...). -O means *-O1*.  Currently,
+     *-O1* and higher set *-fcog*.
+
+*-llimit*
+     Some C compilers impose an arbitrary limit on the length of string
+     constants (e.g. 2048 characters for Microsoft Visual C++).  The
+     *-llimit* options tells the C backend not to generate string literals
+     exceeding that limit.
+
+EXAMPLES
+========
+
+     perl -MO=C,-ofoo.c foo.pl
+     perl cc_harness -o foo foo.c
+
+   Note that `cc_harness' lives in the B subdirectory of your perl library
+directory. The utility called perlcc may also be used to help make use of
+this compiler.
+
+     perl -MO=C,-v,-DcA,-l2048 bar.pl > /dev/null
+
+BUGS
+====
+
+   Plenty. Current status: experimental.
+
+AUTHOR
+======
+
+   Malcolm Beattie, `mbeattie@sable.ox.ac.uk'
+
+
+File: pm.info,  Node: B/CC,  Next: B/Debug,  Prev: B/C,  Up: Module List
+
+Perl compiler's optimized C translation backend
+***********************************************
+
+NAME
+====
+
+   B::CC - Perl compiler's optimized C translation backend
+
+SYNOPSIS
+========
+
+     perl -MO=CC[,OPTIONS] foo.pl
+
+DESCRIPTION
+===========
+
+   This compiler backend takes Perl source and generates C source code
+corresponding to the flow of your program. In other words, this backend is
+somewhat a "real" compiler in the sense that many people think about
+compilers. Note however that, currently, it is a very poor compiler in
+that although it generates (mostly, or at least sometimes) correct code,
+it performs relatively few optimisations.  This will change as the
+compiler develops. The result is that running an executable compiled with
+this backend may start up more quickly than running the original Perl
+program (a feature shared by the C compiler backend-see B::C) and may also
+execute slightly faster. This is by no means a good optimising
+compiler-yet.
+
+OPTIONS
+=======
+
+   If there are any non-option arguments, they are taken to be names of
+objects to be saved (probably doesn't work properly yet).  Without extra
+arguments, it saves the main program.
+
+*-ofilename*
+     Output to filename instead of STDOUT
+
+-v
+     Verbose compilation (currently gives a few compilation statistics).
+
+-
+     Force end of options
+
+*-uPackname*
+     Force apparently unused subs from package Packname to be compiled.
+     This allows programs to use eval "foo()" even when sub foo is never
+     seen to be used at compile time. The down side is that any subs which
+     really are never used also have code generated. This option is
+     necessary, for example, if you have a signal handler foo which you
+     initialise with `$SIG{BAR} = "foo"'.  A better fix, though, is just
+     to change it to `$SIG{BAR} = \&foo'. You can have multiple -u
+     options. The compiler tries to figure out which packages may possibly
+     have subs in which need compiling but the current version doesn't do
+     it very well. In particular, it is confused by nested packages (i.e.
+     of the form `A::B') where package A does not contain any subs.
+
+*-mModulename*
+     Instead of generating source for a runnable executable, generate
+     source for an XSUB module. The boot_Modulename function (which
+     DynaLoader can look for) does the appropriate initialisation and runs
+     the main part of the Perl source that is being compiled.
+
+-D
+     Debug options (concatenated or separate flags like `perl -D').
+
+*-Dr*
+     Writes debugging output to STDERR just as it's about to write to the
+     program's runtime (otherwise writes debugging info as comments in its
+     C output).
+
+*-DO*
+     Outputs each OP as it's compiled
+
+*-Ds*
+     Outputs the contents of the shadow stack at each OP
+
+*-Dp*
+     Outputs the contents of the shadow pad of lexicals as it's loaded for
+     each sub or the main program.
+
+*-Dq*
+     Outputs the name of each fake PP function in the queue as it's about
+     to process it.
+
+*-Dl*
+     Output the filename and line number of each original line of Perl
+     code as it's processed (`pp_nextstate').
+
+*-Dt*
+     Outputs timing information of compilation stages.
+
+-f
+     Force optimisations on or off one at a time.
+
+*-ffreetmps-each-bblock*
+     Delays FREETMPS from the end of each statement to the end of the each
+     basic block.
+
+*-ffreetmps-each-loop*
+     Delays FREETMPS from the end of each statement to the end of the group
+     of basic blocks forming a loop. At most one of the freetmps-each-*
+     options can be used.
+
+*-fomit-taint*
+     Omits generating code for handling perl's tainting mechanism.
+
+*-On*
+     Optimisation level (n = 0, 1, 2, ...). -O means *-O1*.  Currently,
+     *-O1* sets *-ffreetmps-each-bblock* and *-O2* sets
+     *-ffreetmps-each-loop*.
+
+EXAMPLES
+========
+
+     perl -MO=CC,-O2,-ofoo.c foo.pl
+     perl cc_harness -o foo foo.c
+
+   Note that `cc_harness' lives in the B subdirectory of your perl library
+directory. The utility called perlcc may also be used to help make use of
+this compiler.
+
+     perl -MO=CC,-mFoo,-oFoo.c Foo.pm
+     perl cc_harness -shared -c -o Foo.so Foo.c
+
+BUGS
+====
+
+   Plenty. Current status: experimental.
+
+DIFFERENCES
+===========
+
+   These aren't really bugs but they are constructs which are heavily tied
+to perl's compile-and-go implementation and with which this compiler
+backend cannot cope.
+
+Loops
+-----
+
+   Standard perl calculates the target of "next", "last", and "redo" at
+run-time. The compiler calculates the targets at compile-time.  For
+example, the program
+
+     sub skip_on_odd { next NUMBER if $_[0] % 2 }
+     NUMBER: for ($i = 0; $i < 5; $i++) {
+         skip_on_odd($i);
+         print $i;
+     }
+
+   produces the output
+
+     024
+
+   with standard perl but gives a compile-time error with the compiler.
+
+Context of ".."
+---------------
+
+   The context (scalar or array) of the ".." operator determines whether
+it behaves as a range or a flip/flop. Standard perl delays until runtime
+the decision of which context it is in but the compiler needs to know the
+context at compile-time. For example,
+
+     @a = (4,6,1,0,0,1);
+     sub range { (shift @a)..(shift @a) }
+     print range();
+     while (@a) { print scalar(range()) }
+
+   generates the output
+
+     456123E0
+
+   with standard Perl but gives a compile-time error with compiled Perl.
+
+Arithmetic
+----------
+
+   Compiled Perl programs use native C arithemtic much more frequently
+than standard perl. Operations on large numbers or on boundary cases may
+produce different behaviour.
+
+Deprecated features
+-------------------
+
+   Features of standard perl such as $[ which have been deprecated in
+standard perl since Perl5 was released have not been implemented in the
+compiler.
+
+AUTHOR
+======
+
+   Malcolm Beattie, `mbeattie@sable.ox.ac.uk'
+
+
+File: pm.info,  Node: B/Debug,  Next: B/Deparse,  Prev: B/CC,  Up: Module List
+
+Walk Perl syntax tree, printing debug info about ops
+****************************************************
+
+NAME
+====
+
+   B::Debug - Walk Perl syntax tree, printing debug info about ops
+
+SYNOPSIS
+========
+
+     perl -MO=Debug[,OPTIONS] foo.pl
+
+DESCRIPTION
+===========
+
+   See `ext/B/README'.
+
+AUTHOR
+======
+
+   Malcolm Beattie, `mbeattie@sable.ox.ac.uk'
+
+
+File: pm.info,  Node: B/Deparse,  Next: B/Disassembler,  Prev: B/Debug,  Up: Module List
+
+Perl compiler backend to produce perl code
+******************************************
+
+NAME
+====
+
+   B::Deparse - Perl compiler backend to produce perl code
+
+SYNOPSIS
+========
+
+   *perl* *-MO=Deparse*[*,-u*PACKAGE][*,-p*][*,-q*][*,-l*][*,-s**LETTERS*]
+    *prog.pl*
+
+DESCRIPTION
+===========
+
+   B::Deparse is a backend module for the Perl compiler that generates
+perl source code, based on the internal compiled structure that perl
+itself creates after parsing a program. The output of B::Deparse won't be
+exactly the same as the original source, since perl doesn't keep track of
+comments or whitespace, and there isn't a one-to-one correspondence
+between perl's syntactical constructions and their compiled form, but it
+will often be close. When you use the -p option, the output also includes
+parentheses even when they are not required by precedence, which can make
+it easy to see if perl is parsing your expressions the way you intended.
+
+   Please note that this module is mainly new and untested code and is
+still under development, so it may change in the future.
+
+OPTIONS
+=======
+
+   As with all compiler backend options, these must follow directly after
+the '-MO=Deparse', separated by a comma but not any white space.
+
+-l
+     Add '#line' declarations to the output based on the line and file
+     locations of the original code.
+
+-p
+     Print extra parentheses. Without this option, B::Deparse includes
+     parentheses in its output only when they are needed, based on the
+     structure of your program. With -p, it uses parentheses (almost)
+     whenever they would be legal. This can be useful if you are used to
+     LISP, or if you want to see how perl parses your input. If you say
+
+          if ($var & 0x7f == 65) {print "Gimme an A!"}
+          print ($which ? $a : $b), "\n";
+          $name = $ENV{USER} or "Bob";
+
+     `B::Deparse,-p' will print
+
+          if (($var & 0)) {
+              print('Gimme an A!')
+          };
+          (print(($which ? $a : $b)), '???');
+          (($name = $ENV{'USER'}) or '???')
+
+     which probably isn't what you intended (the `'???'' is a sign that
+     perl optimized away a constant value).
+
+-q
+     Expand double-quoted strings into the corresponding combinations of
+     concatenation, uc, ucfirst, lc, lcfirst, quotemeta, and join. For
+     instance, print
+
+          print "Hello, $world, @ladies, \u$gentlemen\E, \u\L$me!";
+
+     as
+
+          print 'Hello, ' . $world . ', ' . join($", @ladies) . ', '
+                . ucfirst($gentlemen) . ', ' . ucfirst(lc $me . '!');
+
+     Note that the expanded form represents the way perl handles such
+     constructions internally - this option actually turns off the reverse
+     translation that B::Deparse usually does. On the other hand, note that
+     `$x = "$y"' is not the same as `$x = $y': the former makes the value
+     of $y into a string before doing the assignment.
+
+-uPACKAGE
+     Normally, B::Deparse deparses the main code of a program, all the subs
+     called by the main program (and all the subs called by them,
+     recursively), and any other subs in the main:: package. To include
+     subs in other packages that aren't called directly, such as AUTOLOAD,
+     DESTROY, other subs called automatically by perl, and methods (which
+     aren't resolved to subs until runtime), use the -u option. The
+     argument to -u is the name of a package, and should follow directly
+     after the 'u'. Multiple -u options may be given, separated by commas.
+     Note that unlike some other backends, B::Deparse doesn't (yet) try
+     to guess automatically when -u is needed - you must invoke it
+     yourself.
+
+-s*LETTERS*
+     Tweak the style of B::Deparse's output. The letters should follow
+     directly after the 's', with no space or punctuation. The following
+     options are available:
+
+    C
+          Cuddle `elsif', else, and continue blocks. For example, print
+
+               if (...) {
+                    ...
+               } else {
+                    ...
+               }
+
+          instead of
+
+               if (...) {
+                    ...
+               }
+               else {
+                    ...
+               }
+
+          The default is not to cuddle.
+
+    i*NUMBER*
+          Indent lines by multiples of *NUMBER* columns. The default is 4
+          columns.
+
+    T
+          Use tabs for each 8 columns of indent. The default is to use
+          only spaces.  For instance, if the style options are *-si4T*, a
+          line that's indented 3 times will be preceded by one tab and
+          four spaces; if the options were *-si8T*, the same line would be
+          preceded by three tabs.
+
+    vSTRING.
+          Print STRING for the value of a constant that can't be determined
+          because it was optimized away (mnemonic: this happens when a
+          constant is used in void context). The end of the string is
+          marked by a period.  The string should be a valid perl
+          expression, generally a constant.  Note that unless it's a
+          number, it probably needs to be quoted, and on a command line
+          quotes need to be protected from the shell. Some conventional
+          values include 0, 1, 42, ", 'foo', and 'Useless use of constant
+          omitted' (which may need to be *-sv"'Useless use of constant
+          omitted'."* or something similar depending on your shell). The
+          default is '???'.  If you're using B::Deparse on a module or
+          other file that's require'd, you shouldn't use a value that
+          evaluates to false, since the customary true constant at the end
+          of a module will be in void context when the file is compiled as
+          a main program.
+
+USING B::Deparse AS A MODULE
+============================
+
+Synopsis
+--------
+
+     use B::Deparse;
+     $deparse = B::Deparse->new("-p", "-sC");
+     $body = $deparse->coderef2text(\&func);
+     eval "sub func $body"; # the inverse operation
+
+Description
+-----------
+
+   B::Deparse can also be used on a sub-by-sub basis from other perl
+programs.
+
+new
+---
+
+     $deparse = B::Deparse->new(OPTIONS)
+
+   Create an object to store the state of a deparsing operation and any
+options. The options are the same as those that can be given on the
+command line (see `' in this node); options that are separated by commas
+after *-MO=Deparse* should be given as separate strings. Some options,
+like -u, don't make sense for a single subroutine, so don't pass them.
+
+coderef2text
+------------
+
+     $body = $deparse->coderef2text(\&func)
+     $body = $deparse->coderef2text(sub ($$) { ... })
+
+   Return source code for the body of a subroutine (a block, optionally
+preceded by a prototype in parens), given a reference to the sub. Because
+a subroutine can have no names, or more than one name, this method doesn't
+return a complete subroutine definition - if you want to eval the result,
+you should prepend "sub subname ", or "sub " for an anonymous function
+constructor. Unless the sub was defined in the main:: package, the code
+will include a package declaration.
+
+BUGS
+====
+
+   See the 'to do' list at the beginning of the module file.
+
+AUTHOR
+======
+
+   Stephen McCamant <smccam@uclink4.berkeley.edu>, based on an earlier
+version by Malcolm Beattie <mbeattie@sable.ox.ac.uk>, with contributions
+from Gisle Aas, James Duncan, Albert Dvornik, Hugo van der Sanden,
+Gurusamy Sarathy, and Nick Ing-Simmons.
+
+
+File: pm.info,  Node: B/Disassembler,  Next: B/Fathom,  Prev: B/Deparse,  Up: Module List
+
+Disassemble Perl bytecode
+*************************
+
+NAME
+====
+
+   B::Disassembler - Disassemble Perl bytecode
+
+SYNOPSIS
+========
+
+     use Disassembler;
+
+DESCRIPTION
+===========
+
+   See `ext/B/B/Disassembler.pm'.
+
+AUTHOR
+======
+
+   Malcolm Beattie, `mbeattie@sable.ox.ac.uk'
+
+
+File: pm.info,  Node: B/Fathom,  Next: B/FindAmpersand,  Prev: B/Disassembler,  Up: Module List
+
+a module to evaluate the readability of Perl code
+*************************************************
+
+NAME
+====
+
+   B::Fathom - a module to evaluate the readability of Perl code
+
+SYNOPSIS
+========
+
+     perl -MO=Fathom <script>
+
+   or
+
+     perl -MO=Fathom,-v <script>
+
+   where <script> is the name of the Perl program that you want to
+evaluate.
+
+   -v activates verbose mode, which currently reports which subs have been
+skipped over because they seem to be imported.  One can also indicate
+`-vN', where N is some number greater than zero, to provide *even more*
+verbose diagnostics.  The specifics of these modes may change in future
+releases.  See comments in the code for further information.
+
+   There is also an OO interface, which can be used as follows:
+
+     my $fathom  = B::Fathom->new('-v');
+     my $score   = $fathom->fathom(\&foo);
+
+   See METHODS below for a more complete explanation of the OO interface.
+
+DESCRIPTION
+===========
+
+   `B::Fathom' is a backend to the Perl compiler; it analyzes the syntax
+of your Perl code, and estimates the readability of your program.
+
+   Currently, this module's idea of `readability' is based on methods used
+for analyzing readability of English prose.  Further extensions are
+intended.
+
+METHODS
+=======
+
+   There is a simple object-oriented interface to B::Fathom.  It consists
+of two methods:
+
+new(@args)
+     This method constructs a new compiler object.  The optional @args
+     indicate compiler options; see SYNOPSIS for a list.
+
+fathom(@subrefs)
+     This method grades the subroutines referred to by @subrefs, and
+     returns their score as a string.
+
+CAVEATS
+=======
+
+   Because of the nature of the compiler, `Fathom' has to do some guessing
+about the syntax of your program.  See the comments in the module for
+specifics.
+
+   `Fathom' doesn't work very well on modules yet.
+
+AUTHOR
+======
+
+   Kurt Starsinic <`kstar@cpan.org'>
+
+COPYRIGHT
+=========
+
+     Copyright (c) 1998, 1999, 2000 Kurt Starsinic.
+     This module is free software; you may redistribute it
+     and/or modify it under the same terms as Perl itself.
+
+
+File: pm.info,  Node: B/FindAmpersand,  Next: B/Generate,  Prev: B/Fathom,  Up: Module List
+
+A compiler backend to find variables that set sawampersand
+**********************************************************
+
+NAME
+====
+
+   B::FindAmpersand - A compiler backend to find variables that set
+sawampersand
+
+SYNOPSIS
+========
+
+     perl -MO=FindAmpersand file.pl
+
+DESCRIPTION
+===========
+
+   The Devel::SawAmpersand can tell you if Perl has set `sawampersand',
+but it doesn't tell you where.  Sure, you can grep, but what if you don't
+know where to grep?
+
+AUTHOR
+======
+
+   Doug MacEachern
+
+
+File: pm.info,  Node: B/Generate,  Next: B/Graph,  Prev: B/FindAmpersand,  Up: Module List
+
+Create your own op trees.
+*************************
+
+NAME
+====
+
+   B::Generate - Create your own op trees.
+
+SYNOPSIS
+========
+
+     use B::Generate;
+     # Do nothing, slowly.
+       CHECK {
+         my $null = new B::OP("null",0);
+         my $enter = new B::OP("enter",0);
+         my $cop = new B::COP(0, "hiya", 0);
+         my $leave = new B::LISTOP("leave", 0, $enter, $null);
+         $leave->children(3);
+         $enter->sibling($cop);
+         $enter->next($cop);
+         $cop->sibling($null);
+         $null->next($leave);
+         $cop->next($leave);
+
+     # Tell Perl where to find our tree.
+     B::main_root($leave);
+     B::main_start($enter);
+           }
+
+WARNING
+=======
+
+   ! WARNING ! WARNING ! WARNING ! WARNING ! WARNING ! WARNING ! WARNING !
+WARNING
+
+   `B::Generate' is alpha-quality software. Large parts of it don't work.
+Even the parts that do work should give you the willies.
+
+   Patches welcome.
+
+DESCRIPTION
+===========
+
+   Malcolm Beattie's B module allows you to examine the Perl op tree at
+runtime, in Perl space; it's the basis of the Perl compiler. But what it
+doesn't let you do is manipulate that op tree: it won't let you create new
+ops, or modify old ones. Now you can.
+
+   Well, if you're intimately familiar with Perl's internals, you can.
+
+   `B::Generate' turns B's accessor methods into get-set methods.  Hence,
+instead of merely saying
+
+     $op2 = $op->next;
+
+   you can now say
+
+     $op->next($op2);
+
+   to set the next op in the chain. It also adds constructor methods to
+create new ops. This is where it gets really hairy.
+
+     new B::OP     ( type, flags )
+     new B::UNOP   ( type, flags, first )
+     new B::BINOP  ( type, flags, first, last )
+     new B::LOGOP  ( type, flags, first, other )
+     new B::LISTOP ( type, flags, first, last )
+     new B::COP    ( flags, name, first )
+
+   In all of the above constructors, type is either a numeric value
+representing the op type (62 is the addition operator, for instance) or
+the name of the op. (`"add"')
+
+   first, last and other are ops to be attached to the current op; these
+should be B::OP objects. If you haven't created the ops yet, don't worry;
+give a false value, and fill them in later:
+
+     $x = new B::UNOP("negate", 0, undef);
+     # ... create some more ops ...
+     $x->first($y);
+
+   Finally, you can set the main root and the starting op by passing ops
+to the `B::main_root' and `B::main_start' functions.
+
+   This module can obviously be used for all sorts of fun purposes. The
+best one will be in conjuction with source filters; have your source
+filter parse an input file in a foreign language, create an op tree for it
+and get Perl to execute it. Then email me and tell me how you did it.  And
+why.
+
+OTHER METHODS
+-------------
+
+$b_sv->sv
+     Returns a real SV instead of a B::SV. For instance:
+
+          $b_sv = $svop->sv;
+          if ($b_sv->sv == 3) {
+              print "SVOP's SV has an IV of 3\n"
+          }
+
+     You can't use this to set the SV. That would be scary.
+
+$op->dump
+     Runs `Perl_op_dump' on an op; this is roughly equivalent to B::Debug,
+     but not quite.
+
+$b_sv->dump
+     Runs `Perl_sv_dump' on an SV; this is exactly equivalent to `<
+     Data::Dumper::dump($b_sv-'sv) >>
+
+EXPORT
+------
+
+   None.
+
+AUTHOR
+======
+
+   Simon Cozens, `simon@cpan.org'
+
+SEE ALSO
+========
+
+   *Note B: B,, `perlguts', `op.c'
+
+
+File: pm.info,  Node: B/Graph,  Next: B/JVM/Emit,  Prev: B/Generate,  Up: Module List
+
+Perl compiler backend to produce graphs of OP trees
+***************************************************
+
+NAME
+====
+
+   B::Graph - Perl compiler backend to produce graphs of OP trees
+
+SYNOPSIS
+========
+
+     perl -MO=Graph,-text prog.pl >graph.txt
+
+     perl -MO=Graph,-vcg prog.pl >graph.vcg
+     xvcg graph.vcg
+
+     perl -MO=Graph,-dot prog.pl | dot -Tps >graph.ps
+
+DESCRIPTION
+===========
+
+   This module is a backend to the perl compiler (B::*) which, instead of
+outputting bytecode or C based on perl's compiled version of a program,
+writes descriptions in graph-description languages specifying graphs that
+show the program's structure. It currently generates descriptions for the
+VCG tool (`http://www.cs.uni-sb.de/RW/users/sander/html/gsvcg1.html') and
+Dot (part of the graph visualization toolkit from AT&T:
+`http://www.research.att.com/sw/tools/graphviz/'). It also can produce
+plain text output (which is more useful for debugging the module itself
+than anything else, though you might be able to make cut the nodes out and
+make a mobile or something similar).
+
+OPTIONS
+=======
+
+   Like any other compiler backend, this module needs to be invoked using
+the O module to run correctly:
+
+     perl -MO=Graph,-opt,-opt,-opt program.pl
+     OR
+     perl -MO=Graph,-opt,obj -e 'BEGIN {$obj = ["hi"]}; print $obj'
+     OR EVEN
+     perl -e 'use O qw(Graph -opt obj obj); print "hi!\n";'
+
+   `Obj' is the name of a perl variable whose contents will be examined.
+It can't be a my() variable, and it shouldn't have a prefix symbol
+('$@^*'), though you can specify a package - the name will be used to look
+up a GV, whose various fields will lead to the scalar, array, and other
+values that correspond to the named variable. If no object is specified,
+the whole main program, including the CV that points to its pad, will be
+displayed.
+
+   Each of the the opts can come from one of the following (each set is
+mutually exclusive; case and underscores are insignificant):
+
+-text, -vcg, -dot
+-----------------
+
+   Produce output of the appropriate type. The default is '-text', which
+isn't useful for much of anything (it does draw some nice ASCII boxes,
+though).
+
+-addrs, -no_addrs
+-----------------
+
+   Each of the nodes on the graph produced corresponds to a C structure
+that has an address and includes pointers to other structures. The module
+uses these addresses to decide how to draw edges, but it makes the graph
+more compact if they aren't printed. The default is '-no_addrs'.
+
+-compile_order, -run_order
+--------------------------
+
+   The collection of OPs that perl compiles a script into has two different
+layers of structure. It has a tree structure which corresponds roughly to
+the synactic nesting of constructs in the source text, and a roughly
+linked-list representation, essentially a postorder traversal of this
+tree, which is used at runtime to decide what to do next.  The graph can
+be drawn to emphasize one structure or the other. The former,
+'compile_order', is the default, as it tends to lead to graphs with aspect
+ratios close to those of standard paper.
+
+-SVs, -no_SVs
+-------------
+
+   If OPs represent a program's compiled code, SVs represent its data. This
+includes literal numbers and strings (IVs, NVs, PVs, PVIVs, and PVNVs),
+regular arrays, hashes, and references (AVs, HVs, and RVs), but also the
+structures that correspond to individual variables (special HVs for symbol
+tables and GVs to represent values within them, and special AVs that hold
+my() variables (as well as compiler temporaries)), structures that keep
+track of code (CVs), and a variety of others. The default is to display
+all these too, to give a complete picture, but if you aren't in a holistic
+mood, you can make them disappear.
+
+-ellipses, -rhombs
+------------------
+
+   The module tries to give the nodes representing SVs a different shape
+from those of OPs. OPs are usually rectangular, so two obvious shapes for
+SVs are ellipses and rhombuses (stretched diamonds). This option currently
+only makes a difference for VCG (ellipse is the default).
+
+-stashes, -no_stashes
+---------------------
+
+   The hashes that perl uses to represent symbol tables are called
+'stashes'.  Since every GV has a pointer back to its stash, it's virtually
+inevitable for the links in a graph to lead to the main stash.
+Unfortunately stashes, especially the main one, can be quite big, and lead
+to forests of other structures - there's one GV and another SV for each
+magic variable, plus all of @INC and %ENV, and so on. To prevent
+information overload, then, the display of stashes is disabled by default.
+
+-fileGVs, -no_fileGVs
+---------------------
+
+   Another kind graph element that can be annoying are the pointers from
+every GV and COP (a kind of OP that occurs for every statement) to the GV
+that represents the file from which that code came (used for error
+messages). By default, these links aren't shown, to keep them from
+cluttering the graph. Also, perl's internal interfaces changed in a recent
+version, so in perl 5.005_63 or later you can't see the fileGVs at all.
+
+-SEQs, -no_SEQs
+---------------
+
+   As it is visited in the peephole optimization phase, each OP gets a
+sequence number, which is currently used by anything (except the peephole
+optimizer, to avoid visiting OPs twice). If you want to see these, ask for
+them. (COPs have their own sequence numbers too, but they're more
+interesting to look at - for instance, they're used to bound the lifetimes
+of lexicals).
+
+-types, -no_types
+-----------------
+
+   B::Graph always gives the type of each OP symbolically ('entersub'), but
+it can also print the numeric value of the type field, if you want.  The
+default is no_types.
+
+-float, -no_float
+-----------------
+
+   Almost every OP has an op_next and an op_sibling pointer, and B::Graph
+colors them distinctively (pink and light blue, respectively). Because of
+this, it isn't strictly necessary to 'anchor' the arrow on a line in the
+OP's box saying 'op_next'. The float option lets the graph layout engine
+start these arrows wherever it wants, which can sometimes lead to a more
+pleasing layout, at the expense of being less obvious. The default is not
+to float.
+
+-targlinks, -no_targlinks
+-------------------------
+
+   Lexical (my()) variables and temporary values used by individual OPs
+are stored in 'pads', per-code arrays linked to the CV. OPs store indexes
+into these arrays in the 'op_targ' field, but B::Graph can often also draw
+links directly from the OP to the SV that stores the name of the variable.
+These links don't correspond to any real pointers, however, and they can
+make the graph more complicated, so they are disabled by default.
+
+WHAT DOES THIS ALL MEAN?
+========================
+
+SvFLAGS abbreviations
+---------------------
+
+     Pb     SVs_PADBUSY   reserved for tmp or my already
+     Pt     SVs_PADTMP    in use as tmp
+     Pm     SVs_PADMY     in use a "my" variable
+     T      SVs_TEMP      string is stealable?
+     O      SVs_OBJECT    is "blessed"
+     Mg     SVs_GMG       has magical get method
+     Ms     SVs_SMG       has magical set method
+     Mr     SVs_RMG       has random magical methods
+     I      SVf_IOK       has valid public integer value
+     N      SVf_NOK       has valid public numeric (float) value
+     P      SVf_POK       has valid public pointer (string) value
+     R      SVf_ROK       has a valid reference pointer
+     F      SVf_FAKE      glob or lexical is just a copy
+     L      SVf_OOK       has valid offset value (mnemonic: lvalue)
+     B      SVf_BREAK     refcnt is artificially low
+     Ro     SVf_READONLY  may not be modified
+     i      SVp_IOK       has valid non-public integer value
+     n      SVp_NOK       has valid non-public numeric value
+     p      SVp_POK       has valid non-public pointer value
+     S      SVp_SCREAM    has been studied?
+     V      SVf_AMAGIC    has magical overloaded methods
+
+op_flags abbreviations
+----------------------
+
+     V      OPf_WANT_VOID    Want nothing (void context)
+     S      OPf_WANT_SCALAR  Want single value (scalar context)
+     L      OPf_WANT_LIST    Want list of any length (list context)
+     K      OPf_KIDS         There is a firstborn child.
+     P      OPf_PARENS       This operator was parenthesized.
+                              (Or block needs explicit scope entry.)
+     R      OPf_REF          Certified reference.
+                              (Return container, not containee).
+     M      OPf_MOD          Will modify (lvalue).
+     T      OPf_STACKED      Some arg is arriving on the stack.
+     *      OPf_SPECIAL      Do something weird for this op (see op.h)
+
+BUGS
+====
+
+   VCG has a problem with boxes that have more than about 55 arrows coming
+out of them, so with large arrays and hashes B::Graph will stop outputting
+edges and some boxes may be disconnected.
+
+AUTHOR
+======
+
+   Stephen McCamant <smcc@CSUA.Berkeley.EDU>
+
+SEE ALSO
+========
+
+   `dot(1)' in this node, `xvcg(1)' in this node, `perl(1)' in this node,
+`perlguts(1)' in this node.
+
+   If you like B::Graph, you might also be interested in Gisle Aas's
+PerlGuts Illustrated, at `http://gisle.aas.no/perl/illguts/'.
+
+
+File: pm.info,  Node: B/JVM/Emit,  Next: B/JVM/Jasmin,  Prev: B/Graph,  Up: Module List
+
+Package used by B::JVM to emit Java Bytecode
+********************************************
+
+NAME
+====
+
+   B::JVM::Emit -  Package used by B::JVM to emit Java Bytecode
+
+SYNOPSIS
+========
+
+     use B::JVM::Jasmin::Emit;
+
+     my $emitter = new B::JVM::Emit(FILEHANDLE);
+
+     # ...
+     $emitter->DIRECTIVE_NAME([@ARGS]);
+     #  ...
+     $emitter->OPCODE_NAME([@ARGS]);
+     #  ...
+     $emitter->OPCODE_NAME([@ARGS]);
+
+DESCRIPTION
+===========
+
+   This class is used Java bytcodes on a file handle.  Until someone
+actually creates a module that truely emits Java bytecodes, the
+interesting stuff is all happening in the subclass,
+`B::JVM::Jasmin::Emit|B::JVM::Jasmin::Emit' in this node.  The method
+names used here were built up from the `jasmin|jasmin' in this node syntax.
+There was no reason for this other than the implementor was most familar
+with that manner of thinking about Java bytecode.  However, the set should
+cover every opcode available.
+
+   The user of this module must send opcodes in the order desired and is
+responsible for emitting a sensible JVM program.  All this module provides
+is a consistent way to emit JVM opcodes from Perl, since there is no
+universal assembler syntax.  Someone who wants to emit opcodes need only
+subclass this module and implement all the methods.
+
+AUTHOR
+======
+
+   Bradley M. Kuhn, bkuhn@ebb.org, http://www.ebb.org/bkuhn
+
+COPYRIGHT
+=========
+
+   Copyright (C) 1999, Bradley M. Kuhn, All Rights Reserved.
+
+LICENSE
+=======
+
+   You may distribute under the terms of either the GNU General Public
+License or the Artistic License, as specified in the LICENSE file that was
+shipped with this distribution.
+
+SEE ALSO
+========
+
+   perl(1), B::JVM::Jasmin(3), B::JVM::Jasmin::Emit(3)
+
+DETAILED DOCUMENTATION
+======================
+
+B::JVM::Emit Package Variables
+------------------------------
+
+$VERSION
+     Version number of B::JVM::Emit.  For now, it should always match the
+     version of B::JVM::Jasmin
+
+Modules used by B::JVM::Emit
+----------------------------
+
+Carp
+     Used for error reporting
+
+Methods in B::JVM::Emit
+-----------------------
+
+B::JVM::Emit::new
+     usage: B::JVM::Emit::new(FILEHANDLE)
+
+     Creates a new object of the class.  It assumes that FILEHANDLE is a
+     lexically scoped file handle open for writing.
+
+B::JVM::Emit::_clearMethod
+     usage: $emitter->_clearMethod()
+
+     Clears  the current method name.
+
+B::JVM::Emit::_setCurrentMethod
+     usage: B::JVM::Emit::_setCurrentMethod(METHOD_NAME)
+
+     Sets the current name of the method being emitted.
+
+B::JVM::Emit::inMethod
+     usage: $emitter->inMethod()
+
+     Returns true (in particular, the current method name) if we are
+     currently in method, and returns false otherwise.
+
+B::JVM::Emit::_setClassName
+     usage: B::JVM::Emit::_setClassName(CLASS_NAME)
+
+     Sets the  name of the class being emitted.
+
+
+File: pm.info,  Node: B/JVM/Jasmin,  Next: B/JVM/Jasmin/CompileState,  Prev: B/JVM/Emit,  Up: Module List
+
+Perl Backend module for generating JVM code via Jasmin Assembler
+****************************************************************
+
+NAME
+====
+
+   B::JVM::Jasmin - Perl Backend module for generating JVM code via Jasmin
+Assembler
+
+SYNOPSIS
+========
+
+     use B::JVM::Jasmin;
+
+     compile(KEEP_INTERMEDIATE_FILES_FLAG, [MAIN_CLASS_NAME]);
+
+     OR
+
+     perl -MO=JVM::Jasmin,KEEP_INTERMEDIATE_FILES_FLAG, [MAIN_CLASS_NAME] file.plx
+
+DESCRIPTION
+===========
+
+   The B::JVM::Jasmin module is a Perl backend module that generates Jasmin
+assembler code (which can then be compiled into JVM code with jasmin(1))
+for a Perl program.
+
+AUTHOR
+======
+
+   Bradley M. Kuhn, bkuhn@ebb.org, http://www.ebb.org/bkuhn
+
+COPYRIGHT
+=========
+
+   Copyright (C) 1999, Bradley M. Kuhn, All Rights Reserved.
+
+LICENSE
+=======
+
+   You may distribute under the terms of either the GNU General Public
+License or the Artistic License, as specified in the LICENSE file that was
+shipped with this distribution.
+
+SEE ALSO
+========
+
+   perl(1), jasmin(1).
+
+DETAILED DOCUMENTATION
+======================
+
+B::JVM::Jasmin Package Variables
+--------------------------------
+
+$VERSION
+     Version number of B::JVM::Jasmin
+
+@ISA
+     Canonical @ISA array, currently only derives from Exporter
+
+@EXPORT
+     Canonical @EXPORT array
+
+@EXPORT_OK
+     Canonical @EXPORT_OK array
+
+$STATE
+     Reference to a B::JVM::Jasmin::CompileState object for the current
+     state of this compiler
+
+Modules used by B::JVM::Jasmin
+------------------------------
+
+B
+     Of course, we must use the B module to overide its functions and
+     interface with O.
+
+Methods in B::JVM::Jasmin
+-------------------------
+
+B::JVM::Jasmin::compile
+     usage: B::JVM::Jasmin::compile(KEEP_INTERMEDIATE_FILES_FLAG,
+     [MAIN_CLASS_NAME])
+
+     This is the default method that O.pm will call when this backend is
+     used.  The first argument is a flag that indicates whether or not to
+     keep the intermediate temporary files that are generated by the
+     compilation process.  The second argument
+
+B::JVM::Jasmin::WalkOPTree
+     usage: B::JVM::Jasmin::compile($op, $level)
+
+     This method walks the op-tree and does pre and post processing on the
+     op codes.  In some cases, the pre-processing will call WalkOPTree for
+     any sub-ops that exist.
+
+B::OP::JVMJasminPre
+     This method handles pre-processing on plain OPs.  Note that for all
+     these OPs, there are no recursive calls to WalkOPTree, since plain
+     OPs should never have sub-OPs (I think :).
+
+     The following OPs are currently supported:
+
+    enter
+          Currently, nothing is done on an "enter" OP.  This may change in
+          the future, but I haven't seen a use for them (yet :).
+
+    pushmark
+          On an "pushmark" OP, the LIST_MARK is pushed onto the JVM
+          operand stack.  This indicates to other OPs that expect a list
+          that the list ends here.
+
+    null
+          A empty operation.  Just send a "nop".
+
+B::OP::JVMJasminPost
+     Currently, there is no post processing done on plain OPs.
+
+B::LISTOP::JVMJasminPre
+     Pre-processing on LISTOPs requires that any we recursively call
+     `WalkOPTree', since LISTOPs can have children.
+
+     The following LISTOPs are currently supported:
+
+    leave
+          A "leave" LISTOP will be the parent of a number of OPs.
+          Therefore, we  process all the sub-OPs *in order* on the
+          pre-processing step.
+
+    print
+          For a "print" LISTOP, we need to process the kids in reverse
+          order, save pushing the `LIST_MARK', which must happen first
+          (the "print" post-processing depends on the mark being there).
+          As in many instances, Perl appears to its own stack like a queue
+          at times, and this causes problems, since we are using the JVM
+          operand stack.  In other words, for a "print" LISTOP, the Perl
+          stack looks like this (left is top):
+
+          LIST_MARK, "1", "2\n"
+
+          However, this would print the string "12\n", not "2\n1".  It's
+          as if Perl first finds the mark, and then processes from the
+          mark to the end of the stack as a queue!  (This behavior is
+          probably documented somewhere else, but I just discovered it
+          serendipitously (perhaps I should read documentation more :)).
+          So, to process a "print" statement, we grab the "pushmark" OP
+          first, process that, and then call `WalkOPTree' recursively in
+          reverse for the rest of the sub-OPs.
+
+    list
+          On a "list" LISTOP, there is no need to "pushmark" (I think :).
+          When the "list" LISTOP completes (at least from analyzing perl
+          -Dts output) the mark simply disappears.  It doesn't appear to
+          be there for any other operation but the "list" LISTOP itself.
+          If this isn't correct, this code will need to be corrected.
+
+          In addition, the list is reversed on the JVM operand stack, just
+          as is done with the "print" LISTOP.
+
+          No post-processing is needed (I think :), because the "list"
+          LISTOP just sets up arguments for another OP.
+
+    scope
+          A "scope" LISTOP will be the parent of a number of OPs.
+          Therefore, we process all the sub-OPs *in order* on the
+          pre-processing step.  May processing may be needed, but I
+          haven't discovered that it is yet.
+
+B::LISTOP::JVMJasminPost
+     Post-processing on LISTOPs is often required, since the sub-OPs often
+     set up arguments for processing.
+
+     The following LISTOPs currently have post-processing done:
+
+    print
+          At this point, the pre-processing should have set up the
+          arguments to "print" on the JVM operand stack.  A `LIST_MARK'
+          should mark the end of the argument list on the JVM operand
+          stack.  A temporary variable is used to store the return value
+          of the print statement.  It is and'ed with each
+          `Functions.print' call return.
+
+          At the end, we build a `StackElement' containing a Scalar that
+          represents the final integer return value of the print statement.
+
+B::COP::JVMJasminPre
+     The following COPs are currently supported:
+
+    nextstate
+          The "nextstate" COP clears the JVM operand stack.  It finds the
+          `STATE_MARK', which indicates where and remaining data ends.
+
+          The `STATE_MARK' is left on the stack.
+
+B::COP::JVMJasminPost
+B::SVOP::JVMJasminPre
+     The following SVOPs are currently supported:
+
+    const
+          On a "const" SVOP, a Scalar and a `StackElement' to hold it must
+          be built.  This is done by grabbing the `cstring()' of the PV
+          associated with the SV we are given.  I don't know if every SV
+          supports the PV() method, my thought is that it doesn't and this
+          will need to be rewritten to handle other types of SVs.
+
+          All this is done in pre-processing, no post-processing is
+          necessary; the `StackElement' need only be left on the stack for
+          whatever OP needs it.
+
+B::SVOP::JVMJasminPost
+     No post-processing is currently required for SVOPs.
+
+B::BINOP::JVMJasminPre
+     Pre-processing on BINOPs requires that any we recursively call
+     `WalkOPTree', for the two sub-ops
+
+     The following BINOPs are currently supported:
+
+    sassign
+          To pre-process an "sassign" BINOP, we need only process the two
+          sub-OPs.  We do so in, so that in post-processing, we can assume
+          that the left-hand-side of the assignment is first on the stack,
+          and the right-hand-side is the second down element on the stack.
+
+          The post-processing actually does the assignment.
+
+    concat
+          To pre-process a "concat" BINOP, we need only process the two
+          sub-OPs.  We do so in order.  Post processing would be easier if
+          it was done in reverse order (since the top of the JVM operand
+          stack would be the result we need to keep), but it is imperative
+          we go in order for cascading operations to have the proper
+          semantics.
+
+    seq and sne
+          To pre-process a "seq" and "sne" BINOPs, we need to process the
+          two sub-OPs.  We do so in order.  Post processing would be
+          easier if it was done in reverse order (since the top of the JVM
+          operand stack would be the result we need to keep), but it is
+          imperative we go in order for cascading operations to have the
+          proper semantics.
+
+B::BINOP::JVMJasminPost
+     Currently, post-processing occurs on the following BINOPs:
+
+    sassign
+          On post-processing, the "sassign" BINOP expects there to be two
+          `StackElement's on the JVM operand stack.  The top is the
+          left-hand-side of the "sassign", and below that (on the operand
+          stack) is the right-hand-side of the "sassign".  Both Scalar
+          quantities will be wrapped in `StackElements'.
+
+          So, both `StackElement's are converted into Scalar.  To do this,
+          the function TurnStackElementsToScalars is called, and told to
+          leave the stack elements in an array.  The array that is
+          returned is used set up the Scalars for assignment.
+
+          Then, to to perform the actual assignment, `assignFromScalar' is
+          used.
+
+          Finally, note as well that the left-hand-side `StackElement' is
+          saved, as this should be the "return value" of the "sassign".
+          It is left on the JVM operand stack at the end.
+
+    concat
+          On post-processing, the "concat" BINOP expects there to be two
+          `StackElement's on the JVM operand stack.  The top is the
+          right-operand of the "concat", and below that (on the operand
+          stack) is the left-operand of the "concat".  Both Scalar
+          quantities will be wrapped in `StackElements'.
+
+          So, both `StackElement's are converted into Scalar.  To do this,
+          the function TurnStackElementsToScalars is called, and is told
+          to leave the stack elements in an array.  The array that is
+          returned is used set up the Scalars for concatenation.
+
+          Then, to perform the actual concatenation, `Scalar.concat'
+          function is used.
+
+          Finally, note as well that the left-operand `StackElement' is
+          saved, as this should be the "return value" of the "concat".  It
+          is left on the JVM operand stack at the end.
+
+    seq and sne
+          On post-processing, the "seq" and "sne" BINOPs expect there to
+          be two `StackElement's on the JVM operand stack.  The top is the
+          right-operand of the "seq", and below that (on the operand
+          stack) is the left-operand of the "seq".  Both Scalar quantities
+          will be wrapped in `StackElements'.
+
+          So, both `StackElement's are converted into Scalar.  To do this,
+          the function TurnStackElementsToScalars is called, and is told
+          to leave the stack elements in an array.  The array that is
+          returned is used set up the Scalars for comparison.
+
+          Then, to perform the actual comparison, `Scalar.seq' function is
+          used.
+
+          Then, we use that return value to create a new Scalar, wrapped
+          in a `StackElement', which is left on the stack at the end.
+
+B::UNOP::JVMJasminPre
+     Pre-processing on UNOPs requires that any we recursively call
+     `WalkOPTree', for the two sub-ops
+
+     The following UNOPs are currently supported:
+
+    null
+          On "null" UNOPs, we simply process the sub-OP.  More interesting
+          stuff happens in the post-processing.
+
+B::UNOP::JVMJasminPost
+     Post-processing on UNOPs is required because some flags needed to be
+     checked.  The results of the UNOP's child may require manipulation
+     based on these flags.
+
+     The following UNOPs currently require post-processing:
+
+    null
+          On a "null" UNOP, we need to check to see if the OPf_MOD flag is
+          on.  If it is not, then we need to make a copy of the Scalar
+          result (wrapped in a `StackElement' on the stack.  We canno
+          inadvertently modify the l-value of a variable, so we make the
+          copy.
+
+          If OPf_MOD is on, we need an l-value on the stack anyway, so
+          things can be left alone.
+
+B::GVOP::JVMJasminPre
+     The following GVOPs are currently supported:
+
+    gvsv
+          To pre-process a "gvsv" GVOP, we must find the correct Scalar
+          object.
+
+          First, the `DEF_STASH' is put on the JVM operand stack.  Then,
+          if this is not a variable in "main" namespace, we use that
+          `DEF_STASH' to find the proper `Stash' (this part not yet
+          working FIXME).  Once the required `Stash' is found, the proper
+          GV is obtained, using methods from the `Stash' class).  The
+          Scalar is retrieved from that GV.  The Scalar is then wrapped in
+          a `StackElement' object.
+
+B::GVOP::JVMJasminPost
+     Post-processing is not currently required on any GVOPs.
+
+B::LOGOP::JVMJasminPre
+     Pre-processing on LOGOPs requires that any we recursively call
+     `WalkOPTree', for the 3 sub-OPs.
+
+     The following LOGOPs are currently supported:
+
+    cond_expr
+          For an "cond_expr" LOGOP, we should have exactly three sub-OPs.
+          This is a basic "if-else" structure (I think :).  The first
+          sub-OP will be the condition, the second sub-OP will be the
+          block that should be executed if the condition is false, and the
+          third is the block that should be executed if the condition is
+          true.
+
+          So, we process each OP, and surround it with the logic that is
+          required to carry out the conditional.
+
+B::LOGOP::JVMJasminPost
+     Currently, post-processing occurs on the following LOGOPs:
+
+    ""
+ClearOperandStackToStateMark
+     usage: `ClearOperandStackToStateMark($emitter, $curMethod,
+     $leaveStateMark);'
+
+     This subroutine emits the required code to clear the JVM operand
+     stack until a `StackElement' which is a state mark is reached.  It
+     emits the code using the given `$emitter' and to the method,
+     `$curMethod'.
+
+     If `$leaveStateMark' is defined and true, then the `STATE_MARK' is
+     left on the stack, otherwise the `STATE_MARK' is removed.
+
+TurnStackElementsToScalars
+     usage: `TurnStackElementsToScalars($emitter, $curMethod, $count,
+     $leaveArray);'
+
+     This subroutine emits the required code to take $count `StackElement's
+     off the stack and turn them back into Scalars.
+
+     It is completely required, that this function be called only if the
+     top $count elements on the JVM operand stack be `StackElement'
+     objects who have valid elements.
+
+     To do this, an array of Scalars is built.  A loop runs, getting the
+     Scalar elements from the `StackElement's on the stack.
+
+     If `$leaveArray' is defined and true, then the variable name of the
+     array is simply returned.  The array variable returned as yet to be
+     freed.
+
+     If `$leaveArray' not defined or is false, then, another loop runs to
+     push all the Scalars back onto the stack *in the same order*.  The
+     array varable is not returned (an empty string is returned instead).
+     The array variable will be freed in this case.
+
+

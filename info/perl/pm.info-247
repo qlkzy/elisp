@@ -1,0 +1,1950 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Net/Bind,  Next: Net/Bind/Resolv,  Prev: Net/APP,  Up: Module List
+
+load various Net::Bind modules
+******************************
+
+NAME
+====
+
+   Net::Bind - load various Net::Bind modules
+
+SYNOPSIS
+========
+
+     use Net::Bind;
+
+DESCRIPTION
+===========
+
+   `Net::Bind' provides a simple mechanism to load all of the `Net::Bind'
+modules in one fell swoop.
+
+   Currently, this includes the following modules:
+
+     Net::Bind::Resolv
+
+   Futures releases will include:
+
+     Net::Bind::Boot
+     Net::Bind::Zone
+     Net::Bind::Dump
+     Net::Bind::Conf
+
+AUTHOR
+======
+
+   Kevin Johnson <`kjj@pobox.com'>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997 Kevin Johnson <kjj@pobox.com>.
+
+   All rights reserved. This program is free software; you can
+redistribute it and/or modify it under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Bind/Resolv,  Next: Net/Bind/Utils,  Prev: Net/Bind,  Up: Module List
+
+a class to munge /etc/resolv.conf data.
+***************************************
+
+NAME
+====
+
+   Net::Bind::Resolv - a class to munge /etc/resolv.conf data.
+
+SYNOPSIS
+========
+
+   `use Net::Bind::Resolv;'
+
+DESCRIPTION
+===========
+
+   This class provides an object oriented perl interface to
+`/etc/resolv.conf' data.
+
+   Here is an example snippet of code:
+
+     use Net::Bind::Resolv;
+     my $res = new Net::Bind::Resolv('/etc/resolv.conf');
+     print $res->domain, "\n";
+
+   Or how about:
+
+     use Net::Bind::Resolv;
+     use IO::File;
+     my $res = new Net::Bind::Resolv;
+     $res->comment("Programmatically generated\nDo not edit by hand");
+     $res->domain('arf.fz');
+     $res->nameservers('0.0.0.0');
+     $res->options('debug');
+     print $res->as_string;
+
+METHODS
+=======
+
+new([$filename])
+----------------
+
+   Returns a reference to a new `Net::Bind::Resolv' object.  If $filename
+is given then use that pass the value to a call to `read_from_file'.
+
+read_from_string($string)
+-------------------------
+
+   Populates the object with the parsed contents of $string.  Returns 1 is
+no errors were encounters, otherwise it returns 0.
+
+   The following directives are understood.
+
+   * domain DOMAIN
+
+   * search SEARCHLIST...
+
+     If a search directive and domain directive are found in the same
+     file, the last one encountered will be recorded and all previous ones
+     will be ignored.
+
+   * nameserver IP_ADDR
+
+     Each instance of a nameserver directive will cause the given
+     `IP_ADDR' to be remembered.
+
+   * sortlist SORTLIST...
+
+   * options OPTIONS...
+
+   There are very few requirements placed on the data in $string.
+Multiple entries of certain directives, while technically incorrect, will
+cause the last occurrence of the given directive to be the one remembered.
+If there is sufficient precedence for this to be otherwise, let me know.
+
+   There is no requirement for the arguments to the directives to be valid
+pieces of data.  That job is delagated to local policy methods to be
+applied against the object.
+
+read_from_file($filename)
+-------------------------
+
+   Populates the object with the parsed contents of $filename.  This
+really just a wrapper around `read_from_string'.  Returns 0 if errors were
+encountered, otherwise it returns 1.
+
+clear
+-----
+
+   Zeros out the internal data in the object.  This needs to be done if
+multiple `read_from_string' methods are called on a given
+`Net::Bind::Resolv' object and you do not want to retain the previous
+values in the object.
+
+domain([$domain])
+-----------------
+
+   Returns the value of the domain directive.  If $domain is specified,
+then set the domain to the given value and the searchlist, if defined in
+the object, is undefined.
+
+nameservers([@values])
+----------------------
+
+   Returns (in order) the list of nameserver entries.  If called in an
+array context it returns an array, otherwise it returns an array reference.
+
+   If `@values' is specified, then set the nameserver list to the given
+values.  Any items in `@values' that are list references are dereferences
+as they are added.
+
+searchlist([@values])
+---------------------
+
+   Returns an array reference containing the items for the search
+directive.  If called in an array context it returns an array, otherwise
+it returns an array reference.
+
+   If a list of values is specified, then set the searchlist to those
+values and the domain, if defined in the object, is undefined.  Any items
+in `@values' that are list references are dereferenced as they are added.
+
+sortlist([@values])
+-------------------
+
+   Returns an array reference containing the items for the `sortlist'
+directive.  If called in an array context it returns an array, otherwise
+it returns an array reference.
+
+   If a list of values is specified, then set the sortlist to those
+values.  Any items in `@values' that are list references are dereferenced
+as they are added.
+
+options([@values])
+------------------
+
+   Returns the items for the options directive.  If called in an array
+context it returns an array, otherwise it returns an array reference.
+
+   If a list of values is specified, then set the options to those values.
+Any items in `@values' that are list references are dereferenced as they
+are added.
+
+comments([@strings])
+--------------------
+
+   Returns the comments for the object.  If called in an array context it
+returns an array, otherwise it returns an array reference.
+
+   If a list of strings is specified, then set the comments to those
+values after splitting the items on a `NEWLINE' boundary.  This allows
+several combinations of arrays, array refs, or strings with embedded
+newlines to be specified.  There is no need to prefix any of the comment
+lines with a comment character (`[;\#]'); the as_string automagically
+commentifies (:-) the comment strings.
+
+   Any items in `@strings' that are list references are dereferenced as
+they are added.
+
+as_string
+---------
+
+   Returns a string representing the contents of the object.  Technically,
+this string could be used to populate a `resolv.conf' file, but use print
+for that.  The <print> method is a wrapper around this method.  The data
+is generated in the following order:
+
+     comments
+     domain	(mutually exclusive with search)
+     search	(mutually exclusive with domain)
+     nameservers   (one line for each nameserver entry)
+     sortlist
+     options
+
+print($fh)
+----------
+
+   A wrapper around as_string that prints a valid `resolver(5)'
+representation of the data in the object to the given filehandle.
+
+check([$policy])
+----------------
+
+   Performs a policy/validity check of the data contained in the object
+using the given subroutine `&policy'.  The given `$policy' routine is
+called as `&$policy($self)'.  If `$policy' is not given it defaults to
+using default_policy_check.  It returns the return status of the policy
+check routine.
+
+default_policy_check
+--------------------
+
+   A simple wrapper around various `check_*' methods.
+
+check_domain
+------------
+
+   Returns 1 if the domain member of the object is defined and is a valid
+rfc1035 domain name, otherwise returns 0.
+
+check_searchlist
+----------------
+
+   Returns 1 if the searchlist member of the object is defined and
+contains only valid rfc1035 domain names, otherwise returns 0.
+
+check_nameservers
+-----------------
+
+   Returns 1 if the nameservers member of the object is defined and
+contains only ip-addresses, otherwise returns 0.
+
+   Uses `valid_ip' to do the real work.
+
+check_sortlist
+--------------
+
+   Returns 1 if the sortlist member of the object is defined and contains
+only ip-address/netmasks, otherwise returns 0.
+
+   Uses `valid_netmask' to do the real work.
+
+check_options
+-------------
+
+   Returns 1 if the options member of the object is empty or contains only
+valid options, otherwise returns 0.
+
+   Currently recognized options are:
+
+   * debug
+
+   * ndots:N
+
+qtynameservers
+--------------
+
+   Returns the quantity of nameserver entries present.
+
+CAVEATS
+=======
+
+   The `read_from_{file|string}' methods and the print method are not
+isomorphic.  Given an arbitrary file or string which is read in, the
+output of print is not guaranteed to be an exact duplicate of the original
+file.  In the special case of files that are generated with this module,
+the results will be isomorphic, assuming no modifications were made to the
+data between when it was read in and subsequently written back out.
+
+   Since Net::Bind::Resolv does not impose many requirements on the values
+of the various directives present in a `/etc/resolv.conf' file, it is
+important to apply the appropriate policy methods against the object
+before writing it to a file that will be used by the resolver.  Consider
+yourself warned!
+
+AUTHOR
+======
+
+   Kevin Johnson <`kjj@pobox.com'>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997 Kevin Johnson <kjj@pobox.com>.
+
+   All rights reserved. This program is free software; you can
+redistribute it and/or modify it under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Bind/Utils,  Next: Net/CDDBScan,  Prev: Net/Bind/Resolv,  Up: Module List
+
+various routines common across Net::Bind packages.
+**************************************************
+
+NAME
+====
+
+   Net::Bind::Utils - various routines common across Net::Bind packages.
+
+DESCRIPTION
+===========
+
+   A catch-all place for various routines that useful across most, if not
+all, of the `Net::Bind' interfaces.
+
+   This module is not designed to be subclassable.
+
+ROUTINES
+========
+
+valid_domain($domain)
+---------------------
+
+   Returns 1 if the given $domain string is defined and is a valid rfc1035
+domain name, otherwise returns 0.
+
+valid_ip($ip)
+-------------
+
+   Returns 1 if the given $ip string is defined and is an ip address,
+otherwise returns 0.
+
+   The check for a valid ip address is currently very simple minded.  It
+merely checks for a dotted-quad with all non-negative numbers with no
+number larger than 254.
+
+valid_netmask($netmask)
+-----------------------
+
+   Returns 1 if the given `$netmask' string is defined and is a netmask,
+otherwise return 0.
+
+   The check for a valid netmask is currently very simple minded.  It
+merely checks for a dotted-quad with all non-negative numbers with no
+number larger than 255.
+
+AUTHOR
+======
+
+   Kevin Johnson <`kjj@pobox.com'>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997 Kevin Johnson <kjj@pobox.com>.
+
+   All rights reserved. This program is free software; you can
+redistribute it and/or modify it under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/CDDBScan,  Next: Net/Cmd,  Prev: Net/Bind/Utils,  Up: Module List
+
+String search interface to CDDB datbase
+***************************************
+
+NAME
+====
+
+   Net::CDDBScan - String search interface to CDDB datbase
+
+SYNOPSIS
+========
+
+   `use Net::CDDBScan;'
+
+     Grab a list of all songs for Madonna
+     	$cddb = Net::CDDBScan->new(CONT =>1);
+     $songs = $cddb->getsongs("madonna");
+     print $songs{$_},'\n' foreach %{$songs};
+     $cddb->close();
+
+DESCRIPTION
+===========
+
+   Net::CDDBScan is an interface to the www.cddb.com website; or more
+specifically to their online search engine for the cddb database.
+Originally created as a small part of a greater application.  This module
+allows you to take any existing string like "tricky" or "for whom the bell
+tolls" and get the artist name, all albums from said artist and all songs
+on ANY album said artist has ever worked on. (Or close enough: This is
+assuming the cddb database has a record of the given artist/album/song.)
+
+USING Net::CDDBScan
+===================
+
+*1. Creating a Net::CDDBScan object*
+     You first must create a Net::CDDBScan object.
+
+     `my $cddb = Net::CDDBScan->new()'
+
+     new() has the following optional parameters:
+
+          DEBUG: Debug has 2 levels, the first level shows all urls, albums
+          and songs as it finds them. The second level also shows all internal function
+          calls.  You shouldn't ever need to use level 2 but it's there if you feel
+          the need.
+
+     DEBUG
+
+     Level 1: *`$cddb = Net::CDDBScan->new(DEBUG =>1)'*
+
+     Level 2: *`$cddb = Net::CDDBScan->new(DEBUG =>2)'*
+
+     Pretty simple I would think.  These currently print to stdout, but I
+     may change that to stderr in the future as it would seem easier to
+     redirect to error logs all debug output without also getting the std
+     output you may still want in stdout.
+
+     *CONT*
+
+     CONT is used to tell Net::CDDBScan if you want it to continue or not.
+     Default is no since it can take longer then you may desire. If you
+     ask for a list of albums for the band Portishead.
+
+     *`$albums = $cddb->getalbums("portishead");'*
+
+     Net::CDDBScan will retrieve a list of albums, but only one page
+     worth, that is it will only grab 1 html page worth of data (usually
+     7-9 items).  But, if you want Net::CDDBScan to get ALL albums for a
+     band, then you can set CONT as:
+
+     *`$cddb = Net::CDDBScan->new(CONT =>1);'*
+
+     This will cause Net::CDDBScan to continue through all pages gathering
+     albums until none are left.  NOTE: This also works for songs, but not
+     for artist (since one entry is enough to tell us who the artist is.
+     This may change in the future as you may want to know all possible
+     artists for a song or album).
+
+*2. Getting a list of all albums for a given artist.*
+     getalbums()
+
+     NOTE: Must use the *CONT* contructor option to get 'ALL' albums
+
+     $albums = $cddb->getalbums("medusa");
+
+     print $albums{$_},'\n' foreach (keys %$albums);
+
+     Returns a reference to a hash of album urls and names (The key is the
+     url and the value is the album name). This function also takes any
+     cddb.com url or partial url in the following formats:
+
+     *http://www.cddb.com/xm/search?f=artist&q=medusa*
+
+     *www.cddb.com/xm/search?f=artist&q=medusa*
+
+     */xm/search?f=artist&q=medusa*
+
+     */xm/search?q=medusa*
+
+     *medusa* etc... you get the idea.
+
+     The reason for taking all these types of urls/strings is based on the
+     internal usage of this function.  These formats are not planned to
+     change.
+
+*3. Getting a list of all songs for all albums of a given artist.*
+     getsongs()
+
+          $songs = $cddb->getsongs("cocteau twins");
+          print $songs{$_},'\n' foreach (keys %$songs);
+
+     This function accepts all the url/string formats that *getalbums()*
+     takes and otherwise acts just like getalbums() including returning a
+     hashref of urls and song names.
+
+*4. Determining an Artist name based on an album or song name.*
+     getartist()
+
+     "Mezzanine" is the name of a Massive Attach album
+
+     $artist = $cddb->getartist("mezzanine");
+
+     NOTE: Currently you cannot do:
+
+     $artist = $cddb->getartist('less then strangers');
+
+     i.e. You cannot use ANY string for an artist search.  Sorry, it's a
+     limitation of the cddb.com search engine.  I'm currently working on a
+     work-around. You can use any of the cddb url formats listed above.
+
+     $songs = $cddb->getsongs('less then strangers');
+
+     @urls = key %{$songs};
+
+     $artist = $cddb->getartist($urls[0]);
+
+NOTICE
+======
+
+   Be aware this module is in *BETA* stage.  Some major changes have
+happened as I said they would. The biggest change is that getalbums() and
+getsongs() return hashrefs instead of arrayrefs now. Sorry for the change,
+but this makes room for much more functionality down the road. More
+changes are expected which will allow much cleaner usage, much more
+functionality and caching of data to a local cddb database (optional). If
+you have any comments, suggestions and/or patches you'd like to submit.
+Please email me at dshultz@redchip.com
+
+AUTHOR
+======
+
+   Copyright 1998-2000, David J. Shultz All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.  Address bug reports and comments to:
+dshultz@redchip.com
+
+BUGS
+====
+
+   This section intentionally left blank.
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: Net/Cmd,  Next: Net/Config,  Prev: Net/CDDBScan,  Up: Module List
+
+Network Command class (as used by FTP, SMTP etc)
+************************************************
+
+NAME
+====
+
+   Net::Cmd - Network Command class (as used by FTP, SMTP etc)
+
+SYNOPSIS
+========
+
+     use Net::Cmd;
+     
+     @ISA = qw(Net::Cmd);
+
+DESCRIPTION
+===========
+
+   `Net::Cmd' is a collection of methods that can be inherited by a sub
+class of IO::Handle. These methods implement the functionality required
+for a command based protocol, for example FTP and SMTP.
+
+USER METHODS
+============
+
+   These methods provide a user interface to the `Net::Cmd' object.
+
+debug ( VALUE )
+     Set the level of debug information for this object. If VALUE is not
+     given then the current state is returned. Otherwise the state is
+     changed to VALUE and the previous state returned.
+
+     Set the level of debug information for this object. If no argument is
+     given then the current state is returned. Otherwise the state is
+     changed to $valueand the previous state returned.  Different packages
+     may implement different levels of debug but, a  non-zero value result
+     in copies of all commands and responses also being sent to STDERR.
+
+     If VALUE is undef then the debug level will be set to the default
+     debug level for the class.
+
+     This method can also be called as a static method to set/get the
+     default debug level for a given class.
+
+message ()
+     Returns the text message returned from the last command
+
+code ()
+     Returns the 3-digit code from the last command. If a command is
+     pending then the value 0 is returned
+
+ok ()
+     Returns non-zero if the last code value was greater than zero and
+     less than 400. This holds true for most command servers. Servers
+     where this does not hold may override this method.
+
+status ()
+     Returns the most significant digit of the current status code. If a
+     command is pending then `CMD_PENDING' is returned.
+
+datasend ( DATA )
+     Send data to the remote server, converting LF to CRLF. Any line
+     starting with a '.' will be prefixed with another '.'.  DATA may be
+     an array or a reference to an array.
+
+dataend ()
+     End the sending of data to the remote server. This is done by
+     ensuring that the data already sent ends with CRLF then sending
+     '.CRLF' to end the transmission. Once this data has been sent dataend
+     calls response and returns true if response returns CMD_OK.
+
+CLASS METHODS
+=============
+
+   These methods are not intended to be called by the user, but used or
+over-ridden by a sub-class of `Net::Cmd'
+
+debug_print ( DIR, TEXT )
+     Print debugging information. DIR denotes the direction *true* being
+     data being sent to the server. Calls debug_text before printing to
+     STDERR.
+
+debug_text ( TEXT )
+     This method is called to print debugging information. TEXT is the
+     text being sent. The method should return the text to be printed
+
+     This is primarily meant for the use of modules such as FTP where
+     passwords are sent, but we do not want to display them in the
+     debugging information.
+
+command ( CMD [, ARGS, ... ])
+     Send a command to the command server. All arguments a first joined
+     with a space character and CRLF is appended, this string is then sent
+     to the command server.
+
+     Returns undef upon failure
+
+unsupported ()
+     Sets the status code to 580 and the response text to 'Unsupported
+     command'.  Returns zero.
+
+response ()
+     Obtain a response from the server. Upon success the most significant
+     digit of the status code is returned. Upon failure, timeout etc.,
+     undef is returned.
+
+parse_response ( TEXT )
+     This method is called by response as a method with one argument. It
+     should return an array of 2 values, the 3-digit status code and a
+     flag which is true when this is part of a multi-line response and
+     this line is not the list.
+
+getline ()
+     Retrieve one line, delimited by CRLF, from the remote server. Returns
+     undef upon failure.
+
+     NOTE: If you do use this method for any reason, please remember to add
+     some debug_print calls into your method.
+
+ungetline ( TEXT )
+     Unget a line of text from the server.
+
+read_until_dot ()
+     Read data from the remote server until a line consisting of a single
+     '.'.  Any lines starting with '..' will have one of the '.'s removed.
+
+     Returns a reference to a list containing the lines, or undef upon
+     failure.
+
+EXPORTS
+=======
+
+   `Net::Cmd' exports six subroutines, five of these, `CMD_INFO', `CMD_OK',
+`CMD_MORE', `CMD_REJECT' and `CMD_ERROR' ,correspond to possible results
+of response and status. The sixth is `CMD_PENDING'.
+
+AUTHOR
+======
+
+   Graham Barr <gbarr@pobox.com>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1995-1997 Graham Barr. All rights reserved.  This program
+is free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Config,  Next: Net/DLookup,  Prev: Net/Cmd,  Up: Module List
+
+Local configuration data for libnet
+***********************************
+
+NAME
+====
+
+   Net::Config - Local configuration data for libnet
+
+SYNOPSYS
+========
+
+     use Net::Config qw(%NetConfig);
+
+DESCRIPTION
+===========
+
+   `Net::Config' holds configuration data for the modules in the libnet
+distribuion. During installation you will be asked for these values.
+
+   The configuration data is held globally in a file in the perl
+installation tree, but a user may override any of these values by
+providing thier own. This can be done by having a `.libnetrc' file in
+thier home directory. This file should return a reference to a HASH
+containing the keys described below.  For example
+
+     # .libnetrc
+     {
+         nntp_hosts => [ "my_prefered_host" ],
+     	ph_hosts   => [ "my_ph_server" ],
+     }
+     __END__
+
+METHODS
+=======
+
+   `Net::Config' defines the following methods. They are methods as they
+are invoked as class methods. This is because `Net::Config' inherits from
+`Net::LocalCfg' so you can override these methods if you want.
+
+requires_firewall HOST
+     Attempts to determine if a given host is outside your firewall.
+     Possible return values are.
+
+          -1  Cannot lookup hostname
+           0  Host is inside firewall (or there is no ftp_firewall entry)
+           1  Host is outside the firewall
+
+     This is done by using hostname lookup and the local_netmask entry in
+     the configuration data.
+
+NetConfig VALUES
+================
+
+nntp_hosts
+snpp_hosts
+
+pop3_hosts
+smtp_hosts
+ph_hosts
+daytime_hosts
+time_hosts
+     Each is a reference to an array of hostnames (in order of preference),
+     which should be used for the given protocol
+
+inet_domain
+     Your internet domain name
+
+ftp_firewall
+     If you have an FTP proxy firewall (*NOT* a HTTP or SOCKS firewall)
+     then this value should be set to the firewall hostname. If your
+     firewall does not listen to port 21, then this value should be set to
+     `"hostname:port"' (eg `"hostname:99"')
+
+ftp_ext_passive
+ftp_int_pasive
+     FTP servers normally work on a non-passive mode. That is when you
+     want to transfer data you have to tell the server the address and
+     port to connect to.
+
+     With some firewalls this does not work as te server cannot connect to
+     your machine (because you are beind a firewall) and the firewall does
+     not re-write te command. In this case you should set ftp_ext_passive
+     to a *true* value.
+
+     Some servers are configured to only work in passive mode. If you have
+     one of these you can force `Net::FTP' to always transfer in passive
+     mode, when not going via a firewall, by cetting `ftp_int_passive' to
+     a *true* value.
+
+local_netmask
+     A reference to a list of netmask strings in the form
+     `"134.99.4.0/24"'.  These are used by the requires_firewall function
+     to determine if a given host is inside or outside your firewall.
+
+   The following entries are used during installation & testing on the
+libnet package
+
+test_hosts
+     If true them make test may attempt to connect to hosts given in the
+     configuration.
+
+test_exists
+     If true the Configure will check each hostname given that it exists
+
+
+File: pm.info,  Node: Net/DLookup,  Next: Net/DNS,  Prev: Net/Config,  Up: Module List
+
+Perform domain lookups on 2-letter and 3-letter TLDs
+****************************************************
+
+NAME
+====
+
+   Net::DLookup - Perform domain lookups on 2-letter and 3-letter TLDs
+
+SYNOPSIS
+========
+
+     use Net::DLookup;
+
+     # Initialize Net::DLookup object
+     my $dlu = Net::DLookup -> new;
+
+     # Replace domain definitions from a file
+     $dlu -> LoadTLD($file, 1);
+
+     # Add domain definitions from a file
+     $dlu -> LoadTLD($file, 0);
+
+     # Check domain name validity and assign it to the object
+     @errors = $dlu -> IsValid($domain);
+
+     # Return availability
+     @response = $dlu -> DoWhois(0);
+
+     # Return availability and registrar information
+     @response = $dlu -> DoWhois(1);
+
+DESCRIPTION
+===========
+
+   Net::DLookup performs domain lookups for 2-letter and 3-letter top
+level domains.  It also verifies the validity of domain names by checking
+punctuation, length, metacharacters, etc..
+
+   Information for currently recognized top level domains is included
+within the module. This list may be replaced or added to by calling
+$dlu->LoadTLD().
+
+   With the advent of new registrars for 3-letter top level domains, it's
+become difficult to get the whois output from a single domain lookup,
+unless you know what registration agency to look at.  Net::DLookup solves
+this problem by checking Internic's database first and then performing a
+second query to the respective registrar for full whois output.
+
+USAGE
+=====
+
+   These functions must be used in order:
+
+   Of course:
+
+     use Net::DLookup;
+
+   Create an object that contains the default top level domains.
+
+     my $dlu = Net::DLookup -> new;
+
+   Validate domain name ($domaintocheck) and associate it with the object.
+This must be the full domain name, such as yourdomain.com.
+
+     my @errors = $dlu -> IsValid($domaintocheck);
+
+   It checks for the following possible errors:
+
+Is 67 characters or less for 3-letter TLDs
+Is not a 3rd level domain for 3-letter TLDs (me.yourdomain.com)
+Is 26 characters or less for 2-letter TLDs
+Is not a 4th level domain for 2-letter TLDs (me.yourdomain.co.uk)
+Does not start or end with a non-alphanumeric character
+Does not contain non alphanumeric characters (except a dash) within the domain name
+Is a valid TLD*
+   * All CCTLDs (Country Code TLDs) currently listed at IANA as well as
+the .com, .net, .org, .edu and .mil are checked
+
+   @errors will contain a list of all possible errors that the domain name
+may have, such as:
+
+Domain name can't start or end with non-alphanumeric character.
+Domains with the .com extension cannot exceed 67 characters.
+   Last, the domain lookup.
+
+     @response = $domain->Net::DLookup::DoWhois();
+
+Is domain registered?   1 for yes; 0 for no
+Name of Registration Agency or Country
+URL of Registration Agency for TLD
+Whois Server for TLD
+Whois Output
+A "worded" reponse for domain availability "{domain} is available"
+   If you're looking up a 3-letter TLD domain (.com, .net, .org, .edu and
+.mil), you have the choice to NOT perform the second lookup.  This would
+be useful if you're just checking for domain availability and don't care
+who's already registered it.  You can disable the second lookup by
+removing the 1.  This will give you Internic's plain Jane, uninformative
+whois information.
+
+     @response = $domain->Net::DLookup::DoWhois(1);
+
+RESTRICTIONS
+============
+
+   Net::DLookup requires that the Sockets (included with the Perl
+distribution) module is installed.
+
+VERSION
+=======
+
+   Net::DLookup Version 1.01  6/10/2000
+
+CAVEATS
+=======
+
+   Registration agencies are finicky beasts.  They may change their whois
+server, urls, or responses (that this module relies on) without notice.
+As of 6/10/2000, the agency data in the module is accurate.
+
+CREDITS
+=======
+
+   Many thanks goes to Michael Chase for the new LoadTLD() and DumpTLD()
+routines.
+
+AUTHOR
+======
+
+   D. Jasmine Merced  <djasmine@tnsgroup.com>, CPAN ID: DJASMINE
+
+   The Perl Archive  <http://www.perlarchive.com>
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.  If you make modifications, the
+author would like to know so that they can be incorporated into future
+releases.
+
+
+File: pm.info,  Node: Net/DNS,  Next: Net/DNS/Header,  Prev: Net/DLookup,  Up: Module List
+
+Perl interface to the DNS resolver
+**********************************
+
+NAME
+====
+
+   Net::DNS - Perl interface to the DNS resolver
+
+SYNOPSIS
+========
+
+   `use Net::DNS;'
+
+DESCRIPTION
+===========
+
+   Net::DNS is a collection of Perl modules that act as a Domain Name
+System (DNS) resolver.  It allows the programmer to perform DNS queries
+that are beyond the capabilities of gethostbyname and gethostbyaddr.
+
+   The programmer should be somewhat familiar with the format of a DNS
+packet and its various sections.  See RFC 1035 or *DNS and BIND* (Albitz &
+Liu) for details.
+
+Resolver Objects
+----------------
+
+   A resolver object is an instance of the `Net::DNS::Resolver' class.  A
+program can have multiple resolver objects, each maintaining its own state
+information such as the nameservers to be queried, whether recursion is
+desired, etc.
+
+Packet Objects
+--------------
+
+   `Net::DNS::Resolver' queries return `Net::DNS::Packet' objects.  Packet
+objects have five sections:
+
+   * The header section, a `Net::DNS::Header' object.
+
+   * The question section, a list of `Net::DNS::Question' objects.
+
+   * The answer section, a list of `Net::DNS::RR' objects.
+
+   * The authority section, a list of `Net::DNS::RR' objects.
+
+   * The additional section, a list of `Net::DNS::RR' objects.
+
+   The `Net::DNS::Update' package is a front-end to `Net::DNS::Packet' for
+creating packet objects to be used in dynamic updates.
+
+Header Objects
+--------------
+
+   `Net::DNS::Header' objects represent the header section of a DNS packet.
+
+Question Objects
+----------------
+
+   `Net::DNS::Question' objects represent the question section of a DNS
+packet.
+
+RR Objects
+----------
+
+   `Net::DNS::RR' is the base class for DNS resource record (RR) objects in
+the answer, authority, and additional sections of a DNS packet.
+
+   Don't assume that RR objects will be of the type you requested - always
+check an RR object's type before calling any of its methods.
+
+METHODS
+=======
+
+   See the manual pages listed above for other class-specific methods.
+
+version
+-------
+
+     print Net::DNS->version, "\n";
+
+   Returns the version of Net::DNS.
+
+mx
+--
+
+     # Use a default resolver -- can't get an error string this way.
+     use Net::DNS;
+     @mx = mx("foo.com");
+
+     # Use your own resolver object.
+     use Net::DNS;
+     $res = new Net::DNS::Resolver;
+     @mx = mx($res, "foo.com");
+
+   Returns a list of `Net::DNS::RR::MX' objects representing the MX
+records for the specified name; the list will be sorted by preference.
+Returns an empty list if the query failed or no MX records were found.
+
+   This method does not look up A records - it only performs MX queries.
+
+   See `' in this node for a more complete example.
+
+yxrrset
+-------
+
+   Use this method to add an "RRset exists" prerequisite to a dynamic
+update packet.  There are two forms, value-independent and value-dependent:
+
+     # RRset exists (value-independent)
+     $packet->push("pre", yxrrset("foo.bar.com A"));
+
+   Meaning:  At least one RR with the specified name and type must exist.
+
+     # RRset exists (value-dependent)
+     $packet->push("pre", yxrrset("foo.bar.com A 10.1.2.3"));
+
+   Meaning:  At least one RR with the specified name and type must exist
+and must have matching data.
+
+   Returns a `Net::DNS::RR' object or undef if the object couldn't be
+created.
+
+nxrrset
+-------
+
+   Use this method to add an "RRset does not exist" prerequisite to a
+dynamic update packet.
+
+     $packet->push("pre", nxrrset("foo.bar.com A"));
+
+   Meaning:  No RRs with the specified name and type can exist.
+
+   Returns a `Net::DNS::RR' object or undef if the object couldn't be
+created.
+
+yxdomain
+--------
+
+   Use this method to add a "name is in use" prerequisite to a dynamic
+update packet.
+
+     $packet->push("pre", yxdomain("foo.bar.com"));
+
+   Meaning:  At least one RR with the specified name must exist.
+
+   Returns a `Net::DNS::RR' object or undef if the object couldn't be
+created.
+
+nxdomain
+--------
+
+   Use this method to add a "name is not in use" prerequisite to a dynamic
+update packet.
+
+     $packet->push("pre", nxdomain("foo.bar.com"));
+
+   Meaning:  No RR with the specified name can exist.
+
+   Returns a `Net::DNS::RR' object or undef if the object couldn't be
+created.
+
+rr_add
+------
+
+   Use this method to add RRs to a zone.
+
+     $packet->push("update", rr_add("foo.bar.com A 10.1.2.3"));
+
+   Meaning:  Add this RR to the zone.
+
+   RR objects created by this method should be added to the "update"
+section of a dynamic update packet.  The TTL defaults to 86400 seconds (24
+hours) if not specified.
+
+   Returns a `Net::DNS::RR' object or undef if the object couldn't be
+created.
+
+rr_del
+------
+
+   Use this method to delete RRs from a zone.  There are three forms:
+delete an RRset, delete all RRsets, and delete an RR.
+
+     # Delete an RRset.
+     $packet->push("update", rr_del("foo.bar.com A"));
+
+   Meaning:  Delete all RRs having the specified name and type.
+
+     # Delete all RRsets.
+     $packet->push("update", rr_del("foo.bar.com"));
+
+   Meaning:  Delete all RRs having the specified name.
+
+     # Delete an RR.
+     $packet->push("update", rr_del("foo.bar.com A 10.1.2.3"));
+
+   Meaning:  Delete all RRs having the specified name, type, and data.
+
+   RR objects created by this method should be added to the "update"
+section of a dynamic update packet.
+
+   Returns a `Net::DNS::RR' object or undef if the object couldn't be
+created.
+
+EXAMPLES
+========
+
+   The following examples show how to use the `Net::DNS' modules.  See the
+other manual pages and the demo scripts included with the source code for
+additional examples.
+
+   See the `Net::DNS::Update' manual page for an example of performing
+dynamic updates.
+
+Look up a host's addresses.
+---------------------------
+
+     use Net::DNS;
+     $res = new Net::DNS::Resolver;
+     $query = $res->search("foo.bar.com");
+     if ($query) {
+         foreach $rr ($query->answer) {
+             next unless $rr->type eq "A";
+             print $rr->address, "\n";
+         }
+     }
+     else {
+         print "query failed: ", $res->errorstring, "\n";
+     }
+
+Find the nameservers for a domain.
+----------------------------------
+
+     use Net::DNS;
+     $res = new Net::DNS::Resolver;
+     $query = $res->query("foo.com", "NS");
+     if ($query) {
+         foreach $rr ($query->answer) {
+             next unless $rr->type eq "NS";
+             print $rr->nsdname, "\n";
+         }
+     }
+     else {
+         print "query failed: ", $res->errorstring, "\n";
+     }
+
+Find the MX records for a domain.
+---------------------------------
+
+     use Net::DNS;
+     $name = "foo.com";
+     $res = new Net::DNS::Resolver;
+     @mx = mx($res, $name);
+     if (@mx) {
+         foreach $rr (@mx) {
+             print $rr->preference, " ", $rr->exchange, "\n";
+         }
+     }
+     else {
+         print "can't find MX records for $name: ", $res->errorstring, "\n";
+     }
+
+Print a domain's SOA record in zone file format.
+------------------------------------------------
+
+     use Net::DNS;
+     $res = new Net::DNS::Resolver;
+     $query = $res->query("foo.com", "SOA");
+     if ($query) {
+         ($query->answer)[0]->print;
+     }
+     else {
+         print "query failed: ", $res->errorstring, "\n";
+     }
+
+Perform a zone transfer and print all the records.
+--------------------------------------------------
+
+     use Net::DNS;
+     $res = new Net::DNS::Resolver;
+     $res->nameservers("ns.foo.com");
+     @zone = $res->axfr("foo.com");
+     foreach $rr (@zone) {
+         $rr->print;
+     }
+
+Perform a background query and do some other work while waiting for the answer.
+-------------------------------------------------------------------------------
+
+     use Net::DNS;
+     $res = new Net::DNS::Resolver;
+     $socket = $res->bgsend("foo.bar.com");
+     until ($res->bgisready($socket)) {
+         # do some work here while waiting for the answer
+         # ...and some more here
+     }
+     $packet = $res->bgread($socket);
+     $packet->print;
+
+Send a background query and use select to determine when the answer has arrived.
+--------------------------------------------------------------------------------
+
+     use Net::DNS;
+     use IO::Select;
+     $timeout = 5;
+     $res = new Net::DNS::Resolver;
+     $bgsock = $res->bgsend("foo.bar.com");
+     $sel = new IO::Select($bgsock);
+     # Add more sockets to $sel if desired.
+     @ready = $sel->can_read($timeout);
+     if (@ready) {
+         foreach $sock (@ready) {
+             if ($sock == $bgsock) {
+                 $packet = $res->bgread($bgsock);
+                 $packet->print;
+                 $bgsock = undef;
+             }
+     	  # Check for the other sockets.
+     	  $sel->remove($sock);
+     	  $sock = undef;
+         }
+     }
+     else {
+         print "timed out after $timeout seconds\n";
+     }
+
+BUGS
+====
+
+   `Net::DNS' is slow.  Real slow.
+
+   For other items to be fixed, please see the TODO file included with the
+source distribution.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997 Michael Fuhr.  All rights reserved.  This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+AUTHOR INFORMATION
+==================
+
+   Michael Fuhr <mfuhr@dimensional.com>
+http://www.dimensional.com/~mfuhr/perldns/
+
+SEE ALSO   `perl(1)' in this node, *Note Net/DNS/Resolver: Net/DNS/Resolver,, *Note Net/DNS/Packet: Net/DNS/Packet,, *Note Net/DNS/Update: Net/DNS/Update,, *Note Net/DNS/Header: Net/DNS/Header,, *Note Net/DNS/Question: Net/DNS/Question,, *Note Net/DNS/RR: Net/DNS/RR,, RFC 1035, *DNS and BIND* by Paul Albitz & Cricket Liu
+==================================================================================================================================================================================================================================================================================================================================
+
+
+File: pm.info,  Node: Net/DNS/Header,  Next: Net/DNS/Packet,  Prev: Net/DNS,  Up: Module List
+
+DNS packet header class
+***********************
+
+NAME
+====
+
+   Net::DNS::Header - DNS packet header class
+
+SYNOPSIS
+========
+
+   `use Net::DNS::Header;'
+
+DESCRIPTION
+===========
+
+   A `Net::DNS::Header' object represents the header portion of a DNS
+packet.
+
+METHODS
+=======
+
+new
+---
+
+     $header = new Net::DNS::Header;
+     $header = new Net::DNS::Header(\$data);
+
+   Without an argument, new creates a header object appropriate for making
+a DNS query.
+
+   If new is passed a reference to a scalar containing DNS packet data, it
+creates a header object from that data.
+
+   Returns undef if unable to create a header object (e.g., if the data is
+incomplete).
+
+print
+-----
+
+     $header->print;
+
+   Dumps the header data to the standard output.
+
+string
+------
+
+     print $header->string;
+
+   Returns a string representation of the header object.
+
+id
+--
+
+     print "query id = ", $header->id, "\n";
+     $header->id(1234);
+
+   Gets or sets the query identification number.
+
+qr
+--
+
+     print "query response flag = ", $header->qr, "\n";
+     $header->qr(0);
+
+   Gets or sets the query response flag.
+
+opcode
+------
+
+     print "query opcode = ", $header->opcode, "\n";
+     $header->opcode("UPDATE");
+
+   Gets or sets the query opcode (the purpose of the query).
+
+aa
+--
+
+     print "answer is ", $header->aa ? "" : "non-", "authoritative\n";
+     $header->aa(0);
+
+   Gets or sets the authoritative answer flag.
+
+tc
+--
+
+     print "packet is ", $header->tc ? "" : "not ", "truncated\n";
+     $header->tc(0);
+
+   Gets or sets the truncated packet flag.
+
+rd
+--
+
+     print "recursion was ", $header->rd ? "" : "not ", "desired\n";
+     $header->rd(0);
+
+   Gets or sets the recursion desired flag.
+
+ra
+--
+
+     print "recursion is ", $header->ra ? "" : "not ", "available\n";
+     $header->ra(0);
+
+   Gets or sets the recursion available flag.
+
+rcode
+-----
+
+     print "query response code = ", $header->rcode, "\n";
+     $header->rcode("SERVFAIL");
+
+   Gets or sets the query response code (the status of the query).
+
+qdcount, zocount
+----------------
+
+     print "# of question records: ", $header->qdcount, "\n";
+     $header->qdcount(2);
+
+   Gets or sets the number of records in the question section of the
+packet.  In dynamic update packets, this field is known as `zocount' and
+refers to the number of RRs in the zone section.
+
+ancount, prcount
+----------------
+
+     print "# of answer records: ", $header->ancount, "\n";
+     $header->ancount(5);
+
+   Gets or sets the number of records in the answer section of the packet.
+In dynamic update packets, this field is known as `prcount' and refers to
+the number of RRs in the prerequisite section.
+
+nscount, upcount
+----------------
+
+     print "# of authority records: ", $header->nscount, "\n";
+     $header->nscount(2);
+
+   Gets or sets the number of records in the authority section of the
+packet.  In dynamic update packets, this field is known as `upcount' and
+refers to the number of RRs in the update section.
+
+arcount, adcount
+----------------
+
+     print "# of additional records: ", $header->arcount, "\n";
+     $header->arcount(3);
+
+   Gets or sets the number of records in the additional section of the
+packet.  In dynamic update packets, this field is known as `adcount'.
+
+data
+----
+
+     $hdata = $header->data;
+
+   Returns the header data in binary format, appropriate for use in a DNS
+query packet.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997 Michael Fuhr.  All rights reserved.  This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+SEE ALSO
+========
+
+   `perl(1)' in this node, *Note Net/DNS: Net/DNS,, *Note
+Net/DNS/Resolver: Net/DNS/Resolver,, *Note Net/DNS/Packet: Net/DNS/Packet,,
+*Note Net/DNS/Update: Net/DNS/Update,, *Note Net/DNS/Question:
+Net/DNS/Question,, *Note Net/DNS/RR: Net/DNS/RR,, RFC 1035 Section 4.1.1
+
+
+File: pm.info,  Node: Net/DNS/Packet,  Next: Net/DNS/Question,  Prev: Net/DNS/Header,  Up: Module List
+
+DNS packet object class
+***********************
+
+NAME
+====
+
+   Net::DNS::Packet - DNS packet object class
+
+SYNOPSIS
+========
+
+   `use Net::DNS::Packet;'
+
+DESCRIPTION
+===========
+
+   A `Net::DNS::Packet' object represents a DNS packet.
+
+METHODS
+=======
+
+new
+---
+
+     $packet = new Net::DNS::Packet(\$data);
+     $packet = new Net::DNS::Packet(\$data, 1);  # set debugging
+
+     $packet = new Net::DNS::Packet("foo.com");
+     $packet = new Net::DNS::Packet("foo.com", "MX", "IN");
+
+     ($packet, $err) = new Net::DNS::Packet(\$data);
+
+   If passed a reference to a scalar containing DNS packet data, new
+creates a packet object from that data.  A second argument can be passed
+to turn on debugging output for packet parsing.
+
+   If passed a domain, type, and class, new creates a packet object
+appropriate for making a DNS query for the requested information.  The
+type and class can be omitted; they default to A and IN.
+
+   If called in array context, returns a packet object and an error
+string.  The error string will only be defined if the packet object is
+undefined (i.e., couldn't be created).
+
+   Returns undef if unable to create a packet object (e.g., if the packet
+data is truncated).
+
+data
+----
+
+     $data = $packet->data;
+
+   Returns the packet data in binary format, suitable for sending to a
+nameserver.
+
+header
+------
+
+     $header = $packet->header;
+
+   Returns a `Net::DNS::Header' object representing the header section of
+the packet.
+
+question, zone
+--------------
+
+     @question = $packet->question;
+
+   Returns a list of `Net::DNS::Question' objects representing the
+question section of the packet.
+
+   In dynamic update packets, this section is known as `zone' and
+specifies the zone to be updated.
+
+answer, pre, prerequisite
+-------------------------
+
+     @answer = $packet->answer;
+
+   Returns a list of `Net::DNS::RR' objects representing the answer
+section of the packet.
+
+   In dynamic update packets, this section is known as pre or
+`prerequisite' and specifies the RRs or RRsets which must or must not
+preexist.
+
+authority, update
+-----------------
+
+     @authority = $packet->authority;
+
+   Returns a list of `Net::DNS::RR' objects representing the authority
+section of the packet.
+
+   In dynamic update packets, this section is known as update and
+specifies the RRs or RRsets to be added or delted.
+
+additional
+----------
+
+     @additional = $packet->additional;
+
+   Returns a list of `Net::DNS::RR' objects representing the additional
+section of the packet.
+
+print
+-----
+
+     $packet->print;
+
+   Prints the packet data on the standard output in an ASCII format
+similar to that used in DNS zone files.
+
+string
+------
+
+     print $packet->string;
+
+   Returns a string representation of the packet.
+
+answerfrom
+----------
+
+     print "packet received from ", $packet->answerfrom, "\n";
+
+   Returns the IP address from which we received this packet.  User-created
+packets will return undef for this method.
+
+answersize
+----------
+
+     print "packet size: ", $packet->answersize, " bytes\n";
+
+   Returns the size of the packet in bytes as it was received from a
+nameserver.  User-created packets will return undef for this method (use
+`length $packet'->data instead).
+
+push
+----
+
+     $packet->push("pre", $rr);
+     $packet->push("update", $rr);
+     $packet->push("additional", $rr);
+
+     $packet->push("update", $rr1, $rr2, $rr3);
+     $packet->push("update", @rr);
+
+   Adds RRs to the specified section of the packet.
+
+dn_comp
+-------
+
+     $compname = $packet->dn_comp("foo.bar.com", $offset);
+
+   Returns a domain name compressed for a particular packet object, to be
+stored beginning at the given offset within the packet data.  The name
+will be added to a running list of compressed domain names for future use.
+
+dn_expand
+---------
+
+     use Net::DNS::Packet qw(dn_expand);
+     ($name, $nextoffset) = dn_expand(\$data, $offset);
+
+     ($name, $nextoffset) = Net::DNS::Packet::dn_expand(\$data, $offset);
+
+   Expands the domain name stored at a particular location in a DNS
+packet.  The first argument is a reference to a scalar containing the
+packet data.  The second argument is the offset within the packet where
+the (possibly compressed) domain name is stored.
+
+   Returns the domain name and the offset of the next location in the
+packet.
+
+   Returns *(undef, undef)* if the domain name couldn't be expanded.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997 Michael Fuhr.  All rights reserved.  This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+SEE ALSO
+========
+
+   `perl(1)' in this node, *Note Net/DNS: Net/DNS,, *Note
+Net/DNS/Resolver: Net/DNS/Resolver,, *Note Net/DNS/Update: Net/DNS/Update,,
+*Note Net/DNS/Header: Net/DNS/Header,, *Note Net/DNS/Question:
+Net/DNS/Question,, *Note Net/DNS/RR: Net/DNS/RR,, RFC 1035 Section 4.1,
+RFC 2136 Section 2
+
+
+File: pm.info,  Node: Net/DNS/Question,  Next: Net/DNS/RR,  Prev: Net/DNS/Packet,  Up: Module List
+
+DNS question class
+******************
+
+NAME
+====
+
+   Net::DNS::Question - DNS question class
+
+SYNOPSIS
+========
+
+   `use Net::DNS::Question'
+
+DESCRIPTION
+===========
+
+   A `Net::DNS::Question' object represents a record in the question
+section of a DNS packet.
+
+METHODS
+=======
+
+new
+---
+
+     $question = new Net::DNS::Question("foo.com", "MX", "IN");
+
+   Creates a question object from the domain, type, and class passed as
+arguments.
+
+qname, zname
+------------
+
+     print "qname = ", $question->qname, "\n";
+     print "zname = ", $question->zname, "\n";
+
+   Returns the domain name.  In dynamic update packets, this field is
+known as `zname' and refers to the zone name.
+
+qtype, ztype
+------------
+
+     print "qtype = ", $question->qtype, "\n";
+     print "ztype = ", $question->ztype, "\n";
+
+   Returns the record type.  In dymamic update packets, this field is
+known as `ztype' and refers to the zone type (must be SOA).
+
+qclass, zclass
+--------------
+
+     print "qclass = ", $question->qclass, "\n";
+     print "zclass = ", $question->zclass, "\n";
+
+   Returns the record class.  In dynamic update packets, this field is
+known as `zclass' and refers to the zone's class.
+
+print
+-----
+
+     $question->print;
+
+   Prints the question record on the standard output.
+
+string
+------
+
+     print $qr->string, "\n";
+
+   Returns a string representation of the question record.
+
+data
+----
+
+     $qdata = $question->data($packet, $offset);
+
+   Returns the question record in binary format suitable for inclusion in
+a DNS packet.
+
+   Arguments are a `Net::DNS::Packet' object and the offset within that
+packet's data where the `Net::DNS::Question' record is to be stored.  This
+information is necessary for using compressed domain names.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997 Michael Fuhr.  All rights reserved.  This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+SEE ALSO
+========
+
+   `perl(1)' in this node, *Note Net/DNS: Net/DNS,, *Note
+Net/DNS/Resolver: Net/DNS/Resolver,, *Note Net/DNS/Packet: Net/DNS/Packet,,
+*Note Net/DNS/Update: Net/DNS/Update,, *Note Net/DNS/Header:
+Net/DNS/Header,, *Note Net/DNS/RR: Net/DNS/RR,, RFC 1035 Section 4.1.2
+
+
+File: pm.info,  Node: Net/DNS/RR,  Next: Net/DNS/RR/A,  Prev: Net/DNS/Question,  Up: Module List
+
+DNS Resource Record class
+*************************
+
+NAME
+====
+
+   Net::DNS::RR - DNS Resource Record class
+
+SYNOPSIS
+========
+
+   `use Net::DNS::RR'
+
+DESCRIPTION
+===========
+
+   `Net::DNS::RR' is the base class for DNS Resource Record (RR) objects.
+See also the manual pages for each RR type.
+
+METHODS
+=======
+
+   WARNING!!!  Don't assume the RR objects you receive from a query are of
+a particular type - always check an object's type before calling any of
+its methods.  If you call an unknown method, you'll get a nasty warning
+message and `Net::DNS::RR' will return undef to the caller.
+
+new (from string)
+-----------------
+
+     $a = new Net::DNS::RR("foo.bar.com. 86400 A 10.1.2.3");
+     $mx = new Net::DNS::RR("bar.com. 7200 MX 10 mailhost.bar.com.");
+     $cname = new Net::DNS::RR("www.bar.com 300 IN CNAME www1.bar.com");
+     $txt = new Net::DNS::RR("baz.bar.com 3600 HS TXT 'text record'");
+
+   Returns a `Net::DNS::RR' object of the appropriate type and initialized
+from the string passed by the user.  The format of the string is that used
+in zone files, and is compatible with the string returned by
+`Net::DNS::RR'->string.
+
+   The name and RR type are required; all other information is optional.
+If omitted, the TTL defaults to 0 and the RR class defaults to IN.
+Omitting the optional fields is useful for creating the empty RDATA
+sections required for certain dynamic update operations.  See the
+`Net::DNS::Update' manual page for additional examples.
+
+   All names must be fully qualified.  The trailing dot (.) is optional.
+
+new (from hash)
+---------------
+
+     $rr = new Net::DNS::RR(
+     	Name    => "foo.bar.com",
+     	TTL     => 86400,
+     	Class   => "IN",
+         Type    => "A",
+     	Address => "10.1.2.3",
+     );
+
+     $rr = new Net::DNS::RR(
+     	Name    => "foo.bar.com",
+         Type    => "A",
+     );
+
+   Returns an RR object of the appropriate type, or a `Net::DNS::RR'
+object if the type isn't implemented.  See the manual pages for each RR
+type to see what fields the type requires.
+
+   The Name and Type fields are required; all others are optional.  If
+omitted, `TTL' defaults to 0 and Class defaults to IN.  Omitting the
+optional fields is useful for creating the empty RDATA sections required
+for certain dynamic update operations.
+
+   The fields are case-insensitive, but starting each with uppercase is
+recommended.
+
+print
+-----
+
+     $rr->print;
+
+   Prints the record to the standard output.  Calls the string method to
+get the RR's string representation.
+
+string
+------
+
+     print $rr->string, "\n";
+
+   Returns a string representation of the RR.  Calls the rdatastr method
+to get the RR-specific data.
+
+rdatastr
+--------
+
+     $s = $rr->rdatastr;
+
+   Returns a string containing RR-specific data.  Subclasses will need to
+implement this method.
+
+name
+----
+
+     $name = $rr->name;
+
+   Returns the record's domain name.
+
+type
+----
+
+     $type = $rr->type;
+
+   Returns the record's type.
+
+class
+-----
+
+     $class = $rr->class;
+
+   Returns the record's class.
+
+ttl
+---
+
+     $ttl = $rr->ttl;
+
+   Returns the record's time-to-live (TTL).
+
+rdlength
+--------
+
+     $rdlength = $rr->rdlength;
+
+   Returns the length of the record's data section.
+
+rdata
+-----
+
+     $rdata = $rr->rdata
+
+   Returns the record's data section as binary data.
+
+BUGS
+====
+
+   This version of `Net::DNS::RR' does little sanity checking on
+user-created RR objects.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997 Michael Fuhr.  All rights reserved.  This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+SEE ALSO
+========
+
+   `perl(1)' in this node, *Note Net/DNS: Net/DNS,, *Note
+Net/DNS/Resolver: Net/DNS/Resolver,, *Note Net/DNS/Packet: Net/DNS/Packet,,
+*Note Net/DNS/Update: Net/DNS/Update,, *Note Net/DNS/Header:
+Net/DNS/Header,, *Note Net/DNS/Question: Net/DNS/Question,, RFC 1035
+Section 4.1.3
+
+

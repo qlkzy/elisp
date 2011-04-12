@@ -1,0 +1,1794 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Search/InvertedIndex/AutoLoader,  Next: Search/InvertedIndex/DB/DB_File_SplitHash,  Prev: Search/InvertedIndex,  Up: Module List
+
+A manager for autoloading Search::InvertedIndex modules
+*******************************************************
+
+NAME
+====
+
+   Search::InvertedIndex::AutoLoader - A manager for autoloading
+Search::InvertedIndex modules
+
+SYNOPSIS
+========
+
+   use Search::InvertedIndex::AutoLoader;
+
+DESCRIPTION
+===========
+
+   Sets up the autoloader to load the modules in the Search::InvertedIndex
+system on demand.
+
+CHANGES
+=======
+
+   1.01 Added Search::InvertedIndex::DB::Mysql to the list of autoloaded
+modules
+
+COPYRIGHT
+=========
+
+   Copyright 1999, Benjamin Franz (<URL:http://www.nihongo.org/snowhare/>)
+and FreeRun Technologies, Inc. (<URL:http://www.freeruntech.com/>). All
+Rights Reserved.  This software may be copied or redistributed under the
+same terms as Perl itelf.
+
+AUTHOR
+======
+
+   Benjamin Franz
+
+TODO
+====
+
+   Nothing.
+
+
+File: pm.info,  Node: Search/InvertedIndex/DB/DB_File_SplitHash,  Next: Search/InvertedIndex/DB/Mysql,  Prev: Search/InvertedIndex/AutoLoader,  Up: Module List
+
+A Berkeley database interface object for Search::InvertedIndex
+**************************************************************
+
+NAME
+====
+
+   Search::InvertedIndex::DB::DB_File_SplitHash - A Berkeley database
+interface object for Search::InvertedIndex
+
+SYNOPSIS
+========
+
+     use Search::InvertedIndex::DB::DB_File_SplitHash;
+
+     my $db = Search::InvertedIndex::DB::DB_File_SplitHash->new({
+                -map_name => '/www/search-engine/databases/test-map_names/test',
+                   -multi => 4,
+               -file_mode => 0644,
+               -lock_mode => 'EX',
+            -lock_timeout => 30,
+          -blocking_locks => 0,
+               -cachesize => 1000000,
+           -write_through => 0,
+         -read_write_mode => 'RDONLY';
+           });
+
+     my $inv_map = Search::InvertedIndex->new({ -database => $db });
+
+     my $query = Search::InvertedIndex::Query->new(...);
+     my $result = $inv_map->search({ -query => $query });
+
+     my $update = Search::InvertedIndex::Update->new(...);
+     my $result = $inv_map->update({ -update => $update });
+
+     $inv_map->close;
+
+DESCRIPTION
+===========
+
+   Provides a standard interface to an underlaying database - in this case
+Berkeley DB as extended by the Tie::DB_File::SplitHash package.
+
+   There are twelve standard API calls required of any database interface
+used by the Search::InvertedIndex module:
+
+     new     - Takes all parameters required for initialization.
+               Free form parameters as required by the underlaying
+               database.
+     open    - Actually opens the database. No parameters.
+     close   - Closes the database. No parameters.
+     lock    - Sets a lock state of (UN, SH or EX) and optionally allows setting/
+               changing the 'blocking/non-blocking' and timeouts for locking.
+     get     - Fetches a string -value for a -key. Returns 'undef' if no -key matches in the database.
+     put     - Stores a string -value for a -key. Returns true on success, false on failure.
+     exists  - Returns true if the -key is defined in the database, false otherwise.
+     delete  - Removes a -key and associated -value from database. Returns true on success, false on failure.
+     clear   - Clears all keys/values from the database
+     status  - Returns open and lock status messages.
+
+     DESTROY - Used to dispose of the database object
+
+CHANGES
+=======
+
+     1.00 1999.06.16 - Initial release.
+
+     1.01 1999.06.17 - Bug fix to 'close' method. Failed to clear the filehandle used for locking.
+
+     1.02 1999.06.18 - Major bugfix to locking system and performance tweaking
+
+     1.03 1999.07.01 - Documentation corrections.
+
+     1.04 1999.10.20 - Removed use of 'use attr' for portability improvement
+
+     1.06 2000.01.25 - Bugfix (added 'use Tie::DB_File::SplitHash;' to initialization)
+
+     1.07 2000.03.23 - Bugfix for disposal when database was never actually opened
+
+Public API
+----------
+
+`new($parm_ref);'
+     Provides the interface for obtaining a new Search::InvertedIndex
+     object for manipulating a inverted database.
+
+     Example 1: my $inv_map = Search::InvertedIndex->new;
+
+     Example 2: my $inv_map = Search::InvertedIndex->new({
+         -map_name => '/tmp/imap', # file path to map
+        -multi => 4,           # multiple DB file factor. Defaults to 4
+                      -file_mode => 0644,        # File permissions to
+     open with. Defaults to 0666.                      -cachesize =>
+     1000000,     # DB cache size. Defaults to 1000000
+     -lock_mode => 'EX',        # DB lock mode. Defaults to EX
+         -lock_timeout => 30,          # Seconds to try and get locks.
+     Defaults to 30                 -write_through => 0,           # Write
+     through on cache? Defaults to 0 (no)                -blocking_locks
+     => 0,           # Locks should block? Defaults to 0 (no)
+     -read_write_mode => 'RDWR',      # RDONLY or RDWR? Defaults to 'RDWR'
+                 });
+
+`open;'
+     Actually open the database for use.
+
+     Example 1: $inv_map->open;
+
+`status($parm_ref);'
+     Returns the requested status line for the database. Allowed requests
+     are '-open', and '-lock'.
+
+     Example 1:  my $status = $db->status(-open); # Returns either '1' or
+     '0'
+
+     Example 2:  my $status = $db->status(-lock_mode); # Returns 'UN',
+     'SH' or 'EX'
+
+`lock($parm_ref);'
+     Sets or changes a filesystem lock on the underlaying database files.
+     Forces 'sync' if the stat is changed from 'EX' to a lower lock state
+     (i.e. 'SH' or 'UN'). Croaks on errors.
+
+     Example:
+
+          $inv->lock({ -lock_mode => 'EX',
+                    -lock_timeout => 30,
+                  -blocking_locks => 0,
+                });
+
+     The only _required_ parameter is the -lock_mode. The other parameters
+     can be inherited from the object state. If the other parameters are
+     used, they change the object state to match the new settings.
+
+`close;'
+     Closes the currently open -map_name and flushes all associated
+     buffers.
+
+`DESTROY;'
+     Closes the currently open -map_name and flushes all associated
+     buffers.
+
+`put({ -key =' $key, -value => $value });>
+     Stores the -value at the -key location in the database. No
+     serialization is performed - this is a pure 'store a string' method.
+     Returns '1' on success, '0' on failure.
+
+`get({ -key =' $key });>
+     Returns the -value at the -key location in the database. No
+     deserialization is performed - this is a pure 'fetch a string'
+     method. It returns 'undef' if no such key exists in the database.
+
+     Example:
+
+          my ($value) = $db->get({ -key => $key });
+
+`delete({ -key =' $key });>
+     Deletes the -value at the -key location in the database.
+
+`exists{-key =' $key});>
+     Returns true if the -key exists in the database.  Returns false if
+     the -key does not exist in the database.
+
+`clear;'
+     Internal method. Not for access outside of the module.
+
+     Completely clears the map database.
+
+`_open_multi_map;'
+     Internal method. Not for access outside of the module.
+
+     Actually open the map for use using either DB_File or
+     Tie::DB_File_SplitHash as appropriate.
+
+     Example 1: $self->_open_multi_map;
+
+COPYRIGHT
+=========
+
+   Copyright 1999, Benjamin Franz (<URL:http://www.nihongo.org/snowhare/>)
+and FreeRun Technologies, Inc. (<URL:http://www.freeruntech.com/>). All
+Rights Reserved.  This software may be copied or redistributed under the
+same terms as Perl itelf.
+
+AUTHOR
+======
+
+   Benjamin Franz
+
+TODO
+====
+
+   Everything.
+
+
+File: pm.info,  Node: Search/InvertedIndex/DB/Mysql,  Next: Search/InvertedIndex/Query,  Prev: Search/InvertedIndex/DB/DB_File_SplitHash,  Up: Module List
+
+A MySQL database interface object for Search::InvertedIndex
+***********************************************************
+
+NAME
+====
+
+   Search::InvertedIndex::DB::Mysql - A MySQL database interface object
+for Search::InvertedIndex
+
+SYNOPSIS
+========
+
+     use Search::InvertedIndex::DB::Mysql;
+
+     my $db = Search::InvertedIndex::DB::Mysql->new({
+                 -db_name => 'searchdb',
+                -hostname => 'db.domain.com',
+                -username => 'dbuser',
+                -password => 'dbuserpw',
+              -table_name => 'indextablename',
+               -lock_mode => 'EX' });
+
+     my $inv_map = Search::InvertedIndex->new({ -database => $db });
+
+     my $query = Search::InvertedIndex::Query->new(...);
+     my $result = $inv_map->search({ -query => $query });
+
+     my $update = Search::InvertedIndex::Update->new(...);
+     my $result = $inv_map->update({ -update => $update });
+
+     $inv_map->close;
+
+DESCRIPTION
+===========
+
+   An interface allowing Search::InvertedIndex to store and retrieve data
+from Mysql database tables. All of the data is stored in a single table,
+which will be created automatically if it does not exist when the new
+method is called.
+
+   The new method takes up to six parameters, two of which are required.
+
+`-db_name'
+     Mysql database name. Required.
+
+`-table_name'
+     Table within the database to use. *CAUTION* If this table exists, the
+     clear method will erase the contents WITHOUT verifying that the table
+     contains data the module understands. If you point the module to an
+     existing table you do so at your own risk! Required.
+
+`-hostname'
+     Mysql database host. Default: database server is on the local machine.
+
+`-username'
+     User for connecting to the Mysql server. The user must have
+     appropriate authority for the operations you are performing or Mysql
+     may complain.  Default: none.
+
+`-password'
+     Password for the User. Default: none.
+
+`-lock_mode'
+     Locking status for the database table. EX, SH, or UN. EX will attempt
+     to obtain a WRITE lock on the table, SH a READ lock, and UN will not
+     request one at all. Tables may be created and modified in any mode,
+     but EX is obviously recommended.
+
+CHANGES
+=======
+
+     1.00 2000.11.28 - First version.
+
+COPYRIGHT
+=========
+
+   This software may be copied or redistributed under the same terms as
+Perl itelf.
+
+AUTHOR
+======
+
+   Michael Cramer <cramer@webkist.com>, based on
+Search::InvertedIndex::DB::DB_File_SplitHash by Benjamin Franz.
+
+NOTES
+=====
+
+   This module is not tested during installation due to its need for MySQL
+support in Perl and associated access permissions and so on.
+
+   You *MUST* have the DBI and DBD::mysql modules installed to be able to
+use this module.
+
+   Theoretically, someone could use this module as a starting point for
+creating support for all kinds of DBI supported databases.
+
+SEE ALSO
+========
+
+   Search::InvertedIndex Search::InvertedIndex::DB::DB_File_SplitHash DBI
+DBD::mysql
+
+
+File: pm.info,  Node: Search/InvertedIndex/Query,  Next: Search/InvertedIndex/Query/Leaf,  Prev: Search/InvertedIndex/DB/Mysql,  Up: Module List
+
+A query for an inverted index search.
+*************************************
+
+NAME
+====
+
+   Search::InvertedIndex::Query - A query for an inverted index search.
+
+SYNOPSIS
+========
+
+DESCRIPTION
+===========
+
+   Provides methods for setting up a search query to be performed by the
+search engine.
+
+CHANGES
+=======
+
+     1.01 1999.06.30 - Documentation updates
+
+Public API
+----------
+
+   Inherits 'get','set','clear' and 'exists' methods from Class::NamedParms
+
+Initialization
+--------------
+
+`new($parm_ref);'
+     Returns and optionally initializes a new Search::InvertedIndex::Query
+     object.
+
+     Examples:
+
+          my $query = Search::InvertedIndex::Query->new;
+
+          my $query = Search::InvertedIndex::Query->new({ -logic => 'or',
+                                                         -weight => 0.5,
+                                                          -nodes => \@query_nodes,
+                                                          -leafs => \@leaf_nodes,
+                                                         });
+
+     -nodes must be 'Search::InvertedIndex::Query' objects.  -leafs must
+     be 'Search::InvertedIndex::Query::Leaf' objects.  -logic applies to
+     both -nodes (after search resolution) and -leafs.         If omitted,
+     -logic is defaults to 'and'. Allowed logic values 	   are 'and', 'or'
+     and  'nand'.  -weight is applied to the _result_ of a search of the
+     Query object and         is optional (defaulted to '1' if omitted).
+
+     Inherits 'get/set' methods from Class::NamedParms - thus to 'append'
+     use the 'get' method on '-nodes' or '-leafs',  'push' the new thing
+     on the end of the anon array return, and use the 'set' method to save
+     the updated anon array.
+
+COPYRIGHT
+=========
+
+   Copyright 1999, Benjamin Franz (<URL:http://www.nihongo.org/snowhare/>)
+and FreeRun Technologies, Inc. (<URL:http://www.freeruntech.com/>). All
+Rights Reserved.  This software may be copied or redistributed under the
+same terms as Perl itelf.
+
+AUTHOR
+======
+
+   Benjamin Franz
+
+TODO
+====
+
+   Everything.
+
+
+File: pm.info,  Node: Search/InvertedIndex/Query/Leaf,  Next: Search/InvertedIndex/Result,  Prev: Search/InvertedIndex/Query,  Up: Module List
+
+A query leaf item for an inverted index search.
+***********************************************
+
+NAME
+====
+
+   Search::InvertedIndex::Query::Leaf - A query leaf item for an inverted
+index search.
+
+SYNOPSIS
+========
+
+DESCRIPTION
+===========
+
+   Provides an object for holding the specifics of a search term item.
+
+`new($parm_ref);'
+     Creates and initializes a Search::InvertedIndex::Query::Leaf object:
+
+          Example:
+           my $leaf = Search::InvertedIndex::Query::Leaf->new({
+                                                      -key => 'sterling',
+                                                    -group => 'wineries',
+                                                   -weight => 1,
+                                                    });
+
+          -group and -key are required, -weight is optional.
+
+     Inherits 'get','set','clear','exists' methods from Class::NamedParms
+
+COPYRIGHT
+=========
+
+   Copyright 1999, Benjamin Franz (<URL:http://www.nihongo.org/snowhare/>)
+and FreeRun Technologies, Inc. (<URL:http://www.freeruntech.com/>). All
+Rights Reserved.  This software may be copied or redistributed under the
+same terms as Perl itelf.
+
+AUTHOR
+======
+
+   Benjamin Franz
+
+TODO
+====
+
+   Document.
+
+
+File: pm.info,  Node: Search/InvertedIndex/Result,  Next: Search/InvertedIndex/Update,  Prev: Search/InvertedIndex/Query/Leaf,  Up: Module List
+
+A list of result entries from a inverted index search.
+******************************************************
+
+NAME
+====
+
+   Search::InvertedIndex::Result - A list of result entries from a
+inverted index search.
+
+SYNOPSIS
+========
+
+DESCRIPTION
+===========
+
+   Contains zero or more result entries from a search. Provides access
+methods to information in/from/about the entries.
+
+CHANGES
+=======
+
+     1.00 1999.6.16 - Initial release
+
+     1.01 1999.6.17 - Documentation fixes
+
+Public API
+----------
+
+Initialization
+--------------
+
+`new($parm_ref);'
+
+`number_of_index_entries;'
+     Returns the number of index entries in the result.
+
+`entry($parm_ref);'
+     In an array context, returns the index, data and ranking for the
+     requested entry.
+
+     In a scalar context returns only the index.
+
+     Examples:
+
+          my $index = $result->entry({ -number => 10 };
+
+          my ($index,$data,$ranking) = $result->entry({ -number => 10 });
+
+COPYRIGHT
+=========
+
+   Copyright 1999, Benjamin Franz (<URL:http://www.nihongo.org/snowhare/>)
+and FreeRun Technologies, Inc. (<URL:http://www.freeruntech.com/>). All
+Rights Reserved.  This software may be copied or redistributed under the
+same terms as Perl itelf.
+
+AUTHOR
+======
+
+   Benjamin Franz
+
+TODO
+====
+
+   Everything.
+
+
+File: pm.info,  Node: Search/InvertedIndex/Update,  Next: SecurID/ACEdb,  Prev: Search/InvertedIndex/Result,  Up: Module List
+
+A container for a mass data update for a -group/-index.
+*******************************************************
+
+NAME
+====
+
+   Search::InvertedIndex::Update - A container for a mass data update for
+a -group/-index.
+
+SYNOPSIS
+========
+
+DESCRIPTION
+===========
+
+   Provides a container for the information to perform an update for a
+-group/-index tuple.
+
+Public API
+----------
+
+   Inherits 'get','set','clear' and 'exists' methods from Class::NamedParms
+
+Initialization
+--------------
+
+`new($parm_ref);'
+     Returns and optionally initializes a new Search::InvertedIndex::Update
+     object.
+
+     Examples:
+
+          my $update = Search::InvertedIndex::Update->new;
+
+          my $update = Search::InvertedIndex::Update->new({ -group => $group,
+                                                            -index => $index,
+                                                             -data => $index_data,
+                                                             -keys => {
+          												               $key0 => 10,
+          															   $key1 => 20,
+          															   $key2 => 15,
+          													         },
+          												 });
+
+     Inherits 'get/set' methods from Class::NamedParms
+
+     The -keys parameter is a reference to a hash containing all the keys
+     for this index and their assigned rankings. Rankings are allowed to
+     be integer values between -32768 and +32767 inclusive.
+
+     The -group and -index are required, the -keys are optional. The
+     Update object is used for update by replacement of all -keys for the
+     specified -group and -index.  All existing keys are deleted and the
+     passed -keys is used to insert a completely new set of keys for the
+     specified index/group.
+
+     The -data parameter is optional, but if passed will replace the
+     existing -data record for the -index.
+
+COPYRIGHT
+=========
+
+   Copyright 1999, Benjamin Franz (<URL:http://www.nihongo.org/snowhare/>)
+and FreeRun Technologies, Inc. (<URL:http://www.freeruntech.com/>). All
+Rights Reserved.  This software may be copied or redistributed under the
+same terms as Perl itelf.
+
+AUTHOR
+======
+
+   Benjamin Franz
+
+TODO
+====
+
+   Everything.
+
+
+File: pm.info,  Node: SecurID/ACEdb,  Next: Secure/File,  Prev: Search/InvertedIndex/Update,  Up: Module List
+
+Perl extension to use the ACE/Server Administration Toolkit API
+***************************************************************
+
+NAME
+====
+
+   SecurID::ACEdb - Perl extension to use the ACE/Server Administration
+Toolkit API
+
+SYNOPSIS
+========
+
+     use SecurID::ACEdb qw(:basic func1 func2 ...)
+     use SecurID::ACEdb qw(:all);
+     ApiInit();
+     ...
+     ApiEnd();
+
+DESCRIPTION
+===========
+
+   The ACE/Server Administration Toolkit API is used to create custom
+administration applications for ACE/Server, specifically functions that
+can read and modify the ACE/Server databases.
+
+FUNCTIONS
+=========
+
+   All functions must be explicitly imported into the namespace. The import
+tag *basic* imports ApiInit, ApiEnd, and Result. The import tag all
+imports all functions.
+
+   Unless otherwise documented, all function calls return 1 if the function
+succeeded, 0 otherwise.
+
+Result
+------
+
+     $result = Result();
+
+   Returns the result of the last operation as a string. This should be
+called whenever any function fails to determine the cause of the failure.
+
+ApiInit
+-------
+
+     ApiInit([commitFlag => v]);
+
+   Initializes and connects to the ACE/Server databases. This is required
+before subsequent `SecurID::ACEdb' functions can be called. The
+`commitFlag' should be set to true to automatically commit database
+changes. If not set, then the Commit and Rollback functions can be used to
+define transactions. *This function can only be called once in any
+program. It cannot even be called a second time after calling ApiEnd*.
+Don't blame me; blame Security Dynamics.
+
+Commit
+------
+
+     Commit();
+
+   Commits all API function calls to the database since the last commit or
+rollback. Only needed if ApiInit was not called with a `commitFlag' of
+true.
+
+Rollback
+--------
+
+     Rollback();
+
+   Rolls back all API function calls since the last commit or rollback.
+Only needed if ApiInit was not called with a `commitFlag' of true.
+
+ApiEnd
+------
+
+     ApiEnd();
+
+   Finishes the API session. Once this function is called, no subsequent
+API functions can be called, *including ApiInit*.
+
+ApiRev
+------
+
+     $rev = ApiRev()
+
+   Returns the revision number of the API, as a string.
+
+AssignToken
+-----------
+
+     AssignToken($lastname, $firstname, $login, $shell, $serial);
+
+   Adds a user to the database and assigns the token specified by
+`$serial'. The token is enabled, the PIN is cleared, and both
+BadTokenCodes and BadPINs are set to zero.
+
+SetUser
+-------
+
+     SetUser($lastname, $firstname, $login, $shell, $serial);
+
+   Sets an existing user's information as specified by the parameters.
+The token serial number is used to locate the user in the database, so
+this function cannot be used to change a user's token.
+
+ListUserInfo
+------------
+
+     $userinfo = ListUserInfo($serial);
+
+   Returns user information for a user who owns the specified token. The
+user information is returned in a hashref which contains the keys
+*userNum*, *lastName*, *firstName*, *defaultLogin*, *createPIN*,
+*mustCreatePIN*, *defaultShell*, *tempUser*, *dateStart*, *todStart*,
+*dateEnd*, and *todEnd*. Returns undef if there was an error.
+
+UnassignToken
+-------------
+
+     UnassignToken($serial)
+
+   Unassigns the token and deletes the user from the database. The user
+must be removed from all groups and not be enabled on any clients before
+calling this function.
+
+SetCreatePin
+------------
+
+     SetCreatePin($state, $serial);
+
+   Sets the createPIN modes for the user related to `$serial'. $state
+should be a string containing one of the values USER, SYSTEM, or *EITHER*.
+
+AddUserExtension
+----------------
+
+     AddUserExtension($key, $data, $serial);
+
+   Adds a user extension record for the user related to `$serial'. The
+data field can be no more than 80 characters, while the key field must be
+no more than 48 characters.
+
+DelUserExtension
+----------------
+
+     DelUserExtension($key, $serial);
+
+   Deletes a user extension record for the user related to `$serial'.
+
+ListUserExtension
+-----------------
+
+     $ext = ListUserExtension($key, $serial);
+
+   Returns the user extension data for the specified key of the user
+related to `$serial'. Returns undef if there was an error.
+
+SetUserExtension
+----------------
+
+     SetUserExtension($key, $data, $serial);
+
+   Sets data in an existing extension field for the user related to
+`$serial'.
+
+DisableToken
+------------
+
+     DisableToken($serial);
+
+   Disables the token so that the related user cannot authenticate.
+
+EnableToken
+-----------
+
+     EnableToken($serial);
+
+   Enables the token so that the related user can authenticate.
+
+ListTokens
+----------
+
+     @list = ListTokens();
+
+   Returns a list of all tokens in the database, or an empty list if there
+was an error. Note that the underlying C API requires this function to be
+called multiple times to get the entire list; the Perl version does not
+require this. If a call to the function other than the first results in an
+error, ListTokens will return a partial list, and will not notify the
+caller of any error condition. The caller should examine the value of
+`Result()'; if it is not *Done*, then the entire list was not returned.
+
+ListTokenInfo
+-------------
+
+     $info = ListTokenInfo($serial);
+
+   Returns a hashref containing token information, or undef if there was
+an error. The hashref contains the keys *serialNum*, *pinClear*,
+*numDigits*, interval, *dateBirth*, *todBirth*, *dateDeath*, *todDeath*,
+*dateLastLogin*, *todLastLogin*, type, hex, enabled, *newPINMode*,
+*userNum*, *nextTCodeStatus*, *badTokenCodes*, *badPINs*, *datePIN*,
+*todPIN*, *dateEnabled*, *todEnabled*, *dateCountsLastModified*, and
+*todCountsLastModified*.
+
+ResetToken
+----------
+
+     ResetToken($serial);
+
+   Resets the token to a known state, so that the token is enabled, next
+token code mode is off, bad token codes is zero, and bad PINs is zero.
+This should be done before assigning the token to a user or to remedy
+token problems.
+
+NewPin
+------
+
+     NewPin($serial)
+
+   Puts the token into new PIN mode.
+
+AddLoginToGroup
+---------------
+
+     AddLoginToGroup($login, $group, $shell, $serial);
+
+   Adds the user login to a group in the database. The group must exist
+and the login must be unique to the group. The shell can be an empty
+string.
+
+DelLoginFromGroup
+-----------------
+
+     DelLoginFromGroup($login, $group);
+
+   Deletes the login name from a group.
+
+ListGroupMembership
+-------------------
+
+     $groups = ListGroupMembership($serial);
+
+   Lists the groups that a token has been assigned to. Returns a listref
+or undef if there was a problem. Each element of the list is a hashref
+containing the keys *userName*, *shell*, and group.
+
+ListGroups
+----------
+
+     $groups = ListGroups();
+
+   Lists the groups in the ACE/Server database. Returns a listref or undef
+if there was a problem. Each element of the list is a hashref containing
+the keys group and *siteName*.
+
+EnableLoginOnClient
+-------------------
+
+     EnableLoginOnClient($login, $client, $shell, $serial);
+
+   Enables a user login on a client. The client must exist and the login
+must be unique to the client. The shell can be an empty string.
+
+DelLoginFromClient
+------------------
+
+     DelLoginFromClient($login, $client);
+
+   Disables a user login from a client.
+
+ListClientActivations
+---------------------
+
+     $list = ListClientActivations($serial);
+
+   Lists the clients that a token is activated on. Returns a listref or
+undef if there was an error. Each element of the list is a hashref
+containing the keys login, *shell*, *clientName*, and *siteName*.
+
+ListClientsForGroup
+-------------------
+
+     $list = ListClientsForGroup($group);
+
+   Lists the clients associated with a group. Returns a listref or undef
+if there was a problem. Each element of the list is a hashref containing
+the keys *clientName* and *siteName*.
+
+ListClients
+-----------
+
+     $list = ListClients();
+
+   Returns a list of all clients in the database. Returns a listref or
+undef if there was a problem. Each element of the list is a hashref
+containing the keys *clientName* and *siteName*.
+
+ListSerialByLogin
+-----------------
+
+     @serial = ListSerialByLogin($login, [$count]);
+
+   Looks up the token serial number belonging to the user with login name
+`$login'. $count specifies which instance of `$login' to use if there are
+multiple instances, and defaults to 1. Returns a listref to the serial
+numbers assigned to `$login'. Returns an empty listref if the user does
+not exist, or if the count was too high, and returns undef if there was
+another error.
+
+ListHistory
+-----------
+
+     $hist = ListHistory($days, $serial, [$filter]);
+
+   Lists the events in the activity log affecting token `$serial'.
+`$days' specifies the number of days prior to the present date to list the
+history for. If `$filter' is true, events performed by an administrator
+will be filtered from the list, making it easier to view authentication
+events. Returns a listref or undef if there was a problem. Each element of
+the list is a hashref containing the keys *msgString*, *localDate*,
+*localTOD*, login, *affectedUserName*, *groupName*, *clientName*,
+*siteName*, *serverName*, and *messageNum*.
+
+MonitorHistory
+--------------
+
+     MonitorHistory([$filename, [$close]]);
+
+   Docs tbd.
+
+DumpHistory
+-----------
+
+     DumpHistory($month, $day, $year, [$days, [$filename, [$truncate]]]);
+
+   Dumps the affected events in the log. If $filename is provided,
+specifies a filename to dump the log to. $filename can also be the empty
+string. The affected events start at the beginning of the log and end one
+day prior to the date specified by the $month, $day, and $year parameters.
+$year should be a 4-digit number. If the `$days' parameter is non-zero,
+then the first three parameters are ignored, and the `$days' parameters
+specifies the number of days prior to today's date that are not affected.
+If the `$truncate' option is set, the entries will be removed from the log.
+
+AUTHOR
+======
+
+   Dave Carrigan <Dave.Carrigan@cnpl.enbridge.com>
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: Secure/File,  Next: SelectSaver,  Prev: SecurID/ACEdb,  Up: Module List
+
+A module to open or create files within suid/sgid files
+*******************************************************
+
+NAME
+====
+
+   `Secure::File' - A module to open or create files within suid/sgid files
+
+SYNOPSIS
+========
+
+     use Secure::File;
+     my $SF = new Secure::File;
+     $SF->open();
+
+     my $NF = new Secure::File, 'myfile';
+
+DESCRIPTION
+===========
+
+   open  This checks that both the effective and real  user / group ids
+have sufficient permissions to use the specified file.  (Standard open
+calls only check the effective ids).  `Secure::File' also checks that the
+file we open, really is the same file we checked ids on.
+
+   If the file already exists, open will fail.
+
+WARNING <==============================================================>
+========================================================================
+
+   E<DO NOT TRUST THIS MODULE>.  Every effort has been made to make this
+module useful, but it can not make a secure system out of an insecure one.
+It can not read the programers mind.
+
+Author
+======
+
+   Randall Maas (`mailto:randym@acm.org' in this node, `http:' in this
+node)
+
+
+File: pm.info,  Node: SelectSaver,  Next: SelfLoader,  Prev: Secure/File,  Up: Module List
+
+save and restore selected file handle
+*************************************
+
+NAME
+====
+
+   SelectSaver - save and restore selected file handle
+
+SYNOPSIS
+========
+
+     use SelectSaver;
+
+     {
+        my $saver = new SelectSaver(FILEHANDLE);
+        # FILEHANDLE is selected
+     }
+     # previous handle is selected
+
+     {
+        my $saver = new SelectSaver;
+        # new handle may be selected, or not
+     }
+     # previous handle is selected
+
+DESCRIPTION
+===========
+
+   A SelectSaver object contains a reference to the file handle that was
+selected when it was created.  If its new method gets an extra parameter,
+then that parameter is selected; otherwise, the selected file handle
+remains unchanged.
+
+   When a SelectSaver is destroyed, it re-selects the file handle that was
+selected when it was created.
+
+
+File: pm.info,  Node: SelfLoader,  Next: Semi/Semicolons,  Prev: SelectSaver,  Up: Module List
+
+load functions only on demand
+*****************************
+
+NAME
+====
+
+   SelfLoader - load functions only on demand
+
+SYNOPSIS
+========
+
+     package FOOBAR;
+     use SelfLoader;
+
+     ... (initializing code)
+
+     __DATA__
+     sub {....
+
+DESCRIPTION
+===========
+
+   This module tells its users that functions in the FOOBAR package are to
+be autoloaded from after the `__DATA__' token.  See also `"Autoloading"',
+*Note Perlsub: (perl.info)perlsub,.
+
+The __DATA__ token
+------------------
+
+   The `__DATA__' token tells the perl compiler that the perl code for
+compilation is finished. Everything after the `__DATA__' token is
+available for reading via the filehandle FOOBAR::DATA, where FOOBAR is the
+name of the current package when the `__DATA__' token is reached. This
+works just the same as `__END__' does in package 'main', but for other
+modules data after `__END__' is not automatically retrievable, whereas
+data after `__DATA__' is.  The `__DATA__' token is not recognized in
+versions of perl prior to 5.001m.
+
+   Note that it is possible to have `__DATA__' tokens in the same package
+in multiple files, and that the last `__DATA__' token in a given package
+that is encountered by the compiler is the one accessible by the
+filehandle. This also applies to `__END__' and main, i.e. if the 'main'
+program has an `__END__', but a module 'require'd (_not_ 'use'd) by that
+program has a 'package main;' declaration followed by an '`__DATA__'',
+then the DATA filehandle is set to access the data after the `__DATA__' in
+the module, _not_ the data after the `__END__' token in the 'main'
+program, since the compiler encounters the 'require'd file later.
+
+SelfLoader autoloading
+----------------------
+
+   The SelfLoader works by the user placing the `__DATA__' token after
+perl code which needs to be compiled and run at 'require' time, but before
+subroutine declarations that can be loaded in later - usually because they
+may never be called.
+
+   The SelfLoader will read from the FOOBAR::DATA filehandle to load in
+the data after `__DATA__', and load in any subroutine when it is called.
+The costs are the one-time parsing of the data after `__DATA__', and a
+load delay for the _first_ call of any autoloaded function. The benefits
+(hopefully) are a speeded up compilation phase, with no need to load
+functions which are never used.
+
+   The SelfLoader will stop reading from `__DATA__' if it encounters the
+`__END__' token - just as you would expect.  If the `__END__' token is
+present, and is followed by the token DATA, then the SelfLoader leaves the
+FOOBAR::DATA filehandle open on the line after that token.
+
+   The SelfLoader exports the AUTOLOAD subroutine to the package using the
+SelfLoader, and this loads the called subroutine when it is first called.
+
+   There is no advantage to putting subroutines which will _always_ be
+called after the `__DATA__' token.
+
+Autoloading and package lexicals
+--------------------------------
+
+   A 'my $pack_lexical' statement makes the variable $pack_lexical local
+_only_ to the file up to the `__DATA__' token. Subroutines declared
+elsewhere _cannot_ see these types of variables, just as if you declared
+subroutines in the package but in another file, they cannot see these
+variables.
+
+   So specifically, autoloaded functions cannot see package lexicals (this
+applies to both the SelfLoader and the Autoloader).  The vars pragma
+provides an alternative to defining package-level globals that will be
+visible to autoloaded routines. See the documentation on vars in the
+pragma section of *Note Perlmod: (perl.info)perlmod,.
+
+SelfLoader and AutoLoader
+-------------------------
+
+   The SelfLoader can replace the AutoLoader - just change 'use AutoLoader'
+to 'use SelfLoader' (though note that the SelfLoader exports the AUTOLOAD
+function - but if you have your own AUTOLOAD and are using the AutoLoader
+too, you probably know what you're doing), and the `__END__' token to
+`__DATA__'. You will need perl version 5.001m or later to use this
+(version 5.001 with all patches up to patch m).
+
+   There is no need to inherit from the SelfLoader.
+
+   The SelfLoader works similarly to the AutoLoader, but picks up the subs
+from after the `__DATA__' instead of in the 'lib/auto' directory.  There
+is a maintenance gain in not needing to run AutoSplit on the module at
+installation, and a runtime gain in not needing to keep opening and
+closing files to load subs. There is a runtime loss in needing to parse
+the code after the `__DATA__'. Details of the AutoLoader and another view
+of these distinctions can be found in that module's documentation.
+
+__DATA__, __END__, and the FOOBAR::DATA filehandle.
+---------------------------------------------------
+
+   This section is only relevant if you want to use the `FOOBAR::DATA'
+together with the SelfLoader.
+
+   Data after the `__DATA__' token in a module is read using the
+FOOBAR::DATA filehandle. `__END__' can still be used to denote the end of
+the `__DATA__' section if followed by the token DATA - this is supported
+by the SelfLoader. The `FOOBAR::DATA' filehandle is left open if an
+`__END__' followed by a DATA is found, with the filehandle positioned at
+the start of the line after the `__END__' token. If no `__END__' token is
+present, or an `__END__' token with no DATA token on the same line, then
+the filehandle is closed.
+
+   The SelfLoader reads from wherever the current position of the
+`FOOBAR::DATA' filehandle is, until the EOF or `__END__'. This means that
+if you want to use that filehandle (and ONLY if you want to), you should
+either
+
+   1. Put all your subroutine declarations immediately after the
+`__DATA__' token and put your own data after those declarations, using the
+`__END__' token to mark the end of subroutine declarations. You must also
+ensure that the SelfLoader reads first by  calling
+'SelfLoader->load_stubs();', or by using a function which is selfloaded;
+
+   or
+
+   2. You should read the `FOOBAR::DATA' filehandle first, leaving the
+handle open and positioned at the first line of subroutine declarations.
+
+   You could conceivably do both.
+
+Classes and inherited methods.
+------------------------------
+
+   For modules which are not classes, this section is not relevant.  This
+section is only relevant if you have methods which could be inherited.
+
+   A subroutine stub (or forward declaration) looks like
+
+     sub stub;
+
+   i.e. it is a subroutine declaration without the body of the subroutine.
+For modules which are not classes, there is no real need for stubs as far
+as autoloading is concerned.
+
+   For modules which ARE classes, and need to handle inherited methods,
+stubs are needed to ensure that the method inheritance mechanism works
+properly. You can load the stubs into the module at 'require' time, by
+adding the statement 'SelfLoader->load_stubs();' to the module to do this.
+
+   The alternative is to put the stubs in before the `__DATA__' token
+BEFORE releasing the module, and for this purpose the Devel::SelfStubber
+module is available.  However this does require the extra step of ensuring
+that the stubs are in the module. If this is done I strongly recommend
+that this is done BEFORE releasing the module - it should NOT be done at
+install time in general.
+
+Multiple packages and fully qualified subroutine names
+======================================================
+
+   Subroutines in multiple packages within the same file are supported -
+but you should note that this requires exporting the
+`SelfLoader::AUTOLOAD' to every package which requires it. This is done
+automatically by the SelfLoader when it first loads the subs into the
+cache, but you should really specify it in the initialization before the
+`__DATA__' by putting a 'use SelfLoader' statement in each package.
+
+   Fully qualified subroutine names are also supported. For example,
+
+     __DATA__
+     sub foo::bar {23}
+     package baz;
+     sub dob {32}
+
+   will all be loaded correctly by the SelfLoader, and the SelfLoader will
+ensure that the packages 'foo' and 'baz' correctly have the SelfLoader
+AUTOLOAD method when the data after `__DATA__' is first parsed.
+
+
+File: pm.info,  Node: Semi/Semicolons,  Next: Server/FastPL,  Prev: SelfLoader,  Up: Module List
+
+writing perl code with the word 'Peterbilt' as statement terminator, rather than a semicolon.
+*********************************************************************************************
+
+NAME
+====
+
+   Semi::Semicolons - writing perl code with the word 'Peterbilt' as
+statement terminator, rather than a semicolon.
+
+SYNOPSIS
+========
+
+     use Semi::Semicolons;
+     print "Why????"Peterbilt
+     print "Because of the mouche"Peterbilt
+
+DESCRIPTION
+===========
+
+   This is perhaps the stupidest piece of perl code ever written (for its
+size, anyway...)
+
+   What this does is allow you to write code using the word Peterbilt as
+your statement terminator, rather than the usual semicolon.
+
+   For the adventurous, Semi::Semicolons allows you to customize your
+statement terminator:
+
+     use Semi::Semicolons qw(Mack);
+     print "What's your twenty, Snowman?"Mack
+
+AUTHOR
+======
+
+   David H. Adler <dha@panix.com> and Michael G Schwern <schwern@pobox.com>
+(from an idea by Adam Turoff)
+
+SEE ALSO
+========
+
+   perl(1)
+
+   "Beneath the Valley of the Ultravixens" (Russ Meyer)
+
+   "Convoy" (C. W. McCall)
+
+   "Smokey and the Bandit", et. al. (Burt Reynolds)
+
+   "The Golden Age of Colonic Irrigation" (Monty Python's Flying Circus)
+
+
+File: pm.info,  Node: Server/FastPL,  Next: Server/FastPL/Client,  Prev: Semi/Semicolons,  Up: Module List
+
+Add client-server behavior to scripts.
+**************************************
+
+NAME
+====
+
+   Server::FastPL - Add client-server behavior to scripts.
+
+VERSION
+=======
+
+   This document refers to version 1.00 of Server::FastPL, released April
+10, 2000
+
+SYNOPSIS
+========
+
+   -- server --
+
+   use Server::FastPL;
+
+   my $fps = new Server::FastPL(TYPE=>"SERVER",NAME=>"Test");
+
+   while ($client = $fps->receive_connect()) {    ...  }
+
+   -- client --
+
+   use Server::FastPL;
+
+   my $server = new Server::FastPL(TYPE=>"CLIENT",SERVER=>"/tmp/Test");
+
+   ...
+
+DESCRIPTION
+===========
+
+Overview
+--------
+
+   This module is just a convenience wrapper for Server::FastPL::Server and
+Server::FastPL::Client. You might prefer to use these modules instead of
+this one.
+
+   See Server::FastPL::Server and Server::FastPL::Client for instructions.
+
+SEE ALSO
+========
+
+   Server::FastPL::Server; Server::FastPL::Client;
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000, Daniel Ruoso. All Rights Reserved.  This module is
+free software. It may be used, redistributed and/or modified under the
+same terms of Perl itself
+
+
+File: pm.info,  Node: Server/FastPL/Client,  Next: Server/FastPL/Server,  Prev: Server/FastPL,  Up: Module List
+
+A Client to the Server::FastPL::Server module.
+**********************************************
+
+NAME
+====
+
+   Server::FastPL::Client - A Client to the Server::FastPL::Server module.
+
+VERSION
+=======
+
+   This document refers to version 1.00 of Server::FastPL::Client,
+released April 10, 2000.
+
+SYNOPSIS
+========
+
+     use Server::FastPL::Client;
+     
+     $server = new Server::FastPL::Client(SERVER => "/tmp/Test");
+     
+     ...
+
+DESCRIPTION
+===========
+
+Overview
+--------
+
+   This module connect to a Unix Socket Server, waits for a one line reply
+that indicate a new Socket to connect, and then returns the Socket
+FileHandle to the definitive server.
+
+Constructor and Initialization
+------------------------------
+
+   $server = new Server::FastPL::Client(SERVER=>"/tmp/Teste");
+
+   There is only one parameter, SERVER. This indicates the primary socket
+that the module will connect, this function returns the socket filehandle
+of the definitive server.
+
+SEE ALSO
+========
+
+   Any Information about how it works is on Server::FastPL::Server
+
+AUTHOR
+======
+
+   Daniel Ruoso (daniel@ruoso.com)
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000, Daniel Ruoso. All Rights Reserved.  This modules is
+free software. It may be userd, redistributed and/or modified under the
+same terms of Perl itself.
+
+
+File: pm.info,  Node: Server/FastPL/Server,  Next: Seshat,  Prev: Server/FastPL/Client,  Up: Module List
+
+Eliminate the compile-time of big scripts
+*****************************************
+
+NAME
+====
+
+   Server::FastPL::Server - Eliminate the compile-time of big scripts
+
+VERSION
+=======
+
+   This document refers to version 1.00 of Server::FastPL::Server,
+released April 10, 2000.
+
+SYNOPSIS
+========
+
+   use Server::FastPL::Server
+
+   my $fps = new
+Server::FastPL::Server(NAME=>"Test",MAX_CHILDS=>5,DEBUG=>1);
+
+   while ($client = $fps->receive_connect()) {   ...  }
+
+DESCRIPTION
+===========
+
+Overview
+--------
+
+   This module was created to avoid the compile time of big scripts that
+runs a lot of times. It works forking your script into MAX_CHILDS childs,
+and using Unix Sockets to run your code. Just like CGI::Fast. Combining
+whith Server::FastPL::Client, you can easily do a client-server program.
+
+Contructor and initialization
+-----------------------------
+
+   $fps = new Server::FastPL::Server(  # REQUIRED: This is the name of the
+socket file  NAME => "Test",  # Socket files dir. "/tmp/" as default.
+SOCKET_DIR => "/tmp/",  # Number of childs to fork, 5 as default.
+MAX_CHILDS => 5,  # Debug about the childs. 0 as default.   DEBUG => 0 )
+|| die $!;
+
+Class and object methods
+------------------------
+
+   $client = $fps->receive_connect();
+
+   This method waits for a connection, and return a FileHandle (a Socket)
+to input/output of the server.
+
+ENVIRONMENT
+===========
+
+   Signals:
+
+   This module uses two signals: USR1 and CHLD, don\'t use it in your
+script, it will cause the server not to work.
+
+   %ENV:
+
+   The environment hash is not passed from the client to the server. You
+must do it by your own way.
+
+DIAGNOSTICS
+===========
+
+   All error messages are passed to $!. Use it in your script to detect
+errors.
+
+BUGS
+====
+
+   No known bugs at this moment.
+
+FILES
+=====
+
+   The module creates the folowing files in directory SOCKET_DIR:
+
+NAME The main socket
+NAME.x A socket for each child
+NAME.fifo Comunication beetwen mother and children
+SEE ALSO
+========
+
+   Server::FastPL::Client IO::Socket
+
+AUTHOR
+======
+
+   Daniel Ruoso (daniel@ruoso.com)
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000, Daniel Ruoso. All Rights Reserved.  This module is
+free software. It may be used, redistributed and/or modified under the
+same terms of Perl itself
+
+
+File: pm.info,  Node: Seshat,  Next: Seshat/Parallel,  Prev: Server/FastPL/Server,  Up: Module List
+
+Perl Extension for writing modules
+**********************************
+
+NAME
+====
+
+   Seshat - Perl Extension for writing modules
+
+   "Seshat, her who writes..."
+
+SYNOPSIS
+========
+
+     use Seshat;
+     
+     my $lh = Seshat->new($log_filename[, PARAM => VALUE [, ...]]);
+
+     $res = $lh->write($string,$nl_bool);
+
+DESCRIPTION
+===========
+
+     Seshat is a module designed to handle more than one log, and log files shared by two or more processes.
+     It is a concurrency safe system, and implements extra information about the script that is writing the log.
+
+METHODS
+=======
+
+$lh = Seshat->new($log_filename [, PARAM => VALUE [, ...]])
+     Creates a new object that uses th $log_filename as the log file
+
+     Parameter description:
+
+     DATE_FORMAT => $string
+
+     Defines the format of the date that is written to the log file
+
+          Types:
+
+          %a -> short day
+          %A -> long day
+          %b -> short month
+          %B -> long month
+          %d -> month day
+          %g -> last 2 dig of year
+          %G -> year
+          %c -> long date
+          %D -> short date
+          %F -> short date (inverted)
+          %H -> hour
+          %M -> minutes
+          %S -> seconds
+          
+          ex: "%a %b %G - %H:%M:%S"
+               Tue Oct 2000 - 13:59:41
+
+     LOG_LEVEL => [0..5]
+
+          Defines the amount of information about the caller script that is written to the log file
+
+$res = $lh->write($string,$nl_bool);
+     Writes the $string to the log file , and terminates the line or not
+     ($nl_bool)
+
+TODO
+====
+
+   Sugestions accepted
+
+AUTHOR
+======
+
+   Bruno Tavares (bat@isp.novis.pt)
+
+SEE ALSO
+========
+
+   perl(1), Seshat::Parallel(1)
+
+
+File: pm.info,  Node: Seshat/Parallel,  Next: Set/Bag,  Prev: Seshat,  Up: Module List
+
+Perl extension for Seshat
+*************************
+
+NAME
+====
+
+   Seshat::Parallel - Perl extension for Seshat
+
+SYNOPSIS
+========
+
+     use Seshat::Parallel;
+     
+     my $plh = Seshat::Parallel->new("filename1"[,"filename2",...]);
+
+     $plh->write($string, $bol_flag);
+
+     my $res = $plh->registar("filename3");
+
+     my $res = $plh->register("filename1");
+
+DESCRIPTION
+===========
+
+   This is an extension for Seshat, it introduces multiple , simultaneous,
+log writing.  The module uses a list of filenames given by the user and,
+every time its required, the modulo writes the string to all the filenames
+specified.
+
+AUTHOR
+======
+
+   Bruno Tavares (bruno.tav@clix.pt)
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: Set/Bag,  Next: Set/Crontab,  Prev: Seshat/Parallel,  Up: Module List
+
+bag (multiset) class
+********************
+
+NAME
+====
+
+     Set::Bag - bag (multiset) class
+
+SYNOPSIS
+========
+
+     use Set::Bag;
+
+     my $bag_a = Set::Bag->new(apples => 3, oranges => 4);
+     my $bag_b = Set::Bag->new(mangos => 3);
+     my $bag_c = Set::Bag->new(apples => 1);
+     my $bag_d = ...;
+     
+     # Methods
+
+     $bag_b->insert(apples => 1);
+     $bag_b->delete(mangos => 1);
+
+     $bag_b->insert(cherries => 1, $bag_c);
+
+     my @b_elements = $bag_b->elements;	# ('apples','cherries','mangos')
+     my @b_grab_app = $bag_b->grab('apples', 'cherries'); # (3, 1)
+     my @a_grab_all = $bag_a->grab;	# (apples => 3, oranges => 4)
+
+     print "bag_a     sum      bag_b = ", $bag_b->sum($bag_b),          "\n";
+     print "bag_a  difference  bag_b = ", $bag_b->difference($bag_b),   "\n";
+
+     print "bag_a    union     bag_b = ", $bag_a->union($bag_b),        "\n";
+     print "bag_a intersection bag_b = ", $bag_a->intersection($bag_b), "\n";
+
+     print "bag_b complement = ", $bag_b->complement, "\n";
+
+     # Operator Overloads
+
+     print "bag_a = $bag_a\n";		# (apples => 3, oranges => 4)
+
+     $bag_b += $bag_c;					# Insert
+     $bag_b -= $bag_d;					# Delete
+
+     print "bag_b = $bag_b\n";
+
+     print "bag_a + bag_b = ", $bag_b + $bag_b, "\n";	# Sum
+     print "bag_a - bag_b = ", $bag_b - $bag_b, "\n";	# Difference
+
+     print "bag_a | bag_b = ", $bag_a | $bag_b, "\n";	# Union
+     print "bag_a & bag_b = ", $bag_a & $bag_b, "\n";	# Intersection
+
+     $bag_b |= $bag_c;					# Maximize
+     $bag_b &= $bag_d;					# Minimize
+
+     print "good\n" if     $bag_a eq "(apples => 3, oranges => 4)";	# Eq
+     print "bad\n"  unless $bag_a ne "(apples => 3, oranges => 4)";	# Ne
+
+     print "-bag_b = ", -$bag_b"\n";			# Complement
+
+     $bag_c->delete(apples => 5);			# Would abort.
+     print "Can",					# Cannot ...
+           $bag_c->over_delete() ? "" : "not",
+           " over delete from bag_c\n";
+     $bag_c->over_delete(1);
+     print "Can",					# Can ...
+           $bag_c->over_delete() ? "" : "not",
+           " over delete from bag_c\n";
+     $bag_c->delete(apples => 5);			# Would succeed.
+     print $bag_c, "\n";					# ()
+
+DESCRIPTION
+===========
+
+   This module implements a simple bag (multiset) class.
+
+   A bag may contain one or more instances of elements.  One may add and
+delete one or more instances at a time.
+
+   If one attempts to delete more instances than there are to delete from,
+the default behavious of delete is to raise an exception.  The
+*over_delete* method can be used to control this behaviour.
+
+   Inserting or removing negative number of instances translates into
+removing or inserting positive number of instances, respectively.
+
+   The sum is also known as the *additive union*.  It leaves in the result
+bag the sum of all the instances of all bags.
+
+   Before using the *difference* you very often will need the
+*over_delete*.
+
+   The union is also known as the *maximal union*.  It leaves in the
+result bag the maximal number of instances in all bags.
+
+   The intersection leaves in the result bag only the elements that have
+instances in all bags and of those the minimal number of instances.
+
+   The *complement* will leave in the result bag the maximal number of
+instances *ever* seen (via new, insert, sum, or *maximize*) in the bag
+minus the current number of instances in the bag.
+
+   The *grab* method returns the contents of a bag.  If used with
+parameters the parameters are the elements and their number of instances
+in the bag are returned.  If an element that does not exist in the bag is
+grabbed for, the number of instances returned for that element will be
+undef.  If used without parameters the elements are returned in
+pseudorandom order.
+
+NOTES
+=====
+
+   Beware the low precedence of | and & compared with eq and ne.
+
+AUTHOR
+======
+
+   Jarkko Hietaniemi <jhi@iki.fi>
+
+COPYRIGHT
+=========
+
+   O'Reilly and Associates.  This module can be distributed under the same
+terms as Perl itself.
+
+

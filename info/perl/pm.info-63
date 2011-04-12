@@ -1,0 +1,1728 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Bio/Tools/Blast/Run/Webblast,  Next: Bio/Tools/Blast/Sbjct,  Prev: Bio/Tools/Blast/Run/LocalBlast,  Up: Module List
+
+Bioperl module for running Blast analyses using a HTTP interface.
+*****************************************************************
+
+NAME
+====
+
+   Bio::Tools::Blast::Run::Webblast.pm - Bioperl module for running Blast
+analyses using a HTTP interface.
+
+SYNOPSIS
+========
+
+     # Run a Blast
+     use Bio::Tools::Blast::Run::Webblast qw(&blast_remote);
+
+     @out_file_names = &blast_remote($object, %named_parameters);
+
+   `blast_remote' in this node is the only exported method of this module
+and it returns a list of local file names containing the Blast reports.
+$object is a reference to a *Bio::Root::Object.pm* object or subclass. See
+`blast_remote' in this node() for a description of available parameters.
+
+     # Obtain a list of available databases
+
+     use Bio::Tools::Blast::Run::Webblast qw(@Blast_dbp_remote
+     					    @Blast_dbn_remote);
+
+     @amino_dbs      = @Blast_dbp_remote;
+     @nucleotide_dbs = @Blast_dbn_remote;
+
+INSTALLATION
+============
+
+   This module is included with the central Bioperl distribution:
+
+     http://bio.perl.org/Core/Latest
+     ftp://bio.perl.org/pub/DIST
+
+   Follow the installation instructions included in the README file.
+
+DESCRIPTION
+===========
+
+   *Bio::Tools::Blast::Run::Webblast.pm* contains methods and data
+necessary for running Blast sequence analyses using a remote server and
+saving the results locally.
+
+   *Bio::Tools::Blast::run()* provides an interface for Webblast.pm, so,
+ideally, you shouldn't use Webblast.pm directly, but via Blast.pm.
+
+   *FEATURES:*
+
+   * Supports NCBI Blast1, Blast2, and PSI-Blast servers as well as
+     WashU-Blast servers.
+
+   * Can operate through a proxy server enabling operation from behind a
+     firewall.
+
+   * Can save reports with and without HTML formatting.
+
+   * Uses LWP.
+
+   In principle, this module can be customized to use different servers
+that provide a Blast interface like the NCBI or WashU style servers.  Such
+servers could be remote or local. This hasn't been well-tested however.
+
+DEPENDENCIES
+============
+
+   Bio::Tools::Blast::Run::Webblast.pm is used by Bio::Tools::Blast.pm.
+The development of this is thus linked with the Blast.pm module.
+
+SEE ALSO
+========
+
+     Bio::Tools::Blast.pm                    - Blast object.
+     Bio::Tools::Blast::Run::LocalBlast.pm   - Utility module for running Blasts locally.
+     Bio::Tools::Blast::HTML.pm              - Blast HTML-formating utility class.
+     Bio::Seq.pm                             - Biosequence object
+     Bio::Root::Object.pm                    - Bioperl base object class.
+
+     http://bio.perl.org/Projects/modules.html  - Online module documentation
+     http://bio.perl.org/Projects/Blast/        - Bioperl Blast Project
+     http://bio.perl.org/                       - Bioperl Project Homepage
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules.  Send your comments and suggestions preferably to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     vsns-bcd-perl@lists.uni-bielefeld.de          - General discussion
+     vsns-bcd-perl-guts@lists.uni-bielefeld.de     - Technically-oriented discussion
+     http://bio.perl.org/MailList.html             - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution. Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR
+======
+
+Steve A. Chervitz <sac@genome.stanford.edu>
+          - Webblast.pm modularized version of webblast script.
+
+Alex Dong Li <ali@genet.sickkids.on.ca>
+          - original webblast script.
+
+Ross N. Crowhurst <RCrowhurst@hort.cri.nz>
+          - modified Webblast.pm to use LWP to give proxy server support.
+
+VERSION
+=======
+
+   Bio::Tools::Blast::Run::Webblast.pm, 1.24
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1998, 1999 Steve A. Chervitz, Alex Dong Li,  Ross N.
+Crowhurst.  All Rights Reserved.This module is free software; you can
+redistribute it and/or modify it under the same terms as Perl itself.
+
+APPENDIX
+========
+
+   Methods beginning with a leading underscore are considered private and
+are intended for internal use by this module. They are not considered part
+of the public interface and are described here for documentation purposes
+only.
+
+blast_remote
+------------
+
+     Usage     : @files = blast_remote( $blast_object,  %namedParameters);
+               : This method is exported.
+     Purpose   : Run a remote Blast analysis on one or more sequences.
+               : NOTE: The name of this method is potentially misleading
+               :       since the a local server could be specified.
+      	   :       Probably should be called blast_http.
+     Returns   : Array containing a list of filenames of the Blast reports.
+     Argument  : First argument should be a Bio::Tools::Blast.pm object reference.
+               : This object is primarily used for error reporting
+               : Remaining arguments are named parameters:
+               : (PARAMETER TAGS CAN BE UPPER OR LOWER CASE).
+               :
+               :   -ALIGN      => integer, number of alignments (B, 100)
+               :   -ALIGN_VIEW => alignment view option (see below)
+               :   -CUTOFF     => Blast score cutoff (60-110 or 'default')
+               :   -DATABASE   => name of database (see below)
+               :   -DESCR      => integer, number of on-line descriptions (V, 100)
+               :   -EXPECT     => expect value cutoff
+               :   -EXPECT_PSI => expect value for inclusion in PSI-BLAST iteration 1
+               :   -FILTER     => sequence complexity filter ('default' or 'none')
+               :   -GAP        => 'on' or 'off'
+               :   -GAP_CREATE => gap creation penalty (G, 5)
+               :   -GAP_EXTEND => gap extension penalty (E, 2)
+               :   -GEN_CODE   => integer for special genetic code (see below) blastx only
+               :   -GRAPH      => 'on' or 'off' (graphical overview not yet supported)
+               :   -HISTOGRAM  => 'on' or 'off' or 'both'
+               :   -HTML       => 'on' or 'off' or 'both'
+               :   -INPUT_TYPE => 'Sequence in FASTA format' or 'Accession or GI'
+               :   -MATRIX     => substitution scoring matrix (blast1 only for NCBI server)
+               :   -NCBI_GI    => 'on' or 'off'
+               :   -MATCH      => match reward (r, 1)       (blastn only)
+               :   -MAX_LEN    => max query sequence length to blast
+               :   -MIN_LEN    => min query sequence length to blast
+               :   -MISMATCH   => mismatch penalty (q, -3)  (blastn only)
+               :   -ORGANISM   => organism name to limit Blast2 search.
+               :   -ORGANISM_CUSTOM  => custom organism or taxon name.
+               :   -OUT_DIR    => output directory to store blast result files
+               :   -PROG       => name of blast program (blastp, blastx, etc.)
+               :   -SEQS       => ref to an array of Bio::Seq.pm objects.
+               :   -SERVER     => blast server to use (default is NCBI Blast2)
+               :   -STRAND     => Default = 'Both' (not used by NCBI servers)
+               :   -VERSION    => blast version (1, 2, PSI, WashU)
+               :   -WORD       => word size (W, 11 for blastn, 3 for all others)
+     #rnc:   LIST_ORG
+     #       valid list_org entries for blast2 are a string of 50 chars max, default is empty string
+               :
+     Throws    : Exception if:
+               :   - Cannot obtain parameters by calling _rearrange() on the
+               :     first argument, which should be a Bio::Tools::Blast.pm object ref.
+               :   - No sequences are provided.
+               :   - Sequence type is incompatible with Blast program type.
+               :   - Database name is not one of the valid names.
+               :   - Supplied e-mail address looks invalid.
+     Comments  :
+      -------------------------------------------------------------
+      Available programs: blastn, blastx, dbest, blastp, tblastn, tblastx
+      Program versions: 1, 2, PSI, WashU (or WU)
+
+     -------------------------------------------------------------
+     Available databases:
+           nr, month, swissprot, dbest, dbsts,
+           est_mouse, est_human, est_others, pdb, vector, kabat,
+           mito, alu, epd, yeast, ecoli, gss, htgs.
+     
+       These are exported by this module in the @Blast_dbp_remote
+       and @Blast_dbn_remote arrays.
+     -------------------------------------------------------------
+     Available Genetic Codes are (blastx only):
+
+     (1) Standard                    (2) Vertebrate Mitochondrial
+     (3) Yeast Mitochondrial         (4) Mold Mitochondrial; ...
+     (5) Invertebrate Mitochondrial  (6) Ciliate Nuclear; ...
+     (9) Echinoderm Mitochondrial    (10) Euplotid Nuclear
+     (11) Bacterial                  (12) Alternative Yeast Nuclear
+     (13) Ascidian Mitochondrial     (14) Flatworm Mitochondrial
+     (15) Blepharisma Macronuclear
+     
+       -------------------------------------------------------------
+       Available values for organism (Blast2):
+
+     (None)   (DEFAULT; note that the parentheses are required.)
+     Arabidopsis thaliana
+     Bacillus subtilis
+     Bos taurus
+     Caenorhabditis elegans
+     Danio rerio
+     Dictyostelium discoideum
+     Drosophila melanogaster
+     Escherichia coli
+     Gallus gallus
+     Homo sapiens
+     Human immunodeficiency virus type 1
+     Mus musculus
+     Oryctolagus cuniculus
+     Oryza sativa
+     Ovis aries
+     Plasmodium falciparum
+     Rattus norvegicus
+     Saccharomyces cerevisiae
+     Schizosaccharomyces pombe
+     Simian immunodeficiency virus
+     Xenopus laevis
+     Zea mays
+
+     -------------------------------------------------------------
+     Available values for align_view (Blast2):
+
+     0             Pairwise  (DEFAULT)
+     1             master-slave with identities
+     2             master-slave without identities
+     3             flat master-slave with identities
+     4             flat master-slave without identities
+      -------------------------------------------------------------
+       Available substitution scoring matrices (NCBI):
+
+     BLAST2 matrices: BLOSUM80, BLOSUM62, BLOSUM45, PAM30, PAM70
+
+     BLAST1 matrices: BLOSUM62, PAM40, PAM120, PAM250, IDENTITY.
+
+     Others members of the BLOSUM and PAM family of matrices
+     may be available as well.
+     These are exported by this module in the @Blast_matrix_remote array.
+
+     Note that certain combinations of matrices and gap creation/extension
+     penalties are disallowed (E.g., PAM250 will work with 12/2 but not 11/1).
+      --------------------------------------------------------------
+        Limited values for gap creation and extension are supported for
+        blastp, blastx, tblastn.  Some supported and suggested values are:
+
+     Creation     Extension
+
+     10             1
+     10             2
+     11             1
+      8             2
+      9             2
+       -------------------------------------------------------------
+       Available sequence complexity filters:
+       SEG, SEG+XNU, XNU, dust, none.
+
+   See Also : _set_options(), _adjust_options(), _validate_options(),
+_blast(), Bio::Tools::Blast.pm
+
+APPENDIX 2: Parameter listings
+==============================
+
+   Parameters for Blast (NCBI ungapped, no longer supported by NCBI so
+should dicontinue use of ungapped blast), Blast2 (NCBI), PSI-Blast2
+(NCBI). WashU-Blast2 has yet to be added as does PHI-Blast2 (NCBI).
+
+   These lists of parameters for posting to blast servers were obtained
+directly from the respective WWW forms for each server.
+
+Basic ungapped BLAST Search Server Parameters
+---------------------------------------------
+
+   PROGRAM [default value]:blastn 	blastp tblastn tblastx blastx
+
+   DATALIB [default value]:nr 	month swissprot dbest dbsts pdb
+vector kabat mito alu epd yeast gss htgs ecoli
+
+   INPUT_TYPE [default value]:Sequence in FASTA format 	Accession or GI
+
+   SEQUENCE
+
+   EXPECT [default value]:default 	0.0001 0.01 1 10 100 1000
+
+   CUTOFF [default value]:default 	60 70 80 90 100 110
+
+   MATRIX [default value]:default 	BLOSUM62 PAM40 PAM120 PAM250 IDENTITY
+
+   STRAND [default value]:both 	top bottom
+
+   FILTER [default value]:default none dust SEG SEG+XNU XNU
+
+   HISTOGRAM [default value]:" HISTOGRAM
+
+   NCBI_GI [default value]:"" NCBI_GI
+
+   DESCRIPTIONS [default value]:default 0 10 50 100 250 500
+
+   ALIGNMENTS [default value]:default 0 10 50 100 250 500
+
+   ADVANCED [default value]:""
+
+   EMAIL [default value]:" IS_SET
+
+   PATH [default value]:""
+
+   HTML [default value]:" HTML
+
+Basic Blast 2
+-------------
+
+   PROGRAM [default value]:blastn blastp blastx tblastn tblastx
+
+   DATALIB [default value]:nr month swissprot dbest  dbsts est_mouse
+est_human est_others pdb pat vector kabat mito alu epd yeast ecoli gss htgs
+
+   UNGAPPED_ALIGNMENT [default value]:" is_set
+
+   FSET [default value]:is_set "
+
+   OVERVIEW [default value]:is_set "
+
+   INPUT_TYPE [default value]:Sequence in FASTA format Accession or GI
+
+   SEQUENCE
+
+   EMAIL [default value]:" IS_SET
+
+   PATH [default value]:""
+
+   HTML [default value]:" IS_SET
+
+BLAST2 ADVANCED
+---------------
+
+   PROGRAM [default value]:blastn blastp blastx tblastn tblastx
+
+   DATALIB [default value]:nr  month swissprot dbest dbsts est_mouse
+est_human est_others pdb pat vector kabat mito alu epd yeast ecoli gss htgs
+
+   UNGAPPED_ALIGNMENT [default value]:"" is_set
+
+   INPUT_TYPE [default value]:Sequence in FASTA format Accession or GI
+
+   SEQUENCE
+
+   GI_LIST [default value]:(None) Arabidopsis thaliana   Bacillus subtilis
+ Bos taurus   Caenorhabditis elegans   Danio rerio   Dictyostelium
+discoideum   Drosophila melanogaster   Escherichia coli   Gallus gallus
+Homo sapiens   Human immunodeficiency virus type 1   Mus musculus
+Oryctolagus cuniculus   Oryza sativa   Ovis aries   Plasmodium falciparum
+Rattus norvegicus   Saccharomyces cerevisiae   Schizosaccharomyces pombe
+Simian immunodeficiency virus   Xenopus laevis   Zea mays
+
+   LIST_ORG
+
+   EXPECT [default value]:10 0.0001 0.01 1 10 100 1000
+
+   FILTER [default value]:default none
+
+   NCBI_GI [default value]:" is_set
+
+   OVERVIEW [default value]:is_set "
+
+   DESCRIPTIONS [default value]:500 0 10 50 100 250 500
+
+   ALIGNMENTS [default value]:500 0 10 50 100 250 500
+
+   ALIGNMENT_VIEW [default value]:0	#Pairwise 1	#master-slave with
+identities 2	#master-slave without identities 3	#flat master-slave
+with identities 4	#flat master-slave without identities
+
+   GENETIC_CODE [default value]:Standard (1) Vertebrate Mitochondrial (2)
+Yeast Mitochondrial (3) Mold Mitochondrial; ... (4) Invertebrate
+Mitochondrial (5) Ciliate Nuclear; ... (6) Echinoderm Mitochondrial (9)
+Euplotid Nuclear (10) Bacterial (11) Alternative Yeast Nuclear (12)
+Ascidian Mitochondrial (13) Flatworm Mitochondrial (14) Blepharisma
+Macronuclear (15)
+
+   MAT_PARAM [default value]:BLOSUM62	 11	 1 PAM30	 9	 1
+PAM70	 10	 1 BLOSUM80	 10	 1 BLOSUM62	 11	 1 BLOSUM45
+14	 2 PAM30	 7	 2 PAM30	 6	 2 PAM30	 5	 2
+PAM30	 10	 1 PAM30	 9	 1  #recommended PAM30	 8	 1
+PAM70	 8	 2 PAM70	 7	 2 PAM70	 6	 2 PAM70	 11	 1
+PAM70	 10	 1  #recommended PAM70	 9	 1 BLOSUM80	 8	 2
+BLOSUM80	 7	 2 BLOSUM80	 6	 2 BLOSUM80	 11	 1 BLOSUM80	 10	 1
+#recommended BLOSUM80	 9	 1 BLOSUM62	 9	 2 BLOSUM62	 8	 2
+BLOSUM62	 7	 2 BLOSUM62	 12	 1 BLOSUM62	 11	 1
+#recommended BLOSUM62	 10	 1 BLOSUM45	 13	 3 BLOSUM45	 12	 3
+BLOSUM45	 11	 3 BLOSUM45	 10	 3 BLOSUM45	 15	 2
+BLOSUM45	 14	 2  #recommended BLOSUM45	 13	 2 BLOSUM45	 12	 2
+BLOSUM45	 19	 1 BLOSUM45	 18	 1 BLOSUM45	 17	 1
+BLOSUM45	 16	 1
+
+   OTHER_ADVANCED [default value]:""
+
+   EMAIL [default value]:" IS_SET
+
+   PATH [default value]:""
+
+   HTML [default value]:" IS_SET
+
+PSI BLAST2
+----------
+
+   PROGRAM [default value]:blastp
+
+   DATALIB [default value]:nr month swissprot pdb kabat alu yeast ecoli
+
+   GAPPED_ALIGNMENT [default value]:is_set "
+
+   INPUT_TYPE [default value]:Sequence in FASTA format Accession or GI
+
+   SEQUENCE
+
+   EXPECT [default value]:10 0.0001 0.01 1 10  100  1000
+
+   FILTER [default value]:default none
+
+   NCBI_GI [default value]:" is_set
+
+   GRAPHIC_OVERVIEW [default value]:is_set "
+
+   DESCRIPTIONS [default value]:500 0  10 50 100 250 500
+
+   ALIGNMENTS [default value]:500 0  10 50 100 250 500
+
+   E_THRESH [default value]:0.001 #max value is 10
+
+   MAT_PARAM [default value]:BLOSUM62	 11	 1 PAM30	 9	 1
+PAM70	 10	 1  BLOSUM80	 10	 1  BLOSUM62	 11	 1  BLOSUM45	 14	 2
+PAM30	 7	 2  PAM30	 6	 2  PAM30	 5	 2  PAM30	 10	 1
+PAM30	 9	 1  PAM30	 8	 1  PAM70	 8	 2  PAM70	 7	 2
+PAM70	 6	 2  PAM70	 11	 1  PAM70	 10	 1  PAM70	 9	 1  BLOSUM80
+8	 2  BLOSUM80	 7	 2  BLOSUM80	 6	 2  BLOSUM80	 11	 1  BLOSUM80	 10	 1
+BLOSUM80	 9	 1  BLOSUM62	 9	 2  BLOSUM62	 8	 2
+BLOSUM62	 7	 2  BLOSUM62	 12	 1  BLOSUM62
+11	 1  BLOSUM62	 10	 1  BLOSUM45	 13	 3
+BLOSUM45	 12	 3  BLOSUM45	 11	 3  BLOSUM45
+10	 3  BLOSUM45	 15	 2  BLOSUM45	 14	 2
+BLOSUM45	 13	 2 BLOSUM45	 12	 2 BLOSUM45	 19	 1
+BLOSUM45	 18	 1 BLOSUM45	 17	 1 BLOSUM45	 16	 1
+
+   OTHER_ADVANCED [default value]:""
+
+WashU BLAST2
+------------
+
+   WU-Blast2 Database Searches http://www2.ebi.ac.uk/blast2/
+
+   email ""
+
+   title Sequence
+
+   srchtype interactive email
+
+   database swall swissprot swnew trembl tremblnew pdb gpcrdb prints
+HLAprot embl emnew est igvec emvec imgt HLAnuc
+
+   program WU-blastp WU-blastx WU-blastn
+
+   matrix blosum62 blosum30 blosum35 blosum40 blosum45 blosum50 blosum65
+blosum70 blosum75 blosum80 blosum85 blosum90 blosum100 GONNET pam10 pam20
+pam30 pam40 pam50 pam60 pam70 pam80 pam90 pam100 pam110 pam120 pam130
+pam140 pam150 pam160 pam170 pam180 pam190 pam200 pam210 pam220 pam230
+pam240 pam250 pam260 pam270 pam280 pam290 pam300 pam310 pam320 pam330
+pam340 pam350 pam360 pam370 pam380 pam390 pam400 pam410 pam420 pam430
+pam440 pam450 pam460 pam470 pam480 pam490 pam500
+
+   strand default top bottom
+
+   exp default 1.0 10 100 1000
+
+   filter none seg xnu seg+xnu dust
+
+   echofilter no yes
+
+   histogram no yes
+
+   stats sump poisson
+
+   sort pvalue count highscore totalscore
+
+   scores default 5 10 20 50 100 150 200 250
+
+   numal default 5 10 20 50 100 150 200 250
+
+   sequence
+
+
+File: pm.info,  Node: Bio/Tools/Blast/Sbjct,  Next: Bio/Tools/CodonTable,  Prev: Bio/Tools/Blast/Run/Webblast,  Up: Module List
+
+Bioperl BLAST "Hit" object
+**************************
+
+NAME
+====
+
+   Bio::Tools::Blast::Sbjct.pm - Bioperl BLAST "Hit" object
+
+SYNOPSIS
+========
+
+Object Creation
+---------------
+
+   The construction of HSP objects is handled by Bio::Tools::Blast.pm.
+You should not need to use this package directly. See `_initialize' in
+this node() for a description of constructor parameters.
+
+     require Bio::Tools::Blast::Sbjct;
+     
+     $hit = new Bio::Tools::Blast::Sbjct (-DATA    =>\@hitData,
+     					 -PARENT  =>$self,
+     					 -NAME    =>5,
+     					 -RANK    =>5,
+     					 -RANK_BY =>'order',
+     					 -MAKE    =>'query' (or 'sbjct'),
+     					 -OVERLAP =>2,
+     					 -PROGRAM =>'TBLASTN'
+     					 );
+
+   @hitData includes the summary line for the hit as element [0], plus all
+lines from the HSP alignment section of the BLAST report for the present
+hit.
+
+INSTALLATION
+============
+
+   This module is included with the central Bioperl distribution:
+
+     http://bio.perl.org/Core/Latest
+     ftp://bio.perl.org/pub/DIST
+
+   Follow the installation instructions included in the README file.
+
+DESCRIPTION
+===========
+
+   The Bio::Tools::Blast::Sbjct.pm module encapsulates data and methods for
+parsing and manipulating "hits" from a BLAST report.  This module is a
+utility module used by the Bio::Tools::Blast.pm and is not intended for
+separate use.
+
+   In Blast lingo, the "sbjct" sequences are all the sequences in a target
+database which were compared against a "query" sequence.  The terms
+"sbjct" and "hit" will be used interchangeably in this and related modules.
+
+   This module supports BLAST versions 1.x and 2.x, gapped and ungapped.
+
+HSP Tiling and Ambiguous Alignments
+-----------------------------------
+
+   If a Blast hit has more than one HSP, the Bio::Tools::Blast::Sbjct.pm
+object has the ability to merge overlapping HSPs into contiguous blocks.
+This permits the Sbjct object to sum data across all HSPs without counting
+data in the overlapping regions multiple times, which would happen if data
+from each overlapping HSP are simply summed.  HSP tiling is performed
+automatically when methods of the Sbjct object that rely on tiled data are
+invoked. These include `frac_identical' in this node(), `frac_conserved'
+in this node(), `gaps' in this node(), `frac_aligned_query' in this
+node(), `frac_aligned_hit' in this node(), `num_unaligned_query' in this
+node(), `num_unaligned_hit' in this node().
+
+   It also permits the assessment of an "ambiguous alignment" if the query
+(or sbjct) sequences from different HSPs overlap. The existence of an
+overlap could indicate a biologically interesting region in the sequence,
+such as a repeated domain.  The Sbjct object uses the -OVERLAP parameter
+to determine when two sequences overlap; if this is set to 2 - the default
+- then any two sbjct or query HSP sequences must overlap by more than two
+residues to get merged into the same contig and counted as an overlap. See
+the `BUGS' in this node section below for "issues" with HSP tiling.
+
+   The results of the HSP tiling is reported with the following ambiguity
+codes:
+
+     'q' = Query sequence contains multiple sub-sequences matching
+           a single region in the sbjct sequence.
+     
+     's' = Sbjct sequence contains multiple sub-sequences matching
+           a single region in the query sequence.
+     
+     'qs' = Both query and sbjct sequences contain more than one
+            sub-sequence with similarity to the other sequence.
+
+   For addition information about ambiguous BLAST alignments, see
+`_tile_hsps' in this node() and
+
+     http://www-genome.stanford.edu/Sacch3D/help/ambig_aln.html
+
+DEPENDENCIES
+============
+
+   Bio::Tools::Blast::Sbjct.pm is a concrete class that inherits from
+*Bio::Root::Object.pm* and relies on two other modules:
+
+Bio::Tools::Blast::HSP.pm
+     Encapsulates a single high-scoring segment pair within a hit.
+
+Bio::Tools::Blast.pm
+     Provides a container for Sbjct.pm objects.
+
+   Bio::Tools::Blast::Sbjct.pm does not currently inherit from
+Bio::Root::Vector.pm since Bio::Root::Vector.pm may be re-designed to make
+it usable via delegation.  Thus, a Blast.pm object would manage a vector
+of Sbjct.pm objects.  Stay tuned.
+
+BUGS
+====
+
+   One consequence of the HSP tiling is that methods that rely on HSP
+tiling such as `frac_identical' in this node(), `frac_conserved' in this
+node(), `gaps' in this node() etc. may report misleading numbers when
+`-OVERLAP' is set to a large number.  For example, say we have two HSPs
+and the query sequence tile as follows:
+
+     1      8             22      30        40             60
+      Full seq:  ------------------------------------------------------------
+             *  ** *   **
+      HSP1:             ---------------                    (6 identical matches)
+                       **   **  **
+      HSP2:                        -------------           (6 identical matches)
+
+   If `-OVERLAP' is set to some number over 4, HSP1 and HSP2 will not be
+tiled into a single contig and their numbers of identical matches will be
+added, giving a total of 12, not 10 if they had be combined into one
+contig. This can lead to number greater than 1.0 for methods
+`frac_identical' in this node() and `frac_conserved' in this node(). This
+is less of an issue with gapped Blast since it tends to combine HSPs that
+would be listed separately without gapping.  (Fractions >1.0 can be viewed
+as a signal for an interesting alignment that warrants further inspection,
+thus turning this bug into a feature).
+
+   Using large values for `-OVERLAP' can lead to incorrect numbers
+reported by methods that rely on HSP tiling but can be useful if you care
+more about detecting ambiguous alignments.  Setting `-OVERLAP' to zero
+will lead to the most accurate numbers for the tiling-dependent methods
+but will be useless for detecting overlapping HSPs since all HSPs will
+appear to overlap.
+
+SEE ALSO
+========
+
+     Bio::Tools::Blast::HSP.pm     - Blast HSP object.
+     Bio::Tools::Blast.pm          - Blast object.
+     Bio::Root::Object.pm          - Proposed base class for all Bioperl objects.
+
+   Links:
+
+     http://bio.perl.org/Core/POD/Tools/Blast/HSP.pm.html
+
+     http://bio.perl.org/Projects/modules.html  - Online module documentation
+     http://bio.perl.org/Projects/Blast/        - Bioperl Blast Project
+     http://bio.perl.org/                       - Bioperl Project Homepage
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules.  Send your comments and suggestions preferably to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     bioperl-l@bioperl.org          - General discussion
+     http://bio.perl.org/MailList.html             - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution. Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR
+======
+
+   Steve A. Chervitz, sac@genome.stanford.edu
+
+   See the `FEEDBACK' in this node section for where to send bug reports
+and comments.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1996-2000 Steve A. Chervitz. All Rights Reserved.  This
+module is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+APPENDIX
+========
+
+   Methods beginning with a leading underscore are considered private and
+are intended for internal use by this module. They are not considered part
+of the public interface and are described here for documentation purposes
+only.
+
+_initialize
+-----------
+
+     Usage     : n/a; automatically called by Bio::Root::Object::new()
+               : Bio::Tools::Blast::Sbjct.pm objects are constructed
+               : automatically by Bio::Tools::Blast.pm, so there is no need
+               : for direct consumption.
+     Purpose   : Initializes key varaiables and calls methods to parse a single Blast hit.
+               : Constructs Bio::Tools::Blast::HSP.pm objects for each
+               : high-scoring segment pair (HSP).
+               : Calls superclass constructor first (Bio::Root::Object.pm).
+     Returns   : n/a
+     Argument  : Named Parameters passed from new()
+               : ALL TAGS MUST BE UPPERCASE (does not call _rearrange()).
+               :     -DATA       => array reference holding all data for a single hit.
+               :                    The first element should hold the description
+               :                    line (from the desctiption section at the top of
+               :                    the report), remaining lines should hold all lines
+               :                    within the HSP alignment listing section of report.
+     	   :	 -PARENT     => object reference to a Bio::Tools::Blast.pm object.
+     	   :	 -NAME       => string (typically same as -RANK, just a temporary
+               :                    name to use until the actual name of hit is parsed),
+     	   :	 -RANK       => integer,
+     	   :	 -RANK_BY    => 'order',
+     	   :	 -OVERLAP    => integer (maximum overlap between adjacent
+               :                    HSPs when tiling)
+     	   :	 -PROGRAM    => string (type of Blast blastp, blastn, etc).
+
+   See Also   : `_set_id' in this node(), `_set_hsps' in this node(),
+`_tile_hsps' in this node(), *Bio::Root::Object.pm*::new,
+Bio::Tools::Blast.pm::_set_hit_db
+
+rank
+----
+
+     Usage     : $sbjct->rank( integer or string );
+     Purpose   : Sets/Gets the rank of the current Sbjct object relative to
+               : other Sbjct objects managed by a given Blast object.
+     Example   : $sbjct->rank(1);
+     Returns   : The current rank value.
+     Argument  : Integer or string to be used for ranking the hit
+               : relative to other hits.
+     Throws    : n/a
+     Comments  : The rank usually corresponds to the order the listing
+               : of hits in the BLAST report from lowest to highest p-value.
+               : Rank need not be restricted to this value.
+               : rank() may be provided by a delegated or inherited
+               : iterator class in the future (such as Bio::Root::Vector.pm).
+
+_set_id
+-------
+
+     Usage     : n/a; automatically called by _initialize()
+     Purpose   : Sets the name of the Sbjct sequence from the BLAST summary line.
+               : The identifier is assumed to be the first
+               : chunk of non-whitespace characters in the description line
+               : Does not assume any semantics in the structure of the identifier
+               : (Formerly, this method attempted to extract database name from
+               : the seq identifiers, but this was prone to break).
+     Returns   : n/a
+     Argument  : String containing description line of the hit from Blast report
+               : or first line of an alignment section.
+     Throws    : Warning if cannot locate sequence ID.
+
+   See Also   : `_initialize' in this node(),
+Bio::Tools::Blast.pm::database
+
+_set_hsps
+---------
+
+     Usage     : n/a; called automatically during object construction.
+     Purpose   : Creates HSP.pm objects for each HSP in a BLAST hit alignment.
+               : Also collects the full description of the hit from the
+               : HSP alignment section.
+     Returns   : n/a
+     Argument  : List of strings containing raw BLAST report data for
+               : a single hit's HSP alignment data.
+     Throws    : Warnings for each HSP.pm object that fails to be constructed.
+               : Exception if no HSP.pm objects can be constructed.
+               : Exception if can't parse length data for hit sequence.
+     Comments  : Requires Bio::Tools::Blast::HSP.pm.
+               : Sets the description using the full string present in
+               : the alignment data.
+               : Also sets Expect and P-values for the Sbjct object by
+               : copying from the HSP object.
+               : While this sacrifices some memory efficiency, it
+               : improves access speed for these critical data.
+
+   See Also   : `_initialize' in this node(), `_set_desc' in this node()
+
+_set_desc
+---------
+
+     Usage     : n/a; called automatically by _set_hsps()
+     Purpose   : Sets the description of the hit sequence.
+               : For sequence without descriptions, sets description to "-".
+     Argument  : Array containing description (multiple lines).
+     Comments  : _set_hsps() calls this method with the data from the
+               : HSP alignment listing, which contains the complete description.
+               : (Formerly, this was called from the _set_desc_data() method initially.)
+
+   See Also   : _set_hsps()
+
+_tile_hsps
+----------
+
+     Usage     : n/a; called automatically during object construction or
+               : as needed by methods that rely on having tiled data.
+     Purpose   : Collect statistics about the aligned sequences in a set of HSPs.
+               : Calculates the following data across all HSPs:
+               :    -- total alignment length
+               :    -- total identical residues
+               :    -- total conserved residues
+     Returns   : n/a
+     Argument  : n/a
+     Throws    : n/a
+     Status    : Experimental
+     Comments  :
+               : This method performs more careful summing of data across
+               : all HSPs in the Sbjct object. Simply summing the data from all HSPs
+               : will overestimate the actual length of the alignment if there is
+               : overlap between different HSPs (often the case).
+               : The strategy is to tile the HSPs and sum over the
+               : contigs, collecting data separately from overlapping and
+               : non-overlapping regions of each HSP. To facilitate this, the
+               : HSP.pm object now permits extraction of data from sub-sections
+               : of an HSP.
+               :
+               : Additional useful information is collected from the results
+               : of the tiling. It is possible that sub-sequences in
+               : different HSPs will overlap significantly. In this case, it
+               : is impossible to create a single unambiguous alignment by
+               : concatenating the HSPs. The ambiguity may indicate the
+               : presence of multiple, similar domains in one or both of the
+               : aligned sequences. This ambiguity is recorded using the
+               : ambiguous_aln() method.
+               :
+               : This method does not attempt to discern biologically
+               : significant vs. insignificant overlaps. The allowable amount of
+               : overlap can be set with the overlap() method or with the -OVERLAP
+               : parameter used when constructing the Blast & Sbjct objects.
+               :
+               : For a given hit, both the query and the sbjct sequences are
+               : tiled independently.
+               :
+               :    -- If only query sequence HSPs overlap,
+               :          this may suggest multiple domains in the sbjct.
+               :    -- If only sbjct sequence HSPs overlap,
+               :          this may suggest multiple domains in the query.
+               :    -- If both query & sbjct sequence HSPs overlap,
+               :          this suggests multiple domains in both.
+               :    -- If neither query & sbjct sequence HSPs overlap,
+               :          this suggests either no multiple domains in either
+               :          sequence OR that both sequences have the same
+               :          distribution of multiple similar domains.
+               :
+               : This method can deal with the special case of when multiple
+               : HSPs exactly overlap.
+               :
+               : Efficiency concerns:
+               :  Speed will be an issue for sequences with numerous HSPs.
+               :
+     Bugs      : Currently, _tile_hsps() does not properly account for
+               : the number of non-tiled but overlapping HSPs, which becomes a problem
+               : as overlap() grows. Large values overlap() may thus lead to
+               : incorrect statistics for some hits. For best results, keep overlap()
+               : below 5 (DEFAULT IS 2). For more about this, see the "HSP Tiling and
+               : Ambiguous Alignments" section.
+
+   See Also   : `_adjust_contigs' in this node(), `ambiguous_aln' in this
+node(), `overlap' in this node(), `frac_identical' in this node(),
+`frac_conserved' in this node(), `frac_aligned_query' in this node(),
+`frac_aligned_hit' in this node(), `num_unaligned_query' in this node(),
+`num_unaligned_hit' in this node(), `HSP Tiling and Ambiguous Alignments'
+in this node
+
+_adjust_contigs
+---------------
+
+     Usage     : n/a; called automatically during object construction.
+     Purpose   : Builds HSP contigs for a given BLAST hit.
+               : Utility method called by _tile_hsps()
+     Returns   :
+     Argument  :
+     Throws    : Exceptions propagated from Bio::Tools::Blast::HSP::matches()
+               : for invalid sub-sequence ranges.
+     Status    : Experimental
+     Comments  : This method does not currently support gapped alignments.
+               : Also, it does not keep track of the number of HSPs that
+               : overlap within the amount specified by overlap().
+               : This will lead to significant tracking errors for large
+               : overlap values.
+
+   See Also   : `overlap' in this node(), `_tile_hsps' in this node(),
+Bio::Tools::Blast::HSP.pm::matches
+
+ambiguous_aln
+-------------
+
+     Usage     : $ambig_code = $sbjct_object->ambiguous_aln();
+     Purpose   : Sets/Gets ambiguity code data member.
+     Example   : (see usage)
+     Returns   : String = 'q', 's', 'qs', '-'
+               :   'q'  = query sequence contains overlapping sub-sequences
+               :          while sbjct does not.
+               :   's'  = sbjct sequence contains overlapping sub-sequences
+               :          while query does not.
+               :   'qs' = query and sbjct sequence contains overlapping sub-sequences
+               :          relative to each other.
+               :   '-'  = query and sbjct sequence do not contains multiple domains
+               :          relative to each other OR both contain the same distribution
+               :          of similar domains.
+     Argument  : n/a
+     Throws    : n/a
+     Status    : Experimental
+
+   See Also   : `_tile_hsps' in this node(),  `HSP Tiling and Ambiguous
+Alignments' in this node
+
+overlap
+-------
+
+     Usage     : $blast_object->overlap( [integer] );
+     Purpose   : Gets/Sets the allowable amount overlap between different HSP sequences.
+     Example   : $blast_object->overlap(5);
+               : $overlap = $blast_object->overlap();
+     Returns   : Integer.
+     Argument  : integer.
+     Throws    : n/a
+     Status    : Experimental
+     Comments  : Any two HSPs whose sequences overlap by less than or equal
+               : to the overlap() number of resides will be considered separate HSPs
+               : and will not get tiled by _adjust_contigs().
+
+   See Also   : `_adjust_contigs' in this node(), `BUGS' in this node
+
+score
+-----
+
+     Usage     : $sbjct_object->score();
+     Purpose   : Gets the BLAST score of the best HSP for the current Blast hit.
+     Example   : $score = $sbjct_object->score();
+     Returns   : Integer
+     Argument  : n/a
+     Throws    : n/a
+     
+     See Also   : L<bits>()
+
+bits
+----
+
+     Usage     : $sbjct_object->bits();
+     Purpose   : Gets the BLAST bit score of the best HSP for the current Blast hit.
+     Example   : $bits = $sbjct_object->bits();
+     Returns   : Integer
+     Argument  : n/a
+     Throws    : Exception if bit score is not set.
+     Comments  : For BLAST1, the non-bit score is listed in the summary line.
+
+   See Also   : `score' in this node()
+
+n
+-
+
+     Usage     : $sbjct_object->n();
+     Purpose   : Gets the N number for the current Blast hit.
+               : This is the number of HSPs in the set which was ascribed
+               : the lowest P-value (listed on the description line).
+               : This number is not the same as the total number of HSPs.
+               : To get the total number of HSPs, use num_hsps().
+     Example   : $n = $sbjct_object->n();
+     Returns   : Integer
+     Argument  : n/a
+     Throws    : Exception if HSPs have not been set (BLAST2 reports).
+     Comments  : Note that the N parameter is not reported in gapped BLAST2.
+               : Calling n() on such reports will result in a call to num_hsps().
+               : The num_hsps() method will count the actual number of
+               : HSPs in the alignment listing, which may exceed N in
+               : some cases.
+
+   See Also   : `num_hsps' in this node()
+
+frame
+-----
+
+     Usage     : $sbjct_object->frame();
+     Purpose   : Gets the reading frame for the hit sequence (TBLASTN/X only).
+     Example   : $frame = $sbjct_object->frame();
+     Returns   : Integer (-3 .. +3).
+     Argument  : n/a
+     Throws    : Exception if HSPs have not been set (BLAST2 reports).
+
+   See Also   : `hsps' in this node()
+
+p
+-
+
+     Usage     : $sbjct_object->p( [format] );
+     Purpose   : Get the P-value for the given BLAST hit.
+               : (Note that P-values are not provided with NCBI Blast2 reports).
+     Example   : $p =  $sbjct->p;
+               : $p =  $sbjct->p('exp');  # get exponent only.
+               : ($num, $exp) =  $sbjct->p('parts');  # split sci notation into parts
+     Returns   : Float or scientific notation number (the raw P-value, DEFAULT).
+               : Integer if format == 'exp' (the magnitude of the base 10 exponent).
+               : 2-element list (float, int) if format == 'parts' and P-value
+               :                is in scientific notation (See Comments).
+     Argument  : format: string of 'raw' | 'exp' | 'parts'
+               :    'raw' returns value given in report. Default. (1.2e-34)
+               :    'exp' returns exponent value only (34)
+               :    'parts' returns the decimal and exponent as a
+               :            2-element list (1.2, -34) (See Comments).
+     Throws    : Exception if the P-value is not defined, which will occur
+               : with any NCBI Blast2 report.
+     Comments  : Using the 'parts' argument is not recommended since it will not
+               : work as expected if the P-value is not in scientific notation.
+               : That is, floats are not converted into sci notation before
+               : splitting into parts.
+
+   See Also   : `expect' in this node(), `signif' in this node(),
+`get_exponent' in this node()
+
+expect
+------
+
+     Usage     : $sbjct_object->expect( [format] );
+     Purpose   : Get the Expect value for the given BLAST hit.
+     Example   : $e =  $sbjct->expect;
+               : $e =  $sbjct->expect('exp');  # get exponent only.
+               : ($num, $exp) = $sbjct->expect('parts');  # split sci notation into parts
+     Returns   : Float or scientific notation number (the raw expect value, DEFAULT).
+               : Integer if format == 'exp' (the magnitude of the base 10 exponent).
+               : 2-element list (float, int) if format == 'parts' and Expect
+               :                is in scientific notation (see Comments).
+     Argument  : format: string of 'raw' | 'exp' | 'parts'
+               :    'raw' returns value given in report. Default. (1.2e-34)
+               :    'exp' returns exponent value only (34)
+               :    'parts' returns the decimal and exponent as a
+               :            2-element list (1.2, -34)  (see Comments).
+     Throws    : Exception if the Expect value is not defined.
+     Comments  : Using the 'parts' argument is not recommended since it will not
+               : work as expected if the expect value is not in scientific notation.
+               : That is, floats are not converted into sci notation before
+               : splitting into parts.
+
+   See Also   : `p' in this node(), `signif' in this node(),
+`get_exponent' in this node()
+
+signif
+------
+
+     Usage     : $sbjct_object->signif( [format] );
+     Purpose   : Get the P or Expect value for the given BLAST hit.
+               : The value returned is the one which is reported in the description
+               : section of the Blast report. For Blast1 and WU-Blast2, this
+               : is a P-value, for Blast2, it is an Expect value.
+     Example   : $obj->signif()        # returns 1.3e-34
+               : $obj->signif('exp')   # returns -34
+               : $obj->signif('parts') # returns (1.3, -34)
+     Returns   : Float or scientific notation number (the raw P/Expect value, DEFAULT).
+               : Integer if format == 'exp' (the magnitude of the base 10 exponent).
+               : 2-element list (float, int) if format == 'parts' and P/Expect value
+               :                is in scientific notation (see Comments).
+     Argument  : format: string of 'raw' | 'exp' | 'parts'
+               :    'raw' returns value given in report. Default. (1.2e-34)
+               :    'exp' returns exponent value only (34)
+               :    'parts' returns the decimal and exponent as a
+               :            2-element list (1.2, -34)  (see Comments).
+     Throws    : n/a
+     Status    : Deprecated. Use p() or expect().
+     Comments  : The signif() method provides a way to deal with the fact that
+               : Blast1 and Blast2 formats differ in what is reported in the
+               : description lines of each hit in the Blast report. The signif()
+               : method frees any client code from having to know if this is a P-value
+               : or an Expect value, making it easier to write code that can process
+               : both Blast1 and Blast2 reports. This is not necessarily a good thing, since
+               : one should always know when one is working with P-values or
+               : Expect values (hence the deprecated status).
+               : Use of expect() is recommended since all hits will have an Expect value.
+               :
+               : Using the 'parts' argument is not recommended since it will not
+               : work as expected if the expect value is not in scientific notation.
+               : That is, floats are not converted into sci notation before
+               : splitting into parts.
+
+   See Also   : `p' in this node(), `expect' in this node(),
+`get_exponent' in this node()
+
+desc
+----
+
+     Usage     : $sbjct_object->desc( [integer] );
+     Purpose   : Get the description for the given BLAST hit.
+     Example   : (see usage)
+     Returns   : String
+     Argument  : Integer (optional) indicating the desired length of the
+               : description string to be returned.
+     Throws    : n/a
+
+   See Also   : `_set_desc' in this node()
+
+database
+--------
+
+     Usage     : $sbjct_object->database();
+     Purpose   : Get the name of the database for the hit sequence.
+     Example   : (see usage)
+     Returns   : String
+     Argument  : n/a
+     Throws    : n/a
+     Status    : Experimental
+     Comments  : Database id should be the same for all hits in a given
+               : BLAST report, however, they do not always have the same
+               : name as the database name extraced by the Blast.pm object.
+               : The Sbjct.pm database id is obtained from the summary line.
+
+hsps
+----
+
+     Usage     : $sbjct_object->hsps();
+     Purpose   : Get a list containing all HSP objects.
+               : Get the numbers of HSPs for the current hit.
+     Example   : @hsps = $sbjct_object->hsps();
+               : $num  = $sbjct_object->hsps();  # alternatively, use num_hsps()
+     Returns   : Array context : list of Bio::Tools::Blast::HSP.pm objects.
+               : Scalar context: integer (number of HSPs).
+               :                 (Equivalent to num_hsps()).
+     Argument  : n/a. Relies on wantarray
+     Throws    : Exception if the HSPs have not been collected.
+
+   See Also   : `hsp' in this node(), `num_hsps' in this node(),
+`_set_hsps' in this node()
+
+hsp
+---
+
+     Usage     : $sbjct_object->hsp( [string] );
+     Purpose   : Get a single HSP.pm object for the present Sbjct.pm object.
+     Example   : $hspObj  = $sbjct_object->hsp;  # same as 'best'
+               : $hspObj  = $sbjct_object->hsp('best');
+               : $hspObj  = $sbjct_object->hsp('worst');
+     Returns   : Object reference for a Bio::Tools::Blast::HSP.pm object.
+     Argument  : String (or no argument).
+               :   No argument (default) = highest scoring HSP (same as 'best').
+               :   'best' or 'first' = highest scoring HSP.
+               :   'worst' or 'last' = lowest scoring HSP.
+     Throws    : Exception if the HSPs have not been collected.
+               : Exception if an unrecognized argument is used.
+
+   See Also   : `hsps' in this node(), `num_hsps' in this node(),
+`_set_hsps' in this node()
+
+num_hsps
+--------
+
+     Usage     : $sbjct_object->num_hsps();
+     Purpose   : Get the number of HSPs for the present Blast hit.
+     Example   : $nhsps = $sbjct_object->num_hsps();
+     Returns   : Integer
+     Argument  : n/a
+     Throws    : Exception if the HSPs have not been collected.
+
+   See Also   : `hsps' in this node()
+
+length
+------
+
+     Usage     : $sbjct_object->length();
+     Purpose   : Get the total length of the hit sequence.
+     Example   : $len    = $sbjct_object->length();
+     Returns   : Integer
+     Argument  : n/a
+     Throws    : n/a
+     Comments  : Developer note: when using the built-in length function within
+               : this module, call it as CORE::length().
+
+   See Also   : `logical_length' in this node(),  `length_aln' in this
+node()
+
+logical_length
+--------------
+
+     Usage     : $sbjct_object->logical_length( [seq_type] );
+               : (mostly intended for internal use).
+     Purpose   : Get the logical length of the hit sequence.
+               : If the Blast is a TBLASTN or TBLASTX, the returned length
+               : is the length of the would-be amino acid sequence (length/3).
+               : For all other BLAST flavors, this function is the same as length().
+     Example   : $len    = $sbjct_object->logical_length();
+     Returns   : Integer
+     Argument  : seq_type = 'query' or 'sbjct' (default = 'query')
+     Throws    : n/a
+     Comments  : This is important for functions like frac_aligned_query()
+               : which need to operate in amino acid coordinate space when dealing
+               : with [T]BLAST[NX] type reports.
+
+   See Also   : `length' in this node(), `frac_aligned_query' in this
+node(), `frac_aligned_hit' in this node()
+
+length_aln
+----------
+
+     Usage     : $sbjct_object->length_aln( [seq_type] );
+     Purpose   : Get the total length of the aligned region for query or sbjct seq.
+               : This number will include all HSPs
+     Example   : $len    = $sbjct_object->length_aln(); # default = query
+               : $lenAln = $sbjct_object->length_aln('query');
+     Returns   : Integer
+     Argument  : seq_Type = 'query' | 'sbjct'  (Default = 'query')
+     Throws    : Exception if the argument is not recognized.
+     Comments  : This method will report the logical length of the alignment,
+               : meaning that for TBLAST[NX] reports, the length is reported
+               : using amino acid coordinate space (i.e., nucleotides / 3).
+               :
+               : This method requires that all HSPs be tiled. If they have not
+               : already been tiled, they will be tiled first.
+               : If you don't want the tiled data, iterate through each HSP
+               : calling length() on each (use hsps() to get the HSPs).
+
+   See Also   : `length' in this node(), `frac_aligned_query' in this
+node(), `frac_aligned_hit' in this node(), `gaps' in this node(),
+`_tile_hsps' in this node(), *Bio::Tools::Blast::HSP::length()*
+
+gaps
+----
+
+     Usage     : $sbjct_object->gaps( [seq_type] );
+     Purpose   : Get the number of gaps in the aligned query, sbjct, or both sequences.
+               : Data is summed across all HSPs.
+     Example   : $qgaps = $sbjct_object->gaps('query');
+               : $sgaps = $sbjct_object->gaps('sbjct');
+               : $tgaps = $sbjct_object->gaps();    # default = total (query + sbjct)
+     Returns   : scalar context: integer
+               : array context without args: two-element list of integers
+               :    (queryGaps, sbjctGaps)
+               : Array context can be "induced" by providing an argument of 'list' or 'array'.
+     Argument  : seq_type: 'query' | 'sbjct' | 'total' | 'list'  (default = 'total')
+     Throws    : n/a
+     Comments  : If you need data for each HSP, use hsps() and then interate
+               : through each HSP object.
+               : This method requires that all HSPs be tiled. If they have not
+               : already been tiled, they will be tiled first.
+               : Not relying on wantarray since that will fail in situations
+               : such as printf "%d", $hit->gaps() in which you might expect to
+               : be printing the total gaps, but evaluates to array context.
+
+   See Also   : `length_aln' in this node()
+
+matches
+-------
+
+     Usage     : $sbjct_object->matches( [class] );
+     Purpose   : Get the total number of identical or conserved matches
+               : (or both) across all HSPs.
+               : (Note: 'conservative' matches are indicated as 'positives'
+     	   :         in the Blast report.)
+     Example   : ($id,$cons) = $sbjct_object->matches(); # no argument
+               : $id = $sbjct_object->matches('id');
+               : $cons = $sbjct_object->matches('cons');
+     Returns   : Integer or a 2-element array of integers
+     Argument  : class = 'id' | 'cons' OR none.
+               : If no argument is provided, both identical and conservative
+               : numbers are returned in a two element list.
+               : (Other terms can be used to refer to the conservative
+               :  matches, e.g., 'positive'. All that is checked is whether or
+               :  not the supplied string starts with 'id'. If not, the
+               : conservative matches are returned.)
+     Throws    : Exception if the requested data cannot be obtained.
+     Comments  : If you need data for each HSP, use hsps() and then interate
+               : through the HSP objects.
+               : Does not rely on wantarray to return a list. Only checks for
+               : the presence of an argument (no arg = return list).
+
+   See Also   : *Bio::Tools::Blast::HSP::matches()*, `hsps' in this node()
+
+start
+-----
+
+     Usage     : $sbjct->start( [seq_type] );
+     Purpose   : Gets the start coordinate for the query, sbjct, or both sequences
+               : in the Sbjct object. If there is more than one HSP, the lowest start
+               : value of all HSPs is returned.
+     Example   : $qbeg = $sbjct->start('query');
+               : $sbeg = $sbjct->start('sbjct');
+               : ($qbeg, $sbeg) = $sbjct->start();
+     Returns   : scalar context: integer
+               : array context without args: list of two integers (queryStart, sbjctStart)
+               : Array context can be "induced" by providing an argument of 'list' or 'array'.
+     Argument  : In scalar context: seq_type = 'query' or 'sbjct'
+               :  (case insensitive). If not supplied, 'query' is used.
+     Throws    : n/a
+     Comments  : This method requires that all HSPs be tiled. If there is more than one
+               : HSP and they have not already been tiled, they will be tiled first.
+               : Remember that the start and end coordinates of all HSPs are
+               : normalized so that start < end. Strand information can only be
+               : obtained on an HSP-by-HSP basis by calling $hsp->strand().
+
+   See Also   : `end' in this node(), `range' in this node(), `HSP Tiling
+and Ambiguous Alignments' in this node, *Bio::Tools::Blast::HSP::start*()
+
+end
+---
+
+     Usage     : $sbjct->end( [seq_type] );
+     Purpose   : Gets the end coordinate for the query, sbjct, or both sequences
+               : in the Sbjct object. If there is more than one HSP, the largest end
+               : value of all HSPs is returned.
+     Example   : $qend = $sbjct->end('query');
+               : $send = $sbjct->end('sbjct');
+               : ($qend, $send) = $sbjct->end();
+     Returns   : scalar context: integer
+               : array context without args: list of two integers (queryEnd, sbjctEnd)
+               : Array context can be "induced" by providing an argument of 'list' or 'array'.
+     Argument  : In scalar context: seq_type = 'query' or 'sbjct'
+               :  (case insensitive). If not supplied, 'query' is used.
+     Throws    : n/a
+     Comments  : This method requires that all HSPs be tiled. If there is more than one
+               : HSP and they have not already been tiled, they will be tiled first.
+               : Remember that the start and end coordinates of all HSPs are
+               : normalized so that start < end. Strand information can only be
+               : obtained on an HSP-by-HSP basis by calling $hsp->strand().
+
+   See Also   : `start' in this node(), `range' in this node(), `HSP
+Tiling and Ambiguous Alignments' in this node,
+*Bio::Tools::Blast::HSP::end*()
+
+range
+-----
+
+     Usage     : $sbjct->range( [seq_type] );
+     Purpose   : Gets the (start, end) coordinates for the query or sbjct sequence
+               : in the HSP alignment.
+     Example   : ($qbeg, $qend) = $sbjct->range('query');
+               : ($sbeg, $send) = $sbjct->range('sbjct');
+     Returns   : Two-element array of integers
+     Argument  : seq_type = string, 'query' or 'sbjct'  (default = 'query')
+               : (case insensitive).
+     Throws    : n/a
+
+   See Also   : `start' in this node(), `end' in this node()
+
+frac_identical
+--------------
+
+     Usage     : $sbjct_object->frac_identical( [seq_type] );
+     Purpose   : Get the overall fraction of identical positions across all HSPs.
+               : The number refers to only the aligned regions and does not
+               : account for unaligned regions in between the HSPs, if any.
+     Example   : $frac_iden = $sbjct_object->frac_identical('query');
+     Returns   : Float (2-decimal precision, e.g., 0.75).
+     Argument  : seq_type: 'query' | 'sbjct' | 'total'
+               : default = 'total' (but see comments below).
+     Throws    : n/a
+     Comments  : Different versions of Blast report different values for the total
+               : length of the alignment. This is the number reported in the
+               : denominators in the stats section:
+               : "Identical = 34/120 Positives = 67/120".
+               : BLAST-GP uses the total length of the alignment (with gaps)
+               : WU-BLAST uses the length of the query sequence (without gaps).
+               : Therefore, when called without an argument or an argument of 'total',
+               : this method will report different values depending on the
+               : version of BLAST used.
+               :
+               : To get the fraction identical among only the aligned residues,
+               : ignoring the gaps, call this method with an argument of 'query'
+               : or 'sbjct'.
+               :
+               : If you need data for each HSP, use hsps() and then iterate
+               : through the HSP objects.
+               : This method requires that all HSPs be tiled. If they have not
+               : already been tiled, they will be tiled first.
+
+   See Also   : `frac_conserved' in this node(), `frac_aligned_query' in
+this node(), `matches' in this node(), `_tile_hsps' in this node()
+
+frac_conserved
+--------------
+
+     Usage     : $sbjct_object->frac_conserved( [seq_type] );
+     Purpose   : Get the overall fraction of conserved positions across all HSPs.
+               : The number refers to only the aligned regions and does not
+               : account for unaligned regions in between the HSPs, if any.
+     Example   : $frac_cons = $sbjct_object->frac_conserved('sbjct');
+     Returns   : Float (2-decimal precision, e.g., 0.75).
+     Argument  : seq_type: 'query' | 'sbjct' | 'total'
+               : default = 'total' (but see comments below).
+     Throws    : n/a
+     Comments  : Different versions of Blast report different values for the total
+               : length of the alignment. This is the number reported in the
+               : denominators in the stats section:
+               : "Identical = 34/120 Positives = 67/120".
+               : BLAST-GP uses the total length of the alignment (with gaps)
+               : WU-BLAST uses the length of the query sequence (without gaps).
+               : Therefore, when called without an argument or an argument of 'total',
+               : this method will report different values depending on the
+               : version of BLAST used.
+               :
+               : To get the fraction conserved among only the aligned residues,
+               : ignoring the gaps, call this method with an argument of 'query'
+               : or 'sbjct'.
+               :
+               : If you need data for each HSP, use hsps() and then interate
+               : through the HSP objects.
+               : This method requires that all HSPs be tiled. If they have not
+               : already been tiled, they will be tiled first.
+
+   See Also   : `frac_identical' in this node(), `matches' in this node(),
+`_tile_hsps' in this node()
+
+frac_aligned_query
+------------------
+
+     Usage     : $sbjct_object->frac_aligned_query();
+     Purpose   : Get the fraction of the query sequence which has been aligned
+               : across all HSPs (not including intervals between non-overlapping
+               : HSPs).
+     Example   : $frac_alnq = $sbjct_object->frac_aligned_query();
+     Returns   : Float (2-decimal precision, e.g., 0.75).
+     Argument  : n/a
+     Throws    : n/a
+     Comments  : If you need data for each HSP, use hsps() and then interate
+               : through the HSP objects.
+               : To compute the fraction aligned, the logical length of the query
+               : sequence is used, meaning that for [T]BLASTX reports, the
+               : full length of the query sequence is converted into amino acids
+               : by dividing by 3. This is necessary because of the way
+               : the lengths of aligned sequences are computed.
+               : This method requires that all HSPs be tiled. If they have not
+               : already been tiled, they will be tiled first.
+
+   See Also   : `frac_aligned_hit' in this node(), `_tile_hsps' in this
+node(), `logical_length' in this node(), `length_aln' in this node()
+
+frac_aligned_hit
+----------------
+
+     Usage     : $sbjct_object->frac_aligned_hit();
+     Purpose   : Get the fraction of the hit (sbjct) sequence which has been aligned
+               : across all HSPs (not including intervals between non-overlapping
+               : HSPs).
+     Example   : $frac_alnq = $sbjct_object->frac_aligned_hit();
+     Returns   : Float (2-decimal precision, e.g., 0.75).
+     Argument  : n/a
+     Throws    : n/a
+     Comments  : If you need data for each HSP, use hsps() and then interate
+               : through the HSP objects.
+               : To compute the fraction aligned, the logical length of the sbjct
+               : sequence is used, meaning that for TBLAST[NX] reports, the
+               : full length of the sbjct sequence is converted into amino acids
+               : by dividing by 3. This is necessary because of the way
+               : the lengths of aligned sequences are computed.
+               : This method requires that all HSPs be tiled. If they have not
+               : already been tiled, they will be tiled first.
+
+   See Also   : `frac_aligned_query' in this node(), `matches' in this
+node(), `_tile_hsps' in this node(), `logical_length' in this node(),
+`length_aln' in this node()
+
+num_unaligned_hit
+-----------------
+
+     Usage     : $sbjct_object->num_unaligned_hit();
+     Purpose   : Get the number of the unaligned residues in the hit sequence.
+               : Sums across all all HSPs.
+     Example   : $num_unaln = $sbjct_object->num_unaligned_hit();
+     Returns   : Integer
+     Argument  : n/a
+     Throws    : n/a
+     Comments  : See notes regarding logical lengths in the comments for frac_aligned_hit().
+               : They apply here as well.
+               : If you need data for each HSP, use hsps() and then interate
+               : through the HSP objects.
+               : This method requires that all HSPs be tiled. If they have not
+               : already been tiled, they will be tiled first.
+
+   See Also   : `num_unaligned_query' in this node(), `_tile_hsps' in this
+node(), `frac_aligned_hit' in this node()
+
+num_unaligned_query
+-------------------
+
+     Usage     : $sbjct_object->num_unaligned_query();
+     Purpose   : Get the number of the unaligned residues in the query sequence.
+               : Sums across all all HSPs.
+     Example   : $num_unaln = $sbjct_object->num_unaligned_query();
+     Returns   : Integer
+     Argument  : n/a
+     Throws    : n/a
+     Comments  : See notes regarding logical lengths in the comments for frac_aligned_query().
+               : They apply here as well.
+               : If you need data for each HSP, use hsps() and then interate
+               : through the HSP objects.
+               : This method requires that all HSPs be tiled. If they have not
+               : already been tiled, they will be tiled first.
+
+   See Also   : `num_unaligned_hit' in this node(), `_tile_hsps' in this
+node(), `frac_aligned_query' in this node()
+
+seq_inds
+--------
+
+     Usage     : $hit->seq_inds( seq_type, class, collapse );
+     Purpose   : Get a list of residue positions (indices) across all HSPs
+               : for identical or conserved residues in the query or sbjct sequence.
+     Example   : @ind = $hit->seq_inds('query', 'identical');
+               : @ind = $hit->seq_inds('sbjct', 'conserved');
+               : @ind = $hit->seq_inds('sbjct', 'conserved', 1);
+     Returns   : Array of integers
+               : May include ranges if collapse is non-zero.
+     Argument  : seq_type  = 'query' or 'sbjct'  (default = query)
+               : class     = 'identical' or 'conserved' (default = identical)
+               :              (can be shortened to 'id' or 'cons')
+               :              (actually, anything not 'id' will evaluate to 'conserved').
+               : collapse  = boolean, if non-zero, consecutive positions are merged
+               :             using a range notation, e.g., "1 2 3 4 5 7 9 10 11"
+               :             collapses to "1-5 7 9-11". This is useful for
+               :             consolidating long lists. Default = no collapse.
+     Throws    : n/a.
+
+   See Also   : *Bio::Tools::Blast::HSP::seq_inds()*
+
+display
+-------
+
+     Usage     : $sbjct_object->display( %named_parameters );
+     Purpose   : Display information about Bio::Tools::Blast::Sbjct.pm data members
+     Example   : $object->display(-SHOW=>'stats');
+     Argument  : Named parameters: -SHOW  => 'hsp',
+               :                   -WHERE => filehandle (default = STDOUT)
+     Returns   : n/a
+     Status    : Deprecated, Buggy.
+               : Use Blast::table() or Blast::table_tiled() instead.
+
+   See Also   : `_display_stats' in this node(), `_display_hsps' in this
+node(), *Bio::Root::Object.pm*::display
+
+_display_stats
+--------------
+
+     Usage     : n/a; called automatically by display()
+     Purpose   : Display information about Bio::Tools::Blast.pm data members.
+               : Not tab-delimited.
+               : Prints the rank, name, database, score, p, n, length
+               : of the hit sequence, length of the aligned region,
+               : fraction identical, fraction conserved, and the fraction aligned
+               : for both the query and hit sequences.
+     Example   : n/a
+     Argument  : one argument = filehandle object.
+     Returns   : printf call.
+     Status    : Deprecated, Buggy.
+               : Use Blast::table() or Blast::table_tiled() instead.
+
+   See Also   : `display' in this node()
+
+_display_hsps
+-------------
+
+     Usage     : n/a; called automatically by display()
+     Purpose   : Display information about each HSP in the current BLAST hit.
+     Example   : n/a
+     Argument  : one argument = filehandle object.
+     Returns   : printf call.
+     Status    : Experimental
+
+   See Also   : `display' in this node(),
+Bio::Tools::Blast::HSP.pm::display
+
+homol_data
+----------
+
+     Usage     : $data = $sbjct_object->homo_data( %named_params );
+     Purpose   : Gets specific similarity data about all HSPs.
+     Returns   : String
+     Argument  : named parameters forwarded to Bio::Tools::Blast::HSP::homol_data().
+     Throws    : n/a
+     Status    : Experimental
+     Comments  : This is an experimental method used for obtaining an
+               : indication of:
+               :   1) how many HSPs are in a Blast alignment
+               :   2) how strong the similarity is between sequences in the HSP
+               :   3) the endpoints of the alignment (sequence monomer numbers)
+               : "Homology data" for each HSP is in the format:
+               :  "<integer> <start> <stop>"
+               : Data for different HSPs are tab-delimited.
+
+   See Also   : *Bio::Tools::Blast::homol_data()*,
+*Bio::Tools::Blast::HSP::homol_data()*
+
+is_signif
+---------
+
+     Usage     : $sbjct_object->is_signif();
+     Purpose   : Determine if the given BLAST hit is significant.
+     Example   :
+     Returns   : Boolean
+     Argument  : n/a
+     Throws    : n/a
+     Comments  : Uses criteria defined in the parent Blast.pm object
+               : to assess significance. Currently, only relies on
+               : P-value and length criteria.
+               : This mehtod is largely obsolete since are hits are now by
+               : definition significant.
+
+CLASS METHODS
+=============
+
+get_exponent
+------------
+
+     Usage     : &get_exponent( number );
+     Purpose   : Determines the power of 10 exponent of an integer, float,
+               : or scientific notation number.
+     Example   : &get_exponent("4.0e-206");
+               : &get_exponent("0.00032");
+               : &get_exponent("10.");
+               : &get_exponent("1000.0");
+               : &get_exponent("e+83");
+     Argument  : Float, Integer, or scientific notation number
+     Returns   : Integer representing the exponent part of the number (+ or -).
+               : If argument == 0 (zero), return value is "-999".
+     Comments  : Exponents are rounded up (less negative) if the mantissa is >= 5.
+               : Exponents are rounded down (more negative) if the mantissa is <= -5.
+               : This method probably belongs in a more general utility class.
+
+FOR DEVELOPERS ONLY
+===================
+
+Data Members
+------------
+
+   Information about the various data members of this module is provided
+for those wishing to modify or understand the code. Two things to bear in
+mind:
+
+  1. Do NOT rely on these in any code outside of this module.  All data
+     members are prefixed with an underscore to signify that they are
+     private.  Always use accessor methods. If the accessor doesn't exist
+     or is inadequate, create or modify an accessor (and let me know,
+     too!). (An exception to this might be for HSP.pm which is more
+     tightly coupled to Sbjct.pm and may access Sbjct data members
+     directly for efficiency purposes, but probably should not).
+
+  2. This documentation may be incomplete and out of date.  It is easy for
+     these data member descriptions to become obsolete as this module is
+     still evolving. Always double check this info and search for members
+     not described here.
+
+        An instance of Bio::Tools::Blast::Sbjct.pm is a blessed reference
+to a hash containing all or some of the following fields:
+
+     FIELD           VALUE
+     --------------------------------------------------------------
+     _hsps          : Array ref for a list of Bio::Tools::Blast::HSP.pm objects.
+     		:
+     _db            : Database identifier from the summary line.
+     		:
+     _desc          : Description data for the hit from the summary line.
+     		:
+     _length        : Total length of the hit sequence.
+     		:
+     _score         : BLAST score.
+     		:
+     _bits          : BLAST score (in bits). Matrix-independent.
+     		:
+     _p             : BLAST P value. Obtained from summary section. (Blast1/WU-Blast only)
+     		:
+     _expect        : BLAST Expect value. Obtained from summary section.
+     		:
+     _n             : BLAST N value (number of HSPs) (Blast1/WU-Blast2 only)
+     		:
+     _frame         : Reading frame for TBLASTN and TBLASTX analyses.
+     		:
+     _totalIdentical: Total number of identical aligned monomers.
+     		:
+     _totalConserved: Total number of conserved aligned monomers (a.k.a. "positives").
+     		:
+     _overlap       : Maximum number of overlapping residues between adjacent HSPs
+     		: before considering the alignment to be ambiguous.
+     		:
+     _ambiguous_aln : Boolean. True if the alignment of all HSPs is ambiguous.
+     		:
+     _length_aln_query : Length of the aligned region of the query sequence.
+     		   :
+     _length_aln_sbjct : Length of the aligned region of the sbjct sequence.
+
+     INHERITED DATA MEMBERS
+     ----------------------
+     _name          : From Bio::Root::Object.pm. String representing the name of the
+     		: sbjct sequence obtained from the BLAST report.
+     		:
+     _parent        : From Bio::Root::Object.pm. This member contains a reference to the
+     		: Bio::Tools::Blast.pm object to which this hit belongs.
+
+

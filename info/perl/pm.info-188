@@ -1,0 +1,1899 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: IO/Multiplex,  Next: IO/Null,  Prev: IO/LockedFile,  Up: Module List
+
+Object interface to multiplex-style server implementations.
+***********************************************************
+
+NAME
+====
+
+   IO::Multiplex - Object interface to multiplex-style server
+implementations.
+
+SYNOPSIS
+========
+
+   use IO::Multiplex;
+
+DESCRIPTION
+===========
+
+   IO::Multiplex is an object interface to classic multiplex server
+designs.
+
+   Alarmed by the time I was wasting re-implementing a fairly
+straightforward multiplexing server design, I decided it was time I
+abstracted the problem into an object for re-use. If the term
+'multiplexing' preplexes you, read `select(2)' in this node, or read a
+good book on socket communications, I'm pretty sure most of them cover the
+subject.
+
+   This implementation is based on an event model. Users (programmers)
+control server behaviour by assigning handlers to certain server events
+(client connected, disconnected, input from client, server timeout).
+
+CONSTRUCTOR
+===========
+
+   Server construction arguments are supplied in a hash format.
+
+   IO::Multiplex->new(arg1 => 'val1', arg2 => 'val2' ...)
+
+ARGUMENTS
+---------
+
+   Arguments define how the server will communicate with it's clients.
+
+'loop_timeout'
+     Users may sometime find it useful to schedule a handler to be
+     re-executed periodicly within the server's main event loop every
+     defined number of seconds. Setting this argument will define the time
+     interval between executions of the 'timeout' event.
+
+'proto'
+     Optional. Setting this argument will define the server's
+     communication layer with it's clients. Common values are 'unix' and
+     'tcp'.  Other values ('udp' ?) are passed on to the IO::Socket::INET
+     object.
+
+     If left undefined, IO::Multiplex will determine the server's transport
+     layer by looking at some of the other arguments.
+
+     example: ('proto' => 'tcp', ...)
+
+'localpath'
+     Passed on to the IO::Socket::UNIX object constructor, as the 'Local'
+     options.
+
+     Warnings: we remove stale sockets by unlinking 'localpath' for you,
+     any other file that happens to be there is removed with no warning.
+
+     Sockets are created with full world read-write permissions.  This
+     means any local user with execute permissions on the target directory
+     can talk to the server.
+
+     Restrictions: Please realize you do need ordinary file write
+     permissions to create a socket in a directory of choice.
+
+'localaddr'
+     Optional. Passed on to the IO::Socket::INET object constructor, as
+     the 'LocalAddr' option.
+
+     Setting this argument will define the server's local bind address,
+     which is necessary in the case of multiple local network interfaces
+     (routers, firewalls, proxies).
+
+     If left undefined, IO::Socket::INET will assume 'localhost'.
+
+     example: ('localaddr' => 'localhost', ...)
+
+'localport'
+     Passed on to the IO::socket::INET object constructor.  Setting this
+     argument will define the server's local bind port.
+
+     Restrictions: If your running unix, binding to port numbers below
+     1024 is only allowed by root.
+
+     example: ('localport' => 6666, ...)
+
+METHODS
+=======
+
+set_handler($event, \&handler)
+     Set a handler for an event. See EVENTS further in this manual.
+
+start()
+     Start main (infinite) event loop. Don't expect the program to return
+     over execution after starting the start method.
+
+     *Snippet*:
+
+     $server->start() # NOT REACHED
+
+disconnect($client_filehandle)
+     Disconnect a client_filehandle, envoking the
+     $client_filehandle->close method and calling the
+     'client_disconnected' method. It is very important for users to
+     understand that the server will never call this method on it's own.
+
+     When users decide a client should go, this is the only proper way to
+     disconnect it (removing it from the server's internal 'select'
+     object).
+
+EVENTS
+======
+
+   A brief reference discription of the server's events. With
+'loop_timeout' being the exception, all events will be called with one
+argument:
+
+   ($client_filehandle).
+
+   Event handlers should **never** block, or the server will (obviously,
+since we're under a single process model) deadlock for the duration of the
+execution misbehaving handler.
+
+'loop_timeout' ()
+     Define a handler for 'loop_timeout'. A time-based event called in
+     repeated intervals of every 'loop_timeout' seconds. Useful when a
+     server needs to wake up in an inconditional interval and get
+     something done.
+
+     Don't forget to assign supply a value for the 'loop_timeout' argument
+     in the server's constructor method.
+
+'client_input' ($client_filehandle)
+     The select object decided a client has something to say, and handler
+     should read from $client_filehandle and handle input.
+
+     Note if input is null, client has most likely disconnected and
+     $server->disconnect should be invoked.
+
+'client_connected' ($client_filehandle)
+     Called when a new client connects, handler should handle the joyfull
+     event, (print a banner, log connection).
+
+     RETURN VALUE: Return true if we keep the connection, false to drop it.
+
+'client_disconnected' ($client_filehandle)
+     Called (by the *IO::Multiplex::disconnect* method) when a client
+     disconnects.
+
+AUTHOR
+======
+
+   Liraz Siri <liraz_siri@usa.net>, Ariel, Israel.
+
+COPYRIGHT
+=========
+
+   Copyright 1999 (c) Liraz Siri <liraz_siri@usa.net>, Ariel, Israel,
+             All rights reserved.
+
+
+File: pm.info,  Node: IO/Null,  Next: IO/Page,  Prev: IO/Multiplex,  Up: Module List
+
+class for null filehandles
+**************************
+
+NAME
+====
+
+   IO::Null - class for null filehandles
+
+SYNOPSIS
+========
+
+     use IO::Null;
+     my $fh = IO::Null->new;
+     print $fh "I have nothing to say\n";  # does nothing.
+     # or:
+     $fh->print("And I'm saying it.\n");   # ditto.
+     # or:
+     my $old = select($fh);
+     print "and that is poetry / as I needed it --John Cage"; # nada!
+     select($old);
+
+   Or even:
+
+     tie(*FOO, IO::Null);
+     print FOO "Lalalalala!\n";  # does nothing.
+
+DESCRIPTION
+===========
+
+   This is a class for null filehandles.
+
+   Calling a constructor of this class always succeeds, returning a new
+null filehandle.
+
+   Writing to any object of this class is always a no-operation, and
+returns true.
+
+   Reading from any object of this class is always no-operation, and
+returns empty-string or empty-list, as appropriate.
+
+WHY
+===
+
+   You could say:
+
+     open(NULL, '>/dev/null') || die "WHAAT?! $!";
+
+   and get a null FH that way.  But not everyone is using an OS that has a
+`/dev/null'
+
+IMPLEMENTATION
+==============
+
+   This is a subclass of IO::Handle.  Applicable methods with subs that do
+nothing, and return an appropriate value.
+
+SEE ALSO
+========
+
+   *Note IO/Handle: IO/Handle,, *Note Perltie: (perl.info)perltie,,
+*IO::Scalar*
+
+CAVEATS
+=======
+
+   * This:
+
+     use IO::Null;
+     $^W = 1;  # turn on warnings
+     tie(*FOO, IO::Null);
+     print FOO "Lalalalala!\n";  # does nothing.
+     untie(*FOO);
+
+   has been known to produce this odd warning:
+
+     untie attempted while 3 inner references still exist.
+
+   and I've no idea why.
+
+   * Furthermore, this:
+
+     use IO::Null;
+     $^W = 1;
+     *FOO = IO::Null->new;
+     print FOO "Lalalalala!\n";  # does nothing.
+     close(FOO);
+
+   emits these warnings:
+
+     Filehandle main::FOO never opened.
+     Close on unopened file <GLOB>.
+
+   ...which are, in fact, true; the FH behind the FOO{IO} was never opened
+on any real filehandle.  (I'd welcome anyone's (working) suggestions on
+how to suppress these warnings.)
+
+   You get the same warnings with:
+
+     use IO::Null;
+     $^W = 1;
+     my $fh = IO::Null->new;
+     print $fh "Lalalalala!\n";  # does nothing.
+     close $fh;
+
+   Note that this, however:
+
+     use IO::Null;
+     $^W = 1;
+     my $fh = IO::Null->new;
+     $fh->print("Lalalalala!\n");  # does nothing.
+     $fh->close();
+
+   emits no warnings.
+
+   * I don't know if you can successfully untaint a null filehandle.
+
+   * This:
+
+     $null_fh->fileno
+
+   will return a defined and nonzero number, but one you're not likely to
+want to use for anything.  See the source.
+
+   * These docs are longer than the source itself.  Read the source!
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000 Sean M. Burke. All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+AUTHOR
+======
+
+   Sean M. Burke `sburke@cpan.org'
+
+
+File: pm.info,  Node: IO/Page,  Next: IO/Pipe,  Prev: IO/Null,  Up: Module List
+
+Pipe STDOUT to a pager if STDOUT is a TTY
+*****************************************
+
+NAME
+====
+
+     IO::Page - Pipe STDOUT to a pager if STDOUT is a TTY
+
+SYNOPSIS
+========
+
+   Pipes STDOUT to a pager if STDOUT is a TTY
+
+DESCRIPTION
+===========
+
+   IO::Page is designed to programmaticly decide whether or not to point
+the STDOUT file handle into a pipe to program specified in $ENV{PAGER} or
+one of a standard list of pagers.
+
+USAGE
+=====
+
+     use IO::Page ;
+     print <<"  HEREDOC" ;
+     ...
+     A bunch of text later
+     HEREDOC
+
+AUTHOR
+======
+
+     Monte Mitzelfelt <monte-iopage@gonefishing.org>
+
+
+File: pm.info,  Node: IO/Pipe,  Next: IO/Poll,  Prev: IO/Page,  Up: Module List
+
+supply object methods for pipes
+*******************************
+
+NAME
+====
+
+   IO::Pipe - supply object methods for pipes
+
+SYNOPSIS
+========
+
+     use IO::Pipe;
+
+     $pipe = new IO::Pipe;
+
+     if($pid = fork()) { # Parent
+         $pipe->reader();
+
+     while(<$pipe> {
+     		....
+     }
+
+     }
+     elsif(defined $pid) { # Child
+         $pipe->writer();
+
+     print $pipe ....
+     	}
+
+     or
+
+     $pipe = new IO::Pipe;
+
+     $pipe->reader(qw(ls -l));
+
+     while(<$pipe>) {
+         ....
+     }
+
+DESCRIPTION
+===========
+
+   IO::Pipe provides an interface to createing pipes between processes.
+
+CONSTRCUTOR
+===========
+
+new ( [READER, WRITER] )
+     Creates a IO::Pipe, which is a reference to a newly created symbol
+     (see the Symbol package). `IO::Pipe::new' optionally takes two
+     arguments, which should be objects blessed into IO::Handle, or a
+     subclass thereof. These two objects will be used for the system call
+     to pipe. If no arguments are given then method handles is called on
+     the new IO::Pipe object.
+
+     These two handles are held in the array part of the GLOB until either
+     reader or writer is called.
+
+METHODS
+=======
+
+reader ([ARGS])
+     The object is re-blessed into a sub-class of IO::Handle, and becomes a
+     handle at the reading end of the pipe. If ARGS are given then fork is
+     called and ARGS are passed to exec.
+
+writer ([ARGS])
+     The object is re-blessed into a sub-class of IO::Handle, and becomes a
+     handle at the writing end of the pipe. If ARGS are given then fork is
+     called and ARGS are passed to exec.
+
+handles ()
+     This method is called during construction by `IO::Pipe::new' on the
+     newly created IO::Pipe object. It returns an array of two objects
+     blessed into `IO::Pipe::End', or a subclass thereof.
+
+SEE ALSO
+========
+
+   *Note IO/Handle: IO/Handle,
+
+AUTHOR
+======
+
+   Graham Barr <gbarr@pobox.com>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1996-8 Graham Barr <gbarr@pobox.com>. All rights reserved.
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: IO/Poll,  Next: IO/Pty,  Prev: IO/Pipe,  Up: Module List
+
+Object interface to system poll call
+************************************
+
+NAME
+====
+
+   IO::Poll - Object interface to system poll call
+
+SYNOPSIS
+========
+
+     use IO::Poll qw(POLLRDNORM POLLWRNORM POLLIN POLLHUP);
+
+     $poll = new IO::Poll;
+
+     $poll->mask($input_handle => POLLRDNORM | POLLIN | POLLHUP);
+     $poll->mask($output_handle => POLLWRNORM);
+
+     $poll->poll($timeout);
+
+     $ev = $poll->events($input);
+
+DESCRIPTION
+===========
+
+   IO::Poll is a simple interface to the system level poll routine.
+
+METHODS
+=======
+
+mask ( IO [, EVENT_MASK ] )
+     If EVENT_MASK is given, then, if EVENT_MASK is non-zero, IO is added
+     to the list of file descriptors and the next call to poll will check
+     for any event specified in EVENT_MASK. If EVENT_MASK is zero then IO
+     will be removed from the list of file descriptors.
+
+     If EVENT_MASK is not given then the return value will be the current
+     event mask value for IO.
+
+poll ( [ TIMEOUT ] )
+     Call the system level poll routine. If TIMEOUT is not specified then
+     the call will block. Returns the number of handles which had events
+     happen, or -1 on error.
+
+events ( IO )
+     Returns the event mask which represents the events that happend on IO
+     during the last call to poll.
+
+remove ( IO )
+     Remove IO from the list of file descriptors for the next poll.
+
+handles( [ EVENT_MASK ] )
+     Returns a list of handles. If EVENT_MASK is not given then a list of
+     all handles known will be returned. If EVENT_MASK is given then a list
+     of handles will be returned which had one of the events specified by
+     EVENT_MASK happen during the last call ti poll
+
+SEE ALSO
+========
+
+   `poll(2)' in this node, *Note IO/Handle: IO/Handle,, *Note IO/Select:
+IO/Select,
+
+AUTHOR
+======
+
+   Graham Barr <gbarr@pobox.com>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997-8 Graham Barr <gbarr@pobox.com>. All rights reserved.
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: IO/Pty,  Next: IO/Scalar,  Prev: IO/Poll,  Up: Module List
+
+Pseudo TTY object class
+***********************
+
+NAME
+====
+
+   IO::Pty - Pseudo TTY object class
+
+SYNOPSIS
+========
+
+     use IO::Pty;
+
+     $pty = new IO::Pty;
+
+     $slave  = $pty->slave;
+
+     foreach $val (1..10) {
+     	print $pty "$val\n";
+     	$_ = <$slave>;
+     	print "$_";
+     }
+
+     close($slave);
+
+DESCRIPTION
+===========
+
+   `IO::Pty' provides an interface to allow the creation of a pseudo tty.
+
+   `IO::Pty' inherits from IO::Handle and so provide all the methods
+defined by the IO::Handle package.
+
+CONSTRUCTOR
+===========
+
+new
+     The new contructor take no arguments and returns a new object which
+     the master side of the pseudo tty.
+
+METHODS
+=======
+
+slave
+     The slave method will return a new `IO::Pty' object which represents
+     the slave side of the pseudo tty
+
+ttyname
+     Returns the name of the pseudo tty. On UNIX machines this will be the
+     pathname of the device.
+
+SEE ALSO
+========
+
+   *Note IO/Handle: IO/Handle,
+
+AUTHOR
+======
+
+   Graham Barr <`gbarr@ti.com'>
+
+   Based on original Ptty module by Nick Ing-Simmons <`nik@tiuk.ti.com'>
+
+COPYRIGHT
+=========
+
+   Most of the C code used in the XS file is covered by the GNU GENERAL
+PUBLIC LICENSE, See COPYING
+
+   All other code is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+
+File: pm.info,  Node: IO/Scalar,  Next: IO/ScalarArray,  Prev: IO/Pty,  Up: Module List
+
+IO:: interface for reading/writing a scalar
+*******************************************
+
+NAME
+====
+
+   IO::Scalar - IO:: interface for reading/writing a scalar
+
+SYNOPSIS
+========
+
+   If you have any Perl5, you can use the basic OO interface...
+
+     use IO::Scalar;
+     
+     ### Open a handle on a string:
+     $SH = new IO::Scalar;
+     $SH->open(\$somestring);
+     
+     ### Open a handle on a string, read it line-by-line, then close it:
+     $SH = new IO::Scalar \$somestring;
+     while ($_ = $SH->getline) { print "Line: $_" }
+     $SH->close;
+     
+     ### Open a handle on a string, and slurp in all the lines:
+     $SH = new IO::Scalar \$somestring;
+     print $SH->getlines;
+     
+     ### Open a handle on a string, and append to it:
+     $SH = new IO::Scalar \$somestring
+     $SH->print("bar\n");        ### will add "bar\n" to the end
+     
+     ### Get the current position:
+     $pos = $SH->getpos;         ### $SH->tell() also works
+     
+     ### Set the current position:
+     $SH->setpos($pos);          ### $SH->seek(POS,WHENCE) also works
+     
+     ### Open an anonymous temporary scalar:
+     $SH = new IO::Scalar;
+     $SH->print("Hi there!");
+     print "I got: ", ${$SH->sref}, "\n";      ### get at value
+
+   If your Perl is 5.004 or later, you can use the TIEHANDLE interface,
+and read/write scalars just like files:
+
+     use IO::Scalar;
+
+     ### Writing to a scalar...
+     my $s;
+     tie *OUT, 'IO::Scalar', \$s;
+     print OUT "line 1\nline 2\n", "line 3\n";
+     print "s is now... $s\n"
+     
+     ### Reading and writing an anonymous scalar...
+     tie *OUT, 'IO::Scalar';
+     print OUT "line 1\nline 2\n", "line 3\n";
+     tied(OUT)->seek(0,0);
+     while (<OUT>) { print "LINE: ", $_ }
+
+   Stringification now works, too!
+
+     my $SH = new IO::Scalar \$somestring;
+     $SH->print("Hello, ");
+     $SH->print("world!");
+     print "I've got: <$SH>\n";
+
+   You can also make the objects sensitive to the $/ setting, just like
+IO::Handle wants them to be:
+
+     my $SH = new IO::Scalar \$somestring;
+     $SH->use_RS(1);           ### perlvar's short name for $/
+     ...
+     local $/ = "";            ### read paragraph-at-a-time
+     $nextpar = $SH->getline;
+
+DESCRIPTION
+===========
+
+   This class implements objects which behave just like FileHandle (or
+IO::Handle) objects, except that you may use them to write to (or read
+from) scalars.  They can be tiehandle'd as well.
+
+   Basically, this:
+
+     my $s;
+     $SH = new IO::Scalar \$s;
+     $SH->print("Hel", "lo, ");         # OO style
+     $SH->print("world!\n");            # ditto
+
+   Or this (if you have 5.004 or later):
+
+     my $s;
+     $SH = tie *OUT, 'IO::Scalar', \$s;
+     print OUT "Hel", "lo, ";           # non-OO style
+     print OUT "world!\n";              # ditto
+
+   Or this (if you have 5.004 or later):
+
+     my $s;
+     $SH = IO::Scalar->new_tie(\$s);
+     $SH->print("Hel", "lo, ");         # OO style...
+     print $SH "world!\n";              # ...or non-OO style!
+
+   Causes $s to be set to:
+
+     "Hello, world!\n"
+
+PUBLIC INTERFACE
+================
+
+Construction
+------------
+
+new [ARGS...]
+     *Class method.* Return a new, unattached scalar handle.  If any
+     arguments are given, they're sent to open().
+
+open [SCALARREF]
+     *Instance method.* Open the scalar handle on a new scalar, pointed to
+     by SCALARREF.  If no SCALARREF is given, a "private" scalar is
+     created to hold the file data.
+
+     Returns the self object on success, undefined on error.
+
+opened
+     *Instance method.* Is the scalar handle opened on something?
+
+close
+     *Instance method.* Disassociate the scalar handle from its underlying
+     scalar.  Done automatically on destroy.
+
+Input and output
+----------------
+
+flush
+     *Instance method.* No-op, provided for OO compatibility.
+
+getc
+     *Instance method.* Return the next character, or undef if none remain.
+
+getline
+     *Instance method.* Return the next line, or undef on end of string.
+     Can safely be called in an array context.  Currently, lines are
+     delimited by "\n".
+
+getlines
+     *Instance method.* Get all remaining lines.  It will croak() if
+     accidentally called in a scalar context.
+
+print ARGS...
+     *Instance method.* Print ARGS to the underlying scalar.
+
+     Warning: Currently, this always causes a "seek to the end of the
+     string"; this may change in the future.
+
+read BUF, NBYTES, [OFFSET]
+     *Instance method.* Read some bytes from the scalar.  Returns the
+     number of bytes actually read, 0 on end-of-file, undef on error.
+
+write BUF, NBYTES, [OFFSET]
+     *Instance method.* Write some bytes to the scalar.
+
+sysread BUF, LEN, [OFFSET]
+     *Instance method.* Read some bytes from the scalar.  Returns the
+     number of bytes actually read, 0 on end-of-file, undef on error.
+
+syswrite BUF, NBYTES, [OFFSET]
+     *Instance method.* Write some bytes to the scalar.
+
+Seeking/telling and other attributes
+------------------------------------
+
+autoflush
+     *Instance method.* No-op, provided for OO compatibility.
+
+binmode
+     *Instance method.* No-op, provided for OO compatibility.
+
+clearerr
+     *Instance method.*  Clear the error and EOF flags.  A no-op.
+
+eof
+     *Instance method.*  Are we at end of file?
+
+seek OFFSET, WHENCE
+     *Instance method.*  Seek to a given position in the stream.
+
+sysseek OFFSET, WHENCE
+     *Instance method.* Identical to `seek OFFSET, WHENCE', *q.v.*
+
+tell
+     *Instance method.* Return the current position in the stream, as a
+     numeric offset.
+
+use_RS [YESNO]
+     *Instance method.* Obey the curent setting of $/, like IO::Handle
+     does?  Default is false.
+
+setpos POS
+     *Instance method.* Set the current position, using the opaque value
+     returned by `getpos()'.
+
+getpos
+     *Instance method.* Return the current position in the string, as an
+     opaque object.
+
+sref
+     *Instance method.* Return a reference to the underlying scalar.
+
+VERSION
+=======
+
+   $Id: Scalar.pm,v 1.125 2001/02/23 09:46:22 eryq Exp $
+
+AUTHORS
+=======
+
+Principal author
+----------------
+
+   Eryq (`eryq@zeegee.com').  President, ZeeGee Software Inc
+(`http://www.zeegee.com').
+
+Other contributors
+------------------
+
+   The full set of contributors always includes the folks mentioned in
+`"CHANGE LOG"', *Note IO/Stringy: IO/Stringy,.  But just the same, special
+thanks to the following individuals for their invaluable contributions (if
+I've forgotten or misspelled your name, please email me!):
+
+   *Andy Glew,* for contributing `getc()'.
+
+   *Brandon Browning,* for suggesting `opened()'.
+
+   *David Richter,* for finding and fixing the bug in `PRINTF()'.
+
+   *Eric L. Brine,* for his offset-using read() and write()
+implementations.
+
+   *Richard Jones,* for his patches to massively improve the performance
+of `getline()' and add sysread and syswrite.
+
+   *B. K. Oxley (binkley),* for stringification and inheritance
+improvements, and sundry good ideas.
+
+
+File: pm.info,  Node: IO/ScalarArray,  Next: IO/Seekable,  Prev: IO/Scalar,  Up: Module List
+
+IO:: interface for reading/writing an array of scalars
+******************************************************
+
+NAME
+====
+
+   IO::ScalarArray - IO:: interface for reading/writing an array of scalars
+
+SYNOPSIS
+========
+
+   If you have any Perl5, you can use the basic OO interface...
+
+     use IO::ScalarArray;
+     
+     # Open a handle on an array-of-scalars:
+     $AH = new IO::ScalarArray;
+     $AH->open(\@a);
+     
+     # Open a handle on an array-of-scalars, read it line-by-line,
+     # then close it:
+     $AH = new IO::ScalarArray \@a;
+     while ($_ = $AH->getline) { print "Line: $_" }
+     $AH->close;
+     
+     # Open a handle on an array-of-scalars, and slurp in all the lines:
+     $AH = new IO::ScalarArray \@a;
+     print $AH->getlines;
+     
+     # Open a handle on an array-of-scalars, and append to it:
+     $AH = new IO::ScalarArray \@a;
+     $AH->print("bar\n");
+     print "some string is now: ", $somestring, "\n";
+     
+     # Get the current position:
+     $pos = $AH->getpos;         ### $AH->tell() also works
+     
+     # Set the current position:
+     $AH->setpos($pos);          ### $AH->seek(POS,WHENCE) also works
+     
+     # Open an anonymous temporary scalar array:
+     $AH = new IO::ScalarArray;
+     $AH->print("Hi there!\nHey there!\n");
+     $AH->print("Ho there!\n");
+     print "I got: ", @{$AH->aref}, "\n";      ### get at value
+
+   If your Perl is 5.004 or later, you can use the TIEHANDLE interface,
+and read/write as array-of-scalars just like files:
+
+     use IO::ScalarArray;
+
+     # Writing to a scalar array...
+     my @a;
+     tie *OUT, 'IO::ScalarArray', \@a;
+     print OUT "line 1\nline 2\n", "line 3\n";
+     print "s is now... [", join('', @a), "]\n";
+     
+     # Reading and writing an anonymous scalar array...
+     tie *OUT, 'IO::ScalarArray';
+     print OUT "line 1\nline 2\n", "line 3\n";
+     tied(OUT)->seek(0,0);
+     while (<OUT>) { print "LINE: ", $_ }
+
+DESCRIPTION
+===========
+
+   This class implements objects which behave just like FileHandle (or
+IO::Handle) objects, except that you may use them to write to (or read
+from) scalars.  They can be tiehandle'd as well.
+
+   For writing large amounts of data with individual print() statements,
+this is likely to be more efficient than IO::Scalar.
+
+   Basically, this:
+
+     my @a;
+     $AH = new IO::ScalarArray \@a;
+     $AH->print("Hel", "lo, ");
+     $AH->print("world!\n");
+
+   Or this (if you have 5.004 or later):
+
+     my @a;
+     $AH = tie *OUT, 'IO::ScalarArray', \@a;
+     print OUT "Hel", "lo, ";
+     print OUT "world!\n";
+
+   Causes @a to be set to the following arrayt of 3 strings:
+
+     ( "Hel" ,
+       "lo, " ,
+       "world!\n" )
+
+   Compare this with IO::Scalar.
+
+PUBLIC INTERFACE
+================
+
+Construction
+------------
+
+new [ARGS...]
+     *Class method.* Return a new, unattached array handle.  If any
+     arguments are given, they're sent to open().
+
+open [ARRAYREF]
+     *Instance method.* Open the array handle on a new array, pointed to
+     by ARRAYREF.  If no ARRAYREF is given, a "private" array is created
+     to hold the file data.
+
+     Returns the self object on success, undefined on error.
+
+opened
+     *Instance method.* Is the array handle opened on something?
+
+close
+     *Instance method.* Disassociate the array handle from its underlying
+     array.  Done automatically on destroy.
+
+Input and output
+----------------
+
+flush
+     *Instance method.* No-op, provided for OO compatibility.
+
+getc
+     *Instance method.* Return the next character, or undef if none remain.
+     This does a read(1), which is somewhat costly.
+
+getline
+     *Instance method.* Return the next line, or undef on end of data.
+     Can safely be called in an array context.  Currently, lines are
+     delimited by "\n".
+
+getlines
+     *Instance method.* Get all remaining lines.  It will croak() if
+     accidentally called in a scalar context.
+
+print ARGS...
+     *Instance method.* Print ARGS to the underlying array.
+
+     Currently, this always causes a "seek to the end of the array" and
+     generates a new array entry.  This may change in the future.
+
+read BUF, NBYTES, [OFFSET];
+     *Instance method.* Read some bytes from the array.  Returns the
+     number of bytes actually read, 0 on end-of-file, undef on error.
+
+write BUF, NBYTES, [OFFSET];
+     *Instance method.* Write some bytes into the array.
+
+Seeking/telling and other attributes
+------------------------------------
+
+autoflush
+     *Instance method.* No-op, provided for OO compatibility.
+
+binmode
+     *Instance method.* No-op, provided for OO compatibility.
+
+clearerr
+     *Instance method.*  Clear the error and EOF flags.  A no-op.
+
+eof
+     *Instance method.*  Are we at end of file?
+
+seek POS,WHENCE
+     *Instance method.* Seek to a given position in the stream.  Only a
+     WHENCE of 0 (SEEK_SET) is supported.
+
+tell
+     *Instance method.* Return the current position in the stream, as a
+     numeric offset.
+
+setpos POS
+     *Instance method.* Seek to a given position in the array, using the
+     opaque getpos() value.  Don't expect this to be a number.
+
+getpos
+     *Instance method.* Return the current position in the array, as an
+     opaque value.  Don't expect this to be a number.
+
+aref
+     *Instance method.* Return a reference to the underlying array.
+
+VERSION
+=======
+
+   $Id: ScalarArray.pm,v 1.117 2000/09/28 06:32:28 eryq Exp $
+
+AUTHOR
+======
+
+Principal author
+----------------
+
+   Eryq (`eryq@zeegee.com').  President, ZeeGee Software Inc
+(`http://www.zeegee.com').
+
+Other contributors
+------------------
+
+   Thanks to the following individuals for their invaluable contributions
+(if I've forgotten or misspelled your name, please email me!):
+
+   *Andy Glew,* for suggesting `getc()'.
+
+   *Brandon Browning,* for suggesting `opened()'.
+
+   *Eric L. Brine,* for his offset-using read() and write()
+implementations.
+
+
+File: pm.info,  Node: IO/Seekable,  Next: IO/Select,  Prev: IO/ScalarArray,  Up: Module List
+
+supply seek based methods for I/O objects
+*****************************************
+
+NAME
+====
+
+   IO::Seekable - supply seek based methods for I/O objects
+
+SYNOPSIS
+========
+
+     use IO::Seekable;
+     package IO::Something;
+     @ISA = qw(IO::Seekable);
+
+DESCRIPTION
+===========
+
+   IO::Seekable does not have a constuctor of its own as is intended to be
+inherited by other IO::Handle based objects. It provides methods which
+allow seeking of the file descriptors.
+
+   If the C functions fgetpos() and fsetpos() are available, then
+`$io-<getpos' returns an opaque value that represents the current position
+of the IO::File, and `$io->setpos(POS)' uses that value to return to a
+previously visited position.
+
+   See *Note Perlfunc: (perl.info)perlfunc, for complete descriptions of
+each of the following supported IO::Seekable methods, which are just front
+ends for the corresponding built-in functions:
+
+     $io->seek( POS, WHENCE )
+     $io->sysseek( POS, WHENCE )
+     $io->tell
+
+SEE ALSO
+========
+
+   *Note Perlfunc: (perl.info)perlfunc,, `"I', *Note Perlop:
+(perl.info)perlop,, `"I', *Note IO/Handle: IO/Handle, `"I', *Note IO/File:
+IO/File,
+
+HISTORY
+=======
+
+   Derived from FileHandle.pm by Graham Barr <gbarr@pobox.com>
+
+
+File: pm.info,  Node: IO/Select,  Next: IO/SendFile,  Prev: IO/Seekable,  Up: Module List
+
+OO interface to the select system call
+**************************************
+
+NAME
+====
+
+   IO::Select - OO interface to the select system call
+
+SYNOPSIS
+========
+
+     use IO::Select;
+
+     $s = IO::Select->new();
+
+     $s->add(\*STDIN);
+     $s->add($some_handle);
+
+     @ready = $s->can_read($timeout);
+
+     @ready = IO::Select->new(@handles)->read(0);
+
+DESCRIPTION
+===========
+
+   The IO::Select package implements an object approach to the system
+select function call. It allows the user to see what IO handles, see *Note
+IO/Handle: IO/Handle,, are ready for reading, writing or have an error
+condition pending.
+
+CONSTRUCTOR
+===========
+
+new ( [ HANDLES ] )
+     The constructor creates a new object and optionally initialises it
+     with a set of handles.
+
+METHODS
+=======
+
+add ( HANDLES )
+     Add the list of handles to the IO::Select object. It is these values
+     that will be returned when an event occurs. IO::Select keeps these
+     values in a cache which is indexed by the fileno of the handle, so if
+     more than one handle with the same fileno is specified then only the
+     last one is cached.
+
+     Each handle can be an IO::Handle object, an integer or an array
+     reference where the first element is a IO::Handle or an integer.
+
+remove ( HANDLES )
+     Remove all the given handles from the object. This method also works
+     by the fileno of the handles. So the exact handles that were added
+     need not be passed, just handles that have an equivalent fileno
+
+exists ( HANDLE )
+     Returns a true value (actually the handle itself) if it is present.
+     Returns undef otherwise.
+
+handles
+     Return an array of all registered handles.
+
+can_read ( [ TIMEOUT ] )
+     Return an array of handles that are ready for reading. TIMEOUT is the
+     maximum amount of time to wait before returning an empty list. If
+     TIMEOUT is not given and any handles are registered then the call
+     will block.
+
+can_write ( [ TIMEOUT ] )
+     Same as can_read except check for handles that can be written to.
+
+has_exception ( [ TIMEOUT ] )
+     Same as can_read except check for handles that have an exception
+     condition, for example pending out-of-band data.
+
+count ()
+     Returns the number of handles that the object will check for when one
+     of the `can_' methods is called or the object is passed to the select
+     static method.
+
+bits()
+     Return the bit string suitable as argument to the core select() call.
+
+select ( READ, WRITE, ERROR [, TIMEOUT ] )
+     select is a static method, that is you call it with the package name
+     like new. READ, WRITE and ERROR are either undef or IO::Select
+     objects. TIMEOUT is optional and has the same effect as for the core
+     select call.
+
+     The result will be an array of 3 elements, each a reference to an
+     array which will hold the handles that are ready for reading, writing
+     and have error conditions respectively. Upon error an empty array is
+     returned.
+
+EXAMPLE
+=======
+
+   Here is a short example which shows how IO::Select could be used to
+write a server which communicates with several sockets while also
+listening for more connections on a listen socket
+
+     use IO::Select;
+     use IO::Socket;
+
+     $lsn = new IO::Socket::INET(Listen => 1, LocalPort => 8080);
+     $sel = new IO::Select( $lsn );
+     
+     while(@ready = $sel->can_read) {
+         foreach $fh (@ready) {
+             if($fh == $lsn) {
+                 # Create a new socket
+                 $new = $lsn->accept;
+                 $sel->add($new);
+             }
+             else {
+                 # Process socket
+
+     # Maybe we have finished with the socket
+     $sel->remove($fh);
+     $fh->close;
+                 }
+             }
+         }
+
+AUTHOR
+======
+
+   Graham Barr <`gbarr@pobox.com'>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997-8 Graham Barr <gbarr@pobox.com>. All rights reserved.
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: IO/SendFile,  Next: IO/Sockatmark,  Prev: IO/Select,  Up: Module List
+
+Perl extension that implements the sendfile() interface.
+********************************************************
+
+NAME
+====
+
+   IO::SendFile - Perl extension that implements the sendfile() interface.
+
+SYNOPSIS
+========
+
+     use IO::SendFile;
+     IO::SendFile::sendfile( fileno(OUT), fileno(IN), $offset, $count );
+     # Send file everything from filehandle IN from offset
+     # $offset and send $count bytes.
+
+     use IO::SendFile qw( sendfile ); # import the senfile function
+     sendfile( fileno(OUT), fileno(IN), $offset, $count );
+
+DESCRIPTION
+===========
+
+   IO::SendFile implements the sendfile() function call.  This version
+only works on linux.
+
+   IO::SendFile is released under the same conditions as perl itself.
+
+AUTHOR
+======
+
+   Arnar M. Hrafnkelsson, addi@umich.edu
+
+SEE ALSO
+========
+
+   perl(1).  sendfile(2).
+
+
+File: pm.info,  Node: IO/Sockatmark,  Next: IO/Socket,  Prev: IO/SendFile,  Up: Module List
+
+Perl extension for TCP urgent data
+**********************************
+
+NAME
+====
+
+   IO::Sockatmark - Perl extension for TCP urgent data
+
+SYNOPSIS
+========
+
+     use IO::Sockatmark;
+     use IO::Socket;
+
+     my $sock = IO::Socket::INET->new('some_server');
+     $sock->read(1024,$data) until $sock->atmark;
+
+DESCRIPTION
+===========
+
+   This module adds the atmark() method to the standard IO::Socket class.
+This can be used to detect the "mark" created by the receipt of TCP urgent
+data.
+
+Methods
+-------
+
+$flag = $socket->atmark()
+     The atmark() method true if the socket is currently positioned at the
+     urgent data mark, false otherwise.
+
+Exported functions
+------------------
+
+$flag = sockatmark($socket)
+     The atmark() function returns true if the socket is currently
+     positioned at the urgent data mark, false otherwise.  This will work
+     with an IO::Socket object, as well as with a conventional filehandle
+     socket.
+
+CAVEATS
+=======
+
+   This module is critically dependent on the system ioctl() constant
+SIOCATMARK, which is located in different places on different systems.
+The module compiles and works correctly on Linux, Solaris and Tru64 Unix
+systems, but probably needs tweaking to compile on others.  Please send
+patches.
+
+AUTHOR
+======
+
+   Copyright 2001, Lincoln Stein <lstein@cshl.org>.
+
+   This module is distributed under the same terms as Perl itself.  Feel
+free to use, modify and redistribute it as long as you retain the correct
+attribution.
+
+SEE ALSO
+========
+
+   perl(1), IO::Socket(3)
+
+
+File: pm.info,  Node: IO/Socket,  Next: IO/Socket/INET,  Prev: IO/Sockatmark,  Up: Module List
+
+Object interface to socket communications
+*****************************************
+
+NAME
+====
+
+   IO::Socket - Object interface to socket communications
+
+SYNOPSIS
+========
+
+     use IO::Socket;
+
+DESCRIPTION
+===========
+
+   IO::Socket provides an object interface to creating and using sockets.
+It is built upon the *Note IO/Handle: IO/Handle, interface and inherits
+all the methods defined by *Note IO/Handle: IO/Handle,.
+
+   IO::Socket only defines methods for those operations which are common
+to all types of socket. Operations which are specified to a socket in a
+particular domain have methods defined in sub classes of IO::Socket
+
+   IO::Socket will export all functions (and constants) defined by *Note
+Socket: Socket,.
+
+CONSTRUCTOR
+===========
+
+new ( [ARGS] )
+     Creates an IO::Socket, which is a reference to a newly created symbol
+     (see the Symbol package). new optionally takes arguments, these
+     arguments are in key-value pairs.  new only looks for one key Domain
+     which tells new which domain the socket will be in. All other
+     arguments will be passed to the configuration method of the package
+     for that domain, See below.
+
+          NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
+          
+          As of VERSION 1.18 all IO::Socket objects have autoflush turned on
+          by default. This was not the case with earlier releases.
+
+          NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
+
+METHODS
+=======
+
+   See *Note Perlfunc: (perl.info)perlfunc, for complete descriptions of
+each of the following supported IO::Socket methods, which are just front
+ends for the corresponding built-in functions:
+
+     socket
+     socketpair
+     bind
+     listen
+     accept
+     send
+     recv
+     peername (getpeername)
+     sockname (getsockname)
+     shutdown
+
+   Some methods take slightly different arguments to those defined in
+*Note Perlfunc: (perl.info)perlfunc, in attempt to make the interface more
+flexible. These are
+
+accept([PKG])
+     perform the system call accept on the socket and return a new object.
+     The new object will be created in the same class as the listen
+     socket, unless `PKG' is specified. This object can be used to
+     communicate with the client that was trying to connect. In a scalar
+     context the new socket is returned, or undef upon failure. In an
+     array context a two-element array is returned containing the new
+     socket and the peer address, the list will be empty upon failure.
+
+     Additional methods that are provided are
+
+timeout([VAL])
+     Set or get the timeout value associated with this socket. If called
+     without any arguments then the current setting is returned. If called
+     with an argument the current setting is changed and the previous
+     value returned.
+
+sockopt(OPT [, VAL])
+     Unified method to both set and get options in the SOL_SOCKET level.
+     If called with one argument then getsockopt is called, otherwise
+     setsockopt is called.
+
+sockdomain
+     Returns the numerical number for the socket domain type. For example,
+     for a AF_INET socket the value of &AF_INET will be returned.
+
+socktype
+     Returns the numerical number for the socket type. For example, for a
+     SOCK_STREAM socket the value of &SOCK_STREAM will be returned.
+
+protocol
+     Returns the numerical number for the protocol being used on the
+     socket, if known. If the protocol is unknown, as with an AF_UNIX
+     socket, zero is returned.
+
+connected
+     If the socket is in a connected state the the peer address is
+     returned.  If the socket is not in a connected state then undef will
+     be returned.
+
+SEE ALSO
+========
+
+   *Note Socket: Socket,, *Note IO/Handle: IO/Handle,, *Note
+IO/Socket/INET: IO/Socket/INET,, *Note IO/Socket/UNIX: IO/Socket/UNIX,
+
+AUTHOR
+======
+
+   Graham Barr <`gbarr@pobox.com'>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997-8 Graham Barr <gbarr@pobox.com>. All rights reserved.
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: IO/Socket/INET,  Next: IO/Socket/Multicast,  Prev: IO/Socket,  Up: Module List
+
+Object interface for AF_INET domain sockets
+*******************************************
+
+NAME
+====
+
+   IO::Socket::INET - Object interface for AF_INET domain sockets
+
+SYNOPSIS
+========
+
+     use IO::Socket::INET;
+
+DESCRIPTION
+===========
+
+   IO::Socket::INET provides an object interface to creating and using
+sockets in the AF_INET domain. It is built upon the *Note IO/Socket:
+IO/Socket, interface and inherits all the methods defined by *Note
+IO/Socket: IO/Socket,.
+
+CONSTRUCTOR
+===========
+
+new ( [ARGS] )
+     Creates an IO::Socket::INET object, which is a reference to a newly
+     created symbol (see the Symbol package). new optionally takes
+     arguments, these arguments are in key-value pairs.
+
+     In addition to the key-value pairs accepted by *Note IO/Socket:
+     IO/Socket,, IO::Socket::INET provides.
+
+          PeerAddr	Remote host address          <hostname>[:<port>]
+          PeerHost	Synonym for PeerAddr
+          PeerPort	Remote port or service       <service>[(<no>)] | <no>
+          LocalAddr	Local host bind	address      hostname[:port]
+          LocalHost	Synonym for LocalAddr
+          LocalPort	Local host bind	port         <service>[(<no>)] | <no>
+          Proto	Protocol name (or number)    "tcp" | "udp" | ...
+          Type	Socket type                  SOCK_STREAM | SOCK_DGRAM | ...
+          Listen	Queue size for listen
+          Reuse	Set SO_REUSEADDR before binding
+          Timeout	Timeout	value for various operations
+          MultiHomed  Try all adresses for multi-homed hosts
+
+     If Listen is defined then a listen socket is created, else if the
+     socket type, which is derived from the protocol, is SOCK_STREAM then
+     connect() is called.
+
+     Although it is not illegal, the use of `MultiHomed' on a socket which
+     is in non-blocking mode is of little use. This is because the first
+     connect will never fail with a timeout as the connaect call will not
+     block.
+
+     The `PeerAddr' can be a hostname or the IP-address on the
+     "xx.xx.xx.xx" form.  The `PeerPort' can be a number or a symbolic
+     service name.  The service name might be followed by a number in
+     parenthesis which is used if the service is not known by the system.
+     The `PeerPort' specification can also be embedded in the `PeerAddr'
+     by preceding it with a ":".
+
+     If Proto is not given and you specify a symbolic `PeerPort' port,
+     then the constructor will try to derive Proto from the service name.
+     As a last resort Proto "tcp" is assumed.  The Type parameter will be
+     deduced from Proto if not specified.
+
+     If the constructor is only passed a single argument, it is assumed to
+     be a `PeerAddr' specification.
+
+     Examples:
+
+          $sock = IO::Socket::INET->new(PeerAddr => 'www.perl.org',
+                                        PeerPort => 'http(80)',
+                                        Proto    => 'tcp');
+
+          $sock = IO::Socket::INET->new(PeerAddr => 'localhost:smtp(25)');
+
+          $sock = IO::Socket::INET->new(Listen    => 5,
+                                        LocalAddr => 'localhost',
+                                        LocalPort => 9000,
+                                        Proto     => 'tcp');
+
+          $sock = IO::Socket::INET->new('127.0.0.1:25');
+
+          NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
+          
+          As of VERSION 1.18 all IO::Socket objects have autoflush turned on
+          by default. This was not the case with earlier releases.
+
+          NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
+
+METHODS
+-------
+
+sockaddr ()
+     Return the address part of the sockaddr structure for the socket
+
+sockport ()
+     Return the port number that the socket is using on the local host
+
+sockhost ()
+     Return the address part of the sockaddr structure for the socket in a
+     text form xx.xx.xx.xx
+
+peeraddr ()
+     Return the address part of the sockaddr structure for the socket on
+     the peer host
+
+peerport ()
+     Return the port number for the socket on the peer host.
+
+peerhost ()
+     Return the address part of the sockaddr structure for the socket on
+     the peer host in a text form xx.xx.xx.xx
+
+SEE ALSO
+========
+
+   *Note Socket: Socket,, *Note IO/Socket: IO/Socket,
+
+AUTHOR
+======
+
+   Graham Barr <`gbarr@pobox.com'>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1996-8 Graham Barr <gbarr@pobox.com>. All rights reserved.
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: IO/Socket/Multicast,  Next: IO/Socket/SSL,  Prev: IO/Socket/INET,  Up: Module List
+
+Send and receive multicast messages
+***********************************
+
+NAME
+====
+
+   IO::Socket::Multicast - Send and receive multicast messages
+
+SYNOPSIS
+========
+
+     use IO::Socket::Multicast;
+
+     # create a new UDP socket ready to read datagrams on port 1100
+     my $s = IO::Socket::Multicast->new(LocalPort=>1100);
+
+     # Add a multicast group
+     $s->mcast_add('225.0.1.1');
+
+     # Add a multicast group to eth0 device
+     $s->mcast_add('225.0.0.2','eth0');
+
+     # now receive some multicast data
+     $s->recv($data,1024);
+
+     # Drop a multicast group
+     $s->mcast_drop('225.0.0.1');
+
+     # Set outgoing interface to eth0
+     $s->mcast_if('eth0');
+
+     # Set time to live on outgoing multicast packets
+     $s->ttl(10);
+
+     # Turn off loopbacking
+     $s->loopback(0);
+
+     # Multicast a message to group 225.0.0.1
+     $s->mcast_send('hello world!','225.0.0.1:1200');
+     $s->mcast_set('225.0.0.2:1200');
+     $s->mcast_send('hello again!');
+
+DESCRIPTION
+===========
+
+   The IO::Socket::Multicast module subclasses IO::Socket::INET to enable
+you to manipulate multicast groups.  With this module (and an operating
+system that supports multicasting), you will be able to receive incoming
+multicast transmissions and generate your own outgoing multicast packets.
+
+   This module requires IO::Interface version 0.94 or higher.
+
+INTRODUCTION
+------------
+
+   Multicasting is designed for streaming multimedia applications and for
+conferencing systems in which one transmitting machines needs to
+distribute data to a large number of clients.
+
+   IP addresses in the range 224.0.0.0 and 239.255.255.255 are reserved
+for multicasting.  These addresses do not correspond to individual
+machines, but to multicast groups.  Messages sent to these addresses will
+be delivered to a potentially large number of machines that have
+registered their interest in receiving transmissions on these groups.
+They work like TV channels.  A program tunes in to a multicast group to
+receive transmissions to it, and tunes out when it no longer wishes to
+receive the transmissions.
+
+   To receive transmissions from a multicast group, you will use
+IO::Socket::INET->new() to create a UDP socket and bind it to a local
+network port.  You will then subscribe one or more multicast groups using
+the mcast_add() method.  Subsequent calls to the standard recv() method
+will now receive messages incoming messages transmitted to the subscribed
+groups using the selected port number.
+
+   To send transmissions to a multicast group, you can use the standard
+send() method to send messages to the multicast group and port of your
+choice.  The mcast_set() and mcast_send() methods are provided as
+convenience functions.  Mcast_set() will set a default multicast
+destination for messages which you then send with mcast_send().
+
+   To set the number of hops (routers) that outgoing multicast messages
+will cross, call mcast_ttl().  To activate or deactivate the looping back
+of multicast messages (in which a copy of the transmitted messages is
+received by the local machine), call mcast_loopback().
+
+CONSTRUCTORS
+------------
+
+$socket = IO::Socket::Multicast->new(LocalPort=>$port)
+     The new() method is the constructor for the IO::Socket::Multicast
+     class.  It takes the same arguments as IO::Socket::INET, except that
+     the Proto argument, rather than defaulting to "tcp", will default to
+     "udp", which is more appropriate for multicasting.
+
+     To create a UDP socket suitable for sending outgoing multicast
+     messages, call new() without no arguments (or with `Proto=>'udp'').
+     To create a UDP socket that can also receive incoming multicast
+     transmissions on a specific port, call new() with the LocalPort
+     argument.
+
+METHODS
+-------
+
+$success = $socket->mcast_add($multicast_address [,$interface])
+     The mcast_add() method will add the provided multicast address to the
+     list of subscribed multicast groups.  The address may be provided
+     either as a dotted-quad decimal, or as a packed IP address (such as
+     produced by the inet_aton() function).  On success, the method will
+     return a true value.
+
+     The optional $interface argument can be used to specify on which
+     network interface to listen for incoming multicast messages.  If the
+     IO::Interface module is installed, you may use the device name for the
+     interface (e.g. "tu0").  Otherwise, you must use the IP address of the
+     desired network interface.  Either dotted quad form or packed IP
+     address is acceptable.  If no interface is specified, then the
+     multicast group is joined on INADDR_ANY, meaning that multicast
+     transmissions received on any of the host's network interfaces will
+     be forwarded to the socket.
+
+$success = $socket->mcast_drop($multicast_address)
+     This reverses the action of mcast_add(), removing the indicated
+     multicast address from the list of subscribed groups.
+
+$loopback = $socket->mcast_loopback
+$previous = $socket->mcast_loopback($new)
+     The mcast_loopback() method controls whether the socket will receive
+     its own multicast transmissions (default yes).  Called without
+     arguments, the method returns the current state of the loopback flag.
+     Called with a boolean argument, the method will set the loopback
+     flag, and return its previous value.
+
+$ttl = $socket->mcast_ttl
+$previous = $socket->mcast_ttl($new)
+     The mcast_ttl() method examines or sets the time to live (TTL) for
+     outgoing multicast messages.  The TTL controls the numbers of routers
+     the packet can cross before being expired.  The default TTL is 1,
+     meaning that the message is confined to the local area network.
+     Values between 0 and 255 are valid.
+
+     Called without arguments, this method returns the socket's current
+     TTL.  Called with a value, this method sets the TTL and returns its
+     previous value.
+
+$interface = $socket->mcast_if
+$previous = $socket->mcast_if($new)
+     By default, the OS will pick the network interface to use for outgoing
+     multicasts automatically.  You can control this process by using the
+     mcast_if() method to set the outgoing network interface explicitly.
+     Called without arguments, returns the current interface.  Called with
+     the name of an interface, sets the outgoing interface and returns its
+     previous value.
+
+     You can use the device name for the interface (e.g. "tu0") if the
+     IO::Interface module is present.  Otherwise, you must use the
+     interface's dotted IP address.
+
+     NOTE: To set the interface used for *incoming* multicasts, use the
+     mcast_add() method.
+
+$dest = $socket->mcast_dest
+$previous = $socket->mcast_dest($new)
+     The mcast_dest() method is a convenience function that allows you to
+     set the default destination group for outgoing multicasts.  Called
+     without arguments, returns the current destination as a packed binary
+     sockaddr_in data structure.  Called with a new destination address,
+     the method sets the default destination and returns the previous one,
+     if any.
+
+     Destination addresses may be provided as packed sockaddr_in
+     structures, or in the form "XX.XX.XX.XX:YY" where the first part is
+     the IP address, and the second the port number.
+
+$bytes = $socket->mcast_send($data [,$dest])
+     Mcast_send() is a convenience function that simplifies the sending of
+     multicast messages.  $data is the message contents, and $dest is an
+     optional destination group.  You can use either the dotted IP form of
+     the destination address and its port number, or a packed sockaddr_in
+     structure.  If the destination is not supplied, it will default to
+     the most recent value set in mcast_dest() or a previous call to
+     mcast_send().
+
+     The method returns the number of bytes successfully queued for
+     delivery.
+
+     As a side-effect, the method will call mcast_dest() to remember the
+     destination address.
+
+     Example:
+
+          $socket->mcast_send('Hi there group members!','225.0.1.1:1900') || die;
+          $socket->mcast_send("How's the weather?") || die;
+
+     Note that you may still call IO::Socket::INET->new() with a
+     *PeerAddr*, and IO::Socket::INET will perform a connect(), creating a
+     default destination for calls to send().
+
+EXAMPLE
+=======
+
+   The following is an example of a multicast server.  Every 10 seconds it
+transmits the current time and the list of logged-in users to the local
+network using multicast group 226.1.1.2, port 2000 (these are chosen
+arbitrarily).
+
+     #!/usr/bin/perl
+     # server
+     use strict;
+     use IO::Socket::Multicast;
+
+     use constant DESTINATION => '226.1.1.2:2000';
+     my $sock = IO::Socket::INET->new(Proto=>'udp',PeerAddr=>DESTINATION);
+
+     while (1) {
+       my $message = localtime;
+       $message .= "\n" . `who`;
+       $sock->send($message) || die "Couldn't send: $!";
+     } continue {
+       sleep 10;
+     }
+
+   This is the corresponding client.  It listens for transmissions on
+group 226.1.1.2, port 2000, and echoes the messages to standard output.
+
+     #!/usr/bin/perl
+     # client
+
+     use strict;
+     use IO::Socket::Multicast;
+
+     use constant GROUP => '226.1.1.2';
+     use constant PORT  => '2000';
+
+     my $sock = IO::Socket::INET->new(Proto=>'udp',LocalPort=>PORT);
+     $sock->mcast_add(GROUP) || die "Couldn't set group: $!\n";
+
+     while (1) {
+       my $data;
+       next unless $sock->recv($data,1024);
+       print $data;
+     }
+
+EXPORT
+------
+
+   None by default.  However, if you wish to call mcast_add(),
+mcast_drop(), mcast_if(), mcast_loopback(), mcast_ttl, mcast_dest() and
+mcast_send() as functions you may import them explicitly on the use line
+or by importing the tag ":functions".
+
+BUGS
+----
+
+   The mcast_if(), mcast_ttl() and mcast_loopback() methods will cause a
+crash on versions of Linux earlier than 2.2.0 because of a kernel bug in
+the implementation of the multicast socket options.
+
+AUTHOR
+======
+
+   Lincoln Stein, lstein@cshl.org.
+
+   This module is distributed under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   perl(1), IO::Socket(3), IO::Socket::INET(3).
+
+

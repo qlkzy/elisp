@@ -1,0 +1,1766 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Archive/Tar,  Next: Archive/Zip,  Prev: AppleII/ProDOS,  Up: Module List
+
+module for manipulation of tar archives.
+****************************************
+
+NAME
+====
+
+   Tar - module for manipulation of tar archives.
+
+SYNOPSIS
+========
+
+     use Archive::Tar;
+
+     Archive::Tar->create_archive ("my.tar.gz", 9, "/this/file", "/that/file");
+     print join "\n", Archive::Tar->list_archive ("my.tar.gz"), "";
+
+     $tar = Archive::Tar->new();
+     $tar->read("origin.tar.gz",1);
+     $tar->add_files("file/foo.c", "file/bar.c");
+     $tar->add_data("file/baz.c","This is the file contents");
+     $tar->write("files.tar");
+
+DESCRIPTION
+===========
+
+   This is a module for the handling of tar archives.
+
+   Archive::Tar provides an object oriented mechanism for handling tar
+files.  It provides class methods for quick and easy files handling while
+also allowing for the creation of tar file objects for custom
+manipulation.  If you have the Compress::Zlib module installed,
+Archive::Tar will also support compressed or gzipped tar files.
+
+Class Methods
+-------------
+
+   The class methods should be sufficient for most tar file interaction.
+
+create_archive ($file, $compression, @filelist)
+     Creates a tar file from the list of files provided.  The first
+     argument can either be the name of the tar file to create or a
+     reference to an open file handle (e.g. a GLOB reference).
+
+     The second argument specifies the level of compression to be used, if
+     any.  Compression of tar files requires the installation of the
+     Compress::Zlib module.  Specific levels or compression may be
+     requested by passing a value between 2 and 9 as the second argument.
+     Any other value evaluating as true will result in the default
+     compression level being used.
+
+     The remaining arguments list the files to be included in the tar file.
+     These files must all exist.  Any files which don\'t exist or can\'t be
+     read are silently ignored.
+
+     If the archive creation fails for any reason, create_archive will
+     return undef.  Please use the error method to find the cause of the
+     failure.
+
+list_archive ($file, ['property', 'property',...])
+list_archive ($file)
+     Returns a list of the names of all the files in the archive.  The
+     first argument can either be the name of the tar file to create or a
+     reference to an open file handle (e.g. a GLOB reference).
+
+     If `list_archive()' is passed an array reference as its second
+     argument it returns a list of hash references containing the requested
+     properties of each file.  The following list of properties is
+     supported: name, size, mtime (last modified date), mode, uid, gid,
+     linkname, uname, gname, devmajor, devminor, prefix.
+
+     Passing an array reference containing only one element, 'name', is
+     special cased to return a list of names rather than a list of hash
+     references.
+
+extract_archive ($file)
+     Extracts the contents of the tar file.  The first argument can either
+     be the name of the tar file to create or a reference to an open file
+     handle (e.g. a GLOB reference).  All relative paths in the tar file
+     will be created underneath the current working directory.
+
+     If the archive extraction fails for any reason, extract_archive will
+     return undef.  Please use the error method to find the cause of the
+     failure.
+
+new ($file)
+new ()
+     Returns a new Tar object. If given any arguments, new() calls the
+     read() method automatically, parsing on the arguments provided
+     `read()' in this node.
+
+     If new() is invoked with arguments and the read method fails for any
+     reason, new() returns undef.
+
+Instance Methods
+----------------
+
+read ($ref, $compressed)
+     Read the given tar file into memory. The first argument can either be
+     the name of a file or a reference to an already open file handle
+     (e.g. a GLOB reference).  The second argument indicates whether the
+     file referenced by the first argument is compressed.
+
+     The second argument is now optional as Archive::Tar will automatically
+     detect compressed archives.
+
+     The read will replace any previous content in `$tar'!
+
+add_files(@filenamelist)
+     Takes a list of filenames and adds them to the in-memory archive.  On
+     MacOS, the path to the file is automatically converted to a Unix like
+     equivalent for use in the archive, and the file\'s modification time
+     is converted from the MacOS epoch to the Unix epoch.  So tar archives
+     created on MacOS with *Archive::Tar* can be read both with *tar* on
+     Unix and applications like *suntar* or *Stuffit Expander* on MacOS.
+     Be aware that the file\'s type/creator and resource fork will be lost,
+     which is usually what you want in cross-platform archives.
+
+add_data ($filename, $data, $opthashref)
+     Takes a filename, a scalar full of data and optionally a reference to
+     a hash with specific options. Will add a file to the in-memory
+     archive, with name $filename and content $data. Specific properties
+     can be set using `$opthashref', The following list of properties is
+     supported: name, size, mtime (last modified date), mode, uid, gid,
+     linkname, uname, gname, devmajor, devminor, prefix.  (On MacOS, the
+     file\'s path and modification times are converted to Unix
+     equivalents.)
+
+remove (@filenamelist)
+     Removes any entries with names matching any of the given filenames
+     from the in-memory archive. String comparisons are done with eq.
+
+write ($file, $compressed)
+     Write the in-memory archive to disk.  The first argument can either be
+     the name of a file or a reference to an already open file handle (be a
+     GLOB reference).  If the second argument is true, the module will use
+     Compress::Zlib to write the file in a compressed format.  If
+     Compress:Zlib is not available, the write method will fail.  Specific
+     levels of compression can be chosen by passing the values 2 through 9
+     as the second parameter.
+
+     If no arguments are given, write returns the entire formatted archive
+     as a string, which could be useful if you\'d like to stuff the
+     archive into a socket or a pipe to gzip or something.  This
+     functionality may be deprecated later, however, as you can also do
+     this using a GLOB reference for the first argument.
+
+extract(@filenames)
+     Write files whose names are equivalent to any of the names in
+     `@filenames' to disk, creating subdirectories as necessary. This
+     might not work too well under VMS.  Under MacPerl, the file\'s
+     modification time will be converted to the MacOS zero of time, and
+     appropriate conversions will be done to the path.  However, the length
+     of each element of the path is not inspected to see whether it\'s
+     longer than MacOS currently allows (32 characters).
+
+     If extract is called without a list of file names, the entire
+     contents of the archive are extracted.
+
+list_files(['property', 'property',...])
+list_files()
+     Returns a list of the names of all the files in the archive.
+
+     If list_files() is passed an array reference as its first argument it
+     returns a list of hash references containing the requested properties
+     of each file.  The following list of properties is supported: name,
+     size, mtime (last modified date), mode, uid, gid, linkname, uname,
+     gname, devmajor, devminor, prefix.
+
+     Passing an array reference containing only one element, 'name', is
+     special cased to return a list of names rather than a list of hash
+     references.
+
+get_content($file)
+     Return the content of the named file.
+
+replace_content($file,$content)
+     Make the string $content be the content for the file named $file.
+
+CHANGES
+=======
+
+Version 0.20
+     Added class methods for creation, extraction and listing of tar files.
+     No longer maintain a complete copy of the tar file in memory.  Removed
+     the data() method.
+
+Version 0.10
+     Numerous changes. Brought source under CVS.  All changes now recorded
+     in ChangeLog file in distribution.
+
+Version 0.08
+     New developer/maintainer.  Calle has carpal-tunnel syndrome and cannot
+     type a great deal. Get better as soon as you can, Calle.
+
+     Added proper support for MacOS.  Thanks to Paul J. Schinder
+     <schinder@leprss.gsfc.nasa.gov>.
+
+Version 0.071
+     Minor release.
+
+     Arrange to chmod() at the very end in case it makes the file read
+     only.  Win32 is actually picky about that.
+
+     SunOS 4.x tar makes tarfiles that contain directory entries that
+     don\'t have typeflag set properly.  We use the trailing slash to
+     recognise directories in such tar files.
+
+Version 0.07
+     Fixed (hopefully) broken portability to MacOS, reported by Paul J.
+     Schinder at Goddard Space Flight Center.
+
+     Fixed two bugs with symlink handling, reported in excellent detail by
+     an admin at teleport.com called Chris.
+
+     Primitive tar program (called ptar) included with distribution. Usage
+     should be pretty obvious if you\'ve used a normal tar program.
+
+     Added methods get_content and replace_content.
+
+     Added support for paths longer than 100 characters, according to
+     POSIX. This is compatible with just about everything except GNU tar.
+     Way to go, GNU tar (use a better tar, or GNU cpio).
+
+     NOTE: When adding files to an archive, files with basenames longer
+       than 100 characters will be silently ignored. If the prefix part
+        of a path is longer than 155 characters, only the last 155
+     characters will be stored.
+
+Version 0.06
+     Added list_files() method, as requested by Michael Wiedman.
+
+     Fixed a couple of dysfunctions when run under Windows NT. Michael
+     Wiedmann reported the bugs.
+
+     Changed the documentation to reflect reality a bit better.
+
+     Fixed bug in format_tar_entry. Bug reported by Michael Schilli.
+
+Version 0.05
+     Quoted lots of barewords to make `use strict;' stop complaining under
+     perl version 5.003.
+
+     Ties to *Note Compress/Zlib: Compress/Zlib, put in. Will warn if it
+     isn\'t available.
+
+     $tar->write() with no argument now returns the formatted archive.
+
+Version 0.04
+     Made changes to write_tar so that Solaris tar likes the resulting
+     archives better.
+
+     Protected the calls to readlink() and symlink(). AFAIK this module
+     should now run just fine on Windows NT.
+
+     Add method to write a single entry to disk (extract)
+
+     Added method to add entries entirely from scratch (add_data)
+
+     Changed name of add() to add_file()
+
+     All calls to croak() removed and replaced with returning undef and
+     setting Tar::error.
+
+     Better handling of tarfiles with garbage at the end.
+
+
+File: pm.info,  Node: Archive/Zip,  Next: Archive/Zip/Tree,  Prev: Archive/Tar,  Up: Module List
+
+Provide an interface to ZIP archive files.
+******************************************
+
+NAME
+====
+
+   Archive::Zip - Provide an interface to ZIP archive files.
+
+SYNOPSIS
+========
+
+     use Archive::Zip qw( :ERROR_CODES :CONSTANTS );
+
+     my $zip = Archive::Zip->new();
+     my $member = $zip->addDirectory( 'dirname/' );
+     $member = $zip->addString( 'This is a test', 'stringMember.txt' );
+     $member->desiredCompressionMethod( COMPRESSION_DEFLATED );
+     $member = $zip->addFile( 'xyz.pl', 'AnotherName.pl' );
+
+     die 'write error' if $zip->writeToFileNamed( 'someZip.zip' ) != AZ_OK;
+
+     $zip = Archive::Zip->new();
+     die 'read error' if $zip->read( 'someZip.zip' ) != AZ_OK;
+
+     $member = $zip->memberNamed( 'stringMember.txt' );
+     $member->desiredCompressionMethod( COMPRESSION_STORED );
+
+     die 'write error' if $zip->writeToFileNamed( 'someOtherZip.zip' ) != AZ_OK;
+
+DESCRIPTION
+===========
+
+   The Archive::Zip module allows a Perl program to create, manipulate,
+read, and write Zip archive files.
+
+   Zip archives can be created, or you can read from existing zip files.
+Once created, they can be written to files, streams, or strings.
+
+   Members can be added, removed, extracted, replaced, rearranged, and
+enumerated.  They can also be renamed or have their dates, comments, or
+other attributes queried or modified.  Their data can be compressed or
+uncompressed as needed.  Members can be created from members in existing
+Zip files, or from existing directories, files, or strings.
+
+   This module uses the `Compress::Zlib|Compress::Zlib' in this node
+library to read and write the compressed streams inside the files.
+
+EXPORTS
+=======
+
+:CONSTANTS
+     Exports the following constants:
+
+     FA_MSDOS FA_UNIX GPBF_ENCRYPTED_MASK GPBF_DEFLATING_COMPRESSION_MASK
+     GPBF_HAS_DATA_DESCRIPTOR_MASK COMPRESSION_STORED COMPRESSION_DEFLATED
+     IFA_TEXT_FILE_MASK IFA_TEXT_FILE IFA_BINARY_FILE
+     COMPRESSION_LEVEL_NONE COMPRESSION_LEVEL_DEFAULT
+     COMPRESSION_LEVEL_FASTEST COMPRESSION_LEVEL_BEST_COMPRESSION
+
+:MISC_CONSTANTS
+     Exports the following constants (only necessary for extending the
+     module):
+
+     FA_AMIGA FA_VAX_VMS FA_VM_CMS FA_ATARI_ST FA_OS2_HPFS FA_MACINTOSH
+     FA_Z_SYSTEM FA_CPM FA_WINDOWS_NTFS
+     GPBF_IMPLODING_8K_SLIDING_DICTIONARY_MASK
+     GPBF_IMPLODING_3_SHANNON_FANO_TREES_MASK
+     GPBF_IS_COMPRESSED_PATCHED_DATA_MASK COMPRESSION_SHRUNK
+     DEFLATING_COMPRESSION_NORMAL DEFLATING_COMPRESSION_MAXIMUM
+     DEFLATING_COMPRESSION_FAST DEFLATING_COMPRESSION_SUPER_FAST
+     COMPRESSION_REDUCED_1 COMPRESSION_REDUCED_2 COMPRESSION_REDUCED_3
+     COMPRESSION_REDUCED_4 COMPRESSION_IMPLODED COMPRESSION_TOKENIZED
+     COMPRESSION_DEFLATED_ENHANCED
+     COMPRESSION_PKWARE_DATA_COMPRESSION_LIBRARY_IMPLODED
+
+:ERROR_CODES
+     Explained below. Returned from most methods.
+
+     AZ_OK AZ_STREAM_END AZ_ERROR AZ_FORMAT_ERROR AZ_IO_ERROR
+
+OBJECT MODEL
+============
+
+Inheritance
+-----------
+
+     Exporter
+        Archive::Zip                            Common base class, has defs.
+            Archive::Zip::Archive               A Zip archive.
+            Archive::Zip::Member                Abstract superclass for all members.
+                Archive::Zip::StringMember      Member made from a string
+                Archive::Zip::FileMember        Member made from an external file
+                    Archive::Zip::ZipFileMember Member that lives in a zip file
+                    Archive::Zip::NewFileMember Member whose data is in a file
+                Archive::Zip::DirectoryMember   Member that is a directory
+
+ERROR CODES
+===========
+
+   Many of the methods in Archive::Zip return error codes.  These are
+implemented as inline subroutines, using the `use constant' pragma.  They
+can be imported into your namespace using the `:CONSTANT' tag:
+
+     use Archive::Zip qw( :CONSTANTS );
+     ...
+     die "whoops!" if $zip->read( 'myfile.zip' ) != AZ_OK;
+
+AZ_OK (0)
+     Everything is fine.
+
+AZ_STREAM_END (1)
+     The read stream (or central directory) ended normally.
+
+AZ_ERROR (2)
+     There was some generic kind of error.
+
+AZ_FORMAT_ERROR (3)
+     There is a format error in a ZIP file being read.
+
+AZ_IO_ERROR (4)
+     There was an IO error.
+
+COMPRESSION
+===========
+
+   Archive::Zip allows each member of a ZIP file to be compressed (using
+the Deflate algorithm) or uncompressed. Other compression algorithms that
+some versions of ZIP have been able to produce are not supported.
+
+   Each member has two compression methods: the one it's stored as (this
+is always COMPRESSION_STORED for string and external file members), and
+the one you desire for the member in the zip file.  These can be
+different, of course, so you can make a zip member that is not compressed
+out of one that is, and vice versa.  You can inquire about the current
+compression and set the desired compression method:
+
+     my $member = $zip->memberNamed( 'xyz.txt' );
+     $member->compressionMethod();    # return current compression
+     # set to read uncompressed
+     $member->desiredCompressionMethod( COMPRESSION_STORED );
+     # set to read compressed
+     $member->desiredCompressionMethod( COMPRESSION_DEFLATED );
+
+   There are two different compression methods:
+
+COMPRESSION_STORED
+     file is stored (no compression)
+
+COMPRESSION_DEFLATED
+     file is Deflated
+
+Compression Levels
+------------------
+
+   If a member's desiredCompressionMethod is COMPRESSION_DEFLATED, you can
+choose different compression levels. This choice may affect the speed of
+compression and decompression, as well as the size of the compressed
+member data.
+
+     $member->desiredCompressionLevel( 9 );
+
+   The levels given can be:
+
+  1. or COMPRESSION_LEVEL_NONE This is the same as saying
+
+          $member->desiredCompressionMethod( COMPRESSION_STORED );
+
+  2. .. 9 1 gives the best speed and worst compression, and 9 gives the
+     best compression and worst speed.
+
+  3. COMPRESSION_LEVEL_FASTEST This is a synonym for level 1.
+
+  4. COMPRESSION_LEVEL_BEST_COMPRESSION This is a synonym for level 9.
+
+  5. COMPRESSION_LEVEL_DEFAULT This gives a good compromise between speed
+     and compression, and is currently equivalent to 6 (this is in the
+     zlib code).
+
+     This is the level that will be used if not specified.
+
+
+Archive::Zip methods
+====================
+
+   The Archive::Zip class (and its invisible subclass
+Archive::Zip::Archive) implement generic zip file functionality.
+
+   Creating a new Archive::Zip object actually makes an
+Archive::Zip::Archive object, but you don't have to worry about this
+unless you're subclassing.
+
+Constructor
+-----------
+
+new( [$fileName] )
+     Make a new, empty zip archive.
+
+          my $zip = Archive::Zip->new();
+
+     If an additional argument is passed, new() will call read() to read
+     the contents of an archive:
+
+          my $zip = Archive::Zip->new( 'xyz.zip' );
+
+     If a filename argument is passed and the read fails for any reason,
+     new will return undef. For this reason, it may be better to call read
+     separately.
+
+Utility Methods
+---------------
+
+   These Archive::Zip methods may be called as functions or as object
+methods. Do not call them as class methods:
+
+     $zip = Archive::Zip->new();
+     $crc = Archive::Zip::computeCRC32( 'ghijkl' );    # OK
+     $crc = $zip->computeCRC32( 'ghijkl' );            # also OK
+
+     $crc = Archive::Zip->computeCRC32( 'ghijkl' );    # NOT OK
+
+Archive::Zip::computeCRC32( $string [, $crc] )
+     This is a utility function that uses the Compress::Zlib CRC routine
+     to compute a CRC-32.
+
+     You can get the CRC of a string:
+
+          $crc = Archive::Zip::computeCRC32( $string );
+
+     Or you can compute the running CRC:
+
+          $crc = 0;
+          $crc = Archive::Zip::computeCRC32( 'abcdef', $crc );
+          $crc = Archive::Zip::computeCRC32( 'ghijkl', $crc );
+
+Archive::Zip::setChunkSize( $number )
+     Change chunk size used for reading and writing.  Currently, this
+     defaults to 32K.  This is not exportable, so you must call it like:
+
+          Archive::Zip::setChunkSize( 4096 );
+
+     or as a method on a zip (though this is a global setting).  Returns
+     old chunk size.
+
+Archive::Zip::setErrorHandler( \&subroutine )
+     Change the subroutine called with error strings.  This defaults to
+     \&Carp::carp, but you may want to change it to get the error strings.
+
+     This is not exportable, so you must call it like:
+
+          Archive::Zip::setErrorHandler( \&myErrorHandler );
+
+     If no error handler is passed, resets handler to default.
+
+     Returns old error handler.
+
+     Note that if you call Carp::carp or a similar routine or if you're
+     chaining to the default error handler from your error handler, you
+     may want to increment the number of caller levels that are skipped
+     (do not just set it to a number):
+
+          $Carp::CarpLevel++;
+
+Accessors
+---------
+
+members()
+     Return a copy of my members array
+
+          my @members = $zip->members();
+
+numberOfMembers()
+     Return the number of members I have
+
+memberNames()
+     Return a list of the (internal) file names of my members
+
+memberNamed( $string )
+     Return ref to member whose filename equals given filename or undef
+
+membersMatching( $regex )
+     Return array of members whose filenames match given regular
+     expression in list context.  Returns number of matching members in
+     scalar context.
+
+          my @textFileMembers = $zip->membersMatching( '.*\.txt' );
+          # or
+          my $numberOfTextFiles = $zip->membersMatching( '.*\.txt' );
+
+diskNumber()
+     Return the disk that I start on.  Not used for writing zips, but
+     might be interesting if you read a zip in.  This had better be 0, as
+     Archive::Zip does not handle multi-volume archives.
+
+diskNumberWithStartOfCentralDirectory()
+     Return the disk number that holds the beginning of the central
+     directory.  Not used for writing zips, but might be interesting if
+     you read a zip in.  This had better be 0, as Archive::Zip does not
+     handle multi-volume archives.
+
+numberOfCentralDirectoriesOnThisDisk()
+     Return the number of CD structures on this disk.  Not used for
+     writing zips, but might be interesting if you read a zip in.
+
+numberOfCentralDirectories()
+     Return the number of CD structures in the whole zip.  Not used for
+     writing zips, but might be interesting if you read a zip in.
+
+centralDirectorySize()
+     Returns central directory size, as read from an external zip file.
+     Not used for writing zips, but might be interesting if you read a zip
+     in.
+
+centralDirectoryOffsetWRTStartingDiskNumber()
+     Returns the offset into the zip file where the CD begins.  Not used
+     for writing zips, but might be interesting if you read a zip in.
+
+zipfileComment( [$string] )
+     Get or set the zipfile comment.  Returns the old comment.
+
+          print $zip->zipfileComment();
+          $zip->zipfileComment( 'New Comment' );
+
+Member Operations
+-----------------
+
+   Various operations on a zip file modify members.  When a member is
+passed as an argument, you can either use a reference to the member
+itself, or the name of a member. Of course, using the name requires that
+names be unique within a zip (this is not enforced).
+
+removeMember( $memberOrName )
+     Remove and return the given member, or match its name and remove it.
+     Returns undef if member name doesn't exist in this Zip.  No-op if
+     member does not belong to this zip.
+
+replaceMember( $memberOrName, $newMember )
+     Remove and return the given member, or match its name and remove it.
+     Replace with new member.  Returns undef if member name doesn't exist
+     in this Zip.
+
+          my $member1 = $zip->removeMember( 'xyz' );
+          my $member2 = $zip->replaceMember( 'abc', $member1 );
+          # now, $member2 (named 'abc') is not in $zip,
+          # and $member1 (named 'xyz') is, having taken $member2's place.
+
+extractMember( $memberOrName [, $extractedName ] )
+     Extract the given member, or match its name and extract it.  Returns
+     undef if member doesn't exist in this Zip.  If optional second arg is
+     given, use it as the name of the extracted member. Otherwise, the
+     internal filename of the member is used as the name of the extracted
+     file or directory.
+
+     All necessary directories will be created.
+
+     Returns AZ_OK on success.
+
+extractMemberWithoutPaths( $memberOrName [, $extractedName ] )
+     Extract the given member, or match its name and extract it.  Does not
+     use path information (extracts into the current directory).  Returns
+     undef if member doesn't exist in this Zip.  If optional second arg is
+     given, use it as the name of the extracted member (its paths will be
+     deleted too).  Otherwise, the internal filename of the member (minus
+     paths) is used as the name of the extracted file or directory.
+
+     Returns AZ_OK on success.
+
+addMember( $member )
+     Append a member (possibly from another zip file) to the zip file.
+     Returns the new member.  Generally, you will use addFile(),
+     addDirectory(), addString(), or read() to add members.
+
+          # Move member named 'abc' to end of zip:
+          my $member = $zip->removeMember( 'abc' );
+          $zip->addMember( $member );
+
+addFile( $fileName [, $newName ] )
+     Append a member whose data comes from an external file, returning the
+     member or undef.  The member will have its file name set to the name
+     of the external file, and its desiredCompressionMethod set to
+     COMPRESSION_DEFLATED.  The file attributes and last modification time
+     will be set from the file.
+
+     If the name given does not represent a readable plain file or
+     symbolic link, undef will be returned.
+
+     The text mode bit will be set if the contents appears to be text (as
+     returned by the -T perl operator).
+
+     The optional second argument sets the internal file name to something
+     different than the given $fileName.
+
+addString( $stringOrStringRef [, $name] )
+     Append a member created from the given string or string reference.
+     The name is given by the optional second argument.  Returns the new
+     member.
+
+     The last modification time will be set to now, and the file
+     attributes will be set to permissive defaults.
+
+          my $member = $zip->addString( 'This is a test', 'test.txt' );
+
+addDirectory( $directoryName [, $fileName ] )
+     Append a member created from the given directory name.  The directory
+     name does not have to name an existing directory.  If the named
+     directory exists, the file modification time and permissions are set
+     from the existing directory, otherwise they are set to now and
+     permissive default permissions.  The optional second argument sets
+     the name of the archive member (which defaults to $directoryName)
+
+     Returns the new member.
+
+contents( $memberOrMemberName [, $newContents ] )
+     Returns the uncompressed data for a particular member, or undef.
+
+          print "xyz.txt contains " . $zip->contents( 'xyz.txt' );
+
+     Also can change the contents of a member:
+
+          $zip->contents( 'xyz.txt', 'This is the new contents' );
+
+writeToFileNamed( $fileName )
+     Write a zip archive to named file.  Returns AZ_OK on success.
+
+     Note that if you use the same name as an existing zip file that you
+     read in, you will clobber ZipFileMembers.  So instead, write to a
+     different file name, then delete the original.
+
+          my $status = $zip->writeToFileNamed( 'xx.zip' );
+          die "error somewhere" if $status != AZ_OK;
+
+writeToFileHandle( $fileHandle [, $seekable] )
+     Write a zip archive to a file handle.  Return AZ_OK on success.
+
+     The optional second arg tells whether or not to try to seek backwards
+     to re-write headers.  If not provided, it is set by testing
+     seekability. This could fail on some operating systems, though.
+
+          my $fh = IO::File->new( 'someFile.zip', 'w' );
+          $zip->writeToFileHandle( $fh );
+
+     If you pass a file handle that is not seekable (like if you're writing
+     to a pipe or a socket), pass a false as the second argument:
+
+          my $fh = IO::File->new( '| cat > somefile.zip', 'w' );
+          $zip->writeToFileHandle( $fh, 0 );   # fh is not seekable
+
+read( $fileName )
+     Read zipfile headers from a zip file, appending new members.  Returns
+     AZ_OK or error code.
+
+          my $zipFile = Archive::Zip->new();
+          my $status = $zipFile->read( '/some/FileName.zip' );
+
+MEMBER OPERATIONS
+=================
+
+Class Methods
+-------------
+
+   Several constructors allow you to construct members without adding them
+to a zip archive.
+
+   These work the same as the addFile(), addDirectory(), and addString()
+zip instance methods described above, but they don't add the new members
+to a zip.
+
+Archive::Zip::Member->newFromString( $stringOrStringRef [, $fileName] )
+     Construct a new member from the given string. Returns undef on error.
+
+          my $member = Archive::Zip::Member->newFromString( 'This is a test',
+                                                           'xyz.txt' );
+
+newFromFile( $fileName )
+     Construct a new member from the given file. Returns undef on error.
+
+          my $member = Archive::Zip::Member->newFromFile( 'xyz.txt' );
+
+newDirectoryNamed( $directoryName )
+     Construct a new member from the given directory.  Returns undef on
+     error.
+
+          my $member = Archive::Zip::Member->newDirectoryNamed( 'CVS/' );
+
+Simple accessors
+----------------
+
+   These methods get (and/or set) member attribute values.
+
+versionMadeBy()
+     Gets the field from my member header.
+
+fileAttributeFormat( [$format] )
+     Gets or sets the field from the member header.  These are `FA_*'
+     values.
+
+versionNeededToExtract()
+     Gets the field from my member header.
+
+bitFlag()
+     Gets the general purpose bit field from my member header.  This is
+     where the `GPBF_*' bits live.
+
+compressionMethod()
+     Returns my compression method. This is the method that is currently
+     being used to compress my data.
+
+     This will be COMPRESSION_STORED for added string or file members, or
+     any of the `COMPRESSION_*' values for members from a zip file.
+     However, this module can only handle members whose data is in
+     COMPRESSION_STORED or COMPRESSION_DEFLATED format.
+
+desiredCompressionMethod( [$method] )
+     Get or set my desiredCompressionMethod This is the method that will
+     be used to write.  Returns prior desiredCompressionMethod.
+
+     Only COMPRESSION_DEFLATED or COMPRESSION_STORED are valid arguments.
+
+     Changing to COMPRESSION_STORED will change my desiredCompressionLevel
+     to 0; changing to COMPRESSION_DEFLATED will change my
+     desiredCompressionLevel to COMPRESSION_LEVEL_DEFAULT.
+
+desiredCompressionLevel( [$method] )
+     Get or set my desiredCompressionLevel This is the method that will be
+     used to write.  Returns prior desiredCompressionLevel.
+
+     Valid arguments are 0 through 9, COMPRESSION_LEVEL_NONE,
+     COMPRESSION_LEVEL_DEFAULT, COMPRESSION_LEVEL_BEST_COMPRESSION, and
+     COMPRESSION_LEVEL_FASTEST.
+
+     0 or COMPRESSION_LEVEL_NONE will change the desiredCompressionMethod
+     to COMPRESSION_STORED. All other arguments will change the
+     desiredCompressionMethod to COMPRESSION_DEFLATED.
+
+fileName()
+     Get or set my internal filename.  Returns the (possibly new) filename.
+
+     Names will have backslashes converted to forward slashes, and will
+     have multiple consecutive slashes converted to single ones.
+
+lastModFileDateTime()
+     Return my last modification date/time stamp in MS-DOS format.
+
+lastModTime()
+     Return my last modification date/time stamp, converted to unix
+     localtime format.
+
+          print "Mod Time: " . scalar( localtime( $member->lastModTime() ) );
+
+setLastModFileDateTimeFromUnix()
+     Set my lastModFileDateTime from the given unix time.
+
+          $member->setLastModFileDateTimeFromUnix( time() );
+
+internalFileAttributes()
+     Return the internal file attributes field from the zip header.  This
+     is only set for members read from a zip file.
+
+externalFileAttributes()
+     Return member attributes as read from the ZIP file.  Note that these
+     are NOT UNIX!
+
+unixFileAttributes( [$newAttributes] )
+     Get or set the member's file attributes using UNIX file attributes.
+     Returns old attributes.
+
+          my $oldAttribs = $member->unixFileAttributes( 0666 );
+
+     Note that the return value has more than just the file permissions,
+     so you will have to mask off the lowest bits for comparisions.
+
+localExtraField( [$newField] )
+     Gets or sets the extra field that was read from the local header.
+     This is not set for a member from a zip file until after the member
+     has been written out.
+
+     The extra field must be in the proper format.
+
+cdExtraField( [$newField] )
+     Gets or sets the extra field that was read from the central directory
+     header.
+
+     The extra field must be in the proper format.
+
+extraFields()
+     Return both local and CD extra fields, concatenated.
+
+fileComment( [$newComment] )
+     Get or set the member's file comment.
+
+hasDataDescriptor()
+     Get or set the data descriptor flag.  If this is set, the local
+     header will not necessarily have the correct data sizes. Instead, a
+     small structure will be stored at the end of the member data with
+     these values.
+
+     This should be transparent in normal operation.
+
+crc32()
+     Return the CRC-32 value for this member.  This will not be set for
+     members that were constructed from strings or external files until
+     after the member has been written.
+
+crc32String()
+     Return the CRC-32 value for this member as an 8 character printable
+     hex string.  This will not be set for members that were constructed
+     from strings or external files until after the member has been
+     written.
+
+compressedSize()
+     Return the compressed size for this member.  This will not be set for
+     members that were constructed from strings or external files until
+     after the member has been written.
+
+uncompressedSize()
+     Return the uncompressed size for this member.
+
+isEncrypted()
+     Return true if this member is encrypted.  The Archive::Zip module
+     does not currently create or extract encrypted members.
+
+isTextFile( [$flag] )
+     Returns true if I am a text file.  Also can set the status if given
+     an argument (then returns old state).  Note that this module does not
+     currently do anything with this flag upon extraction or storage.
+     That is, bytes are stored in native format whether or not they came
+     from a text file.
+
+isBinaryFile()
+     Returns true if I am a binary file.  Also can set the status if given
+     an argument (then returns old state).  Note that this module does not
+     currently do anything with this flag upon extraction or storage.
+     That is, bytes are stored in native format whether or not they came
+     from a text file.
+
+extractToFileNamed( $fileName )
+     Extract me to a file with the given name.  The file will be created
+     with default modes.  Directories will be created as needed.
+
+     Returns AZ_OK on success.
+
+isDirectory()
+     Returns true if I am a directory.
+
+Low-level member data reading
+-----------------------------
+
+   It is possible to use lower-level routines to access member data
+streams, rather than the extract* methods and contents().
+
+   For instance, here is how to print the uncompressed contents of a
+member in chunks using these methods:
+
+     my ( $member, $status, $bufferRef );
+     $member = $zip->memberNamed( 'xyz.txt' );
+     $member->desiredCompressionMethod( COMPRESSION_STORED );
+     $status = $member->rewindData();
+     die "error $status" if $status != AZ_OK;
+     while ( ! $member->readIsDone() )
+     {
+         ( $bufferRef, $status ) = $member->readChunk();
+         die "error $status" if $status != AZ_OK;
+         # do something with $bufferRef:
+         print $$bufferRef;
+     }
+     $member->endRead();
+
+readChunk( [$chunkSize] )
+     This reads the next chunk of given size from the member's data stream
+     and compresses or uncompresses it as necessary, returning a reference
+     to the bytes read and a status.  If size argument is not given,
+     defaults to global set by Archive::Zip::setChunkSize.  Status is
+     AZ_OK on success. Returns `( \$bytes, $status)'.
+
+          my ( $outRef, $status ) = $self->readChunk();
+          print $$outRef if $status != AZ_OK;
+
+rewindData()
+     Rewind data and set up for reading data streams or writing zip files.
+     Can take options for `inflateInit()' or `deflateInit()', but this
+     isn't likely to be necessary.  Subclass overrides should call this
+     method.  Returns AZ_OK on success.
+
+endRead()
+     Reset the read variables and free the inflater or deflater.  Must be
+     called to close files, etc.
+
+     Returns AZ_OK on success.
+
+readIsDone()
+     Return true if the read has run out of data or errored out.
+
+contents()
+     Return the entire uncompressed member data or undef in scalar context.
+     When called in array context, returns `( $string, $status )'; status
+     will be AZ_OK on success:
+
+          my $string = $member->contents();
+          # or
+          my ( $string, $status ) = $member->contents();
+          die "error $status" if $status != AZ_OK;
+
+     Can also be used to set the contents of a member (this may change the
+     class of the member):
+
+          $member->contents( "this is my new contents" );
+
+extractToFileHandle( $fh )
+     Extract (and uncompress, if necessary) my contents to the given file
+     handle.  Return AZ_OK on success.
+
+Archive::Zip::FileMember methods
+================================
+
+   The Archive::Zip::FileMember class extends Archive::Zip::Member.  It is
+the base class for both ZipFileMember and NewFileMember classes.  This
+class adds an `externalFileName' and an fh member to keep track of the
+external file.
+
+externalFileName()
+     Return my external filename.
+
+fh()
+     Return my read file handle.  Automatically opens file if necessary.
+
+Archive::Zip::ZipFileMember methods
+===================================
+
+   The Archive::Zip::ZipFileMember class represents members that have been
+read from external zip files.
+
+diskNumberStart()
+     Returns the disk number that my local header resides in. Had better
+     be 0.
+
+localHeaderRelativeOffset()
+     Returns the offset into the zip file where my local header is.
+
+dataOffset()
+     Returns the offset from the beginning of the zip file to my data.
+
+AUTHOR
+======
+
+   Ned Konz, perl@bike-nomad.com
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000 Ned Konz. All rights reserved.  This program is free
+software; you can redistribute it and/or modify it under the same terms as
+Perl itself.
+
+SEE ALSO
+========
+
+   *Note Compress/Zlib: Compress/Zlib,
+
+
+File: pm.info,  Node: Archive/Zip/Tree,  Next: Argv,  Prev: Archive/Zip,  Up: Module List
+
+methods for adding/extracting trees using Archive::Zip
+******************************************************
+
+NAME
+====
+
+   Archive::Zip::Tree - methods for adding/extracting trees using
+Archive::Zip
+
+SYNOPSIS
+========
+
+     use Archive::Zip;
+     use Archive::Zip::Tree;
+     my $zip = Archive::Zip->new();
+     # add all readable files and directories below . as xyz/*
+     $zip->addTree( '.', 'xyz' );
+     # add all readable plain files below /abc as /def/*
+     $zip->addTree( '/abc', '/def', sub { -f && -r } );
+     # add all .c files below /tmp as stuff/*
+     $zip->addTreeMatching( '/tmp', 'stuff', '\.c$' );
+     # add all .o files below /tmp as stuff/* if they aren't writable
+     $zip->addTreeMatching( '/tmp', 'stuff', '\.o$', sub { ! -w } );
+     # and write them into a file
+     $zip->writeToFile('xxx.zip');
+
+     # now extract the same files into /tmpx
+     $zip->extractTree( 'stuff', '/tmpx' );
+
+METHODS
+=======
+
+$zip->addTree( $root, $dest [,$pred] )
+     $root is the root of the tree of files and directories to be added
+
+     $dest is the name for the root in the zip file (undef or blank means
+     to use relative pathnames)
+
+     `$pred' is an optional subroutine reference to select files: it is
+     passed the name of the prospective file or directory using $_, and if
+     it returns true, the file or directory will be included.  The default
+     is to add all readable files and directories.
+
+     For instance, using
+
+          my $pred = sub { /\.txt/ };
+          $zip->addTree( '.', '.', $pred );
+
+     will add all the .txt files in and below the current directory, using
+     relative names, and making the names identical in the zipfile:
+
+          original name           zip member name
+          ./xyz                   xyz
+          ./a/                    a/
+          ./a/b                   a/b
+
+     To use absolute pathnames, just pass them in:
+
+     $zip->addTree( '/a/b', '/a/b' );
+
+          original name           zip member name
+          /a/                     /a/
+          /a/b                    /a/b
+
+     To translate relative to absolute pathnames, just pass them in:
+
+     $zip->addTree( '.', '/c/d' );
+
+          original name           zip member name
+          ./xyz                   /c/d/xyz
+          ./a/                    /c/d/a/
+          ./a/b                   /c/d/a/b
+
+     To translate absolute to relative pathnames, just pass them in:
+
+     $zip->addTree( '/c/d', 'a' );
+
+          original name           zip member name
+          /c/d/xyz                a/xyz
+          /c/d/a/                 a/a/
+          /c/d/a/b                a/a/b
+
+     Returns AZ_OK on success.
+
+     Note that this will not follow symbolic links to directories.
+
+     Note also that this does not check for the validity of filenames.
+
+$zip->addTreeMatching( $root, $dest, $pattern [,$pred] )
+     $root is the root of the tree of files and directories to be added
+
+     $dest is the name for the root in the zip file (undef means to use
+     relative pathnames)
+
+     $pattern is a (non-anchored) regular expression for filenames to match
+
+     $pred is an optional subroutine reference to select files: it is
+     passed the name of the prospective file or directory in $_, and if it
+     returns true, the file or directory will be included.  The default is
+     to add all readable files and directories.
+
+     To add all files in and below the current dirctory whose names end in
+     `.pl', and make them extract into a subdirectory named `xyz', do this:
+
+          $zip->addTreeMatching( '.', 'xyz', '\.pl$' )
+
+     To add all writable files in and below the dirctory named `/abc'
+     whose names end in `.pl', and make them extract into a subdirectory
+     named `xyz', do this:
+
+          $zip->addTreeMatching( '/abc', 'xyz', '\.pl$', sub { -w } )
+
+     Returns AZ_OK on success.
+
+     Note that this will not follow symbolic links to directories.
+
+$zip->extractTree( $root, $dest )
+     Extracts all the members below a given root. Will translate that root
+     to a given dest pathname.
+
+     For instance,
+
+          $zip->extractTree( '/a/', 'd/e/' );
+
+     when applied to a zip containing the files:  /a/x /a/b/c /d/e
+
+     will extract:  /a/x to d/e/x  /a/b/c to d/e/b/c
+
+     and ignore /d/e
+
+AUTHOR
+======
+
+   Ned Konz, perl@bike-nomad.com
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000 Ned Konz. All rights reserved.  This program is free
+software; you can redistribute it and/or modify it under the same terms as
+Perl itself.
+
+SEE ALSO
+========
+
+   *Note Compress/Zlib: Compress/Zlib, *Note Archive/Zip: Archive/Zip,
+
+
+File: pm.info,  Node: Argv,  Next: Array/Compare,  Prev: Archive/Zip/Tree,  Up: Module List
+
+Provide an O-O interface to an ARGV
+***********************************
+
+NAME
+====
+
+   Argv - Provide an O-O interface to an ARGV
+
+SYNOPSIS
+========
+
+     use Argv;
+
+     # A roundabout way of getting perl's version.
+     my $pl = Argv->new(qw(perl -v));
+     $pl->exec;
+
+     # Run /bin/cat, showing how to provide "predigested" options.
+     Argv->new('/bin/cat', [qw(-u -n)], @ARGV)->system;
+
+     # A roundabout way of globbing.
+     my $echo = Argv->new(qw(echo M*));
+     $echo->glob;
+     my $globbed = $echo->qx;
+     print "'echo M*' globs to: $globbed";
+
+     # A demonstration of the builtin xargs-like behavior.
+     my @files = split(/\s+/, $globbed);
+     my $ls = Argv->new(qw(ls -d -l), @files);
+     $ls->parse(qw(d l));
+     $ls->dbglevel(1);
+     $ls->qxargs(1);
+     my @long = $ls->qx;
+     $ls->dbglevel(0);
+     print @long;
+
+     # A demonstration of how to use option sets in a wrapper program.
+     @ARGV = qw(Who -a -y foo -r);	# hack up an @ARGV
+     my $who = Argv->new(@ARGV);		# instantiate
+     $who->dbglevel(1);			# set verbosity
+     $who->optset(qw(UNAME FOO WHO));	# define 3 option sets
+     $who->parseUNAME(qw(a m n p));	# parse these to set UNAME
+     $who->parseFOO(qw(y=s z));		# parse -y and -z to FOO
+     $who->parseWHO('r');		# for the 'who' cmd
+     warn "got -y flag in option set FOO\n" if $who->flagFOO('y');
+     print Argv->new('uname', $who->optsUNAME)->qx;
+     $who->prog(lc $who->prog);		# force $0 to lower case
+     $who->exec(qw(WHO));		# exec the who cmd
+
+   More advanced examples can be lifted from the test script or the
+./examples subdirectory.
+
+RAISON D'ETRE
+=============
+
+   This module presents an O-O approach to command lines, allowing you to
+instantiate an 'argv object', manipulate it, and eventually run it, e.g.:
+
+     my $ls = Argv->new('ls', ['-l']));
+     my $rc = $ls->system;	# or $ls->exec or $ls->qx
+
+   Which raises the immediate question - what value does this mumbo-jumbo
+add over Perl's native support, e.g.:
+
+     my $rc = system(qw(ls -l));
+
+   The answer comes in a few parts:
+
+   * STRUCTURE
+
+     First, Argv recognizes the underlying property of an arg vector, which
+     is that it begins with a program name potentially followed by options,
+     then operands. An Argv object factors a raw argv into these three
+     groups, provides accessor methods to allow operations on each group
+     independently, and can then put them back together for execution.
+
+   * OPTION SETS
+
+     Second, Argv encapsulates and extends Getopt::Long to allow parsing
+     of the argv's options into different *option sets*. This is useful in
+     the case of wrapper programs which may, for instance, need to parse
+     out one set of flags to direct the behavior of the wrapper itself,
+     extract a different set and pass them to program X, another for
+     program Y, then exec program Z with the remainder.  Doing this kind
+     of thing on a basic @ARGV using indexing and splicing is do-able but
+     leads to spaghetti code and potential off-by-one errors.
+
+   * EXTRA FEATURES
+
+     The *execution methods* `system, exec, and qx' extend their Perl
+     builtin analogues in a few ways, for example:
+
+       1. An xargs-like capability without shell intervention.
+
+       2. UNIX-like exec() behavior on Windows.
+
+       3. Automatic quoting of `system()' on Win32 and `qx()' everywhere
+
+       4. Automatic globbing (primarily for Windows)
+
+       5. Automatic chomping.
+
+       6. Pathname normalization.
+          All of these behaviors can be toggled, either as class or
+instance attributes. See EXECUTION ATTRIBUTES below.
+
+DESCRIPTION
+===========
+
+   An Argv object treats a command line as 3 separate entities: the
+program, the options, and the args. The options may be futher subdivided
+into user-defined *option sets* by use of the `optset' method. When one of
+the *execution methods* is called, the parts are reassmbled into a single
+list and passed to the underlying Perl execution function.
+
+   Compare this with the way Perl works natively, keeping the 0th element
+of the argv in $0 and the rest in `@ARGV'.
+
+   By default there's one option set, known as the *anonymous option set*,
+whose name is the null string. All parsed options go there.  The advanced
+user can define more option sets, parse options into them according to
+Getopt::Long-style descriptions, query or set the parsed values, and then
+reassemble them in any way desired at exec time.  Declaring an option set
+automatically generates a set of methods for manipulating it (see below).
+
+   All argument-parsing within Argv is done via Getopt::Long.
+
+AUTOLOADING
+===========
+
+   Argv employs the same technique made famous by the Shell module to
+allow any command name to be used as a method. E.g.
+
+     $obj->date->exec;
+
+   will run the 'date' command. Internally this is translated into
+
+     $obj->argv('date')->exec;
+
+FUNCTIONAL INTERFACE
+====================
+
+   Because the extensions to `system/exec/qx' described here may be useful
+in writing portable programs, they're made available for export as
+traditional functions. Thus:
+
+     use Argv qw(system exec qv);
+
+   will override the Perl builtins. There's no way to override the
+operator `qx()' so an alias `qv()' is provided.
+
+CONSTRUCTOR
+===========
+
+     my $obj = Argv->new(@list)
+
+   The `@list' is what will be parsed/executed/etc by subsequent method
+calls. During initial construction, the first element of the list is
+separated off as the program; the rest is lumped together as part of the
+args until and unless option parsing is done, in which case matched
+options are shifted into collectors for their various *option sets*. You
+can also create a "predigested" instance by passing any or all of the
+prog, opt, or arg parts as array refs. E.g.
+
+     Argv->new([qw(cvs ci)], [qw(-l -n)], qw(file1 file2 file3));
+
+   Predigested options are placed in the default (anonymous) option set.
+
+   The constructor can be used as a class or instance method. In the
+latter case the new object is a deep (full) clone of its progenitor.  In
+fact 'clone' is aliased to 'new', allowing clones to be created via:
+
+     my $copy = $orig->clone;
+
+   The first argument to new() or clone() can be a hash-ref, which will be
+used to set *execution attributes* at construction time. I.e.:
+
+     my $obj = Argv->new({autochomp => 1, stderr => 0}, @ARGV);
+
+   you may choose to add the command line later:
+
+     my $obj = Argv->new;
+     $obj->prog('cat');
+     $obj->args('/etc/motd');
+
+   Or
+
+     my $obj = Argv->new({autochomp=>1});
+     my $motd = $obj->argv(qw(cat /etc/motd))->qx;
+
+   Or (using the autoloading interface)
+
+     my $motd = $obj->cat('/etc/motd')->qx;
+
+METHODS
+=======
+
+INSTANCE METHODS
+----------------
+
+   * prog()
+
+     Returns or sets the name of the program (the `"argv[0]"'). This can be
+     a list, e.g. `qw(rcs co)' or an array reference.
+
+   * opts()
+
+     Returns or sets the list of operands (aka arguments). As above, it may
+     be passed a list or an array reference. This is simply the member of
+     the class of optsNAME() methods (see below) whose <NAME> is null;
+     it's part of the predefined *anonymous option set*.
+
+   * args()
+
+     Returns or sets the list of operands (aka arguments).  If called in a
+     void context and without args, the effect is to set the list of
+     operands to `()'.
+
+   * optset(<list-of-set-names>);
+
+     For each name NAME in the parameter list, an *option set* of that
+     name is declared and 3 new methods are registered dynamically:
+     `parse*NAME*(), opts*NAME*(), and flagNAME()'. These methods are
+     described below: note that the *anonymous option set* (see *OPTION
+     SETS*) is predefined, so the methods `parse(), opts(), and flag()' are
+     always available.  Most users won't need to define any other sets.
+     Note that option-set names are forced to upper case. E.g.:
+
+          $obj->optset('FOO');
+
+   * parseNAME(...option-descriptions...)
+
+     Takes a list of option descriptions and uses
+     Getopt::Long::GetOptions() to parse them out of the current argv *and
+     into option set NAME*.  The opt-descs are exactly as supported by
+     parseFOO() are exactly the same as those described for Getopt::Long,
+     except that no linkage argument is allowed. E.g.:
+
+          $obj->parseFOO(qw(file=s list=s@ verbose));
+
+   * optsNAME()
+
+     Returns or sets the list of options in the *option set NAME*.
+
+   * flagNAME()
+
+     Sets or gets the value of a flag in the appropriate optset, e.g.:
+
+          print "blah blah blah\n" if $obj->flagFOO('verbose');
+          $obj->flagFOO('verbose' => 1);
+
+   * extract
+
+     Takes an *optset* name and a list of option descs; creates the named
+     optset, extracts any of the named options, places them in the
+     specified optset, and returns them.
+
+   * quote(@list)
+
+     Protects the argument list against exposure to a shell by quoting each
+     element. This method is invoked automatically by the system method on
+     Windows platforms, where the underlying system primitive always uses
+     a shell, and by the *qx* method on all platforms since it invokes a
+     shell on all platforms.
+
+     The automatic use of quote can be turned off via the *autoquote*
+     method (see).
+
+     IMPORTANT: this method quotes its argument list *in place*. In other
+     words, it may modify its arguments.
+
+   * glob
+
+     Expands the argument list using the Perl glob builtin. Primarily
+     useful on Windows where the invoking shell does not do this for you.
+
+     Automatic use of glob on Windows can be enabled via the *autoglob*
+     method (vide infra).
+
+EXECUTION METHODS
+-----------------
+
+   The three methods below are direct analogues of the Perl builtins.
+They simply reassemble a command line from the prog, *opts*, and args
+parts according to the option-set rules described below and invoke their
+builtin equivalent on it.
+
+   * system([<optset-list>])
+
+     Reassembles the argv and invokes system(). Return value and value of
+     $?, $!, etc. are just as described in *perlfunc/"system"*
+
+     Arguments to this method determine which of the parsed option-sets
+     will be used in the executed argv. If passed no arguments,
+     `$obj->system' uses the value of the 'dfltsets' attribute as the list
+     of desired sets.  The default value of 'dfltsets' is the anonymous
+     option set.
+
+     An option set may be requested by passing its name (with an optional
+     leading '+') or explicitly rejected by using its name with a leading
+     '-'. Thus, given the existence of option sets *ONE, TWO, and THREE*,
+     the following are legal:
+
+          $obj->system;			# use the anonymous set only
+          $obj->system('+');			# use all option sets
+          $obj->system(qw(ONE THREE);		# use sets ONE and THREE
+
+     The following sequence would also use sets ONE and THREE.
+
+          $obj->dfltsets({ONE => 1, THREE => 1});
+          $obj->system;
+
+     while this would use all parsed options:
+
+          $obj->dfltsets({'+' => 1});
+          $obj->system;
+
+     and this would set the default to none class-wide, and then use it:
+
+          $obj->dfltsets({'-' => 1});
+          $obj->system;
+
+     By default the `$obj->system' method autoquotes its arguments *iff*
+     the platform is Windows and the arguments are a list, because in this
+     case a shell is always used. This behavior can be toggled with
+     `$obj->autoquote'.  *Note: if and when Perl 5.6 fixes this "bug",
+     Argv will be changed to examine the value of $]*.
+
+   * exec()
+
+     Similar to system above, but never returns. On Windows, it blocks
+     until the new process finishes for a more UNIX-like behavior than the
+     exec implemented by the C runtime library on Windows, if the
+     *execwait* attribute is set. This is actually implemented as
+
+          exit $obj->system(LIST);
+
+     and thus all system shell-quoting issues apply
+
+     Option sets are handled as described in system above.
+
+   * qx()
+
+     Same semantics as described in *perlfunc/"qx"* but has the capability
+     to process only a set number of arguments at a time to avoid exceeding
+     the shell's line-length limit. This value is settable with the
+     *qxargs* method.
+
+     Also, if *autoquote* is set the arguments are quoted to protect them
+     against the platform-standard shell *on all platforms*.
+
+     Option sets are handled as described in system above.
+
+EXECUTION ATTRIBUTES
+--------------------
+
+   The behavior of the *execution methods* `system, exec, and qx' is
+governed by a set of *execution attributes*, which are in turn manipulated
+via a set of eponymous methods. These methods are auto-generated and thus
+share certain common characteristics:
+
+   * Translucency
+
+     They can all be invoked as class or instance methods.  If used as an
+     instance method the attribute is set only on that object; if used on
+     the class it sets or gets the default for all instances which haven't
+     overridden it.  This is inspired by the section on *translucent
+     attributes* in Tom Christiansen's *perltootc* tutorial.
+
+   * Class Defaults
+
+     Each attribute has a default which may be overridden with an
+     environment variable by prepending the class name, e.g.
+     ARGV_QXARGS=256 or ARGV_STDERR=0;
+
+   * Context Sensitivity
+
+     The attribute value is always a scalar. If a value is passed it
+     becomes the new value of the attribute and the object or class is
+     returned. If no value is passed *and there is a valid return
+     context*, the current value is returned. In a void context with no
+     parameter, the attribute value is set to 1.
+
+   * Stickiness
+
+     A subtlety: if an *execution attribute* is set in a void context, that
+     attribute is *"sticky"*, i.e. it retains its state until explicitly
+     changed. But if *a new value is provided* and the context is not void,
+     the new value is *temporary*. It lasts until the next *execution
+     method* (`system, exec, or qx') invocation, after which the previous
+     value is restored. This feature allows locutions like this:
+
+          $obj->cmd('date')->stderr(1)->system;
+
+     Assuming that the $obj object already exists and has a set of
+     attributes; we can override one of them at execution time.  More
+     examples:
+
+          $obj->stdout(1);          # set attribute, sticky
+          $obj->stdout;             # same as above
+          $foo = $obj->stdout;      # get attribute value
+          $obj2 = $obj->stdout(1);  # set to 1 (temporary), return $obj
+
+   * autochomp
+
+     All data returned by the `qx' method is chomped first. Unset by
+     default.
+
+   * autofail
+
+     When set, the program will exit immediately if the system or `qx'
+     methods detect a nonzero status. Unset by default.
+
+     Autofail may also be given a code-ref, in which case that function
+     will be called upon error. This provides a basic "exception-handling"
+     system:
+
+          $obj->autofail(sub { print "caught an exception\n"; exit 17 });
+
+     Any failed executions by $obj will call `handler()'. Alternatively,
+     if the reference provided is an array-ref, the first element of that
+     array is assumed to be a code-ref as above and the rest of the array
+     is passed as args to the function on failure.
+
+   * syfail,qxfail
+
+     Similar to `autofail' but apply only to `system()' or `qx()'
+     respectively. Unset by default.
+
+   * autoglob
+
+     If set, the `glob()' function is applied to the operands
+     (`$obj->args') on Windows only. Unset by default.
+
+   * autoquote
+
+     If set, the operands are automatically quoted against shell expansion
+     before `system()' on Windows and `qx()' on all platforms (since `qx'
+     always invokes a shell, and `system()' always does so on Windows).
+     Set by default.
+
+   * dbglevel
+
+     Sets the debug level. Level 0 (the default) is no debugging, 1 prints
+     each command before executing it, and higher levels offer
+     progressively more output.
+
+   * dfltsets
+
+     Sets and/or returns the default set of *option sets* to be used in
+     building up the command line at execution time.  The default-default
+     is the *anonymous option set*. *Note: this method takes a *hash
+     reference* as its optional argument and returns a hash ref as well*.
+     The selected sets are represented by the hash keys; the values are
+     meaningless.
+
+   * execwait
+
+     If set, `$obj->exec' on Windows blocks until the new process is
+     finished for a more consistent UNIX-like behavior than the traditional
+     Win32 Perl port. Perl just uses the Windows exec() routine, which runs
+     the new process in the background. Set by default.
+
+   * inpathnorm
+
+     If set, normalizes pathnames to their native format just before
+     executing. This is set by default on Windows only, thus converting
+     /x/y/z to \x\y\z.
+
+   * outpathnorm
+
+     If set, normalizes pathnames returned by the `qx' method from
+     \-delimited to /-delimited. This is NOT set by default; even when set
+     it's a no-op except on Windows.
+
+   * noexec
+
+     Analogous to the -n flag to make; prints what would be executed
+     without executing anything.
+
+   * qxargs
+
+     You can set a maximum number of arguments to be processed at a time,
+     allowing you to blithely invoke e.g. `$obj->qx' on a list of any size
+     without fear of exceeding your shell's limits. A per-platform default
+     is set; this method allows it to be changed. A value of 0 suppresses
+     the behavior.
+
+   * syxargs
+
+     Analogous to *qxargs* but applies to `system()' and is turned off by
+     default. The reason is that `qx()' is typically used to read data
+     whereas `system()' is more often used to make stateful changes.
+     Consider that "ls foo bar" produces the same result if broken up into
+     "ls foo" and "ls bar" but the same cannot be said for "mv foo bar".
+
+   * stdout
+
+     Setting this attribute to 0, e.g:
+
+          $obj->stdout(0);
+
+     causes STDOUT to be closed during invocation of any of the *execution
+     methods* `system, exec, and qx', and restored when they finish. A
+     fancy (and portable) way of saying `1>/dev/null' without needing a
+     shell. A value of 2 is the equivalent of `1>&2'.
+
+   * stderr
+
+     As above, for STDERR. A value of 1 is the equivalent of `2>&1':
+
+          @alloutput = $obj->stderr(1)->qx;
+
+   * attropts
+
+     The attributes above can be set via method calls (e.g.
+     `$obj->dbglevel(1)') or environment variables (ARGV_DBGLEVEL=1). Use
+     of the <$obj->attropts> method allows them to be parsed from the
+     command line as well, e.g. *myscript -/dbglevel 1*. If invoked as a
+     class method it causes options of the same names as the methods above
+     to be parsed (and removed) from the current `@ARGV' and set as class
+     attributes.  As an instance method it parses and potentially depletes
+     the current argument vector of that object, and sets instance
+     attributes only. E.g.:
+
+          Argv->attropts;
+
+     would cause the script to parse the following command line:
+
+          script -/noexec 1 -/dbglevel=2 -flag1 -flag2 arg1 arg2 arg3 ...
+
+     so as to remove the `-/noexec 1 -/dbglevel 2' and set the two class
+     attrs.  The `-/' prefix is chosen to prevent conflicts with "real"
+     flags. Abbreviations are allowed as long as they're unique within the
+     set of -/ flags. Whereas
+
+          $obj->attropts;
+
+     would parse the current value of `$obj->args' and run
+
+          $obj->foo(1);
+
+     for every instance of `-/foo=1' found there.
+
+PORTING
+=======
+
+   This module is known to work on Solaris 2.5-7 and Windows NT 4.0SP3-5,
+and with perl 5.004_04 and 5.005_03.  As these two platforms are quite
+different, there should be no *major* portability issues, but please send
+bug reports or patches to the address below.
+
+BUGS
+====
+
+   Argv uses `Getopt::Long::Configure()' to modify configurable parameters
+in order to do some advanced option parsing with Getopt::Long.
+Unfortunately, older versions of Getopt::Long offer no way to set those
+parameters back the way they were; they can only be set to their default
+values. Therefore, when using Getopt::Long 2.23 or above Argv will restore
+prior settings but with older versions it will reset them to their
+defaults instead.  This may lead to confusing behavior if the using code
+also calls `Getopt::Long::Configure()'.
+
+AUTHOR
+======
+
+   David Boyce <dsb@world.std.com>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1999,2000 David Boyce. All rights reserved.  This Perl
+program is free software; you may redistribute and/or modify it under the
+same terms as Perl itself.
+
+SEE ALSO
+========
+
+   perl(1), Getopt::Long(3), IPC::ChildSafe(3)
+
+

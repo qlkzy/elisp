@@ -1,0 +1,1432 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: HTTPD/Authen,  Next: HTTPD/Bench/ApacheBench,  Prev: HTTP/WebTest,  Up: Module List
+
+HTTP server authentication class
+********************************
+
+NAME
+====
+
+   HTTPD::Authen - HTTP server authentication class
+
+SYNOPSIS
+========
+
+     use HTTPD::Authen ();
+
+DESCRIPTION
+===========
+
+   This module provides methods for authenticating a user.  It uses
+HTTPD::UserAdmin to lookup passwords in a database.  Subclasses provide
+methods specific to the authentication mechanism.
+
+   Currently, under HTTP/1.0 the only supported authentication mechanism is
+Basic Authentication.  NCSA Mosaic and NCSA HTTPd understand the proposed
+Message Digest Authentication, which should make it into the HTTP spec
+someday.  This module supports both.
+
+METHODS
+=======
+
+new ()
+------
+
+   Since HTTPD::Authen uses HTTPD::UserAdmin for database lookups it needs
+many of the same attributes.  Or, if the first argument passed to the
+new() object constructor is a reference to an HTTPD::UserAdmin, the
+attributes are inherited.
+
+   The following attributes are recognized from HTTPD::UserAdmin:
+
+   *DBType*, DB, Server, Path, *DBMF*, Encrypt
+
+   And if you wish to query an SQL server: Host, User, Auth, Driver,
+*UserTable*, *NameField*, *PasswordField*
+
+   The same defaults are assumed for these attributes, as in
+HTTPD::UserAdmin.  See *HTTPD::UserAdmin* for details.
+
+     $authen = new HTTPD::Authen (DB => "www-users");
+     
+     =head2 basic()
+
+   Short-cut to return an HTTPD::Authen::Basic object.
+
+     $basic = $authen->basic;
+
+digest()
+--------
+
+   Short-cut to return an HTTPD::Authen::Digest object.
+
+     $digest = $authen->digest;
+
+type($authorization_header_value)
+---------------------------------
+
+   This method will guess the authorization scheme based on the
+'Authorization' header value, and return an object bless into that
+scheme's class.
+
+   By using this method, it is simple to authenticate a user without even
+knowing what scheme is being used:
+
+     $authtype = HTTPD::Authen->type($authinfo);
+     @info = $authtype->parse($authinfo)
+     if( $authtype->check(@info) ) {
+         #response 200 OK, etc.
+     }
+
+SUBCLASSES
+==========
+
+HTTPD::Authen::Basic methods
+new([$hashref])
+---------------
+
+   $hashref should be an HTTPD::Authen object, it must be present when
+looking up users.  Optionally, you can pass the attribute USER with the
+value of an HTTPD::UserAdmin object.
+
+   Normally, this method is not called directly, but rather by
+HTTPD::Authen->basic method.
+
+parse ($authorization_header_value)
+-----------------------------------
+
+   This method expects the value of the HTTP 'Authorization' header of type
+Basic.  This should look something like:
+
+     'Basic ZG91Z206anN0NG1l'
+
+   This string will be parsed and decoded, returning the username and
+password.  Note that the *MIME::Base64* module is required for decoding.
+
+     ($username,$password) = HTTPD::Authen::Basic->parse($authinfo)
+     
+     #or, assuming $authen is an HTTPD::Authen object
+     ($username,$password) = $authen->basic->parse($authinfo)
+
+     #or check the info at the same time
+     $OK = $authen->check($authen->basic->parse($authinfo))
+
+check($username,$password)
+--------------------------
+
+   This method expects a username and *clear text* password as arguments.
+Returns true if the username was found, and passwords match, otherwise
+returns false.
+
+     if($authen->check("JoeUser", "his_clear_text_password")) {
+     	print "Well, the passwords match at least\n";
+     }
+     else {
+     	print "Password mismatch! Intruder alert! Intruder alert!\n";
+     }
+
+HTTPD::Authen::Digest methods
+     NOTE: The MD5 module is required to use these methods.
+
+new([$hashref])
+---------------
+
+   $hashref should be an HTTPD::Authen object.  Normally, this method is
+not called directly, but rather by HTTPD::Authen->digest method.
+
+parse ($authorization_header_value)
+-----------------------------------
+
+   This method expects the value of the HTTP 'Authorization' header of type
+Basic.  This should look something like:
+
+     Digest username="JoeUser", realm="SomePlace", nonce="826407380", uri="/test/blah.html", response="0306f29f88690fb9203451556c376ae9", opaque="5e09061a062a271c8fcc686c5be90c2a"
+
+   This method returns a hash ref containing all Name = Value pairs from
+the header.
+
+     $mda = HTTPD::Authen::Digest->parse($authinfo);
+
+     #or, assuming $authen is an HTTPD::Authen object
+     $mda = $authen->digest->parse($authinfo)
+
+     #or check the info at the same time
+     $OK = $authen->check($authen->digest->parse($authinfo))
+
+check ($hashref[, $request [, $seconds [, $client_ip ]]])
+---------------------------------------------------------
+
+   This method expects a hashref of Name Value pairs normally found in the
+'Authorization' header.  With this argument alone, the method will return
+true without checking nonce or the opaque string if the client 'response'
+checksum matches ours.
+
+   If $request is present, it must be a hashref or an HTTP::Request
+method.  From here, we fetch the request uri and request method.
+Otherwise, we default to the value of 'uri' present in $hashref, and 'GET'
+for the method.
+
+   If $seconds is present, the value of 'nonce' will be checked, returning
+false if it is stale.
+
+   If $client_ip is present, the value of the 'opaque' string will be
+checked, returning false if the string is not valid.
+
+   This implementation is based on the Digest Access Authentication
+internet-draft http://hopf.math.nwu.edu/digestauth/draft.rfc and NCSA's
+implementation http://hoohoo.ncsa.uiuc.edu/docs/howto/md5_auth.html
+
+SEE ALSO
+========
+
+   HTTPD::UserAdmin, MD5, HTTP::Request, MIME::Base64
+
+AUTHOR
+======
+
+   Doug MacEachern <dougm@osf.org>
+
+   Copyright (c) 1996, Doug MacEachern, OSF Research Institute
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: HTTPD/Bench/ApacheBench,  Next: HTTPD/GroupAdmin,  Prev: HTTPD/Authen,  Up: Module List
+
+Perl API for Apache benchmarking and regression testing.
+********************************************************
+
+NAME
+====
+
+   HTTPD::Bench::ApacheBench - Perl API for Apache benchmarking and
+regression testing.
+
+SYNOPSIS
+========
+
+     use HTTPD::Bench::ApacheBench;
+
+     my $b = HTTPD::Bench::ApacheBench->new;
+
+     # global configuration
+     $b->concurrency(5);
+     $b->priority("run_priority");
+
+     # add HTTP request sequences (aka: runs)
+     my $run1 = HTTPD::Bench::ApacheBench::Run->new
+       ( urls => ["http://localhost/one", "http://localhost/two"] );
+     $b->add_run($run1);
+
+     my $run2 = HTTPD::Bench::ApacheBench::Run->new
+       ( urls    => ["http://localhost/three", "http://localhost/four"],
+         cookies => ["Login_Cookie=b3dcc9bac34b7e60;"],
+         order   => "depth_first",
+         repeat  => 10,
+         memory  => 2 );
+     $b->add_run($run2);
+
+     # send HTTP request sequences to server and time responses
+     my $ro = $b->execute;
+
+     # calculate hits/sec
+     print (1000*$b->total_requests/$b->total_time)." req/sec\n";
+
+     # show request times (in ms) for $run1, 1st repetition
+     print join(', ', @{$run1->request_times}) . "\n";
+
+     # show response times (in ms) for $run2, 7th repetition
+     print join(', ', @{$run2->iteration(6)->response_times}) . "\n";
+
+     # dump the entire regression object (WARNING, this could be a LOT OF DATA)
+     use Data::Dumper;
+     my $d = Data::Dumper->new([$ro]);
+     print $d->Dumpxs;
+
+GOALS
+=====
+
+   This project is meant to be the foundation of a complete benchmarking
+and regression testing suite for an advanced, transaction-based mod_perl
+site.  We need to be able to stress our server to its limit while also
+having a way to verify the HTTP responses for correctness.  Since our site
+is transaction-based (as opposed to content-based), we needed to extend
+the single-URL ab model to a multiple-URL sequence model.
+
+   ApacheBench is based on the Apache 1.3.12 ab code (src/support/ab.c).
+
+   Note: although this tool was designed to be used on an Apache mod_perl
+site, it is generally applicable to any HTTP-compliant server.  Beware,
+however, that it sends a high volume of HTTP requests in a very short
+period of time, which may overwhelm some weaker HTTP server platforms like
+NT/IIS.
+
+DESCRIPTION
+===========
+
+   ApacheBench sends sequences of HTTP requests to an HTTP server and keeps
+track of the time taken to receive a response, the data that was returned,
+the size of the data that was returned, and various other bits of
+information.
+
+   Since it is implemented in C, it sends HTTP requests in a tight loop
+which can stress your server to 100% capacity, especially if invoked in
+multiple concurrent instances.  It gives accurate time measurements down
+to the millisecond for each HTTP request-response interval.
+
+   Included is a simplified re-implementation of ab using the ApacheBench
+Perl API.  This should help get you started with ApacheBench.
+
+CONFIGURATION METHODS
+=====================
+
+   You need to tell ApacheBench what the requests will be, in what order to
+send them, and how to prioritize sending them.  ApacheBench was designed
+to simulate many users logged in simultaneously, each of whom may be doing
+many different transactions at once.
+
+Global configuration
+--------------------
+
+   Global configuration methods apply to all benchmarking runs associated
+with this ApacheBench object.
+
+$b = HTTPD::Bench::ApacheBench->new()
+     Constructor.  Takes no arguments.
+
+$b->concurrency( $concur_level )
+     Number of requests to send simultaneously (default: 1)
+
+$b->priority( $priority )
+     $priority can be either "*equal_opportunity*" or "*run_priority*".
+
+     If set to "*equal_opportunity*", all benchmark runs that are
+     configured (see below) under this ApacheBench object are given equal
+     access to the concurrency level.  This means requests are taken from
+     each run and sent in parallel (the level of parallelism defined by
+     concurrency()).
+
+     If set to "*run_priority*", the benchmark runs that are configured
+     first get the highest priority.  This means all requests in
+     $b->run(0) will be sent before any requests in $b->run(1) are sent, if
+     $b->run(0)->order eq "*breadth_first*" (see below).
+
+     (default: "*equal_opportunity*")
+
+$b->repeat( $n )
+     The number of times to repeat the request sequence in each run.  This
+     can be overridden on a per-run basis (see below).
+
+     (default: 1)
+
+$b->buffersize( $bufsz )
+     The maximum size of the buffer in which to store HTTP response bodies.
+     If an HTTP response is received with a size larger than this limit,
+     the content is truncated at length $bufsz, and a warning is issued.
+     This method has no effect if $b->memory() < 3.  This can be
+     overridden on a per-run basis (see below).
+
+     (default: *16384*)
+
+$b->memory( $memlvl )
+     The memory level.  Controls how much data ApacheBench will remember
+     and return in the regression object.  This can be overridden on a
+     per-run basis (see below).
+
+     (default: 1)
+
+     Key:  $memlvl => Description
+
+          0  =>  Remember nothing. (actually still keeps global
+                 regression data: total_time, bytes_received,
+                 and warnings)
+
+          1  =>  Remember connect/response times and minimal
+                 summary information about size of requests and
+                 responses.
+
+          2  =>  Remember connect/response times and all
+                 information about size of requests and responses.
+                 Also keeps an array of all HTTP response
+                 headers returned by the server for each request.
+
+          3  =>  Remember connect/response times, all information
+                 about request/response sizes, HTTP response
+                 headers, and also all content of every HTTP
+                 response returned by the server.  Warning:
+                 this can quickly eat up all available main
+                 memory if used with large runs.
+
+$b->add_run( $run_object )
+     Schedule a run for this ApacheBench object.  Returns the run number
+     where this object was inserted, or undef on failure.  See below for
+     details on $run_object.
+
+$r = $b->run( $run_no, [$run_object] )
+     Returns the run object stored in location $run_no.  If a run object
+     is passed as the optional second argument, it is stored in location
+     $run_no, displacing whatever was there.  The displaced run object is
+     then returned.
+
+$b->delete_run( $run_no )
+     Delete the run object stored in location $run_no.  The deleted run
+     object is returned to the caller for safety sake.
+
+Run configuration methods
+-------------------------
+
+   You need to configure one or more benchmark runs.  Each run is defined
+as an ordered sequence of HTTP requests to be sent to the server, which can
+be repeated multiple times, and scheduled to be sent in different orders.
+
+$r = HTTPD::Bench::ApacheBench::Run->new( { urls => [@url_list] } )
+     Construct a run object with the ordered sequence of HTTP requests in
+     @url_list.
+
+$r->repeat( $n )
+     Number of times to repeat this request sequence.
+
+     (default: 1, or whatever is specified in global configuration)
+
+$r->cookies( \@cookies )
+     Set the HTTP Cookie: header for each *repetition* of this run.
+     Length of @cookies should equal $n (whatever you set $r->repeat to).
+     If this option is omitted, no cookies will be sent in any of the
+     requests for this run.
+
+     Example usage:  You could simulate $n users all doing the same
+     transaction simultaneously by giving $n different login cookies here.
+     Say you have login cookies in an array called @login of length $n.
+     Set $r->repeat($n), $r->order("breadth_first"), $r->cookies([map
+     {$login[$_]} 0..$n]), and ApacheBench will perform the transaction
+     sequence set by $r->urls $n times each with a separate login cookie.
+
+$r->urls( \@url_list )
+     Set the HTTP request URLs for this run.  A @url_list must be given for
+     each run, otherwise the run will not execute.  Typically @url_list is
+     set using the constructor.
+
+$r->postdata( \@postdata )
+     Set the HTTP POST request body contents.  If an undef value is
+     encountered in @postdata, that request will be a GET request.  If
+     this option is omitted, all requests for this run will be GET
+     requests.  Length of @postdata should equal the length of @url_list.
+
+$r->content_types( \@ctypes )
+     Set the Content-type: header for each POST request in this run.
+     Default is "application/x-www-form-urlencoded" which will be used if
+     an undef value is encountered in @ctypes.  Length of @ctypes should
+     equal the length of @url_list.
+
+$r->order( $order )
+     Either "*depth_first*" or "*breadth_first*"
+
+     "*breadth_first*" mode sends $n of the first request in the
+     @url_list, then $n of the second request in the @urls_list, then $n
+     of the third... and so on.  (e.g. If $n == 3 and @url_list contains
+     two requests, then ApacheBench would send the first request 3 times,
+     and then the second request 3 times.)
+
+     "*depth_first*" mode ensures that HTTP requests in the sequence are
+     sent in order, completing a full sequence before starting again for
+     the next repeat() iteration.  (e.g. If $n == 3 and @url_list contains
+     two requests, then ApacheBench would send the @url_list sequence in
+     order, then send it again, and then again.  A total of six requests
+     would be sent.)
+
+     (default: "*breadth_first*")
+
+     Note: if $r->repeat() == 1, or the length of $r->urls() is 1, then the
+     order option has no effect
+
+$r->buffersize( $bufsz )
+     The maximum size of the buffer in which to store HTTP response bodies.
+     If an HTTP response is received with a size larger than this limit,
+     the content is truncated at length $bufsz, and a warning is issued.
+     This method has no effect if $r->memory() < 3.
+
+     (default: *16384*, or whatever is specified in global configuration)
+
+$r->memory( $memlvl )
+     The memory level.  Controls how much data ApacheBench will remember
+     and return in the regression object for this run.  See global
+     configuration method of same name for detailed description.
+
+     (default: 1, or whatever is specified in global configuration)
+
+EXECUTION METHODS
+=================
+
+$b->execute
+     Send all scheduled runs to their respective destinations, and record
+     response data.
+
+REGRESSION METHODS
+==================
+
+   All of the following methods will return undef unless the underlying
+ApacheBench object has been execute()'d at least once.
+
+Global regression methods
+-------------------------
+
+$b->total_time
+     Total time, in milliseconds, between the start of the first request
+     in the first run, and the end of the final response in the final run.
+
+$b->bytes_received
+     Total bytes received from all responses in all runs.
+
+$b->warnings
+     Various warning messages.
+
+Run regression methods
+----------------------
+
+$i = $r->iteration( [$iter_no] )
+     Return a regression object specific to iteration $iter_no of this run.
+     If $iter_no is not given, it assumes 0, or the first iteration of the
+     run.
+
+$i->connect_times
+     Return a reference to an array the same length as $r->urls() which
+     contains connection times, in milliseconds, for each HTTP request in
+     this iteration of the sequence.
+
+$i->min_connect_time
+     The minimum connect time of all requests in the sequence.
+
+$i->max_connect_time
+     The maximum connect time of all requests in the sequence.
+
+$i->avg_connect_time
+     The average connect time of all requests in the sequence.
+
+$i->sum_connect_time
+     The total connect time of all requests in the sequence (equal to the
+     summation of all elements of $i->connect_times).
+
+$i->request_times
+     A reference to an array the same length as $r->urls() which contains
+     the total times taken to send a request to the server, in
+     milliseconds, for each HTTP request in the sequence.
+
+$i->min_request_time
+     The minimum request time of all requests in the sequence.
+
+$i->max_request_time
+     The maximum request time of all requests in the sequence.
+
+$i->avg_request_time
+     The average request time of all requests in the sequence.
+
+$i->sum_request_time
+     The total request time of all requests in the sequence (equal to the
+     summation of all elements of $i->request_times).
+
+$i->response_times
+     A reference to an array the same length as $r->urls() which contains
+     the total times taken to receive a response from the server, in
+     milliseconds, for each HTTP request in the sequence.
+
+$i->min_response_time
+     The minimum response time of all requests in the sequence.
+
+$i->max_response_time
+     The maximum response time of all requests in the sequence.
+
+$i->avg_response_time
+     The average response time of all requests in the sequence.
+
+$i->sum_response_time
+     The total response time of all requests in the sequence (equal to the
+     summation of all elements of $i->response_times).
+
+$i->bytes_posted
+     A reference to an array the same length as $r->urls() which contains
+     the number of bytes posted to the server for each HTTP request in the
+     sequence.
+
+     (return value will be undefined if memory < 2)
+
+$i->sum_bytes_posted
+     The total number of bytes posted to the server in HTTP requests over
+     this iteration of the request sequence.
+
+$i->bytes_read
+     A reference to an array the same length as $r->urls() which contains
+     the total number of bytes read from the server in each HTTP response
+     in the sequence.
+
+     (return value will be undefined if memory < 2)
+
+$i->sum_bytes_read
+     The total number of bytes read from the server in HTTP responses over
+     this iteration of the request sequence.
+
+$i->response_headers
+     A reference to an array the same length as $r->urls() which contains
+     the HTTP response headers returned by the server for each URL in the
+     sequence.
+
+     (return value will be undefined if memory < 2)
+
+$i->response_body
+     A reference to an array the same length as $r->urls() which contains
+     the full page content (including HTTP headers) returned by the server
+     for each URL in the sequence.
+
+     (return value will be undefined if memory < 3)
+
+$i->response_body_lengths
+     A reference to an array the same length as $r->urls() which contains
+     the length of the document (in bytes) returned from the server in
+     each HTTP response in the sequence.  This should be equivalent to the
+     Content-Length: line in the response headers, if the server set them
+     correctly.  The following should also be true, for 1 <= $j <=
+     size($r->urls()):
+
+     ( $i->response_body_lengths()->[$j] == $i->bytes_read()->[$j] -
+     length($i->headers()->[$j]) )
+
+     (return value will be undefined if memory < 2)
+
+EXAMPLES
+========
+
+   The following examples of ApacheBench usage are paired with the
+resulting output from an Apache access_log.  This should give you a feel
+for how the global $b->priority() method and the per-run $r->order()
+method affect how HTTP requests are sent.
+
+   First, let's set $b->priority("*equal_opportunity*") (its default).
+
+     my $b = HTTPD::Bench::ApacheBench->new;
+     $b->concurrency(1);
+     $b->priority("equal_opportunity");
+
+   Add a single run and execute, then look at what gets sent to Apache.
+
+     my $r = HTTPD::Bench::ApacheBench::Run->new
+       ({
+          repeat    => 3,
+          urls      => [ "http://localhost/",
+                         "http://localhost/server-status" ],
+          order     => "breadth_first",
+        });
+     $b->add_run($r);
+     $b->execute;
+
+   Apache access_log output:
+
+     127.0.0.1 - - [20/Sep/2000:18:43:32 -0400] "GET / HTTP/1.0" 200 5565
+     127.0.0.1 - - [20/Sep/2000:18:43:32 -0400] "GET / HTTP/1.0" 200 5565
+     127.0.0.1 - - [20/Sep/2000:18:43:32 -0400] "GET / HTTP/1.0" 200 5565
+     127.0.0.1 - - [20/Sep/2000:18:43:32 -0400] "GET /server-status HTTP/1.0" 200 5294
+     127.0.0.1 - - [20/Sep/2000:18:43:32 -0400] "GET /server-status HTTP/1.0" 200 5294
+     127.0.0.1 - - [20/Sep/2000:18:43:32 -0400] "GET /server-status HTTP/1.0" 200 5294
+
+   Let's add another run and execute, and see what Apache sees.
+
+     my $r2 = HTTPD::Bench::ApacheBench::Run->new
+       ({
+          repeat       => 3,
+          urls         => [ "http://localhost/perl-status",
+                            "http://localhost/proxy-status" ],
+          order        => "breadth_first",
+        });
+     $b->add_run($r2);
+     $b->execute;
+
+   Notice that both the first and second runs get equal opportunity.
+Apache access_log output:
+
+     127.0.0.1 - - [20/Sep/2000:18:49:10 -0400] "GET / HTTP/1.0" 200 5565
+     127.0.0.1 - - [20/Sep/2000:18:49:11 -0400] "GET / HTTP/1.0" 200 5565
+     127.0.0.1 - - [20/Sep/2000:18:49:11 -0400] "GET / HTTP/1.0" 200 5565
+     127.0.0.1 - - [20/Sep/2000:18:49:11 -0400] "GET /perl-status HTTP/1.0" 200 848
+     127.0.0.1 - - [20/Sep/2000:18:49:11 -0400] "GET /perl-status HTTP/1.0" 200 848
+     127.0.0.1 - - [20/Sep/2000:18:49:11 -0400] "GET /perl-status HTTP/1.0" 200 848
+     127.0.0.1 - - [20/Sep/2000:18:49:11 -0400] "GET /server-status HTTP/1.0" 200 5294
+     127.0.0.1 - - [20/Sep/2000:18:49:11 -0400] "GET /server-status HTTP/1.0" 200 5294
+     127.0.0.1 - - [20/Sep/2000:18:49:11 -0400] "GET /server-status HTTP/1.0" 200 5294
+     127.0.0.1 - - [20/Sep/2000:18:49:11 -0400] "GET /proxy-status HTTP/1.0" 200 5886
+     127.0.0.1 - - [20/Sep/2000:18:49:11 -0400] "GET /proxy-status HTTP/1.0" 200 5888
+     127.0.0.1 - - [20/Sep/2000:18:49:11 -0400] "GET /proxy-status HTTP/1.0" 200 5889
+
+   Now let's set $b->priority("*run_priority*").
+
+     $b->priority("run_priority");
+     $b->execute;
+
+   Notice that now ApacheBench completes the entire first run before it
+starts the second.  Here's the Apache access_log output:
+
+     127.0.0.1 - - [20/Sep/2000:18:52:47 -0400] "GET / HTTP/1.0" 200 5565
+     127.0.0.1 - - [20/Sep/2000:18:52:47 -0400] "GET / HTTP/1.0" 200 5565
+     127.0.0.1 - - [20/Sep/2000:18:52:47 -0400] "GET / HTTP/1.0" 200 5565
+     127.0.0.1 - - [20/Sep/2000:18:52:47 -0400] "GET /server-status HTTP/1.0" 200 5294
+     127.0.0.1 - - [20/Sep/2000:18:52:47 -0400] "GET /server-status HTTP/1.0" 200 5294
+     127.0.0.1 - - [20/Sep/2000:18:52:47 -0400] "GET /server-status HTTP/1.0" 200 5294
+     127.0.0.1 - - [20/Sep/2000:18:52:47 -0400] "GET /perl-status HTTP/1.0" 200 848
+     127.0.0.1 - - [20/Sep/2000:18:52:47 -0400] "GET /perl-status HTTP/1.0" 200 848
+     127.0.0.1 - - [20/Sep/2000:18:52:47 -0400] "GET /perl-status HTTP/1.0" 200 848
+     127.0.0.1 - - [20/Sep/2000:18:52:47 -0400] "GET /proxy-status HTTP/1.0" 200 5858
+     127.0.0.1 - - [20/Sep/2000:18:52:47 -0400] "GET /proxy-status HTTP/1.0" 200 5861
+     127.0.0.1 - - [20/Sep/2000:18:52:47 -0400] "GET /proxy-status HTTP/1.0" 200 5864
+
+   Let's now set our runs to $r->order("*depth_first*") instead of
+"*breadth_first*".  With "*depth_first*", $b->priority() has no effect,
+since each run can only use a maximum of one concurrent server (by
+definition of "*depth_first*", it can only be sending one request at a
+time).
+
+     $b->run(0)->order("depth_first");
+     $b->run(1)->order("depth_first");
+     $b->execute;
+
+   Notice each sequence gets sent in full before it repeats.  Apache
+access_log output:
+
+     127.0.0.1 - - [20/Sep/2000:19:02:01 -0400] "GET / HTTP/1.0" 200 5565
+     127.0.0.1 - - [20/Sep/2000:19:02:01 -0400] "GET /server-status HTTP/1.0" 200 5294
+     127.0.0.1 - - [20/Sep/2000:19:02:01 -0400] "GET / HTTP/1.0" 200 5565
+     127.0.0.1 - - [20/Sep/2000:19:02:01 -0400] "GET /server-status HTTP/1.0" 200 5294
+     127.0.0.1 - - [20/Sep/2000:19:02:01 -0400] "GET / HTTP/1.0" 200 5565
+     127.0.0.1 - - [20/Sep/2000:19:02:01 -0400] "GET /server-status HTTP/1.0" 200 5294
+     127.0.0.1 - - [20/Sep/2000:19:02:01 -0400] "GET /perl-status HTTP/1.0" 200 848
+     127.0.0.1 - - [20/Sep/2000:19:02:01 -0400] "GET /proxy-status HTTP/1.0" 200 5858
+     127.0.0.1 - - [20/Sep/2000:19:02:01 -0400] "GET /perl-status HTTP/1.0" 200 848
+     127.0.0.1 - - [20/Sep/2000:19:02:01 -0400] "GET /proxy-status HTTP/1.0" 200 5860
+     127.0.0.1 - - [20/Sep/2000:19:02:01 -0400] "GET /perl-status HTTP/1.0" 200 848
+     127.0.0.1 - - [20/Sep/2000:19:02:01 -0400] "GET /proxy-status HTTP/1.0" 200 5860
+
+   Now let's send the same runs, but with a higher concurrency level.
+
+     $b->concurrency(2);
+     $b->execute;
+
+   Notice that ApacheBench sends requests from all runs in order to fill up
+the specified level of concurrent requests.  Apache access_log output:
+
+     127.0.0.1 - - [20/Sep/2000:19:04:38 -0400] "GET / HTTP/1.0" 200 5565
+     127.0.0.1 - - [20/Sep/2000:19:04:38 -0400] "GET /perl-status HTTP/1.0" 200 848
+     127.0.0.1 - - [20/Sep/2000:19:04:38 -0400] "GET /server-status HTTP/1.0" 200 5294
+     127.0.0.1 - - [20/Sep/2000:19:04:38 -0400] "GET /proxy-status HTTP/1.0" 200 5891
+     127.0.0.1 - - [20/Sep/2000:19:04:38 -0400] "GET / HTTP/1.0" 200 5565
+     127.0.0.1 - - [20/Sep/2000:19:04:38 -0400] "GET /perl-status HTTP/1.0" 200 848
+     127.0.0.1 - - [20/Sep/2000:19:04:38 -0400] "GET /server-status HTTP/1.0" 200 5294
+     127.0.0.1 - - [20/Sep/2000:19:04:38 -0400] "GET /proxy-status HTTP/1.0" 200 5878
+     127.0.0.1 - - [20/Sep/2000:19:04:38 -0400] "GET / HTTP/1.0" 200 5565
+     127.0.0.1 - - [20/Sep/2000:19:04:38 -0400] "GET /perl-status HTTP/1.0" 200 848
+     127.0.0.1 - - [20/Sep/2000:19:04:38 -0400] "GET /server-status HTTP/1.0" 200 5294
+     127.0.0.1 - - [20/Sep/2000:19:04:38 -0400] "GET /proxy-status HTTP/1.0" 200 5878
+
+   Let's take a look at the regression data from that last execute() call.
+
+     foreach my $run (0..1) {
+       foreach my $repeat (0..2) {
+         print "response times (in ms) for run $run, iteration ".($repeat+1).":\n  ";
+         print join("\n  ", @{$b->run($run)->iteration($repeat)->response_times});
+         print "\n";
+       }
+     }
+
+   Perl output:
+
+     response times (in ms) for run 0, iteration 1:
+       69
+       39
+     response times (in ms) for run 0, iteration 2:
+       67
+       39
+     response times (in ms) for run 0, iteration 3:
+       65
+       41
+     response times (in ms) for run 1, iteration 1:
+       67
+       40
+     response times (in ms) for run 1, iteration 2:
+       66
+       39
+     response times (in ms) for run 1, iteration 3:
+       65
+       39
+
+BUGS
+====
+
+   Error checking is getting better but is still not great.  If you do not
+configure correctly, you may experience a segmentation fault on execute().
+
+   The response body of any response which is larger than the *buffersize*
+applicable to it will be truncated to zero length.  This is contrary to
+what the documentation says above.  This should be fixed soon.  For now,
+just set your $r->buffersize() big enough for the largest page you
+anticipate receiving.
+
+   Methods total_requests(), total_requests_sent(), and
+total_responses_received() are temporary hacks that are correct most of
+the time, but not always.
+
+   If you are running in perl's taint-checking mode, and you pass tainted
+data to ApacheBench (e.g. a tainted URL), it will barf.  Don't ask me why.
+
+   It has not been tested on any platforms other than Linux / Apache.
+Please send ports to other platforms to me (Adi Fairbank).
+
+AUTHORS
+=======
+
+   The ApacheBench Perl API is based on code from Apache 1.3.12 ab
+(src/support/ab.c), by the Apache group.
+
+   The ApacheBench Perl API was originally written by Ling Wu
+<ling@certsite.com>
+
+   Rewritten and currently maintained by Adi Fairbank <adi@certsite.com>
+
+   Please e-mail either Adi or Ling with bug reports, or preferably
+patches.
+
+LICENSE
+=======
+
+   This package is free software and is provided AS IS without express or
+implied warranty.  It may be used, redistributed and/or modified under the
+terms of the Perl Artistic License
+(http://www.perl.com/perl/misc/Artistic.html)
+
+LAST MODIFIED
+=============
+
+   Feb 22, 2001
+
+
+File: pm.info,  Node: HTTPD/GroupAdmin,  Next: HTTPD/Realm,  Prev: HTTPD/Bench/ApacheBench,  Up: Module List
+
+Management of HTTP server group databases
+*****************************************
+
+NAME
+====
+
+   HTTPD::GroupAdmin - Management of HTTP server group databases
+
+SYNOPSIS
+========
+
+     use HTTPD::GroupAdmin ();
+
+DESCRIPTION
+===========
+
+   This software is meant to provide a generic interface that hides the
+inconsistencies across HTTP server implementations of user and group
+databases.
+
+METHODS
+=======
+
+new ()
+     Here's where we find out what's different about your server.
+
+     Some examples:
+
+          @DBM = (DBType => 'DBM',
+          	    DB     => '.htgroup',
+          	    Server => 'apache');
+
+          $group = new HTTPD::GroupAdmin @DBM;
+
+     This creates an object whose database is a DBM file named '.htgroup',
+     in a format that the Apache server understands.
+
+          @Text = (DBType => 'Text',
+          	     DB     => '.htgroup',
+          	     Server => 'ncsa');
+
+          $group = new HTTPD::GroupAdmin @Text;
+
+     This creates an object whose database is a plain text file named
+     '.htgroup', in a format that the NCSA server understands.
+
+     Full list of constructor attributes:
+
+     Note: Attribute names are case-insensitive
+
+     Name    - Group name
+
+     *DBType*  - The type of database, one of 'DBM', 'Text', or 'SQL'
+     (Default is 'DBM')
+
+     DB      - The database name (Default is '.htpasswd' for DBM & Text
+     databases)
+
+     Server  - HTTP server name (Default is the generic class, that works
+     with NCSA, Apache and possibly others)
+
+     Note: run 'perl t/support.t matrix' to see what support is currently
+     availible
+
+     Path    - Relative DB files are resolved to this value  (Default is
+     '.')
+
+     Locking - Boolean, Lock Text and DBM files (Default is true)
+
+     Debug   - Boolean, Turn on debug mode
+
+     Specific to DBM files:
+
+     *DBMF*    - The DBM file implementation to use (Default is 'NDBM')
+
+     Flags   - The read, write and create flags.  There are four modes:
+     *rwc* - the default, open for reading, writing and creating.  rw -
+     open for reading and writing.  r - open for reading only.  w - open
+     for writing only.
+
+     Mode    - The file creation mode, defaults to '0644'
+
+     Specific to DBI: We talk to an SQL server via Tim Bunce's DBI
+     interface. For more info see:
+     http://www.hermetica.com/technologia/DBI/
+
+     Host      - Server hostname
+
+     Port      - Server port
+
+     User      - Database login name
+
+     Auth      - Database login password
+
+     Driver    - Driver for DBI  (Default is 'mSQL')
+
+     *GroupTable* - Table with field names below
+
+     *NameField* - Field for the name  (Default is 'user')
+
+     *GroupField* - Field for the group  (Default is 'group')
+
+     From here on out, things should look the same for everyone.
+
+add($username[,$groupname])
+     Add user $username to group $groupname, or whatever the 'Name'
+     attribute is set to.
+
+     Fails if $username exists in the database
+
+          if($group->add('dougm', 'www-group')) {
+          	print "Welcome!\n";
+          }
+
+delete($username[,$groupname])
+     Delete user $username from group $groupname, or whatever the 'Name'
+     attribute is set to.
+
+          if($group->delete('dougm')) {
+          	print "He's gone from the group\n";
+          }
+
+exists($groupname, [$username])
+     True if $groupname is found in the database
+
+          if($group->exists('web-heads')) {
+          	die "oh no!";
+          }
+          if($group->exists($groupname, $username) {
+          	#$username is a member of $groupname
+          }
+
+list([$groupname])
+     Returns a list of group names, or users in a group if '$name' is
+     present.
+
+     @groups = $group->list;
+
+     @users = $group->list('web-heads');
+
+user()
+     Short cut for creating an HTTPD::UserAdmin object.  All applicable
+     attributes are inherited, but can be overridden.
+
+          $user = $group->user();
+
+     (See HTTPD::UserAdmin)
+
+convert(@Attributes)
+     Convert a database.
+
+          #not yet
+
+remove($groupname)
+     Remove group $groupname from the database
+
+name($groupname)
+     Change the value of 'Name' attribute.
+
+          $group->name('bew-ediw-dlrow');
+
+debug($boolean)
+     Turn debugging on or off
+
+lock([$timeout]) =item unlock()
+     These methods give you control of the locking mechanism.
+
+          $group = new HTTPD::GroupAdmin (Locking => 0); #turn off auto-locking
+          $group->lock; #lock the object's database
+          $group->add($username,$passwd); #write while database is locked
+          $group->unlock; release the lock
+
+db($dbname);
+     Select a different database.
+
+          $olddb = $group->db($newdb);
+          print "Now we're reading and writing '$newdb', done with '$olddb'n\";
+
+flags([$flags])
+     Get or set read, write, create flags.
+
+commit
+     Commit changes to disk (for Text files).
+
+SEE ALSO
+========
+
+   HTTPD::UserAdmin(3)
+
+AUTHOR
+======
+
+   Doug MacEachern <dougm@osf.org>
+
+   Copyright (c) 1996, 1997 Doug MacEachern
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: HTTPD/Realm,  Next: HTTPD/RealmManager,  Prev: HTTPD/GroupAdmin,  Up: Module List
+
+Database of HTTPD Security Realms
+*********************************
+
+NAME
+====
+
+   HTTPD::Realm - Database of HTTPD Security Realms
+
+SYNOPSIS
+========
+
+     use HTTPD::Realm;
+
+     # pull out the definition of the "members" realm
+     $realms = new HTTPD::Realm(-config_file=>'/home/httpd/conf/realms.conf');
+     $def = $realms->realm(-realm=>'members');
+
+     # show info about the realm
+     print "realm name = ",     $def->name,"\n";
+     print "user database = ",  $def->userdb,"\n";
+     print "group database = ", $def->groupdb,"\n";
+     print "user type = ",      $def->usertype,"\n";
+     print "group type = ",     $def->grouptype,"\n";
+     print "web server type = ",$def->server,"\n";
+     print "cryptography = ",   $def->crypt,"\n";
+     print "other fields = ",   $def->fields,"\n";
+
+     # Connect to the database for the realm,
+     # returning a HTTPD::RealmManager object.
+     $database = $def->connect(-writable=>1);
+
+DESCRIPTION
+===========
+
+   HTTPD::Realm defines high level security realms to be used in
+conjunction with Apache, Netscape and NCSA Web servers.  You define the
+realms in a central configuration file, and access their underlying
+databases via this module and the HTTPD::RealmManager library.  This
+allows automated tools to change user passwords, groups and other
+information without regard to the underlying database implementation.
+
+   *Important note:* Do not use these modules to adjust the Unix password
+or group files.  They do not have the same format as the Web access
+databases.
+
+CONFIGURATION FILE
+==================
+
+   A typical configuration file is shown below.  It is human readable and
+similar in form to conventional Apache and NCSA HTTPD configuration files.
+Directives are separated from their arguments by white space (tabs or
+spaces), and comments begin with hash marks (#).  By convention, the
+standard configuration file is named "realms.conf", but you can give it
+any name you prefer.
+
+   # realms.conf <Realm main>         Type            text
+Authentication  Basic         Users           /home/httpd/security/passwd
+      Groups          /home/httpd/security/group </Realm>
+
+   <Realm development>         Type            DBM         Authentication
+Basic         Users           /home/httpd/security/devel.passwd
+Groups          /home/httpd/security/devel.group </Realm>
+
+   <Realm members@capricorn.org>         Type            text
+Authentication  Digest         Users           /home/httpd/1.1/passwd
+  Groups          /home/httpd/1.1/group </Realm>
+
+   <Realm subscriptions>         Type            MSQL
+Authentication  Basic         Database        web_accounts@localhost
+ Users           table=users uid=name passwd=pass         Groups
+table=groups group=group 	Fields          Name Age:i Paid:s1
+</Realm>
+
+   realms.conf is made up of one or more <Realm> sections.  The opening
+<Realm> tag must contain the realm's name, which can be any set of
+non-whitespace characters.  Each section contains directives that tells
+the module what type of authentication to use for the realm, what type of
+database to use, and where to find the files or database tables used for
+the realm.  The users and groups defined in one realm are independent of
+those defined in another, giving you a lot of flexibility in setting up
+access control for your site.
+
+   The example shown here defines four different security realms.  The
+first, named "main", uses human readable text files and the Basic
+Authentication protocol.  The second, "development", also uses Basic
+Authentication, but stores users and groups in DBM files rather than in
+text files.  The realm named "members@capricorn.org" uses Digest
+Authentication on top of textfiles.  By convention, Digest realms look
+like e-mail addresses, but you don't have to follow this convention.  The
+last realm definition uses Basic Authentication on top of an mSQL database.
+
+   The directives allowed within a <Realm> section are listed here:
+
+   Directive    *Example Param*        Description  Type           DBM
+         Database type  Authentication Basic             Authentication
+scheme  Users          /etc/httpd/passwd Path to user database  Groups
+   /etc/httpd/group  Path to group database  Database
+www@capricorn.com Location of mSQL db  Server         NCSA
+Type of server  Driver         mSQL              DBI driver  Fields
+name age paid     Additional user fields  Mode           0644
+Mode for new files  Default                          Default realm
+
+Type
+     This directive specifies the database type.  It can be any of "text,"
+     "DBM," "DB," or "SQL."  Although these are the only databases
+     currently recognized by Apache, other Unix DBM-like formats,
+     including "GDBM," and "SDBM" are recognized for future compatibility.
+     You may use "MSQL" as an alias for "SQL."
+
+Authentication
+     This directives specifies the type of authentication to use.  It can
+     be either "Basic" or "Digest."
+
+Users
+     This is the path to the file or database table that holds user names
+     and passwords.  For everything but SQL databases, it's a physical path
+     to a file on your system.  If the database file doesn't exist (and the
+     process has sufficient privileges), it will be created.  For example:
+
+          Users /home/httpd/security/passwd
+
+     For mSQL databases, the value of the directive should have the format:
+
+          Users table=table_name uid=user_field password=password_field
+
+     The value of table is the name of the table in which to look for the
+     user.  The value of uid and password are the fields in which Apache
+     will look for the user ID and password.  For lookup efficiency, the
+     uid field should be defined as the primary key field in mSQL.
+
+     You may optionally place a colon and field width after any of the
+     table names.  These field widths are used as hints by the user_manage
+     script to create a nicely-laid out fill-out form.  If not provided,
+     reasonable defaults are assumed
+
+     Here's an example of a valid directive in which the user ID field is
+     given a width of 40:
+
+          Users table=Members uid=Name:40 password=Pass
+
+     mSQL tables are not created automatically.  You have to define them
+     yourself (using the *msql* application) before using them.
+
+Groups
+     This is the path to the file or database table that holds group
+     assignments.  If you don't need groups, just leave the directive out.
+     For everything but MSQL databases, the argument physical path to a
+     file on your system.  If the database file doesn't exist (and the
+     process has sufficient privileges), it will be created.  For example:
+
+          Groups /home/httpd/security/groups
+
+     For mSQL databases, the directive points to a previously-defined
+     table and field in the database in the format
+
+          Groups table=table_name group=group_field
+
+     The value of table is the name of the table in which to look up the
+     user.  The value of group is the field in which Apache find the group
+     that the user belongs to.  Apache will look for the user name in the
+     same field as declared in the Users directive, so don't declare
+     another uid field here.  You can use the same table for both Users
+     and Groups, or use separate ones.  In the latter case, you can have
+     several records for each user, allowing the one user to belong to
+     multiple groups.
+
+     As for the User directive, you can provide an optional field width for
+     the group field when using mSQL databases.
+
+Database
+     This directive is valid for SQL databases only and indicates where the
+     authentication database can be found.  It should be in the format
+     database@host.  If the hostname is omitted, "localhost" is assumed.
+     For mSQL databases, performance will be much better if database and
+     Web server are on the same machine because in this case, the client
+     and server use a Unix socket to communicate rather than a TCP/IP
+     socket.
+
+Server
+     Web servers differ slightly in the format of the users and groups
+     databases.  This directive indicates which server you are using.
+     Recognized values include "apache", "ncsa", "cern" and "netscape."
+     Example:
+
+          Server cern
+
+     If no server is specified, "apache" is assumed.  If your server is not
+     on this list, try "ncsa".
+
+Driver
+     For SQL databases only, this directive specifies what DBD (database
+     driver) module to use.  It defaults to "mSQL".  You can use any
+     database for which a DBD module is available.  You must also, of
+     course, compile and configure the Web server to correctly use the
+     driver.
+
+Fields
+     This directive lists other fields that can be found in the user table.
+     These fields can then be read and set automatically by the user_manage
+     application.  Note that this works reliably in SQL databases only.
+     Large fields, or fields that contain the "=" character, will fail when
+     applied to text or DBM files.
+
+     This directive expects a list of field names in the format
+     name[:type][width].  The field type and width are hints used by the
+     user_manage application to format the field values correctly.  The
+     type can be one of "i", for an integer value, "s" for a string value
+     and "f" for a floating point number.  If not specified, the field is
+     assumed to be of type string.  The field value must be an integer.
+
+     In this example, we define three fields named "Name", "Age" and
+     "Paid".  The first is a string value of default length.  The second is
+     an integer.  The third is a string of length one (it's assumed to be a
+     "Y" or "N"):
+
+          Fields	Name Age:i Paid:s1
+
+     Other fields may be present in the database.  The Fields directive
+     tells the user_manage script which fields should be made visible to
+     the user interface.
+
+Mode
+     This directive sets the mode that Realm.pm will use to create the
+     database files, if it needs to.  The mode should be in octal form.
+     This value can be overriden with the -mode argument in the connect()
+     method.  The default is 0644 (-rw-r-r-).
+
+Default
+     If this directive is present, the current realm becomes the default to
+     use when no realm is explicitly indicated.  If no section in the
+     configuration file contains this directive, the first defined realm
+     becomes the default.  It is a fatal error for Default to appear in
+     more than one section.
+
+CLASSES
+=======
+
+   There are two closely tied classes in Realm.pm.  HTTPD::Realm parses
+the configuration file, maintains lists of realms, responds to inquiries
+about realms, and opens up connections to realms' underlying databases.
+HTTPD::RealmDef defines the object that holds information about a
+particular realm.
+
+HTTPD::Realm METHODS
+====================
+
+new()
+          $realms = HTTPD::Realm->new(-config=>'/path/to/config/file');
+
+     Create a new set of realm definitions from the given configuration
+     file.
+
+exists()
+          $exists = $realms->exists(-realm=>'subscribers');
+
+     Returns true if the named realm exists.  Otherwise returns undef.
+     Arguments:
+
+          -realm    Name of the realm.
+
+     An alternative form is to use the name of the realm without the named
+     argument:
+
+          $exists = $realms->exists('subscribers');
+
+list()
+          @realms = $realms->list();
+
+     Returns the list of realm names defined in the configuration file.
+
+realm()
+          $realmdef = $realms->realm(-realm=>'subscribers');
+
+     Returns the RealmDef object that defines the realm.  See the
+     discussion below for more details.  An alternative form is to use the
+     name of the realm alone:
+
+          $realmdef = $realms->realm('subscribers');
+
+connect()
+          $database = $realms->connect(-realm=>'subscribers',
+                                       -writable=>1,
+                                       -mode=>0600);
+
+     Connect to the named realm, returning a database handle (actually, a
+     RealmManager object). Recognized named arguments are:
+
+          -realm     Name of the realm.
+          -mode      Mode with which to create file, if necessary.
+          -writable  Whether this realm is to be writable.
+
+     By default, realms are opened read-only.  If you choose to open it for
+     writing, you can provide a mode for creting the file, overriding the
+     mode defined in the configuration file.  If the realm is not listed in
+     the configuration file, this routine returns undef.
+
+HTTPD::RealmDef METHODS
+=======================
+
+new()
+          $realmdef = HTTPD::RealmDef->new('subscribers');
+
+     Create a new RealmDef and assign it a name.  This method is usually
+     called internally.
+
+name()
+          $name = $realmdef->name();
+
+     Return the name of this realm.
+
+userdb()
+          $userdata = $realmdef->userdb();
+
+     Return the path to the user database defined in the configuration
+     file.  For non-SQL databases, this is the path to the database or text
+     file.  For SQL databases, this is the table and field definition line.
+     You can get a pre-parsed version of this information using SQLdata(),
+     see below.
+
+groupdb()
+          $groupdata = $realmdef->groupdb();
+
+     Return the path to the group database defined in the configuration
+     file.  For non-SQL databases, this is the path to the database or text
+     file.  For SQL databases, this is the table and field definition line.
+     You can get a pre-parsed version of this information using SQLdata(),
+
+mode()
+          $mode = $realmdef->mode();
+
+     Return the mode for creating the database file.
+
+database()
+          $database = $realmdef->database();
+
+     Return the database name and host (SQL databases only).
+
+fields()
+          $fields = $realmdef->fields();
+
+     Return the additional field definition line (SQL databases only).  No
+     additional parsing is performed.
+
+usertype()
+          $type = $realmdef->usertype();
+
+     Return the type of the user/password database, for example "NDBM".
+
+grouptype()
+          $type = $realmdef->grouptype();
+
+     Return the type of the group database, for example "NDBM".
+
+authentication()
+          $authentication = $realmdef->authentication();
+
+     Returns the authentication in use for this realm.  May be either
+     "Basic" or "Digest".
+
+server()              $server = $realmdef->server();
+     Return the type of Web server this realm is designed for.
+
+crypt()
+          $crypt = $realmdef->crypt();
+
+     Return the cryptography type for this realm, either "crypt" or "MD5".
+
+SQLdata()
+          $data = $realmdef->SQLdata();
+
+     For SQL databases only, return the parsed information from the Users
+     and Groups directives.  The value returned is an associative array
+     containing the following fields:
+
+          database        name of the SQL database
+          host            name of the SQL database host
+          dblogin
+          dbpassword
+          usertable       name of the SQL table containing users & passwords
+          grouptable      name of the SQL table containing groups
+          userfield       name of the field containing the user ID
+          groupuserfield
+          groupfield      name of the field containing the group name
+          passwdfield     name of the field containing the encrypted password
+          userfield_len   length of the user ID field
+          groupfield_len  length of the group field
+          passwdfield_len length of the password field
+
+connect()
+          $database = $realmdef->connect(-writable=>1,
+                                         -mode=>0600,
+                                         -server=>'ncsa');
+
+     Establish a connection to the realm database, returning a RealmManager
+     object.  You can open up a connection read-only or read-write.
+     Optional arguments allow you to the values of the Mode and Server
+     directives.
+
+          -writable      Open read/write if true.
+          -mode          Override file creation mode.
+          -server        Override server type.
+
+SEE ALSO
+========
+
+   HTTPD::RealmManager(3) HTTPD::UserAdmin(3) HTTPD::GroupAdmin(3),
+HTTPD::Authen(3)
+
+AUTHOR
+======
+
+   Lincoln Stein <lstein@cshl.org>
+
+   Copyright (c) 1997, Lincoln D. Stein
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+

@@ -1,0 +1,1469 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: MIME/Types,  Next: MIME/WordDecoder,  Prev: MIME/Tools,  Up: Module List
+
+Perl extension for determining MIME types and Transfer Encoding
+***************************************************************
+
+NAME
+====
+
+   MIME::Types - Perl extension for determining MIME types and Transfer
+Encoding
+
+SYNOPSIS
+========
+
+     use MIME::Types qw(by_suffix by_mediatype);
+
+     my ($mime_type, $encoding) = by_suffix(FILENAME);
+     my $aref = by_suffix(FILENAME);
+
+     my @list = by_mediatype(MEDIATYPE);
+     my $aref = by_mediatype(MEDIATYPE);
+
+DESCRIPTION
+===========
+
+   NOTE: This is ALPHA code. There are no guarantees that any of the
+subroutines described here will not have their names or return values
+changed.
+
+   This module is built to conform to the MIME types standard defined in
+RFC 1341 and updated by RFC's 1521 and 1522. It follows the collection
+kept at `http://www.ltsw.se/knbase/internet/mime.htp'.
+
+INTERFACE
+=========
+
+   The following functions are avilable:
+
+by_suffix
+     This function takes either a file name suffix or a complete file name.
+     It returns a two-element list or an anonymous array if the suffix can
+     be found: the media type and a content encoding.  An empty list is
+     returned if the suffix could not be found.
+
+by_mediatype
+     This function takes a media type and returns a list or anonymous
+     array of anonymous three-element arrays whose values are the file
+     name suffix used to identify it, the media type, and a content
+     encoding.
+
+     If the media type contains a slash (/), it is assumed to be a
+     complete media type and must exactly match against the internal table.
+     Otherwise the value is compared to all the values in the table via a
+     regular expression.  All regular expression codes are supported
+     (except, of course, any string with a slash in it).  Thus, calling
+     *by_mediatype("application")* will return a large list.
+
+AUTHOR
+======
+
+   Jeff Okamoto <`okamoto@corp.hp.com'>.
+
+   Updated by David Wheeler <`david@wheeler.net'>.
+
+   Inspired by the mail_attach.pl program by Dan Sugalski
+<`dan@sidhe.org'>.
+
+
+File: pm.info,  Node: MIME/WordDecoder,  Next: MIME/Words,  Prev: MIME/Types,  Up: Module List
+
+decode RFC-1522 encoded words to a local representation
+*******************************************************
+
+NAME
+====
+
+   MIME::WordDecoder - decode RFC-1522 encoded words to a local
+representation
+
+SYNOPSIS
+========
+
+   See *Note MIME/Words: MIME/Words, for the basics of encoded words.  See
+`"DESCRIPTION"' in this node for how this class works.
+
+     use MIME::WordDecoder;
+     
+     
+     ### Get the default word-decoder (used by unmime()):
+     $wd = default MIME::WordDecoder;
+     
+     ### Get a word-decoder which maps to ISO-8859-1 (Latin1):
+     $wd = supported MIME::WordDecoder "ISO-8859-1";
+     
+     
+     ### Decode a MIME string (e.g., into Latin1) via the default decoder:
+     $str = $wd->decode('To: =?ISO-8859-1?Q?Keld_J=F8rn_Simonsen?= <keld>');
+     
+     ### Decode a string using the default decoder, non-OO style:
+     $str = unmime('To: =?ISO-8859-1?Q?Keld_J=F8rn_Simonsen?= <keld>');
+
+DESCRIPTION
+===========
+
+   A MIME::WordDecoder consists, fundamentally, of a hash which maps a
+character set name (US-ASCII, ISO-8859-1, etc.) to a subroutine which
+knows how to take bytes in that character set and turn them into the
+target string representation.  Ideally, this target representation would
+be Unicode, but we don't want to overspecify the translation that takes
+place: if you want to convert MIME strings directly to Big5, that's your
+own decision.
+
+   The subroutine will be invoked with two arguments: DATA (the data in
+the given character set), and CHARSET (the upcased character set name).
+
+   For example:
+
+     ### Keep 7-bit characters as-is, convert 8-bit characters to '#':
+     sub keep7bit {
+     	local $_ = shift;
+     	tr/\x00-\x7F/#/c;
+     	$_;
+     }
+
+   Here's a decoder which uses that:
+
+     ### Construct a decoder:
+     $wd = MIME::WordDecoder->new({'US-ASCII'   => "KEEP",   ### sub { $_[0] }
+                                   'ISO-8859-1' => \&keep7bit,
+                                   'ISO-8859-2' => \&keep7bit,
+                                   'Big5'       => "WARN",
+                                   '*'          => "DIE"});
+     
+     ### Convert some MIME text to a pure ASCII string...
+     $ascii = $wd->decode('To: =?ISO-8859-1?Q?Keld_J=F8rn_Simonsen?= <keld>');
+     
+     ### ...which will now hold: "To: Keld J#rn Simonsen <keld>"
+
+PUBLIC INTERFACE
+================
+
+default [DECODER]
+     *Class method.* Get/set the default DECODER object.
+
+supported CHARSET, [DECODER]
+     *Class method.* If just CHARSET is given, returns a decoder object
+     which maps data into that character set (the character set is forced
+     to all-uppercase).
+
+          $wd = supported MIME::WordDecoder "ISO-8859-1";
+
+     If DECODER is given, installs such an object:
+
+          MIME::WordDecoder->supported("ISO-8859-1" =>
+          				 (new MIME::WordDecoder::ISO_8859 "1"));
+
+     You should not override this method.
+
+new [\@HANDLERS]
+     *Class method, constructor.* If \@HANDLERS is given, then @HANDLERS
+     is passed to handler() to initiallize the internal map.
+
+handler CHARSET=>\&SUBREF, ...
+     *Instance method.* Set the handler SUBREF for a given CHARSET, for as
+     many pairs as you care to supply.
+
+     When performing the translation of a MIME-encoded string, a given
+     SUBREF will be invoked when translating a block of text in character
+     set CHARSET.  The subroutine will be invoked with the following
+     arguments:
+
+          DATA    - the data in the given character set.
+          CHARSET - the upcased character set name, which may prove useful
+                    if you are using the same SUBREF for multiple CHARSETs.
+          DECODER - the decoder itself, if it contains configuration information
+                    that your handler function needs.
+
+     For example:
+
+          $wd = new MIME::WordDecoder;
+          $wd->handler('US-ASCII'   => "KEEP");
+          $wd->handler('ISO-8859-1' => \&handle_latin1,
+          		 'ISO-8859-2' => \&handle_latin1,
+          		 '*'          => "DIE");
+
+     Notice that, much as with %SIG, the SUBREF can also be taken from a
+     set of special keywords:
+
+          KEEP     Pass data through unchanged.
+          IGNORE   Ignore data in this character set, without warning.
+          WARN     Ignore data in this character set, with warning.
+          DIE      Fatal exception with "can't handle character set" message.
+
+     The subroutine for the special CHARSET of 'raw' is used for raw
+     (non-MIME-encoded) text, which is supposed to be US-ASCII.  The
+     handler for 'raw' defaults to whatever was specified for 'US-ASCII'
+     at the time of construction.
+
+     The subroutine for the special CHARSET of '*' is used for any
+     unrecognized character set.  The default action for '*' is WARN.
+
+decode STRING
+     *Instance method.* Decode a STRING which might contain MIME-encoded
+     components into a local representation (e.g., UTF-8, etc.).
+
+unmime STRING
+     *Function, exported.* Decode the given STRING using the default()
+     decoder.  See `default()|' in this node.
+
+SUBCLASSES
+==========
+
+MIME::WordDecoder::ISO_8859
+     A simple decoder which keeps US-ASCII and the 7-bit characters of
+     ISO-8859 character sets and UTF8, and also keeps 8-bit characters
+     from the indicated character set.
+
+          ### Construct:
+          $wd = new MIME::WordDecoder::ISO_8859 2;    ### ISO-8859-2
+          
+          ### What to translate unknown characters to (can also use empty):
+          ### Default is "?".
+          $wd->unknown("?");
+          
+          ### Collapse runs of unknown characters to a single unknown()?
+          ### Default is false.
+          $wd->collapse(1);
+
+     According to *http://czyborra.com/charsets/iso8859.html* (ca.
+     November 2000):
+
+     ISO 8859 is a full series of 10 (and soon even more) standardized
+     multilingual single-byte coded (8bit) graphic character sets for
+     writing in alphabetic languages:
+
+          1. Latin1 (West European)
+          2. Latin2 (East European)
+          3. Latin3 (South European)
+          4. Latin4 (North European)
+          5. Cyrillic
+          6. Arabic
+          7. Greek
+          8. Hebrew
+          9. Latin5 (Turkish)
+             10. Latin6 (Nordic)
+
+     The ISO 8859 charsets are not even remotely as complete as the truly
+     great Unicode but they have been around and usable for quite a while
+     (first registered Internet charsets for use with MIME) and have
+     already offered a major improvement over the plain 7bit US-ASCII.
+
+     Characters 0 to 127 are always identical with US-ASCII and the
+     positions 128 to 159 hold some less used control characters: the
+     so-called C1 set from ISO 6429.
+
+MIME::WordDecoder::US_ASCII
+     A subclass of the ISO-8859-1 decoder which discards 8-bit characters.
+     You're probably better off using ISO-8859-1.
+
+AUTHOR
+======
+
+   Eryq (`eryq@zeegee.com'), ZeeGee Software Inc (`http://www.zeegee.com').
+
+VERSION
+=======
+
+   $Revision: 5.403 $ $Date: 2000/11/23 05:04:03 $
+
+
+File: pm.info,  Node: MIME/Words,  Next: MLDBM,  Prev: MIME/WordDecoder,  Up: Module List
+
+deal with RFC-1522 encoded words
+********************************
+
+NAME
+====
+
+   MIME::Words - deal with RFC-1522 encoded words
+
+SYNOPSIS
+========
+
+   Before reading further, you should see *Note MIME/Tools: MIME/Tools, to
+make sure that you understand where this module fits into the grand scheme
+of things.  Go on, do it now.  I'll wait.
+
+   Ready?  Ok...
+
+     use MIME::Words qw(:all);
+     
+     ### Decode the string into another string, forgetting the charsets:
+     $decoded = decode_mimewords(
+           'To: =?ISO-8859-1?Q?Keld_J=F8rn_Simonsen?= <keld@dkuug.dk>',
+           );
+     
+     ### Split string into array of decoded [DATA,CHARSET] pairs:
+     @decoded = decode_mimewords(
+           'To: =?ISO-8859-1?Q?Keld_J=F8rn_Simonsen?= <keld@dkuug.dk>',
+           );
+     
+     ### Encode a single unsafe word:
+     $encoded = encode_mimeword("\xABFran\xE7ois\xBB");
+     
+     ### Encode a string, trying to find the unsafe words inside it:
+     $encoded = encode_mimewords("Me and \xABFran\xE7ois\xBB in town");
+
+DESCRIPTION
+===========
+
+   Fellow Americans, you probably won't know what the hell this module is
+for.  Europeans, Russians, et al, you probably do.  `:-)'.
+
+   For example, here's a valid MIME header you might get:
+
+     From: =?US-ASCII?Q?Keith_Moore?= <moore@cs.utk.edu>
+     To: =?ISO-8859-1?Q?Keld_J=F8rn_Simonsen?= <keld@dkuug.dk>
+     CC: =?ISO-8859-1?Q?Andr=E9_?= Pirard <PIRARD@vm1.ulg.ac.be>
+     Subject: =?ISO-8859-1?B?SWYgeW91IGNhbiByZWFkIHRoaXMgeW8=?=
+      =?ISO-8859-2?B?dSB1bmRlcnN0YW5kIHRoZSBleGFtcGxlLg==?=
+      =?US-ASCII?Q?.._cool!?=
+
+   The fields basically decode to (sorry, I can only approximate the Latin
+characters with 7 bit sequences /o and 'e):
+
+     From: Keith Moore <moore@cs.utk.edu>
+     To: Keld J/orn Simonsen <keld@dkuug.dk>
+     CC: Andr'e  Pirard <PIRARD@vm1.ulg.ac.be>
+     Subject: If you can read this you understand the example... cool!
+
+PUBLIC INTERFACE
+================
+
+decode_mimewords ENCODED, [OPTS...]
+     *Function.* Go through the string looking for RFC-1522-style "Q"
+     (quoted-printable, sort of) or "B" (base64) encoding, and decode them.
+
+     *In an array context,* splits the ENCODED string into a list of
+     decoded `[DATA, CHARSET]' pairs, and returns that list.  Unencoded
+     data are returned in a 1-element array `[DATA]', giving an effective
+     CHARSET of undef.
+
+          $enc = '=?ISO-8859-1?Q?Keld_J=F8rn_Simonsen?= <keld@dkuug.dk>';
+          foreach (decode_mimewords($enc)) {
+              print "", ($_[1] || 'US-ASCII'), ": ", $_[0], "\n";
+          }
+
+     *In a scalar context,* joins the "data" elements of the above list
+     together, and returns that.  *Warning: this is information-lossy,*
+     and probably not what you want, but if you know that all charsets in
+     the ENCODED string are identical, it might be useful to you.  (Before
+     you use this, please see `unmime', *Note MIME/WordDecoder:
+     MIME/WordDecoder,, which is probably what you want.)
+
+     In the event of a syntax error, $@ will be set to a description of
+     the error, but parsing will continue as best as possible (so as to
+     get *something* back when decoding headers).  $@ will be false if no
+     error was detected.
+
+     Any arguments past the ENCODED string are taken to define a hash of
+     options:
+
+    Field
+          Name of the mail field this string came from.  *Currently
+          ignored.*
+
+encode_mimeword RAW, [ENCODING], [CHARSET]
+     *Function.* Encode a single RAW "word" that has unsafe characters.
+     The "word" will be encoded in its entirety.
+
+          ### Encode "<<Franc,ois>>":
+          $encoded = encode_mimeword("\xABFran\xE7ois\xBB");
+
+     You may specify the ENCODING (`"Q"' or `"B"'), which defaults to
+     `"Q"'.  You may specify the CHARSET, which defaults to `iso-8859-1'.
+
+encode_mimewords RAW, [OPTS]
+     *Function.* Given a RAW string, try to find and encode all "unsafe"
+     sequences of characters:
+
+          ### Encode a string with some unsafe "words":
+          $encoded = encode_mimewords("Me and \xABFran\xE7ois\xBB");
+
+     Returns the encoded string.  Any arguments past the RAW string are
+     taken to define a hash of options:
+
+    Charset
+          Encode all unsafe stuff with this charset.  Default is
+          'ISO-8859-1', a.k.a. "Latin-1".
+
+    Encoding
+          The encoding to use, `"q"' or `"b"'.  The default is `"q"'.
+
+    Field
+          Name of the mail field this string will be used in.  *Currently
+          ignored.*
+
+     Warning: this is a quick-and-dirty solution, intended for character
+     sets which overlap ASCII.  *It does not comply with the RFC-1522
+     rules regarding the use of encoded words in message headers*.  You
+     may want to roll your own variant, using `encoded_mimeword()', for
+     your application.  *Thanks to Jan Kasprzak for reminding me about
+     this problem.*
+
+NOTES
+=====
+
+   Exports its principle functions by default, in keeping with
+MIME::Base64 and MIME::QuotedPrint.
+
+AUTHOR
+======
+
+   Eryq (`eryq@zeegee.com'), ZeeGee Software Inc (`http://www.zeegee.com').
+
+   All rights reserved.  This program is free software; you can
+redistribute it and/or modify it under the same terms as Perl itself.
+
+   Thanks also to...
+
+     Kent Boortz        For providing the idea, and the baseline
+                        RFC-1522-decoding code!
+     KJJ at PrimeNet    For requesting that this be split into
+                        its own module.
+     Stephane Barizien  For reporting a nasty bug.
+
+VERSION
+=======
+
+   $Revision: 5.404 $ $Date: 2000/11/10 16:45:12 $
+
+
+File: pm.info,  Node: MLDBM,  Next: MLDBM/Sync,  Prev: MIME/Words,  Up: Module List
+
+store multi-level hash structure in single level tied hash
+**********************************************************
+
+NAME
+====
+
+   MLDBM - store multi-level hash structure in single level tied hash
+
+SYNOPSIS
+========
+
+     use MLDBM;				# this gets the default, SDBM
+     #use MLDBM qw(DB_File FreezeThaw);	# use FreezeThaw for serializing
+     #use MLDBM qw(DB_File Storable);	# use Storable for serializing
+     
+     $dbm = tie %o, 'MLDBM' [..other DBM args..] or die $!;
+
+DESCRIPTION
+===========
+
+   This module can serve as a transparent interface to any TIEHASH package
+that is required to store arbitrary perl data, including nested references.
+Thus, this module can be used for storing references and other arbitrary
+data within DBM databases.
+
+   It works by serializing the references in the hash into a single
+string. In the underlying TIEHASH package (usually a DBM database), it is
+this string that gets stored.  When the value is fetched again, the string
+is deserialized to reconstruct the data structure into memory.
+
+   For historical and practical reasons, it requires the Data::Dumper
+package, available at any CPAN site. Data::Dumper gives you really
+nice-looking dumps of your data structures, in case you wish to look at
+them on the screen, and it was the only serializing engine before version
+2.00.  However, as of version 2.00, you can use any of Data::Dumper,
+*FreezeThaw* or Storable to perform the underlying serialization, as
+hinted at by the `SYNOPSIS' in this node overview above.  Using Storable
+is usually much faster than the other methods.
+
+   See the `BUGS' in this node section for important limitations.
+
+Changing the Defaults
+---------------------
+
+   *MLDBM* relies on an underlying TIEHASH implementation (usually a DBM
+package), and an underlying serialization package.  The respective
+defaults are SDBM_File and D<Data::Dumper>.  Both of these defaults can be
+changed.  Changing the SDBM_File default is strongly recommended.  See
+`WARNINGS' in this node below.
+
+   Three serialization wrappers are currently supported: Data::Dumper,
+Storable, and *FreezeThaw*.  Additional serializers can be supported by
+writing a wrapper that implements the interface required by
+*MLDBM::Serializer*.  See the supported wrappers and the
+*MLDBM::Serializer* source for details.
+
+   In the following, *$OBJ* stands for the tied object, as in:
+
+     $obj = tie %o, ....
+     $obj = tied %o;
+
+$MLDBM::UseDB	or	*$OBJ*->UseDB(*[TIEDOBJECT]*)
+     The global $MLDBM::UseDB can be set to default to something other than
+     SDBM_File, in case you have a more efficient DBM, or if you want to
+     use this with some other TIEHASH implementation.  Alternatively, you
+     can specify the name of the package at use time, as the first
+     "parameter".  Nested module names can be specified as "Foo::Bar".
+
+     The corresponding method call returns the underlying TIEHASH object
+     when called without arguments.  It can be called with any object that
+     implements Perl's TIEHASH interface, to set that value.
+
+$MLDBM::Serializer	or	*$OBJ*->Serializer(*[SZROBJECT]*)
+     The global $MLDBM::Serializer can be set to the name of the
+     serializing package to be used. Currently can be set to one of
+     Data::Dumper, Storable, or `FreezeThaw'. Defaults to Data::Dumper.
+     Alternatively, you can specify the name of the serializer package at
+     use time, as the second "parameter".
+
+     The corresponding method call returns the underlying MLDBM serializer
+     object when called without arguments.  It can be called with an
+     object that implements the MLDBM serializer interface, to set that
+     value.
+
+Controlling Serializer Properties
+---------------------------------
+
+   These methods are meant to supply an interface to the properties of the
+underlying serializer used.  Do not call or set them without understanding
+the consequences in full.  The defaults are usually sensible.
+
+   Not all of these necessarily apply to all the supplied serializers, so
+we specify when to apply them.  Failure to respect this will usually lead
+to an exception.
+
+$MLDBM::DumpMeth	or  *$OBJ*->DumpMeth(*[METHNAME]*)
+     If the serializer provides alternative serialization methods, this
+     can be used to set them.
+
+     With Data::Dumper (which offers a pure Perl and an XS verion of its
+     serializing routine), this is set to `Dumpxs' by default if that is
+     supported in your installation.  Otherwise, defaults to the slower
+     `Dump' method.
+
+     With Storable, a value of `portable' requests that serialization be
+     architecture neutral, i.e. the deserialization can later occur on
+     another platform. Of course, this only makes sense if your database
+     files are themselves architecture neutral.  By default, native format
+     is used for greater serializing speed in Storable.  Both Data::Dumper
+     and *FreezeThaw* are always architecture neutral.
+
+     *FreezeThaw* does not honor this attribute.
+
+$MLDBM::Key  or  *$OBJ*->Key(*[KEYSTRING]*)
+     If the serializer only deals with part of the data (perhaps because
+     the TIEHASH object can natively store some types of data), it may need
+     a unique key string to recognize the data it handles.  This can be
+     used to set that string.  Best left alone.
+
+     Defaults to the magic string used to recognize MLDBM data. It is a six
+     character wide, unique string. This is best left alone, unless you
+     know what you are doing.
+
+     Storable and *FreezeThaw* do not honor this attribute.
+
+$MLDBM::RemoveTaint  or  *$OBJ*->RemoveTaint(*[BOOL]*)
+     If the serializer can optionally untaint any retrieved data subject to
+     taint checks in Perl, this can be used to request that feature.  Data
+     that comes from external sources (like disk-files) must always be
+     viewed with caution, so use this only when you are sure that that is
+     not an issue.
+
+     Data::Dumper uses `eval()' to deserialize and is therefore subject to
+     taint checks.  Can be set to a true value to make the Data::Dumper
+     serializer untaint the data retrieved. It is not enabled by default.
+     Use with care.
+
+     Storable and *FreezeThaw* do not honor this attribute.
+
+EXAMPLES
+========
+
+   Here is a simple example.  Note that does not depend upon the underlying
+serializing package-most real life examples should not, usually.
+
+     use MLDBM;				# this gets SDBM and Data::Dumper
+     #use MLDBM qw(SDBM_File Storable);	# SDBM and Storable
+     use Fcntl;				# to get 'em constants
+     
+     $dbm = tie %o, 'MLDBM', 'testmldbm', O_CREAT|O_RDWR, 0640 or die $!;
+     
+     $c = [\ 'c'];
+     $b = {};
+     $a = [1, $b, $c];
+     $b->{a} = $a;
+     $b->{b} = $a->[1];
+     $b->{c} = $a->[2];
+     @o{qw(a b c)} = ($a, $b, $c);
+     
+     #
+     # to see what was stored
+     #
+     use Data::Dumper;
+     print Data::Dumper->Dump([@o{qw(a b c)}], [qw(a b c)]);
+     
+     #
+     # to modify data in a substructure
+     #
+     $tmp = $o{a};
+     $tmp->[0] = 'foo';
+     $o{a} = $tmp;
+     
+     #
+     # can access the underlying DBM methods transparently
+     #
+     #print $dbm->fd, "\n";		# DB_File method
+
+   Here is another small example using Storable, in a portable format:
+
+     use MLDBM qw(DB_File Storable);	# DB_File and Storable
+     
+     tie %o, 'MLDBM', 'testmldbm', O_CREAT|O_RDWR, 0640 or die $!;
+     
+     (tied %o)->DumpMeth('portable');	# Ask for portable binary
+     $o{'ENV'} = \%ENV;			# Stores the whole environment
+
+BUGS
+====
+
+  1. Adding or altering substructures to a hash value is not entirely
+     transparent in current perl.  If you want to store a reference or
+     modify an existing reference value in the DBM, it must first be
+     retrieved and stored in a temporary variable for further
+     modifications.  In particular, something like this will NOT work
+     properly:
+
+          $mldb{key}{subkey}[3] = 'stuff';	# won't work
+
+     Instead, that must be written as:
+
+          $tmp = $mldb{key};			# retrieve value
+          $tmp->{subkey}[3] = 'stuff';
+          $mldb{key} = $tmp;			# store value
+
+     This limitation exists because the perl TIEHASH interface currently
+     has no support for multidimensional ties.
+
+  2. The Data::Dumper serializer uses eval().  A lot.  Try the Storable
+     serializer, which is generally the most efficient.
+
+
+WARNINGS
+========
+
+  1. Many DBM implementations have arbitrary limits on the size of records
+     that can be stored.  For example, SDBM and many ODBM or NDBM
+     implementations have a default limit of 1024 bytes for the size of a
+     record.  MLDBM can easily exceed these limits when storing large data
+     structures, leading to mysterious failures.  Although SDBM_File is
+     used by MLDBM by default, it is not a good choice if you're storing
+     large data structures.  Berkeley DB and GDBM both do not have these
+     limits, so I recommend using either of those instead.
+
+  2. MLDBM does well with data structures that are not too deep and not
+     too wide.  You also need to be careful about how many FETCHes your
+     code actually ends up doing.  Meaning, you should get the most mileage
+     out of a FETCH by holding on to the highest level value for as long
+     as you need it.  Remember that every toplevel access of the tied hash,
+     for example `$mldb{foo}', translates to a MLDBM FETCH() call.
+
+     Too often, people end up writing something like this:
+
+          tie %h, 'MLDBM', ...;
+          for my $k (keys %{$h{something}}) {
+              print $h{something}{$k}[0]{foo}{bar};  # FETCH _every_ time!
+          }
+
+     when it should be written this for efficiency:
+
+          tie %h, 'MLDBM', ...;
+          my $root = $h{something};                  # FETCH _once_
+          for my $k (keys %$root) {
+              print $k->[0]{foo}{bar};
+          }
+
+
+AUTHORS
+=======
+
+   Gurusamy Sarathy <`gsar@umich.edu'>.
+
+   Support for multiple serializing packages by Raphael Manfredi
+<`Raphael_Manfredi@grenoble.hp.com'>.
+
+   Copyright (c) 1995-98 Gurusamy Sarathy.  All rights reserved.
+
+   Copyright (c) 1998 Raphael Manfredi.
+
+   This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+VERSION
+=======
+
+   Version 2.00	10 May 1998
+
+SEE ALSO
+========
+
+   perl(1), perltie(1), perlfunc(1), Data::Dumper(3), FreezeThaw(3),
+Storable(3).
+
+
+File: pm.info,  Node: MLDBM/Sync,  Next: MMM/Text/Search,  Prev: MLDBM,  Up: Module List
+
+safe concurrent access to MLDBM databases
+*****************************************
+
+NAME
+====
+
+     MLDBM::Sync (BETA) - safe concurrent access to MLDBM databases
+
+SYNOPSIS
+========
+
+     use MLDBM::Sync;                       # this gets the default, SDBM_File
+     use MLDBM qw(DB_File Storable);        # use Storable for serializing
+     use MLDBM qw(MLDBM::Sync::SDBM_File);  # use extended SDBM_File, handles values > 1024 bytes
+
+     # NORMAL PROTECTED read/write with implicit locks per i/o request
+     my $sync_dbm_obj = tie %cache, 'MLDBM::Sync' [..other DBM args..] or die $!;
+     $cache{"AAAA"} = "BBBB";
+     my $value = $cache{"AAAA"};
+
+     # SERIALIZED PROTECTED read/write with explicit lock for both i/o requests
+     my $sync_dbm_obj = tie %cache, 'MLDBM::Sync', '/tmp/syncdbm', O_CREAT|O_RDWR, 0640;
+     $sync_dbm_obj->Lock;
+     $cache{"AAAA"} = "BBBB";
+     my $value = $cache{"AAAA"};
+     $sync_dbm_obj->UnLock;
+
+     # SERIALIZED PROTECTED read access with explicit read lock for both reads
+     $sync_dbm_obj->ReadLock;
+     my @keys = keys %cache;
+     my $value = $cache{'AAAA'};
+     $sync_dbm_obj->UnLock;
+
+     # KEY CHECKSUMS, for lookups on MD5 checksums on large keys
+     my $sync_dbm_obj = tie %cache, 'MLDBM::Sync', '/tmp/syncdbm', O_CREAT|O_RDWR, 0640;
+     $sync_dbm_obj->SyncKeysChecksum(1);
+     my $large_key = "KEY" x 10000;
+     $sync{$large_key} = "LARGE";
+     my $value = $sync{$large_key};
+
+DESCRIPTION
+===========
+
+   This module wraps around the MLDBM interface, by handling concurrent
+access to MLDBM databases with file locking, and flushes i/o explicity per
+lock/unlock.  The new [Read]Lock()/UnLock() API can be used to serialize
+requests logically and improve performance for bundled reads & writes.
+
+     my $sync_dbm_obj = tie %cache, 'MLDBM::Sync', '/tmp/syncdbm', O_CREAT|O_RDWR, 0640;
+
+     # Write locked critical section
+     $sync_dbm_obj->Lock;
+       ... all accesses to DBM LOCK_EX protected, and go to same tied file handles
+       $cache{'KEY'} = 'VALUE';
+     $sync_dbm_obj->UnLock;
+
+     # Read locked critical section
+     $sync_dbm_obj->ReadLock;
+       ... all read accesses to DBM LOCK_SH protected, and go to same tied files
+       ... WARNING, cannot write to DBM in ReadLock() section, will die()
+       my $value = $cache{'KEY'};
+     $sync_dbm_obj->UnLock;
+
+     # Normal access OK too, without explicity locking
+     $cache{'KEY'} = 'VALUE';
+     my $value = $cache{'KEY'};
+
+   MLDBM continues to serve as the underlying OO layer that serializes
+complex data structures to be stored in the databases.  See the MLDBM
+`BUGS' in this node section for important limitations.
+
+INSTALL
+=======
+
+   Like any other CPAN module, either use CPAN.pm, or perl -MCPAN -e shell,
+or get the file MLDBM-Sync-x.xx.tar.gz, unzip, untar and:
+
+     perl Makefile.PL
+     make
+     make test
+     make install
+
+LOCKING
+=======
+
+   The MLDBM::Sync wrapper protects MLDBM databases by locking and
+unlocking around read and write requests to the databases.  Also necessary
+is for each new lock to tie() to the database internally, untie()'ing when
+unlocking.  This flushes any i/o for the dbm to the operating system, and
+allows for concurrent read/write access to the databases.
+
+   Without any extra effort from the developer, an existing MLDBM database
+will benefit from MLDBM::sync.
+
+     my $dbm_obj = tie %dbm, ...;
+     $dbm{"key"} = "value";
+
+   As a write or STORE operation, the above will automatically cause the
+following:
+
+     $dbm_obj->Lock; # also ties
+     $dbm{"key"} = "value";
+     $dbm_obj->UnLock; # also unties
+
+   Just so, a read or FETCH operation like:
+
+     my $value = $dbm{"key"};
+
+   will really trigger:
+
+     $dbm_obj->ReadLock; # also ties
+     my $value = $dbm{"key"};
+     $dbm_obj->Lock; # also unties
+
+   However, these lock operations are expensive because of the underlying
+tie()/untie() that occurs for i/o flushing, so when bundling reads &
+writes, a developer may explicitly use this API for greater performance:
+
+     # tie once to database, write 100 times
+     $dbm_obj->Lock;
+     for (1..100) {
+       $dbm{$_} = $_ * 100;
+       ...
+     }
+     $dbm_obj->UnLock;
+
+     # only tie once to database, and read 100 times
+     $dbm_obj->ReadLock;
+     for(1..100) {
+       my $value = $dbm{$_};
+       ...
+     }
+     $dbm_obj->UnLock;
+
+KEYS CHECKSUM
+=============
+
+   A common operation on database lookups is checksumming the key, prior
+to the lookup, because the key could be very large, and all one really
+wants is the data it maps too.  To enable this functionality automatically
+with MLDBM::Sync, just:
+
+     my $sync_dbm_obj = tie %cache, 'MLDBM::Sync', '/tmp/syncdbm', O_CREAT|O_RDWR, 0640;
+     $sync_dbm_obj->SyncKeysChecksum(1);
+
+     !! WARNING: keys() & each() do not work on these databases
+     !! as of v.03, so the developer will not be fooled into thinking
+     !! the stored key values are meaningful to the calling application
+     !! and will die() if called.
+     !!
+     !! This behavior could be relaxed in the future.
+     
+     An example of this might be to cache a XSLT conversion,
+     which are typically very expensive.  You have the
+     XML data and the XSLT data, so all you do is:
+
+     # $xml_data, $xsl_data are strings
+     my $xslt_output;
+     unless ($xslt_output = $cache{$xml_data.'&&&&'.$xsl_data}) {
+       ... do XSLT conversion here for $xslt_output ...
+       $cache{$xml_data.'&&&&'.xsl_data} = $xslt_output;
+     }
+
+   What you save by doing this is having to create HUGE keys to lookup on,
+which no DBM is likely to do efficiently.  This is the same method that
+File::Cache uses internally to hash its file lookups in its directories.
+
+New MLDBM::Sync::SDBM_File
+==========================
+
+   SDBM_File, the default used for MLDBM and therefore MLDBM::Sync has a
+limit of 1024 bytes for the size of a record.
+
+   SDBM_File is also an order of magnitude faster for small records to use
+with MLDBM::Sync, than DB_File or GDBM_File, because the tie()/untie() to
+the dbm is much faster.  Therefore, bundled with MLDBM::Sync release is a
+MLDBM::Sync::SDBM_File layer which works around this 1024 byte limit.  To
+use, just:
+
+     use MLDBM qw(MLDBM::Sync::SDBM_File);
+
+   It works by breaking up up the STORE() values into small 128 byte
+segments, and spreading those segments across many records, creating a
+virtual record layer.  It also uses Compress::Zlib to compress STORED
+data, reducing the number of these 128 byte records. In benchmarks, 128
+byte record segments seemed to be a sweet spot for space/time
+effienciency, as SDBM_File created very bloated *.pag files for 128+ byte
+records.
+
+BENCHMARKS
+==========
+
+   In the distribution ./bench directory is a bench_sync.pl script that
+can benchmark using the various DBMs with MLDBM::Sync.
+
+   The MLDBM::Sync::SDBM_File DBM is special because is uses SDBM_File for
+fast small inserts, but slows down linearly with the size of the data
+being inserted and read, with the speed matching that of GDBM_File &
+DB_File somewhere around 20,000 bytes.
+
+   So for DBM key/value pairs up to 10000 bytes, you are likely better off
+with MLDBM::Sync::SDBM_File if you can afford the extra space it uses.  At
+20,000 bytes, time is a wash, and disk space is greater, so you might as
+well use DB_File or GDBM_File.
+
+   Note that MLDBM::Sync::SDBM_File is ALPHA as of 2/27/2001.
+
+   The results for a dual 450 linux 2.2.14, with a ext2 file system
+blocksize 4096 mounted async on a SCSI disk were as follows:
+
+     === INSERT OF 50 BYTE RECORDS ===
+      Time for 100 writes + 100 reads for  SDBM_File                  0.13 seconds     12288 bytes
+      Time for 100 writes + 100 reads for  MLDBM::Sync::SDBM_File     0.15 seconds     12288 bytes
+      Time for 100 writes + 100 reads for  GDBM_File                  3.33 seconds     18066 bytes
+      Time for 100 writes + 100 reads for  DB_File                    4.26 seconds     20480 bytes
+
+     === INSERT OF 500 BYTE RECORDS ===
+      Time for 100 writes + 100 reads for  SDBM_File                  0.17 seconds   1033216 bytes
+      Time for 100 writes + 100 reads for  MLDBM::Sync::SDBM_File     0.54 seconds    110592 bytes
+      Time for 100 writes + 100 reads for  GDBM_File                  3.47 seconds     63472 bytes
+      Time for 100 writes + 100 reads for  DB_File                    4.30 seconds     86016 bytes
+
+     === INSERT OF 5000 BYTE RECORDS ===
+     (skipping test for SDBM_File 1024 byte limit)
+      Time for 100 writes + 100 reads for  MLDBM::Sync::SDBM_File     1.33 seconds   1915904 bytes
+      Time for 100 writes + 100 reads for  GDBM_File                  4.32 seconds    832400 bytes
+      Time for 100 writes + 100 reads for  DB_File                    6.16 seconds    839680 bytes
+
+     === INSERT OF 20000 BYTE RECORDS ===
+     (skipping test for SDBM_File 1024 byte limit)
+      Time for 100 writes + 100 reads for  MLDBM::Sync::SDBM_File     4.40 seconds   8173568 bytes
+      Time for 100 writes + 100 reads for  GDBM_File                  4.86 seconds   2063912 bytes
+      Time for 100 writes + 100 reads for  DB_File                    6.71 seconds   2068480 bytes
+
+     === INSERT OF 50000 BYTE RECORDS ===
+     (skipping test for SDBM_File 1024 byte limit)
+      Time for 100 writes + 100 reads for  MLDBM::Sync::SDBM_File    12.87 seconds  27446272 bytes
+      Time for 100 writes + 100 reads for  GDBM_File                  5.39 seconds   5337944 bytes
+      Time for 100 writes + 100 reads for  DB_File                    7.22 seconds   5345280 bytes
+
+WARNINGS
+========
+
+   MLDBM::Sync is in BETA.  As of 2/27/2001 I have been using it in
+development for months, and been using its techniques for years in
+Apache::ASP $Session & $Application data storage.  Future releases of
+Apache::ASP will use MLDBM::Sync for its Apache::ASP::State base
+implementation instead of MLDBM
+
+   MLDBM::Sync::SDBM_File is ALPHA quality.  Databases created while using
+it may not be compatible with future releases if the segment manager code
+or support for compression changes.
+
+TODO
+====
+
+   Production testing.
+
+AUTHORS
+=======
+
+   Copyright (c) 2001 Joshua Chamas, Chamas Enterprises Inc.  All rights
+reserved.  Sponsored by development on NodeWorks http://www.nodeworks.com
+
+SEE ALSO
+========
+
+     MLDBM(3), SDBM_File(3), DB_File(3), GDBM_File(3)
+
+
+File: pm.info,  Node: MMM/Text/Search,  Next: MOP/MOP,  Prev: MLDBM/Sync,  Up: Module List
+
+Perl module for indexing and searching text files and web objects
+*****************************************************************
+
+NAME
+====
+
+   MMM::Text::Search - Perl module for indexing and searching text files
+and web objects
+
+SYNOPSIS
+========
+
+     use MMM::Text::Search;
+     
+     my $srch = new MMM::Text::Search {	#for indexing...
+     	#index main file location...
+     		IndexPath => "/tmp/myindex.db",
+     	#local files...
+     		FileMask  => '(?i)(\.txt|\.htm.?)$',
+     		Dirs	  => [ "/usr/doc", "/tmp" ] ,
+     		FollowSymLinks => 0|1, (default = 0)
+     	#web objects...
+     		URLs	  => [ "http://localhost/", ... ],
+     		Level	  => recursion-level (0=unlimited)
+     	#common options...
+     		IgnoreLimit =>	0.3,   (default = 2/3)
+     		Verbose => 0|1
+     	};
+     
+     $srch->makeindex;
+
+     my $srch = new MMM::Text::Search (  #for searching....
+     		  "/tmp/myindex.db", verbose_flag );
+     
+     my $hashref = $srch->query("pizza","ciao", "-pasta" );
+     my $hashref = $srch->advanced_query("(pizza OR ciao) AND NOT pasta");
+
+     $srch->errstr()	# returns last error
+     			# (only query syntax-errors for the moment being)
+
+     $srch->dump_word_stats(\*FH)
+
+DESCRIPTION
+===========
+
+   * Indexing
+
+     makeindex() does all the job of indexing. When it's finished the
+     following files will have been created (assuming IndexPath =
+     /path/myindex.db, see constructor):
+
+          /path/myindex.db	 word index database
+          /path/myindex-files.db	 filename/URL database
+          /path/myindex-titles.db	 html title database
+          /path/myindex.stopwords	 stop-words list
+          /path/myindex.filelist	 readable list of indexed files/URLs
+          /path/myindex.deadlinks	 broken http links
+
+          [... lots of important things missing ... ]
+
+     dump_word_stats(\*FH) dumps all words sorted by occurence frequency
+     using FH file handle (or STDOUT if no parameter is specified).
+     Stop-words get a frequency value of 1.
+
+   * Searching
+
+     Both query() and advanced_query() return a reference to a hash with
+     the following structure:
+
+          (
+           ignored  => [ string, string, ... ], # ignored words
+           searched => [ string, string, ... ], # words searched for
+           files    => [  hashref, hashref, ... ] # list of files
+          					# or URLs found
+           )
+          
+          The 'files' element is a reference to an array of hashes, each having
+          the following structure:
+
+          (
+           	 filename => string,  # file path or http URL
+           score    => number,  # score
+           title    => string   # HTML title
+          )
+
+NOTES
+=====
+
+   Note on implementation: The technique used for indexing is
+substantially derived from that exposed by Tim Kientzle on Dr. Dobbs
+magazine.
+
+BUGS
+====
+
+   Many, I guess.
+
+AUTHOR
+======
+
+   Max Muzi <maxim@comm2000.it>
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: MOP/MOP,  Next: MOP/MetaModule,  Prev: MMM/Text/Search,  Up: Module List
+
+Perl extension providing a meta-object protocol for Perl modules.
+*****************************************************************
+
+NAME
+====
+
+   MOP::MOP - Perl extension providing a meta-object protocol for Perl
+modules.
+
+SYNOPSIS
+========
+
+     # A random package declaration
+     package MyBaseModule;
+
+     # Activate the meta-object protocol for a few methods
+     use MOP::MOP qw(new method1 method3);
+     # Our meta-module is 'MyMetaModule'
+     MOP::MOP::register_meta('MyMetaModule','MyBaseModule');
+
+     # Some functions
+     sub new () {
+     	return bless {};
+     }
+     sub method1 ($$) { ... }
+     sub method2 ($) { ... }
+     sub method3 () { ... }
+
+DESCRIPTION
+===========
+
+   This module provides a simple and, in my opinion, powerful meta-object
+protocol (MOP) for Perl5 modules.  In short, such MOP allows to *trap the
+method calls* made on an object (represented by a reference) before they
+reach the original module implementing them. These method calls are
+redirected to another module, called the meta-module, before their
+execution. The original (legitimate) destination of the method call is in
+the (base) module. Of course, one day or another, the meta-module should
+perform the actual normal method call at the base level, but it can do
+some nice things before or after doing that. And this is the whole purpose
+of its existence.
+
+   MOP::MOP implements the base level part of the protocol. This module is
+tightly linked with module MOP::MetaModule which implements the other
+upper part of the behavior, i.e. the generic behavior of a meta-module.
+
+   In the above example, MyBaseModule is the base module, and MyMetaModule
+is the meta-module (not shown here). In this example, the 3 methods new(),
+method1() and method3() are modified due to the MOP.  These methods become
+*reflective* methods. When a user of MyBaseModule calls one of these
+methods, they are not called directly, but the method meta_method_call()
+of MyMetaModule is called instead. This method is passed the original
+arguments of the method call, prepended by the (base level) method name and
+(base level) object reference or package name used.
+
+   Hence, if a programmer does:
+
+     use MyBaseModule;
+     my $obj = MyBaseModule->new($newarg);
+     $obj->method1($foo, $bar);
+     $obj->method2($bur);
+     $obj->method3();
+
+   In fact, the actual operations taking place correspond to the following
+steps.
+
+  1. `$obj = MyMetaModule->meta_method_call(new_Refl, 'MyBaseModule',
+     $newarg)'
+
+     This occurs in place of the first call, as MyMetaModule is registered
+     as the meta-module of MyBaseModule.
+
+        Then, supposing that at the end of this strange new() a meta-object
+referenced by $metaobj is registered for the freshly created $obj, the
+processing will continue as in the following.
+
+  1. $metaobj->meta_method_call(*method1_Refl*, $obj, $foo, $bar)
+
+     This is the call of a reflective method on $obj and such calls are
+     processed by the meta-object, not by perl itself directly (even though
+     Perl behavior remains valid somewhere else).
+
+  2. $obj->method2($bur)
+
+     This is a normal method call. As method2() is not reflective, the
+     work is done by perl itself.
+
+  3. $metaobj->meta_method_call(*method2_Refl*, $obj)
+
+     Again, a reflective method call to finish.
+
+        Note: Here, even if they are actually used, the *blabla_Refl*
+names are only for illustration. They represent the name of the base level
+method. The meta-object needs them if it ever wants the real work to be
+done. But note that the structure of these names may not follow this
+scheme indefinitely (and these thingies may become code references in the
+future).  See  meta_handle_method_call() in MOP::MetaModule.
+
+   A MOP is mainly useful for modules that provide a rather strict
+object-oriented interface. It allows to extend transparently the
+functionality provided by such a class module in order to provide
+additional properties not directly related to the module functions. This
+may sound rather obscure, but it can really be useful.  For example, this
+is the case in the real world when you want to add transparent
+distribution to your programs, when you want to enhance such distributed
+execution with a CRC integrity check in messages, when you want to manage
+multiple replicas of a server, etc.
+
+Functions
+---------
+
+`MOP::MOP::register_meta($metaobj,$obj)'
+     Registers the object $metaobj as the meta-object of the (base) object
+     $obj. This allows the MOP to find which meta-object is associated to
+     a given object (the meta-level often needs a state, stored in the
+     meta-object).  You can also directly associate a meta-module to a
+     module. This is even necessary to bootstrap the protocol somewhere.
+
+`MOP::MOP::find_meta($obj)'
+     Finds the meta-object associated to $obj. It is usually not needed to
+     call this function directly as the MOP itself provides the base level
+     object to the meta-object among the arguments to meta_method_call().
+
+Is it possible to do something useful with this?
+------------------------------------------------
+
+   The test programs included with the distribution of this module
+demonstrate such usage (and I hope that the number of really useful
+meta-modules will increase as time goes and files migrate from `t/' to
+their own subdirectory). Most simple examples deal with not very useful
+meta-modules, such as counting the number of method calls, tracing some
+method calls, etc.
+
+   More serious examples include a full-featured client/server system that
+should allow to execute any Perl object remotely without modifying the
+source code of the original module. The MOP traps the creation and local
+method calls on the object (which remains an empty proxy on the client
+side). The meta-module takes care of redirecting all calls and calling the
+real object on the server.  See module MOP::Remote.  Note that you need
+the Data::Dumper module to run that test. Currently, it is blindly based
+on the availability of the Unix rsh command. But I've been seriously using
+this mechanism for distributed processing for more than one year up to now.
+
+   A future demo program that will be added soon will show how to add some
+(simple) encryption to that remote execution system. The idea is simply to
+encrypt transparently the data exchanged by the client/server
+meta-objects, using another meta-object. Thus introducing to the world a
+*meta* meta-module.
+
+Notes
+-----
+
+   The MOP::MOP module is implemented as a source filter and is dependent
+on the Filter::Util::Call module.
+
+   This module transparently *modifies the source code of your module*. It
+really renames the method subroutines and replaces them by stubs. Be warned
+that we are somehow redefining the world...
+
+   Would it be possible to keep the module source code somewhere in memory
+and track the uses of libraries thanks to this mechanism? It could be nice
+to enable Perl to send all this to another host...
+
+BUGS
+====
+
+   Functions stubs (e.g.: `sub truc;') probably do not work.
+
+   This documentation is much bigger than the module code itself.  Do not
+hesitate to read the source code!
+
+AUTHOR
+======
+
+   Rodolphe Ortalo, ortalo@laas.fr
+
+Acknowledgements
+----------------
+
+   This work has been performed with the support of LAAS-CNRS.
+
+SEE ALSO
+========
+
+   perl(1), MOP::MetaModule(3), MOP::Remote(3), Filter::Util::Call(3).
+
+
+File: pm.info,  Node: MOP/MetaModule,  Next: MOP/Remote,  Prev: MOP/MOP,  Up: Module List
+
+Perl base class for all meta-modules.
+*************************************
+
+NAME
+====
+
+   MOP::MetaModule - Perl base class for all meta-modules.
+
+SYNOPSIS
+========
+
+   Basic usage example. Absolutely useless.
+
+     use MOP::MetaModule;
+     use MOP::MOP;
+     use MyBaseModule; # A reflective package
+
+     my $obj = MyBaseModule->new();
+     my $raw_meta_obj = MOP::MetaModule->new();
+
+     # Provides (or replaces) the meta-object for the base object
+     MOP::MOP::register_meta($raw_meta_obj, $obj);
+
+     $obj->method1($foo,$bar);# With a raw meta-object, method calls are
+     $obj->method2($bur);     # done normally.  But they are done by the
+     $obj->method3();         # meta-object. (I told you it was useless.)
+
+   Simple derived class that correspond to the normal context of a
+meta-module.  It allows to perform additional operations before or after
+the method call.
+
+   use MOP::MetaModule;   use MOP::MOP; # We probably use some MOP
+function somewhere
+
+     use vars qw(@ISA);
+     @ISA = qw(MOP::MetaModule);
+
+     # Overload the meta-level management of a method call
+     sub meta_method_call {
+        # Get the meta-object (sometimes a meta-module)
+         my $meta_that = shift;
+         # Get the (base level) method name
+         my $reflected_method = shift;
+         # Normal method arguments (including base self)
+         my @method_args = @_;
+         # Placeholder for returned value(s)
+         my @returned;
+         ...
+         # Here, you have full control over how the actual method call
+         # will take place. So, do something nice that enhances the object
+         # behavior, and somewhere, you can do the real method call with:
+         @returned = $meta_that->meta_handle_method_call($reflected_method,
+     						      @method_args);
+         ...
+         return wantarray ? @returned : $returned[0];
+     }
+
+DESCRIPTION
+===========
+
+Methods
+-------
+
+`MOP::MetaModule->new()' or $meta_thing->new()
+     Creates a new raw meta-object from the MOP::MetaModule class. This
+     one will do nothing except normal method calls. This method should be
+     overloaded, but the default method will provide you an anonymous hash
+     that you can use directly as a placeholder for some named attributes
+     if you want.
+
+$meta_thing->meta_method_call($method_name, $base_arguments)
+     This method is called by the meta-object protocol (MOP) when a
+     (reflective) method call is performed on a base level object
+     controlled by a meta-object. Hence, it provides the entry point where
+     you should customize the meta-object behavior if you want to do
+     something nice for the object. This method should be overloaded in
+     real meta-classes. For example, you can imagine saving some state
+     before the call, and restoring that state in case the method fails
+     the rough way.  The meta-object could also call a remote server (see
+     MOP::Remote).  The MOP may call this method either via a blessed
+     reference (a real meta-object) or on the module itself (that behaves
+     then like a meta-class).
+
+$meta_thing->meta_handle_method_call($method_name, $base_arguments)
+     This method will perform the actual call to the base level class or
+     object and return you the results from this call. Inside the
+     meta-object methods, this one allows you to activate the real method
+     call requested originally by the programmer (or by a lower
+     meta-level). You should use this method that you will inherit from
+     MOP::MetaModule to do so as it will be able to locate the original
+     method thanks to the method name provided by the MOP.
+
+Usage outline
+-------------
+
+   In the following example, the synopsis is detailed a little further to
+show how you can write a meta-module. Most of the work is done inside the
+meta_method_call() method which needs to study the base level methods
+names and act accordingly. Base level constructors deserve special care as
+the meta-module should usually create a meta-object and register it with
+the freshly created base level object (see the `/new/' case below).  More
+generally, pure class methods called on the base module should be treated
+with care at the meta-level.
+
+     # We are a meta-module: use MetaModule to inherit from it
+     use MOP::MetaModule;
+     # We probably use the MOP register function in object creation
+     use MOP::MOP;
+
+     use vars qw(@ISA);
+     @ISA = qw(MOP::MetaModule);
+
+     ###  META-METHODS  ###
+     # Trap of method call
+     sub meta_method_call {
+         my $meta_that = shift; # meta-object (sometimes meta-module)
+         my $reflected_method = shift; # Get the (base) method name
+         my @method_args = @_; # Normal method arguments (w/ self)
+         my @returned; # Placeholder
+         # Switch on method name.
+         foreach ($reflect) {
+     	  # Specific behavior for 'new' method: meta-object creation
+     	  /new/o and do {
+     	      # We call the base-level creation method
+     	      @returned =
+     	       $meta_that->meta_handle_method_call($reflected_method,
+     						   @method_args);
+     	      # We create a meta object for this object
+     	      my $meta_object = $meta_that->new();
+     	      # ...we initialize it if we need some meta-state...
+     	      # We register both the object and meta-object.
+     	    MOP::MOP::register_meta($meta_object, $returned[0]);
+     	      last;
+     	  };
+     	  # First, we manage only object methods... (Not mandatory)
+     	  if (ref($m_that)) {
+     	      # Behavior for working methods
+     	      /method1|method3/o and do {
+     		  ...do something nice before the method call...
+     		  @returned =
+     		   $meta_that->meta_handle_method_call($reflected_method,
+     						       @method_args);
+     		  ...do something nice after the method call...
+     	      };
+     	  } else { # Here, we deal we class methods...
+     	      ...spit some warning...but call it anyway...
+     	      @returned =
+     	       $meta_that->meta_handle_method_call($reflected_method,
+     						   @method_args);
+     	  }
+         }
+         return wantarray ? @returned : $returned[0];
+     }
+
+   Useful work can be performed on normal method calls on base level
+objects (see the `/method1|method3/' case above). At this point, you have
+full control on the method parameters and behavior. Possible usages
+involve: security management via authorization verification or arguments
+encryption, fault tolerance via multiple replicas management or stable
+storage of object state, transparent remote execution, and maybe a
+combination of these.
+
+BUGS
+====
+
+   It is not yet clear how *destruction* of base level objects can be
+trapped and handled in the meta-module. Expect improvement on this point
+(and an additional class method to manage carefully in the meta-object).
+
+AUTHOR
+======
+
+   Rodolphe Ortalo, ortalo@laas.fr
+
+Acknowledgements
+----------------
+
+   This work has been performed with the support of LAAS-CNRS.
+
+SEE ALSO
+========
+
+   perl(1), MOP::MOP(3).
+
+

@@ -1,0 +1,1473 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Array/Compare,  Next: Array/FileReader,  Prev: Argv,  Up: Module List
+
+Perl extension for comparing arrays.
+************************************
+
+NAME
+====
+
+   Array::Compare - Perl extension for comparing arrays.
+
+SYNOPSIS
+========
+
+     use Array::Compare;
+
+     my $comp1 = Array::Compare->new;
+     $comp->Sep('|');
+     $comp->Skip({3 => 1, 4 => 1});
+     $comp->WhiteSpace(0);
+     $comp->Case(1);
+
+     my $comp2 = Array::Compare->new(Sep => '|', WhiteSpace => 0, Case => 1,
+                                     Skip => {3 => 1, 4 => 1});
+
+     my @arr1 = 0 .. 10;
+     my @arr2 = 0 .. 10;
+
+     $comp1->compare(\@arr1, \@arr2);
+     $comp2->compare(\@arr1, \@arr2);
+
+DESCRIPTION
+===========
+
+   If you have two arrays and you want to know if they are the same or
+different, then Array::Compare will be useful to you.
+
+   All comparisons are carried out via a comparator object. In the
+simplest usage, you can create and use a comparator object like this:
+
+     my @arr1 = 0 .. 10;
+     my @arr2 = 0 .. 10;
+
+     my $comp = Array::Compare->new;
+
+     if ($comp->compare(\@arr1, \@arr2) {
+       print "Arrays are the same\n";
+     } else {
+       print "Arrays are different\n";
+     }
+
+   Notice that you pass references to the two arrays to the comparision
+method.
+
+   Internally the comparator compares the two arrays by using join to turn
+both arrays into strings and comparing the strings using eq. In the joined
+strings, the elements of the original arrays are separated with the `^G'
+character. This can cause problems if your array data contains `^G'
+characters as it is possible that two different arrays can be converted to
+the same string.
+
+   To avoid this, it is possible to override the default separator
+character, either by passing and alternative to the new function
+
+     my $comp = Array::Compare->new(Sep => '|');
+
+   or by changing the seperator for an existing comparator object
+
+     $comp->Sep('|');
+
+   In general you should choose a separator character that won't appear in
+your data.
+
+   You can also control whether or not whitespace within the elements of
+the arrays should be considered significant when making the comparison.
+The default is that all whitespace is significant. The alternative is for
+all consecutive white space characters to be converted to a single space
+for the pruposes of the comparison. Again, this can be turned on when
+creating a comparator object:
+
+     my $comp = Array::Compare->new(WhiteSpace => 0);
+
+   or by altering an existing object:
+
+     $comp->WhiteSpace(0);
+
+   You can also control whether or not the case of the data is significant
+in the comparison. The default is that the case of data is taken into
+account. This can be changed in the standard ways when creating a new
+comparator object:
+
+     my $comp = Array::Compare->new(Case => 0);
+
+   or by altering an existing object:
+
+     $comp->Case(0);
+
+   In addition to the simple comparison described above (which returns true
+if the arrays are the same and false if they're different) there is also a
+full comparison which returns a list of elements which are different.  If
+the arrays are the same it returns an empty list. In scalar context the
+full comparison returns the length of this list (i.e. the number of
+elements that differ). You can access the full comparision in two ways.
+Firstly, there is a `DefFull' attribute. If this is `true' then a full
+comparison if carried out whenever the compare method is called.
+
+     my $comp = Array::Compare->new(DefFull => 1);
+     $comp->compare(\@arr1, \@arr2); # Full comparison
+
+     $comp->DefFull(0);
+     $comp->compare(\@arr1, \@arr2); # Simple comparison
+
+     $comp->DefFull(1);
+     $comp->compare(\@arr1, \@arr2); # Full comparison again
+
+   Secondly, you can access the full comparison method directly
+
+     $comp->full_compare(\@arr1, \@arr2);
+
+   For symmetry, there is also a direct method to use to call the simple
+comparison.
+
+     $comp->simple_compare(\@arr1, \@arr2);
+
+   The final complication is the ability to skip elements in the
+comparison.  If you know that two arrays will always differ in a
+particular element but want to compare the arrays *ignoring* this element,
+you can do it with Array::Compare without taking array slices. To do this,
+a comparator object has an optional attribute called Skip which is a
+reference to a hash. The keys in this hash are the indexes of the array
+elements and the values should be any true value for elements that should
+be skipped.
+
+   For example, if you want to compare two arrays, ignoring the values in
+elements two and four, you can do something like this:
+
+     my %skip = (2 => 1, 4 => 1);
+     my @a = (0, 1, 2, 3, 4, 5);
+     my @b = (0, 1, X, 3, X, 5);
+
+     my $comp = Array::Compare->new(Skip => \%skip);
+
+     $comp->compare(\@a, \@b);
+
+   This should return *true*, as we are explicitly ignoring the columns
+which differ.
+
+   Of course, having created a comparator object with no skip hash, it is
+possible to add one later:
+
+     $comp->Skip({1 => 1, 2 => 1});
+
+   or:
+
+     my %skip = (1 => 1, 2 => 2);
+     $comp->Skip(\%skip);
+
+   To reset the comparator so that no longer skips elements, set the skip
+hash to an empty hash.
+
+     $comp->Skip({});
+
+   You can also check to see if one array is a permutation of another, i.e.
+they contain the same elements but in a different order.
+
+     if ($comp->perm(\@a, \@b) {
+       print "Arrays are perms\n";
+     else {
+       print "Nope. Arrays are completely different\n";
+     }
+
+   In this case the values of `WhiteSpace' and Case are still used, but
+Skip is ignored for, hopefully, obvious reasons.
+
+AUTHOR
+======
+
+   Dave Cross <dave@mag-sol.com>
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: Array/FileReader,  Next: Array/IntSpan,  Prev: Array/Compare,  Up: Module List
+
+Lazily tie files to arrays for reading
+**************************************
+
+NAME
+====
+
+   Array::FileReader - Lazily tie files to arrays for reading
+
+SYNOPSIS
+========
+
+     use Array::FileReader;
+     tie @foo, Array::FileReader, "some.file";
+     print $foo[30];
+
+DESCRIPTION
+===========
+
+   Plenty of times I've wanted to run up and down a file like this:
+
+     @foo = <FILE>;
+     for (0..100) {
+         print $foo[$_];
+     }
+     print $foo[10], $foo[20], $foo[30];
+
+   Of course, this is hugely inefficient since you have to load the entire
+file into an array in memory. Array::FileReader removes the inefficiency
+by only storing the line offsets in memory, and only discovering the line
+offsets when a line is called for. For instance, `$foo[4]' will only load
+4 numbers into memory, and then `$foo[30]' will load another 26.
+
+   Because the file offsets are discovered when needed, there's no good way
+of getting the size of the file - you just have to pad through them all,
+which is slow.
+
+   The module was designed to speed up Mark-Jason Dominus'
+`Algorithm::Diff|Algorithm::Diff' in this node module when finding
+differences between two very large files. In fact, it makes things less
+efficient, since the first thing that module does is find the size of the
+arrays.  It just goes to show, doesn't it?
+
+AUTHOR
+======
+
+   Simon Cozens, <simon@cpan.org>
+
+SEE ALSO
+========
+
+   *Note Algorithm/Diff: Algorithm/Diff,, *Note Tie/MmapArray:
+Tie/MmapArray,
+
+
+File: pm.info,  Node: Array/IntSpan,  Next: Array/IntSpan/IP,  Prev: Array/FileReader,  Up: Module List
+
+a Module for handling arrays using IntSpan techniques
+*****************************************************
+
+NAME
+====
+
+   Array::IntSpan - a Module for handling arrays using IntSpan techniques
+
+SYNOPSIS
+========
+
+     use Array::IntSpan;
+
+     my $foo = Array::IntSpan->new([0, 59, 'F'], [60, 69, 'D'], [80, 89, 'B']);
+
+     print "A score of 84% results in a ".$foo->lookup(84).".\n";
+     unless (defined($foo->lookup(70))) {
+       print "The grade for the score 70% is currently undefined.\n";
+     }
+
+     $foo->set_range(70, 79, 'C');
+     print "A score of 75% now results in a ".$foo->lookup(75).".\n";
+
+     $foo->set_range(0, 59, undef);
+     unless (defined($foo->lookup(40))) {
+       print "The grade for the score 40% is now undefined.\n";
+     }
+
+     $foo->set_range(87, 89, 'B+');
+     $foo->set_range(85, 100, 'A');
+     $foo->set_range(100, 1_000_000, 'A+');
+
+DESCRIPTION
+===========
+
+   `Array::IntSpan' brings the speed advantages of `Set::IntSpan' (written
+by Steven McDougall) to arrays.  Uses include manipulating grades, routing
+tables, or any other situation where you have mutually exclusive ranges of
+integers that map to given values.
+
+   `Array::IntSpan::IP' is also provided with the distribution.  It lets
+you use IP addresses in any of three forms (dotted decimal, network
+string, and integer) for the indices into the array.  See the POD for that
+module for more information.
+
+Installation instructions
+-------------------------
+
+   Standard `Make::Maker' approach or just copy `Array/IntSpan.pm' into
+`site/lib/Array/IntSpan.pm' and `Array/IntSpan/IP.pm' into
+`site/lib/Array/IntSpan/IP.pm'.
+
+METHODS
+=======
+
+new
+---
+
+   The new method takes an optional list of array elements.  The elements
+should be in the form `[start_index, end_index, value]'.  They should be
+in sorted order and there should be no overlaps.  The internal method
+`_check_structure' will be called to verify the data is correct.  If you
+wish to avoid the performance penalties of checking the structure, you can
+use Data::Dumper to dump an object and use that code to reconstitute it.
+
+set_range
+---------
+
+   This method takes three parameters - the `start_index', the
+`end_index', and the value.  If you wish to erase a range, specify undef
+for the value.  It properly deals with overlapping ranges and will replace
+existing data as appropriate.  If the new range lies after the last
+existing range, the method will execute in O(1) time.  If the new range
+lies within the existing ranges, the method executes in O(n) time, where n
+is the number of ranges.  The code is not completely optimized and will
+make up to three calls to splice if the new range intersects with existing
+ranges.  It does not consolidate contiguous ranges that have the same
+value.
+
+   If you have a large number of inserts to do, it would be beneficial to
+sort them first.  Sorting is O(n lg(n)), and since appending is O(1), that
+will be considerably faster than the O(n^2) time for inserting n unsorted
+elements.
+
+   The method returns 0 if there were no overlapping ranges and 1 if there
+were.
+
+lookup
+------
+
+   This method takes as a single parameter the index to look up.  If there
+is an appropriate range, the method will return the associated value.
+Otherwise, it returns undef.
+
+AUTHOR
+======
+
+   Toby Everett, teverett@alascom.att.com
+
+
+File: pm.info,  Node: Array/IntSpan/IP,  Next: Array/Lookup,  Prev: Array/IntSpan,  Up: Module List
+
+a Module for arrays using IP addresses as indices
+*************************************************
+
+NAME
+====
+
+   Array::IntSpan::IP - a Module for arrays using IP addresses as indices
+
+SYNOPSIS
+========
+
+     use Array::IntSpan::IP;
+
+     my $foo = Array::IntSpan::IP->new(['123.45.67.0',   '123.45.67.255', 'Network 1'],
+                                       ['123.45.68.0',   '123.45.68.127', 'Network 2'],
+                                       ['123.45.68.128', '123.45.68.255', 'Network 3']);
+
+     print "The address 123.45.68.37 is on network ".$foo->lookup("\173\105\150\45").".\n";
+     unless (defined($foo->lookup(((123*256+45)*256+65)*256+67))) {
+       print "The address 123.45.65.67 is not on a known network.\n";
+     }
+
+     print "The address 123.45.68.177 is on network ".$foo->lookup("123.45.68.177").".\n";
+
+     $foo->set_range('123.45.68.128', '123.45.68.255', 'Network 4');
+     print "The address 123.45.68.177 is now on network ".$foo->lookup("123.45.68.177").".\n";
+
+DESCRIPTION
+===========
+
+   `Array::IntSpan::IP' brings the advantages of `Array::IntSpan' to IP
+address indices.  Anywhere you use an index in `Array::IntSpan', you can
+use an IP address in one of three forms in `Array::IntSpan::IP'.  The
+three accepted forms are:
+
+Dotted decimal
+     This is the standard human-readable format for IP addresses.  The
+     conversion checks that the octets are in the range 0-255.  Example:
+     `'123.45.67.89''.
+
+Network string
+     A four character string representing the octets in network order.
+     Example: `"\173\105\150\131"'.
+
+Integer
+     A integer value representing the IP address. Example:
+     `((123*256+45)*256+67)*256+89' or `2066563929'.
+
+   Note that the algorithm has no way of distinguishing between the
+integer values 1000 through 9999 and the network string format.  It will
+presume network string format in these instances.  For instance, the
+integer `1234' (representing the address `'0.0.4.210'') will be
+interpreted as `"\61\62\63\64"', or the IP address `'49.50.51.52''.  This
+is unavoidable since Perl does not strongly type integers and strings
+separately and there is no other information available to distinguish
+between the two in this situation.  I do not expect that this will be a
+problem in most situations. Most users will probably use dotted decimal or
+network string notations, and even if they do use the integer notation the
+likelyhood that they will be using the addresses `'0.0.3.232'' through
+`'0.0.39.15'' as indices is relatively low.
+
+METHODS
+=======
+
+ip_as_int
+---------
+
+   The class method `Array::IntSpan::IP::ip_as_int' takes as its one
+parameter the IP address in one of the three formats mentioned above and
+returns the integer notation.
+
+AUTHOR
+======
+
+   Toby Everett, teverett@alascom.att.com
+
+
+File: pm.info,  Node: Array/Lookup,  Next: Array/PrintCols,  Prev: Array/IntSpan/IP,  Up: Module List
+
+Lookup strings in arrays or hash tables with abbreviation.
+**********************************************************
+
+NAME
+====
+
+   *Array::Lookup* - Lookup strings in arrays or hash tables with
+abbreviation.
+
+SYNOPSIS
+========
+
+     use Array::Lookup;
+
+     $value = lookup $key, \@keywords, \&notfound, \&toomany;
+
+     $value = lookup $key, \%keywords, \&notfound, \&toomany;
+
+     lookup_error $key, $keywords, $err, $msg;
+
+DESCRIPTION
+===========
+
+lookup
+------
+
+   Lookup `*$key*' in the table `*@keywords*' and return the unambiguously
+matching keyword, if any.  If the second argument is given as a hash
+array, `*%keywords*', then lookup a matching key, with abbreviation, and
+return the value corresponding to the unambiguously matching key.
+
+   If there are no matches, invoke `*&notfound*' like this:
+
+     &$notfound( $key, \@keywords, '');
+
+   If there are two or more matches, invoke `*&toomany*' like this:
+
+     &$toomany( $key, \@keywords, \@matches);
+
+   If either subroutine is omitted or null, then no special action is taken
+except that undef is returned for the failed lookup.
+
+   Note that the third argument, the array of ambiguous matches, allows a
+common subroutine to be used for both error conditions and still
+distinguish the error.
+
+   See `"lookup_error"' in this node for a standard method of handling
+lookup failures.
+
+lookup_error
+------------
+
+   Handle an error for the `*lookup*' subroutine.  The arguments:
+
+$key
+     The search key which failed the lookup.
+
+$keywords
+     The hash or array reference containing the keywords none of which
+     matched the $key.
+
+$err
+     A flag indicating if the lookup failed because of no matches at all
+     ("), or if the lookup failed because of too many matches
+     (`\@matches');
+
+$msg
+     A format string used to format and print the error message.  It should
+     contain two printf substitution sequences: %s.  The first will be
+     substituted with the failed lookup key; the second with one of the
+     phrases: `"not found"' or `"is ambiguous"', depending upon `*$err*'.
+
+     If `*$msg*' is omitted or null, a default message will be used:
+
+          "lookup failed: %s %s; use one of:\n"
+
+     followed by a listing of the strings in the `*$keywords*' array.
+
+EXAMPLES
+========
+
+Using arrays
+------------
+
+     use Array::Lookup;
+     ...
+     @keywords = qw(quit find get set show);
+     ...
+     $command = <STDIN>;
+     $command = lookup $command, \@keywords,
+     	sub { lookup_error @_, "Unknown command '%s'; use one of:\n"; },
+     	sub { lookup_error @_, "Command '%s' %s; use one of:\n"; };
+
+Using hashes
+------------
+
+     use Array::Lookup;
+     ...
+     %Commands = ( 'quit' => \&quit,  'get' => \&get,  'set' => \&set,
+     	          'find' => \&find,  'show' => \&show );
+     ...
+     $input = <STDIN>;
+     $command_sub = lookup $input, \%Commands,
+     	sub { lookup_error @_, "Unknown command '%s'; use one of:\n"; },
+     	sub { lookup_error @_, "Command '%s' %s; use one of:\n"; };
+
+SEE ALSO
+========
+
+   *Note Array/PrintCols: Array/PrintCols,
+
+AUTHOR
+======
+
+   Alan K. Stebbens <aks@sgi.com>
+
+
+File: pm.info,  Node: Array/PrintCols,  Next: Array/RefElem,  Prev: Array/Lookup,  Up: Module List
+
+Print or format array elements in vertically sorted columns.
+************************************************************
+
+NAME
+====
+
+   print_cols, format_cols - Print or format array elements in vertically
+sorted columns.
+
+SYNOPSIS
+========
+
+   `use Array::PrintCols;'
+
+   `print_cols \@*array*;'
+
+   `print_cols \@*array*, $*colspec*;'
+
+   `print_cols \@*array*, $*colspec*, $*total_width*;'
+
+   `print_cols \@*array*, $*colspec*, $*total_width*, $indent;'
+
+   $output = `format_cols' <same arguments as `print_cols'>;
+
+   `$Array::PrintCols::PreSorted = 0;'
+
+DESCRIPTION
+===========
+
+   This module exports two subroutine names: `print_cols' and
+`format_cols'.
+
+   The `print_cols' subroutine prints the items of `@*array*' in multiple,
+alphabetically sorted vertical columns.  One, two, or three optional
+arguments may be given to `print_cols' to control the width and number of
+the columns, the total width of the output, and indentation.  Reasonable
+defaults apply in the absence of the optional arguments (or when given as
+the empty string or zero).  Generally, the minimum width column is used
+when possible.
+
+   If `$*colspec*' is given as a non-negative number, it is treated as the
+minimum width of the column; the actual width will be the maximum of this
+value and the lengths of all array items.
+
+   If `$*colspec*' is given as a negative number, its absolute value value
+is used to determine the total number of columns.  However, it cannot
+exceed the total number of columns possible based on the maximum length of
+all the array elements.
+
+   If a third argument is supplied, it is used as the total width of the
+output.  The default for this value is the value of the environment
+variable `$ENV{'COLUMNS'}', if defined, or 80.
+
+   If the fourth argument is given, it is used as the indent for all lines
+printed, which subtracts from the total width of the output.  This value
+defaults to zero (ie: no indention of the output).
+
+   The variable `$Array::PrintCols::PreSorted' controls whether or not the
+`print_cols' subroutine will expect its array argument to already be
+sorted.  If this variable is nil or zero, `print_cols' will cause print
+out a sorted copy of the input array.
+
+   The routine `format_cols' is called exactly like `print_cols' but
+returns the formatted result as a string, rather than printing it.
+
+EXAMPLES
+========
+
+     use Array::PrintCols;
+
+     @commands = sort qw( use list put get set quit help server );
+
+     # print in three columns with an indention of 1.
+     print_cols \@commands, -3, 0, 1;
+
+     # print the formatted result data to the result file
+     print RESULTFILE format_cols \@result_data;
+
+AUTHOR
+======
+
+   Copyright (C) 1995-1998  Alan K. Stebbens <aks@sgi.com>
+
+   This program is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2 of the License, or (at your option)
+any later version.
+
+   This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
+
+   You should have received a copy of the GNU General Public License along
+with this program; if not, write to the Free Software Foundation, Inc.,
+675 Mass Ave, Cambridge, MA 02139, USA.
+
+BUGS
+====
+
+   With Perl, you cannot default intervening arguments by leaving them
+empty; you must supply a zero or empty-string (").
+
+
+File: pm.info,  Node: Array/RefElem,  Next: Array/Reform,  Prev: Array/PrintCols,  Up: Module List
+
+Set up array elements as aliases
+********************************
+
+NAME
+====
+
+   Array::RefElem - Set up array elements as aliases
+
+SYNOPSIS
+========
+
+     use Array::RefElem qw(av_store av_push hv_store);
+
+     av_store(@a, 1, $a);
+     av_push(@a, $a);
+     hv_store(%h, $key, $a);
+
+DESCRIPTION
+===========
+
+   This module give direct access to some of the internal perl routines
+that let you store things in arrays and hashes.  The following functions
+are available:
+
+av_store(@array, $index, $value)
+     Stores $value inside @array at the indicated $index.  After this call
+     $array[$index] and $value will denote the same thing.
+
+av_push(@array, $value)
+     Push $value onto the @array.  After this call $array[-1] and $value
+     will denote the same thing.
+
+hv_store(%hash, $key, $value);
+     Store $value in the %hash with the given $key. After this call
+     $hash{$key} and $value will denote the same thing.
+
+SEE ALSO
+========
+
+   *Note Perlguts: (perl.info)perlguts,
+
+COPYRIGHT
+=========
+
+   Copyright 2000 Gisle Aas.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Array/Reform,  Next: AsciiDB/TagFile,  Prev: Array/RefElem,  Up: Module List
+
+Convert an array into N-sized array of arrays
+*********************************************
+
+NAME
+====
+
+   Array::Reform - Convert an array into N-sized array of arrays
+
+SYNOPSIS
+========
+
+     use Array::Reform;
+
+     @sample = ( 1 .. 10 );
+     $rowsize = 3;
+
+     Array::Reform->reform( $rowsize, \@sample );
+         =>
+            (
+               [              1,              2,              3            ],
+               [              4,              5,              6            ],
+               [              7,              8,              9            ],
+               [              10            ]
+             );
+
+DESCRIPTION
+===========
+
+   Ever had a list of things you needed to neetly format into a set of
+HTML table rows? Well, look no further my friend. For the low, low price
+of 0.00 you too can reform you data into a neet set of lists and produce
+tables from it.
+
+AUTHOR
+======
+
+   lhoward at www.perlmonks.org wrote this. I merely uploaded it. many
+thanks to adam and swiftone for their solutions (also on Perl Monks).  A
+bit of rewriting and some error checking done by crystalflame, also on
+Perl Monks.
+
+SEE ALSO
+========
+
+   http://www.perlmonks.org -- quick answers to your Perl questions.
+
+
+File: pm.info,  Node: AsciiDB/TagFile,  Next: Astro/Coord,  Prev: Array/Reform,  Up: Module List
+
+Tie class for a simple ASCII database
+*************************************
+
+NAME
+====
+
+   AsciiDB::TagFile - Tie class for a simple ASCII database
+
+SYNOPSIS
+========
+
+     # Bind the hash to the class
+     $tieObj = tie %hash, 'AsciiDB::TagFile',
+            DIRECTORY => $directory,
+            SUFIX => $sufix,
+     	LOCK => $bool,
+     	READONLY => $bool,
+     	CACHESIZE => $cacheSize,
+     	FILEMODE => $mode,
+            SCHEMA => {
+     		ORDER => $arrayRef
+     		KEY => {
+     			ENCODE => $subRef,
+     			DECODE => $subRef
+     		}
+     	};
+
+     # Save to disk all changed records
+     $tieObj->sync();
+
+     # Remove all records from memory (and save them if needed)
+     $tieObj->purge();
+
+     # Remove all records from memory (and save them if needed)
+     #	iif there are more than $cacheSize records in memory
+     $tieObj->purge($cacheSize);
+
+     # Get all record keys
+     @array = keys %hash;
+
+     # Check if a record exists
+     exists $hash{$recordKey}
+
+     # Get a field
+     $scalar = $hash{$recordKey}{$fieldName};
+
+     # Assign to a field
+     $hash{$recordKey}{$fieldName} = $value;
+
+DESCRIPTION
+===========
+
+   The *AsciiDB::TagFile* provides a hash-table-like interface to a simple
+ASCII database.
+
+   The ASCII database stores each record in into a file:
+
+     $directory/recordKey1$sufix
+     $directory/recordKey2$sufix
+     ...
+     $directory/recordKeyI<N>$sufix
+
+   And a record has this format:
+
+     [fieldName1]: value1
+     [fieldName2]: value2
+     ...
+     [fieldNameI<N>]: value2
+
+   After you've tied the hash you can access this database as access a
+hash of hashes:
+
+     $hash{recordKey1}{fieldName1} = ...
+
+   To bind the %hash to the class AsciiDB::TagFile you have to use the tie
+function:
+
+     tie %hash, 'AsciiDB::TagFile', PARAM1 => $param1, ...;
+
+   The parameters are:
+
+DIRECTORY
+     The directory where the records will be stored or readed from.  The
+     default value is the current directory.
+
+SUFIX
+     The records are stored as files. The file name of a record is the key
+     plus this sufix (if supplied).
+
+     For example, if the record with key 'josear' and sufix '.record', will
+     be stored into file: 'josear.record'.
+
+     If this parameter is not supplied the records won't have a sufix.
+
+LOCK
+     If you set this parameter to 1 TagFile will perform basic locking.
+     Record files will be share locked before reading them, and exclusive
+     locked when syncing (writing) them.
+
+     This basic locking only guarantees that a record file is always
+     written correctly, but as TagFile keep records in memory you can
+     still suffer consistency problems reading fields.
+
+     The default value is 0, i.e. the database won't be locked.
+
+READONLY
+     If you set this parameter to 1 the database will be read only and all
+     changes will be discarted.
+
+     The default value is 0, i.e. the database can be changed.
+
+CACHESIZE
+     Records loaded from disk (or simply created) are keeped in memory till
+     the tied hash is deleted. You can limit the number of records in
+     memory setting this option to a value ($cacheSize).
+
+     All records are purged from memory if their count reach $cacheSize.
+
+     You can purge the records manually using the purge() method.
+
+     Of course, the $caseSize should be a positive number, and you can use
+     the 0 value to turn off the caching (useful when testing).
+
+     The default value for CACHESIZE is 'infinite' (more or less...)
+
+FILEMODE
+     Filemode assigned to new created files.
+
+     If this parameter is not supplied the new created files will have the
+     default permissions.
+
+SCHEMA
+     This parameter is a hash reference that contains the database
+     definition.
+
+     With ORDER you can specify in which order fields will be saved into
+     the file.
+
+     For example,
+
+          SCHEMA => {
+          	ORDER => [ 'fieldHi', 'field2There', 'fieldWorld' ]
+          }
+
+     will save the record this way:
+
+          [fieldHi]: ...
+          [fieldThere]: ...
+          [fieldWorld]: ...
+
+     NOTE: this parameter is MANDATORY, and you have to specify all the
+     fields. *If you forget to list a field it will not be saved*.
+
+     With KEY,ENCODE and KEY,DECODE you can define an special encoding for
+     keys when used as filenames.
+
+     For example, if using this SCHEMA:
+
+          SCHEMA => {
+                  ORDER => ['a', 'b', 'c'],
+                  KEY => {
+                          ENCODE => sub { $_[0] =~ s{/}{_SLASH_}g; $_[0] },
+                          DECODE => sub { $_[0] =~ s{_SLASH_}{/}g; $_[0] },
+                  }
+          }
+
+     a record with the key 's1/s2' will be saved into filename
+     's1_SLASH_s2'.  The DECODE subroutine is used to traslate back to the
+     original key.
+
+     NOTE: You should use this feature if you allow filesystem
+     metacharacters (as '/', used in Unix to split path components) in
+     your keys.
+
+   The data will be saved to disk when the hash is destroyed (and garbage
+collected by perl), so if you need for safety to write the updated data
+you can call the sync method to do it.
+
+EXAMPLES
+========
+
+     $dbObj = tie %tietag, 'AsciiDB::TagFile',
+            DIRECTORY => 'data',
+            SUFIX => '.tfr',
+            FILEMODE => 0644,
+            SCHEMA => { ORDER => ['name', 'address'] };
+
+     $tietag{'jose'}{'name'} = 'Jose A. Rodriguez';
+     $tietag{'jose'}{'address'} = 'Granollers, Barcelona, SPAIN';
+     $tietag{'cindy'}{'name'} = 'Cindy Crawford';
+     $tietag{'cindy'}{'address'} = 'YouBetIwouldLikeToKnowIt';
+
+     my $key;
+     foreach $key (keys %tietag) {
+     	print $tietag{$key}{'name'}, "\t", $tietag{$key}{'address'},
+     		"\n";
+     }
+
+
+File: pm.info,  Node: Astro/Coord,  Next: Astro/Misc,  Prev: AsciiDB/TagFile,  Up: Module List
+
+Astronomical coordinate transformations
+***************************************
+
+NAME
+====
+
+   Astro::Coord - Astronomical coordinate transformations
+
+SYNOPSIS
+========
+
+     use Astro::Coord;
+
+     ($l, $b) = fk4gal($ra, $dec);
+     ($az, $el) = eqazel($ha, $dec, $latitude);
+
+DESCRIPTION
+===========
+
+   Astro::Coord contains an assorted set Perl routines for coordinate
+conversions, such as hour angle to elevation and J2000 to B1950.
+
+AUTHOR
+======
+
+   Chris Phillips  phillips@jive.nfra.nl
+
+FUNCTIONS
+=========
+
+pol2r
+          ($x, $y, $z) = pol2r($polar1, $polar2);
+
+          Converts a position in polar coordinates into rectangular coordinates
+            $polar1, $polar2   The polar coordinates to convert (turns)
+            $x, $y, $z         The rectangular coordinates
+
+r2pol
+          ($polar1, $polar2) = r2pol($x, $y, $z);
+
+          Converts a position in rectangular coordinates into polar coordinates
+            $x, $y, $y         The rectangular coordinates to convert
+            $polar1, $polar2   The polar coordinates (turns);
+          Returns undef if too few or too many arguments are passed.
+
+xy2azel
+          ($az, $el) = xy2azel($x, $y);
+
+          Converts a telescope position in X,Y coordinates into Az,El coordinates
+            $x, $y     The X and Y coordinates (turns)
+            $az, $el    The azimuth and elevation (turns)
+
+azel2xy
+          ($x, $y) = azel2xy($az, $el);
+
+          Converts a position in Az,El coordinates into X,Y coordinates
+            $az, $el    The azimuth and elevation (turns)
+            $x, $y      The X and Y coordinate (turns)
+
+eqazel
+          ($ha, $dec) = eqazel($az, $el, $latitude);
+          ($az, $el) = eqazel($ha, $dec, $latitude);
+
+          Converts HA/Dec coordinates to Az/El and vice versa.
+            $ha, $dec     Hour angle and declination of source (turns)
+            $az, $el      Azimuth and elevation of source (turns)
+            $latitude     Latitude of the observatory (turns)
+          Note:
+           The ha,dec and az,el conversion is symmetrical
+
+fk4fk5r
+          @fk5 = fk4fk5r(@fk4);
+
+          Converts an FK4 (B1950) position to the equivalent FK5 (J2000) position.
+          Note: Convert equitoral positions to/from 3-vectors using pol2r and r2pol.
+            @fk4       fk4 position (as a 3-vector, turns)
+            @fk5       fk5 position (as a 3-vector, turns)
+
+          Returns undef if too few or two many arguments are passed.
+
+fk5fk4r
+          @fk4 = fk5fk4r(@fk5);
+
+          Converts an FK5 (J2000) position to the equivalent FK4 (B1950) position.
+          Note: Convert equitoral positions to/from 3-vectors using pol2r and r2pol.
+            @fk5     fk5 position (as a 3-vector, turns)
+            @fk4     fk4 position (as a  3-vector, turns)
+
+fk4galr
+          @gal = fk4galr(@fk4)
+
+          Converts an FK4 position (B1950.0) to the IAU 1958 Galactic
+          coordinate system
+          Note: convert equitoral positions to/from 3-vectors using pol2r and r2pol.
+            @fk4     fk4 position to convert (as a 3-vector, turns)
+            @gal     Galactic position (as a 3-vector, turns)
+          Returns undef if too few or two many arguments are passed.
+          Reference : Blaauw et al., 1960, MNRAS, 121, 123.
+
+galfk4r
+          @fk4 = galfk4r(@gal)
+
+          Converts an IAU 1958 Galactic position to the FK4 coordinate system (B1950)
+          Notes: Convert equitoral positions to/from 3-vectors using pol2r and r2pol.
+            @gal      Galactic position (as a 3-vector, turns)
+            @fk4      fk4 position (as a  3-vector, turns)
+          Returns undef if too few or two many arguments are passed.
+          Reference : Blaauw et al., 1960, MNRAS, 121, 123.
+
+fk4fk5
+          ($JRA, $JDec) = fk4fk5($BRA, $BDec);
+
+          Converts an FK4 (B1950) position to the equivalent FK5 (J2000) position.
+            **LOW PRECISION**
+            $BRA,$BDec     fk4/B1950 position (turns)
+            $JRA,$Dec      fk5/J2000 position (turns)
+
+fk5fk4
+          ($BRA, $BDec) = fk5fk4($JRA, $JDec);
+
+          Converts an FK5 (J2000) position to the equivalent FK4 (B1950) position.
+            **LOW PRECISION**
+            $JRA,$Dec      fk5/J2000 position (turns)
+            $BRA,$BDec     fk4/B1950 position (turns)
+
+fk4gal
+          ($l, $b) = fk4gal($ra, $dec);
+
+          Converts an FK4 position (B1950) to the IAU 1958 Galactic
+          coordinate system
+            ($ra, $dec)  fk4 position to convert (turns)
+            ($l, $b)     Galactic position (turns)
+          Reference : Blaauw et al., 1960, MNRAS, 121, 123.
+
+galfk4
+          ($ra, $dec) = galfk4($l, $b);
+
+          Converts an IAU 1958 Galactic coordinate system position
+          to FK4  (B1950).
+            ($l, $b)    Galactic position (turns)
+           ($ra, $dec)  fk4 position to convert (turns)
+           Reference : Blaauw et al., 1960, MNRAS, 121, 123.
+
+ephem_vars
+          ($omega, $rma, $mlanom, $F, $D, $eps0) = ephem_vars($jd)
+
+          Given the Julian day ($jd) this routine calculates the ephemeris
+          values required by the prcmat and nutate routines
+
+          The returned values are :
+            $omega  - Longitude of the ascending node of the Moons mean orbit on
+                      the ecliptic, measured from the mean equinox of date.
+            $rma    - Mean anomaly of the Sun.
+            $mlanom - Mean anomaly of the Moon.
+            $F      - L - omega, where L is the mean longitude of the Moon.
+            $D      - Mean elongation of the Moon from the Sun.
+            $eps0   - Mean obilquity of the ecliptic.
+
+nutate
+          ($deps, $dpsi, @nu) = nutate($omega, $F, $D, $rma, $mlanom, $eps0);
+
+          To calculate the nutation in longitude and obliquity according to
+          the 1980 IAU Theory of Nutation including terms with amplitudes
+          greater than 0.01 arcsecond.  The nutation matrix is used to
+          compute true place from mean place: true vector = N x mean place
+          vector where the three components of each vector are the direction
+          cosines wrt the mean equinox and equator.
+
+          /   1          -dpsi.cos(eps)    -dpsi.sin(eps)  \
+                |                                                  |
+            N = |  dpsi.cos(eps)      1               -deps        |
+                |                                                  |
+          \ dpsi.sin(eps)    deps                 1        /
+
+          The required inputs are : (NOTE: these are the values returned by ephem_vars)
+            $omega  - Longitude of the ascending node of the Moons mean orbit on
+                      the ecliptic, measured from the mean equinox of date.
+            $rma    - Mean anomaly of the Sun.
+            $mlanom - Mean anomaly of the Moon.
+            $F      - L - omega, where L is the mean longitude of the Moon.
+            $D      - Mean elongation of the Moon from the Sun.
+            $eps0   - Mean obilquity of the ecliptic.
+
+          The returned values are :
+            $deps - nutation in obliquity
+            $dpsi - nutation in longitude (scalar)
+            @nu   - nutation matrix (array [3][3])
+
+precsn
+          @gp = precsn($jd_start, $jd_stop);
+
+          To calculate the precession matrix P for dates AFTER 1984.0 (JD =
+          2445700.5) Given the position of an object referred to the equator
+          and equinox of the epoch $jd_start its position referred to the
+          equator and equinox of epoch $jd_stop can be calculated as follows :
+
+          1) Express the position as a direction cosine 3-vector (V1)
+             (use pol2r to do this).
+          2) The corresponding vector V2 for epoch jd_end is V2 = P.V1
+
+          The required inputs are :
+            $jd_start - The Julian day of the current epoch of the coordinates.
+            $jd_end   - The Julian day at the required epoch for the conversion.
+
+          The returned values are :
+            @gp - The required precession matrix (array [3][3])
+
+coord_convert
+          ($output_left, $output_right) = coord_convert($input_left, $input_right,
+                                                        $input_mode, $output_mode,
+                                                        $mjd, $longitude, $latitude,
+          						$ref0);
+
+          A routine for converting between any of the following coordinate systems :
+                Coordinate system                               input/output mode
+                -----------------                               -----------------
+            X, Y (East-West mounted)                                    0
+            Azimuth, Elevation                                          1
+            Hour Angle, Declination                                     2
+            Right Ascension, Declination (date, J2000 or B1950)       3,4,5
+            Galactic (B1950)                                            6
+
+          The last four parameters in the call ($mjd, $longitude, $latitude
+          and $ref0) are not always required for the coordinate conversion.
+          In particular if the conversion is between two coordinate systems
+          which are fixed with respect to the celestial sphere (RA/Dec J2000,
+          B1950 or Galactic), or two coordinate systems which are fixed with
+          respect to the antenna (X/Y and Az/El) then these parameters are not
+          used (NOTE: they must always be passed, even if they only hold 0 or
+          undef as the routine will return undef if it is not passed 8
+          parameters).  The RA/Dec date system is defined with respect to the
+          celestial sphere, but varies with time.  The table below shows which
+          of $mjd, $longitude, $latitude and $ref0 are used for a given
+          conversion.  If in doubt you should determing the correct values for
+          all input parameters, no checking is done in the routine that the
+          passed values are sensible.
+
+          Conversion                 $mjd $longitude $latitude $ref0
+            ------------------------------------------------------------------------
+            Galactic,             Galactic,
+            RA/Dec J2000,B1950 <->RA/Dec J2000, B1950  N       N         N       N
+
+          Galactic,
+          RA/Dec J2000,B1950 <->RA/Dec date          Y       N         N       N
+
+          Galactic,
+          RA/Dec J2000,B1950,<->HA/Dec               Y       Y         N       N
+          date
+
+          Galactic,
+          RA/Dec J2000,B1950,<->X/Y, Az/El           Y       Y         Y       Y
+          date
+
+          X/Y, Az/El         <->X/Y, Az/El           N       N         N       N
+
+          X/Y, Az/El         <->HA/Dec               N       N         Y       Y
+
+          NOTE :  The method used for refraction correction is asymptotic at
+          	  an elevation of 0 degrees.
+
+          The required inputs are :
+            $input_left   - The left/longitude input coordinate (turns)
+            $input_right  - The right/latitude input coordinate (turns)
+            $input_mode   - The mode of the input coordinates (0-6)
+            $output_mode  - The mode to convert the coordinates to.
+            $mjd          - The time as modified Julian day (if necessary) at
+                            which to perform the conversion
+            $longitude    - The longitude of the location/observatory (if necessary)
+                            at which to perform the conversion (turns)
+            $latitude     - The latitude of the location/observatory (if necessary)
+                            at which to perform the conversion (turns)
+            $ref0         - The refraction constant (if in doubt use 0.00005).
+
+          The returned values are :
+            $output_left  - The left/longitude output coordinate (turns)
+            $output_right - The right/latitude output coordinate (turns)
+
+haset_ewxy
+          $haset = haset_ewxy($declination, $latitude, %limits);
+
+          This routine takes the $declination of the source, and the $latitude of the
+          EWXY mounted antenna and calculates the hour angle at which the source
+          will set.  It is then trivial to calculate the time until the source
+          sets, simply by subtracting the current hour angle of the source from
+          the hour angle at which it sets.
+
+          The required inputs are :
+            $declination - The declination of the source (turns)
+            $latitude    - The latitude of the observatory (turns)
+            %limits     - A reference to a hash holding the EWXY antenna limits
+                           The following keys must be defined XLOW, XLOW_KEYHOLE,
+          		   XHIGH, XHIGH_KEYHOLE, YLOW, YLOW_KEYHOLE, YHIGH,
+          		   YHIGH_KEYHOLE (all values shoule be in turns)
+
+          The returned value is :
+            $haset       - The hour angle (turns) at which a source at this
+                           declination sets for an EWXY mounted antenna with the
+                           given limits at the given latitude
+
+          NOTE: returns undef if %limits hash is missing any of the required keys
+
+ewxy_tlos
+          $tlos = ewxy_tlos($hour_angle, $declination, $latitude, %limits);
+
+          This routine calculates the time left on-source (tlos) for a source
+          at $hour_angle, $declination for an EWXY mount antenna at $latitude.
+
+          The required inputs are :
+            $hour_angle  - The current hour angle of the source (turns)
+            $declination - The declination of the source (turns)
+            $latitude    - The latitude of the observatory (turns)
+            \%limits     - A reference to a hash holding the EWXY antenna limits
+                           The following keys must be defined XLOW, XLOW_KEYHOLE,
+          		   XHIGH, XHIGH_KEYHOLE, YLOW, YLOW_KEYHOLE, YHIGH,
+          		   YHIGH_KEYHOLE (all values should be in turns)
+
+          The returned value is :
+            $tlos        - The time left on-source (turns)
+
+haset_azel
+          $haset = haset_azel($declination, $latitude, %limits);
+
+          This routine takes the $declination of the source, and the
+          $latitude of the Az/El mounted antenna and calculates the hour
+          angle at which the source will set.  It is then trivial to
+          calculate the time until the source sets, simply by subtracting the
+          current hour angle of the source from the hour angle at which it
+          sets.  This routine assumes that the antenna is able to rotate
+          through 360 degrees in azimuth.
+
+          The required inputs are :
+            $declination - The declination of the source (turns)
+            $latitude    - The latitude of the observatory (turns)
+            \%limits     - A reference to a hash holding the Az/El antenna limits
+                           The following keys must be defined ELLOW (all values should
+                           be in turns)
+
+          The returned value is :
+            $haset       - The hour angle (turns) at which a source at this
+                           declination sets for an Az/El mounted antenna with the
+                           given limits at the given latitude
+
+          NOTE: returns undef if the %limits hash is missing any of the required keys
+
+azel_tlos
+          $tlos = azel_tlos($hour_angle, $declination, $latitude, \%limits);
+
+          This routine calculates the time left on-source (tlos) for a source
+          at $hour_angle, $declination for an Az/El mount antenna at $latitude.
+
+          The required inputs are :
+            $hour_angle  - The current hour angle of the source (turns)
+            $declination - The declination of the source (turns)
+            $latitude    - The latitude of the observatory (turns)
+            %limits     - A reference to a hash holding the Az/El antenna limits
+                           The following keys must be defined ELLOW (all values
+                           should be in turns)
+
+          The returned value is :
+            $tlos        - The time left on-source (turns)
+
+antenna_rise
+          $ha_set = antenna_rise($declination, $latitude, $mount, \%limits);
+
+          Given the $declination of the source, the $latitude of the antenna,
+          the type of the antenna $mount and a reference to a hash holding
+          information on the antenna limits, this routine calculates the hour
+          angle at which the source sets for the antenna.  The hour angle at
+          which it rises is simply the negative of that at which it sets.
+          These values in turn can be used to calculate the LMST at which the
+          source rises/sets and from that the UT at which the source
+          rises/sets on a given day, or to calculate the native coordinates
+          at which the source rises/sets.
+
+          If you want to calculate source rise times above arbitrary elevation,
+          use the routine rise.
+
+          The required inputs are :
+            $declination - The declination of the source (turns)
+            $latitude    - The latitude of the observatory (turns)
+            $mount       - The type of antenna mount, 0 => EWXY mount, 1 => Az/El,
+                           any other number will cause the routine to return
+          	           undef
+            %limits     - A reference to a hash holding the antenna limits
+                           For an EWXY antenna there must be keys for all the
+                           limits (i.e.  XLOW, XLOW_KEYHOLE, XHIGH, XHIGH_KEYHOLE,
+                           YLOW, YLOW_KEYHOLE, YHIGH, YHIGH_KEYHOLE).  For an Az/El
+          	           antenna there must be a key for ELLOW (all values should
+                           be in turns).
+
+          The returned values are :
+            $ha_set  - The hour angle at which the source sets (turns).  The hour
+                       angle at which the source rises is simply the negative of this
+                       value.
+
+
+File: pm.info,  Node: Astro/Misc,  Next: Astro/MoonPhase,  Prev: Astro/Coord,  Up: Module List
+
+Miscellaneous astronomical routines
+***********************************
+
+NAME
+====
+
+   Astro::Misc - Miscellaneous astronomical routines
+
+SYNOPSIS
+========
+
+     use Astro::Misc;
+
+     $U = calc_U($flux, $dist, $freq);
+     ($dist1, $dist2)= kindist($ra, $dec, $vel, $epoch, $model);
+
+DESCRIPTION
+===========
+
+   Astro::Misc contains an assorted set Perl routines for doing various
+astronomical calculations.
+
+AUTHOR
+======
+
+   Chris Phillips  phillips@jive.nfra.nl
+
+FUNCTIONS
+=========
+
+read_possm
+          Read_possm interprets the output file from the AIPS POSSM task.
+          the task may be called repeatably if there is more than one POSSM
+          output in the file. The file must be open before calling
+          read_possm, using the FileHandle module. The data from the possm
+          plot is returned in a hash. Some of the header values are returned
+          as scalar values while the actual plot values are returned as
+          references to arrays. The scalar values returned are:
+            SOURCE, DATE, BANDWIDTH, TYPE (='A&P'||'R&I')
+          The array references are: CHANNEL,
+            VELOCITY, FREQUENCY, AMPLITUDE, PHASE, ANTENNA
+          The global variable $Astro::Misc:oldpossm (default=0) controls whether
+          old or new style possm plots are read.  For oldpossm=1, one of
+          VELOCITY or FREQUENCY will be a reference to an empty list (but the
+          hash value IS defined).
+
+          Usage:    use FileHandle
+                    my $fh = FileHandle->new();
+                    my %ahash = ();
+                    open($fh, 'possmfile');
+                    read_possm($fh, %ahash);
+
+          Returns:  0 on success (but not hit eof)
+                    1 on success (and hit eof)
+                    2 on premature eof
+
+          Examples of hash usage:
+               $hash{SOURCE}         # Source name
+               @{$hash{VELOCITY}}    # Array of velocity values
+               ${$hash{PHASE}}[4]    # The fifth phase value
+
+read_lovas
+          Read_lovas read the Lovas "Recommended Rest Frequencies for Observed
+          Interstellar Molecular Microwave Transitions - 1991 Revision"
+          (J. Phys. Chem. Ref. Data, 21, 181-272, 1992). Alpha quality!!
+
+          my @lovas = read_lovas($fname);
+          my @lovas = read_lovas($fname, $minfreq, $maxfreq);
+
+calc_U
+          $U = calc_U($flux, $dist, $freq);
+
+          Calculate U (Excitation Parameter) for an UCHII region
+          Based on Eqn 8 in Schraml and Mezger, 1969
+            $flux        Integrated Source Flux Density (Jy)
+            $dist        Distance to source (kpc)
+            $freq        Frequency of observation
+          Note:
+           Uses the global variable $Astro::Misc::temp for electron temperature
+           Default is 10000K
+
+calc_Nl
+          $Nl = calc_Nl($U);
+
+          Calculate the Lyman continuum photon flux given U, the Excitation
+          Parameter for an UCHII region
+            $U is the Excitation Parameter (from calc_U)
+
+lum2spectral
+          $spectral_type = lum2spectral($luminosity);
+
+          Calculate the spectral type of a ZAMS star from its luminosity
+          Based on Panagia, 1973, ApJ, 78, 929.
+            $luminosity   Star luminosity (normalised to Lsun)
+          Returns undef if luminosity is out of range (O4 - B3)
+
+Nl2spectral
+          $spectral = Nl2spectral($Nl);
+
+          Calculate the spectral type of a ZAMS star from its flux of
+          Lyman Continuum Photons (Nl)
+          Based on Panagia, 1973, ApJ, 78, 929
+            $Nl     Flux of Lyman Continuum Photons
+          Returns undef if luminosity is out of range (O4 - B3)
+
+kindist
+          ($dist1, $dist2)= kindist($ra, $dec, $vel, $epoch, $model);
+
+          Calculate the kinematic distance to an object
+            $dist1, $dist2  Near/Far distance (kpc)
+            $ra             RA of object (turns)
+            $dec            Dec of object (turns)
+            $vel            LSR Velocity (km/s)
+            $epoch          Epoch of coords (J2000/J/B1950/B)
+            $model          Model to use (1 or 2)
+
+          Note:
+           Model 1 is based on Brand and Blitz, 1993, A&A, 275, 67-90.
+           Model 2 has unknown origin.
+
+

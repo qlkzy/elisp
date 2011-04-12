@@ -1,0 +1,2226 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Embedix/DB,  Next: Embedix/DB/FileSystem,  Prev: Embedding_API,  Up: Module List
+
+persistence for ECDs
+********************
+
+NAME
+====
+
+   Embedix::DB - persistence for ECDs
+
+SYNOPSIS
+========
+
+   instantiation
+
+     my $edb = Embedix::DB->new (
+         backend => 'Pg',
+         source  => [
+             'dbi:Pg:dbname=embedix',
+             'user', 'password',
+             { AutoCommit => 0 },
+         ],
+     );
+
+     # $edb should be an instance of Embedix::DB::Pg
+
+   adding a distro
+
+     $edb->addDistro (
+         name  => 'uCLinux 2.4',
+         board => 'm68k',
+     );
+
+     $edb->addDistro (
+         name  => 'Embedix 1.2',
+         board => 'ppc',
+     );
+
+   selecting a distro to work on
+
+     $edb->workOnDistro(name => 'Embedix 1.2', board => 'ppc');
+
+   cloning a distro
+
+     $edb->cloneDistro(board => 'mpc8260adsp');
+
+   updating a distro with new information
+
+     my $apache_ecd = Embedix::ECD->newFromFile('apache.ecd');
+     $edb->updateDistro(ecd => $apache_ecd);
+
+   deleting components from a distro
+
+     $edb->deleteNode(name => 'busybox');
+
+REQUIRES
+========
+
+Embedix::ECD
+     This is needed to get data from ECD files into perl objects that can
+     then be inserted into a database.
+
+DBD::Pg
+     The PostgreSQL backend uses this.
+
+DBD::mysql
+     If anyone writes a MySQL backend, it'll surely use this.
+
+DESCRIPTION
+===========
+
+   The "DB" in Embedix::DB stands for database.  Although Embedix::DB was
+inspired by the *tigger* code that implements the original Embedix
+Database, the implementation strategy is quite different.
+
+   First, Embedix::DB is a means to provide persistence for data found in
+ECD files.  Tigger uses the filesystem for this purpose.  Embedix::DB may
+have a filesystem-based backend in the future, but the current
+implementation provides a PostgreSQL-based backend.  The goal here was to
+minimize the amount of parsing necessary to start an Embedix configuration
+program (like TargetWizard).  By doing the CPU-intensive parsing stage
+only once for when an Embedix distribution is initially defined, startup
+can be much faster.  TargetWizard currently parses a large collection of
+ECDs every time it starts up.
+
+   Beyond that, it has the ability to take ECD data and organize it at a
+higher level into distributions.  Currently, it is awkward to use a single
+TargetWizard installation to provide the ability to configure different
+distributions.  For example, you could not use TargetWizard to configure
+both a uCLinux distribution and an Embedix distribution during the same
+session.  In order to do this, one would currently have to exit
+TargetWizard, install a new config that points to the appropriate
+directories, and restart TargetWizard.  Although tigger is theoretically
+capable of handling this more gracefully, the directory structure for how
+ECDs are stored doesn't facilitate this.  In contrast, Embedix::DB was
+designed from the beginning to be able to manipulate multiple
+distributions simultaneously.
+
+   Another area where Embedix::DB deviates from tigger is in node names
+for ECDs.  Tigger requires that all nodes must have unique names
+regardless of the node's nesting.  Embedix::DB does not have this
+restriction.  Hopefully, this will allow node names to be less contrived
+in the future.
+
+   One significant difference between Embedix::DB and tigger is that
+Embedix::DB does not handle dependency and conflict resolution.  That job
+is delegated to Embedix::Config which will use an instance of Embedix::DB
+to get information from the database when necessary.  Also note that
+Embedix::DB does not know how to parse or generate ECD files.  That job
+belongs to Embedix::ECD.  Tigger does many things, and its parts are
+tightly coupled making it difficult to use any given part of it in
+isolation from the rest of tigger.  The functionality provided by tigger
+is roughly equivalent to the functionality provided by Embedix::ECD,
+Embedix::DB, and Embedix::Config.  (I need to make this paragraph flow
+better).
+
+   The overall theme of Embedix::DB is to try to improve upon the areas
+where tigger is lacking.  It's a lot of work, and I'd like to emphasize
+that I'm not doing this out of disrespect.  Surely, I would have made many
+of the same mistakes (and some original ones of my own) if I were
+implementing this without the benefit of hindsight.  I believe the concept
+of TargetWizard is a good one, and that's why I'm doing this.
+
+   Embedix::DB is an exploratory work where I am trying to put certain
+ideas about how tigger could be improved into practice.
+
+CONCEPTS
+========
+
+distro
+     Short for "distribution".  Examples:  'Embedix 1.2', 'uCLinux 2.4'.
+     Distros are collections of ECDs.
+
+board
+     A board is a name for a piece of hardware that a distro has been
+     ported to.  Examples:  'i386', 'm68k', 'ppc', 'alpha'.
+
+node
+     From ECDs, the data enclosed within a <GROUP>, <COMPONENT>, <OPTION>,
+     <AUTOVAR>, or <ACTION> tag is the data of a node.  Nodes may be
+     nested.
+
+database
+     This is where it's all stored.  The underlying implementation may be
+     something other than a 'real' database.  For example, the filesystem
+     with a specific directory structure may be providing persistence.  We
+     still call that a database - just play along.
+
+cloning
+     When creating a derivative of a distro, it is convenient (and space
+     efficient) to use the cloneDistro() method to create a clone to work
+     on.  Think of it as a form of inheritance.
+
+METHODS
+=======
+
+   The Embedix::DB API provides methods for performing abstract operations
+on the database.  Whether the backend is based on a filesystem or a
+relational database, the same API should be applicable.
+
+Initialization
+--------------
+
+   First, one must connect to a database.
+
+new(backend => $str, source => $source_ref)
+     This instantiates an Embedix::DB with the appropriate backend.
+
+          my $edb = Embedix::DB->new(
+              backend => 'Pg',
+              source  => [
+                  'dbi:Pg:dbname=embedix', $user, $pass,
+                  { AutoCommit => 0},
+              ],
+          );
+
+     `$edb' will be an instance of Embedix::DB::Pg in this example.
+
+workOnDistro(distro => $str, board => $str)
+     This method is used to set the current working distribution.  This
+     method is usually called immediately after the new(), because almost
+     all other methods require that a current working distribution has been
+     set.  (The only exception is addDistro()).
+
+          $edb->workOnDistro(distro => 'Embedix 1.2', board => 'i386');
+
+Methods for defining distributions
+----------------------------------
+
+   Now that a connection to the database has been made, the database may
+be populated.
+
+addDistro
+     This adds a new distribution to the database.
+
+updateDistro
+     This takes data from an ECD and populates the current working database
+     with it.
+
+cloneDistro
+     This takes the current working distribution and makes an exact clone
+     of it.  This method exists to make it easy to create variations on a
+     distribution using a sort of inheritance.  For example, the "Embedix
+     1.2" distro may have the following variations.
+
+          generic
+          |-- i386
+          |-- mips
+          |-- ppc
+          |   `-- mpc8260adsp
+          `-- sh
+              |-- sh3
+              `-- sh4
+
+     generic would be a distro containing data from only architecturally
+     neutral ECDs.  The `i386', `mips', `ppc', and `sh' versions of
+     "Embedix 1.2" would be derived from generic by using cloneDistro().
+     They would then be populated with additional data from
+     architecturally-specific ECDs.  ECD nodes may be removed as well as
+     with the case for the `mpc8260adsp'.  Since it doesn't have a graphics
+     controller, it doesn't make sense to provide the X11 packages, so the
+     `mpc8260adsp' would be a cloned `ppc' distribution w/ the X11 packages
+     removed.
+
+unrelateNode
+     This is used to dissociate a node from a distro.
+
+relateNode
+     This is used to associate a node with a distro.
+
+deleteNode
+     This totally deletes a node.  If a node has been cloned many times,
+     all the clones go away.  This is more serious than unrelateNode().
+
+Methods for querying the database
+---------------------------------
+
+   This is an area that still needs to be fleshed out.  As Embedix::Config
+matures, this API will mature as well to.
+
+getComponentList
+     This returns an arrayref of the form:
+
+          [
+              [ '/category0' [ $node0, $node1, ... ] ],
+              [ '/category1' [ $node0, $node1, ... ] ],
+              ...
+          ];
+
+     The list of categories as well as the list of nodes within each
+     category come sorted in ASCII order.
+
+getDistroList
+     This returns an arrayref of the form:
+
+          [
+              [ 'distro0' [ $board0, $board1, ... ] ],
+              [ 'distro1' [ $board0, $board1, ... ] ],
+              ...
+          ];
+
+     This is a list of distributions where each distribution has a list of
+     which boards it supports.  The board lists are sorted in ASCII order.
+
+DIAGNOSTICS
+===========
+
+   error messages
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000,2001 John BEPPU.  All rights reserved.  This program
+is free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+AUTHOR
+======
+
+   John BEPPU <beppu@lineo.com>
+
+SEE ALSO
+========
+
+related perl modules
+     Embedix::ECD(3pm), Embedix::Config(3pm)
+
+
+File: pm.info,  Node: Embedix/DB/FileSystem,  Next: Embedix/DB/Pg,  Prev: Embedix/DB,  Up: Module List
+
+FileSystem back-end for Embedix::DB
+***********************************
+
+NAME
+====
+
+   Embedix::DB::FileSystem - FileSystem back-end for Embedix::DB
+
+SYNOPSIS
+========
+
+   instantiation
+
+     $edb = Embedix::DB::FileSystem->new()
+
+   other examples
+
+     ...
+
+REQUIRES
+========
+
+Embedix::FileSystem
+DESCRIPTION
+===========
+
+   a brief summary of the module written with users in mind.
+
+METHODS
+=======
+
+   methods
+
+CLASS VARIABLES
+===============
+
+   cvars
+
+DIAGNOSTICS
+===========
+
+   error messages
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000,2001 John BEPPU.  All rights reserved.  This program
+is free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+AUTHOR
+======
+
+   John BEPPU <beppu@lineo.com>
+
+SEE ALSO
+========
+
+related perl modules
+the latest version
+
+File: pm.info,  Node: Embedix/DB/Pg,  Next: Embedix/DB/mysql,  Prev: Embedix/DB/FileSystem,  Up: Module List
+
+PostgreSQL back-end for Embedix::DB
+***********************************
+
+NAME
+====
+
+   Embedix::DB::Pg - PostgreSQL back-end for Embedix::DB
+
+SYNOPSIS
+========
+
+   The API presented here is subject to change.  I haven't figured out all
+the details, yet.
+
+   instantiation
+
+     $ebx = Embedix::DB::Pg->new (
+         source => [
+             'dbi:Pg:dbname=embedix', $user, $pass,
+             { AutoCommit => 0 }
+         ],
+     );
+
+   adding a new distribution
+
+     $ebx->addDistro (
+         arch        => 'm68k',      # maybe in the future?
+         name        => 'uClinux',
+         description => 'Linux for MMU-less architectures',
+     );
+
+   selecting a default distro to work on
+
+     $ebx->workOnDistro('Embedix 1.2');
+
+   updating a distro with information from an ECD
+
+     my $ecd = Embedix::ECD->newFromFile('apache.ecd');
+     $ebx->updateDistro($ecd);
+
+REQUIRES
+========
+
+Embedix::ECD
+DBI
+DBD::Pg
+DESCRIPTION
+===========
+
+   a brief summary of the module written with users in mind.
+
+METHODS
+=======
+
+Constructor
+-----------
+
+new(backend => ..., source => [ ... ])
+          $edb = Embedix::DB::Pg->new (
+              backend => 'Pg',
+              source  => [ 'dbi:Pg:dbname=embedix', $user, $password ],
+          );
+
+Administration Methods
+----------------------
+
+addDistro( name => ..., description => ...)
+          $distro = $edb->addDistro (
+              name        => $string,
+              description => $another_string,
+          );
+
+workOnDistro('name of distribution')
+          $distro = $edb->workOnDistro(
+              distro => 'Embedix 1.2',
+              board  => 'i386',
+          );
+
+updateDistro(ecd => $ecd, parent_id => $id)
+          $edb->updateDistro(ecd => $ecd);
+
+cloneDistro(board => ...);
+          $edb->cloneDistro(board => $_) foreach qw(ppc mips m68k sh);
+
+Client Methods
+--------------
+
+getComponentList
+          my $cl = $edb->getComponentList;
+
+getDistroList
+          my $dl = $edb->getDistroList;
+
+DIAGNOSTICS
+===========
+
+   error messages
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000,2001 John BEPPU.  All rights reserved.  This program
+is free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+AUTHOR
+======
+
+   John BEPPU <beppu@lineo.com>
+
+SEE ALSO
+========
+
+related perl modules
+the latest version
+
+File: pm.info,  Node: Embedix/DB/mysql,  Next: Embedix/ECD,  Prev: Embedix/DB/Pg,  Up: Module List
+
+MySQL back-end for Embedix::DB
+******************************
+
+NAME
+====
+
+   Embedix::DB::mysql - MySQL back-end for Embedix::DB
+
+SYNOPSIS
+========
+
+   instantiation
+
+     $obj = Embedix::DB::mysql->new()
+
+   other examples
+
+     ...
+
+REQUIRES
+========
+
+Embedix::mysql
+DESCRIPTION
+===========
+
+   a brief summary of the module written with users in mind.
+
+METHODS
+=======
+
+   methods
+
+CLASS VARIABLES
+===============
+
+   cvars
+
+DIAGNOSTICS
+===========
+
+   error messages
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000,2001 John BEPPU.  All rights reserved.  This program
+is free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+AUTHOR
+======
+
+   John BEPPU <beppu@lineo.com>
+
+SEE ALSO
+========
+
+related perl modules
+the latest version
+
+File: pm.info,  Node: Embedix/ECD,  Next: Embedix/ECD/Autovar,  Prev: Embedix/DB/mysql,  Up: Module List
+
+Embedix Component Descriptions as objects
+*****************************************
+
+NAME
+====
+
+   Embedix::ECD - Embedix Component Descriptions as objects
+
+SYNOPSIS
+========
+
+   instantiate from a file
+
+     my $ecd       = Embedix::ECD->newFromFile('busybox.ecd');
+     my $other_ecd = Embedix::ECD->newFromFile('tinylogin.ecd');
+
+   access nodes
+
+     my $busybox = $ecd->System->Utilities->busybox;
+
+   build from scratch
+
+     my $server = Embedix::ECD::Group->new(name => 'Server');
+     my $www    = Embedix::ECD::Group->new(name => 'WWW');
+     my $apache = Embedix::ECD::Component->new (
+         name   => 'apache',
+         srpm   => 'apache',
+         prompt => 'Include apache web server?',
+         help   => 'The most popular http server on the internet',
+     );
+     $ecd->addChild($server);
+     $ecd->Server->addChild($www);
+     $ecd->Server->WWW->addChild($apache);
+
+   get/set attributes
+
+     my $srpm = $busybox->srpm();
+
+     $busybox->help('i am busybox of borg -- unix will be assimilated.');
+
+     $busybox->requires([
+         'libc.so.6',
+         'ld-linux.so.2',
+         'skellinux',
+     ]);
+
+   combine Embedix::ECD objects together
+
+     $ecd->mergeWith($other_ecd);
+
+   print as text
+
+     print $ecd->toString;
+
+   print as XML
+
+     use Embedix::ECD::XMLv1 qw(xml_from_cons);
+
+     print $ecd->toXML(shiftwidth => 4, dtd => 'yes');
+
+     my $cons = Embedix::ECD->consFromFile('minicom.ecd');
+     print xml_from_cons($cons);
+
+REQUIRES
+========
+
+Parse::RecDescent
+     for the ECD parser
+
+Data::Dumper
+     for debugging
+
+Tie::IxHash
+     for preserving the insertion order of children while retaining `O(1)'
+     named access (at the expense of memory).
+
+Pod::Usage
+     `bin/ecd2xml' uses this to generate its help message.
+
+DESCRIPTION
+===========
+
+   Embedix::ECD allows one to represent ECD files as a tree of perl
+objects.  One can construct objects by parsing an ECD file, or one can
+build an ECD object from scratch by combining instances of Embedix::ECD
+and its subclasses.  These objects can then be turned back into ECD files
+via the `toString()' method.
+
+   ECD stands for Embedix Component Description, and its purpose is to
+contain meta-data regarding packages (aka components) in the Embedix
+distribution.  ECD files contain much of the same data a .spec file does
+for an RPM.  A major difference however is that ECD files do not contain
+building instructions whereas .spec files do.  Another major difference
+between .spec files and ECD files is the structure.  ECD files are
+hierarchically structured whereas .spec files are comparatively flat.
+
+   The ECD format reminds me of the syntax for Apache configuration files.
+Items are tag-delimited (like in XML) and attributes are found between
+these tags.  Comments are written by prefixing them with /^\s*#/.  Unlike
+apache configurations, attribute names and values are separated by an "="
+sign, whereas in apache the first token is the attribute name and
+everything after that (sans leading whitespace) and up to the end of the
+line is the attribute's value.  Also, unlike apache configurations,
+attributes may also be enclosed in tags, whereas in apache tags are used
+only to describe nodes.
+
+   ECD files look like pseudo-XML with shell-styled comments.
+
+METHODS
+=======
+
+Constructors
+------------
+
+   There are two types of constructors provided by this class.  The first
+kind of constructor begins with "new" and returns an Embedix::ECD object.
+There is another kind of constructor that begins with "cons" and returns
+the syntax tree as nested arrayrefs.
+
+   I realized that creating an object of the syntax tree takes a long time
+(especially for long ECD files).  I also realized that sometimes, the
+simple nested arrayref is useful enough on its own.  It also has the nice
+property of retaining comments whereas the object constructor disposes of
+comments.  I thought if ECD files were ever to be translated into XML,
+it'd be nice to be able to keep the comments.  These factors convinced me
+that it would be useful to have these 2 kinds of constructors.
+
+new(key => $value, ...)
+     This returns an Embedix::ECD object.  It can be initialized with named
+     parameters which represent the attributes the object should have.  The
+     set of valid attributes is described under `' in this node.
+
+          $system     = Embedix::ECD::Group->new(name => 'System');
+          $utilities  = Embedix::ECD::Group->new(name => 'Utilities');
+          $busybox    = Embedix::ECD::Component->new(
+
+          name    => 'busybox',
+          type    => 'bool',
+          value   => 0,
+          srpm    => 'busybox',
+
+          static_size     => 3006,
+          min_dynamic_size=> 0,
+          storage_size    => 4408,
+          startup_time    => 0,
+
+          keeplist        => [ '/bin/busybox' ],
+          requires_expr   => [
+              '(libc.so.6 == "y") &&',
+              '(ld-linux.so.2 == "y") &&',
+              '(skellinux == "y") &&',
+              '(  (Misc-utilities == "y")',
+              '|| (File-compression-utilities == "y")',
+              '|| (Network-utilities == "y")',
+              '|| (Process-utilities == "y")',
+              '|| (Directory-utilities == "y")',
+              '|| (User-info-utilities == "y")',
+              '|| (Disk-info-utilities == "y")',
+              '|| (Screen-utilities == "y")',
+              '|| (System-utilities == "y")',
+              '|| (File-manipulation-utilities == "y") )',
+          ],
+          
+              );
+
+   The following 5 constructors rely on a Parse::RecDescent parser.  When
+they encounter a syntax error they will die, so be sure to wrap them
+around an eval block.
+
+newFromCons($cons)
+     This returns an Embedix::ECD object from a nested arrayref.
+
+          $ecd = Embedix::ECD->newFromCons($cons)
+
+newFromString($string)
+     This returns an Embedix::ECD object from a string in ECD format.
+
+          $ecd = Embedix::ECD->newFromString($string)
+
+newFromFile($filename)
+     This returns an Embedix::ECD object from an ECD file.
+
+          $ecd = Embedix::ECD->newFromFile($filename)
+
+consFromString($string)
+     This returns a nested arrayref from a string in ECD format.
+
+          $cons = Embedix::ECD->consFromString($string)
+
+consFromFile($filename)
+     This returns a nested arrayref from an ECD file.
+
+          $cons = Embedix::ECD->consFromFile($filename)
+
+   (This next constructor is an anomaly.)
+
+Embedix::ECD->parser
+     This returns an instance of Parse::RecDescent configured to understand
+     the ECD grammar.  This instance is a singleton, so you will receive
+     the same instance every time.
+
+          $ecd_parser = Embedix::ECD->parser()
+
+Nodes
+-----
+
+   Nodes are the fundamental building block of the tree structure in an ECD
+file.   Nodes are containers of attributes and other nodes.  No matter
+what, all nodes will have a "name" attribute.  This is the key feature
+that makes nodes distiguishable from attributes.
+
+   This is a node
+
+     <AUTOVAR embedix_ui-VGAOPT>
+         TYPE=string
+         DEFAULT_VALUE=785
+     </AUTOVAR>
+
+   This is an attribute
+
+     <IF>
+         ( ( EBXDUP_CONFIG_USB_BANDWIDTH == "y" )
+         LET ( $VALUE = "y" ) )
+         ||
+         ( ( ( CONFIG_USB != "n" )
+         && ( CONFIG_EXPERIMENTAL != "y" ) )
+         LET ( $VALUE = "n" ) )
+     </IF>
+
+   The distinction is in the opening tag.  The autovar has a second string
+in it which represents the node's name whereas the if has nothing which
+means that it is an attribute of the node it is contained in.
+
+   There are 5 (not 4) types of nodes.
+
+the root node | Embedix::ECD
+     This node is implicit but very real.  When invoking any of the
+     constructors that begin with "newFrom", one will get back an
+     Embedix::ECD object within which the rest of the ECD data will be
+     contained.
+
+Group | Embedix::ECD::Group
+     Their purpose is to establish a hierarchy of components under
+     meaningful subheadings such as "Server/WWW" or "System/Utilities".
+     Their main use is as containers of other nodes.
+
+Component | Embedix::ECD::Component
+     A component node represents a package in the Embedix distribution.
+
+Option | Embedix::ECD::Option
+     An option node is almost always contained under a component node.  The
+     purpose of an option is to provide a point of configurability for a
+     package.
+
+Autovar | Embedix::ECD::Autovar
+     What exactly is this?
+
+Accessing Child Nodes
+---------------------
+
+   The following are accessor methods for child nodes.
+
+getChild($name)
+     This returns a child node with the given $name or undef if no such
+     child exists.
+
+          $child_ecd = $ecd->getChild($name)
+
+n($name)
+     `n()' is an alias for `getChild()'.  "n" stands for "node" and is a
+     lot easier to type than "getChild".
+
+          $ecd->n('System')
+              ->n('Utilities')
+              ->n('busybox')
+              ->n('long-ass-option-name-with-redundant-information');
+
+addChild($obj)
+     This adds a child to the current node.
+
+          $ecd->addChild($obj)
+
+delChild($obj) or delChild($name)
+     This deletes a child from the current node.  The child may either be
+     specified by an object or by its name.
+
+          $ecd->delChild($obj) or $ecd->delChild($name)
+
+getChildren
+     This returns a list of all child nodes.
+
+          @child_ecd = $ecd->getChildren()
+
+hasChildren
+     This returns true if the current node has child nodes.
+
+          $ecd->hasChildren()
+
+Accessing Child Nodes via AUTOLOAD
+----------------------------------
+
+   The name of a node can be used as a method.  This is what makes it
+possible to say something like:
+
+     my $busybox = $ecd->System->Utilities->busybox;
+
+   and get back the Embedix::ECD::Component object that contains the
+information for the busybox package.  "System", "Utilities", and "busybox"
+are not predefined methods in Embedix::ECD or any of its subclasses, so
+they are delegated to the AUTOLOAD method.  The AUTOLOAD method will try
+to find a child with the same name as the undefined method and it will
+return it if found.
+
+   I have not yet decided whether the AUTOLOAD should die when a child is
+not found.  Currently undef is returned in this situation.
+
+   One annoyance is that many nodes have names with "-" in them.  These
+cannot be AUTOLOADed, because method names may not have a "-" in perl.
+When accessing such nodes, use the `getChild()' method.
+
+Attributes
+----------
+
+   If nodes are objects, then attributes are a node's instance variables.
+All attributes may be single-valued or aggregate-valued.  Single-valued
+attributes are non-reference scalar values, and aggregate attributes are
+non-reference scalar values enclosed within an arrayref.
+
+   A single valued attribute:
+
+     my $bbsed = $busybox->n('Misc-utilities')->n('keep-bb-sed');
+     $bbsed->provides('sed');
+
+   The same attribute as an aggregate:
+
+     $bbsed->provides([ 'sed' ]);
+
+   Semantically, these are equivalent.  The main difference one will notice
+is cosmetic.  When the `toString()' method is called, the single-valued
+one will look like:
+
+     PROVIDES=sed
+
+   and the aggregate valued provides will look like:
+
+     <PROVIDES>
+         sed
+     </PROVIDES>
+
+   Again, these two expressions mean the same thing.  An aggregate of one
+is interpreted just as if it were a single value.
+
+   Aggregates become useful when attributes needs to have a list of values.
+
+     $busybox->n('compile-time-features')->n('enable-bb-feature-use-inittab')->requires ([
+         'keep-bb-init',
+         'inittab',
+         '/bin/sh',
+     ]);
+
+   This will be rendered by `toString()' as
+
+     <REQUIRES>
+         keep-bb-init
+         inittab
+         /bin/sh
+     </REQUIRES>
+
+   There are accessors for attributes that work like your typical perl
+getters and setters.  That is, when called without a parameter, the method
+behaves as a getter.  When called with a parameter, the method behaves as
+a setter and the value of the parameter is assigned to the attribute.
+
+   getter:
+
+     my $name = $busybox->name();
+
+   setter:
+
+     $busybox->name('busybox');
+
+Accessors For Single-Valued Attributes
+--------------------------------------
+
+   These are accessors for attributes that are typically single-valued.
+
+name
+     This is the name of the node.
+
+          $ecd->name()
+
+type
+     This is the type of the node.  This is usually (always?) seen in the
+     context of an option and it can contain values such as "bool", "int",
+     "int.hex", "string", and "tridep".
+
+          $ecd->type()
+
+value
+     This is the value of a node which must be something appropriate for
+     its type.
+
+          $ecd->value()
+
+default_value
+     This is the value taken by the node if value is not defined.
+
+          $ecd->default_value()
+
+range
+     For the numerical types, it may be desirable to limit the range of
+     values that may be assigned such that value() will always be
+     meaningful.  The use of this attribute has only been observed in
+     linux.ecd.
+
+          $ecd->range()
+
+help
+     This often contains prose regarding the current node.  I think it
+     would be nice if it were possible to use an alternative form of
+     mark-up language inside these sections.  (HTML, for instance).
+
+          $ecd->help()
+
+prompt
+     The value in prompt is used in TargetWizard to pose a question to the
+     user regarding whether he/she wants to enable an option or not.
+
+          $ecd->prompt()
+
+license
+     This is the license that the software falls under.  Usually, there is
+     only one license, but once in a while you may get a dual-licensed
+     package.  In that case, it's OK to give it an arrayref with multiple
+     licenses in it.
+
+          $ecd->license()
+
+srpm
+     This contains the name of the source RPM sans version information and
+     the file extension.  This attribute almost always has the same value
+     as name().
+
+          $ecd->srpm()
+
+specpatch
+     This attribute is only meaningful within the context of a component.
+     Specpatches are applied to .spec files just prior to the building of a
+     component.  They are often used to configure the compilation of a
+     component.  The busybox package provides a good example of this in
+     action.
+
+          $ecd->specpatch()
+
+static_size
+     This is the sum of .text, .data, and .bss for an option and/or
+     component.
+
+          $ecd->static_size()
+
+eval_static_size
+     If static_size contains a mathematical expression, this method
+     evaluates it.
+
+          ($size, $give_or_take) = $ecd->eval_static_size;
+
+min_dynamic_size
+     The very least a program will `malloc()' during its execution.
+
+          $ecd->min_dynamic_size()
+
+eval_min_dynamic_size
+     If min_dynamic_size contains a mathematical expression, this method
+     evaluates it.
+
+          ($size, $give_or_take) = $ecd->eval_min_dynamic_size;
+
+storage_size
+     This is the amount of space this component and/or option would
+     consume on a filesystem.
+
+          $ecd->storage_size()
+
+eval_storage_size
+     If storage_size contains a mathematical expression, this method
+     evaluates it.
+
+          ($size, $give_or_take) = $ecd->eval_storage_size;
+
+startup_time
+     The amount of time (in what metric?) from the time a program is
+     executed up to the point in time when the program becomes useful.
+
+          $ecd->startup_time()
+
+eval_startup_time
+     If startup_time contains a mathematical expression, this method
+     evaluates it.
+
+          ($size, $give_or_take) = $ecd->eval_startup_time;
+
+Accessing Aggregate Attributes
+------------------------------
+
+   The following are attributes that frequently contain aggregate values.
+When setting attributes with aggregate values, enclose the values within
+an arrayref.
+
+requiresexpr
+     This contains a C-like expression describing node dependencies.
+
+          $ecd->requiresexpr()
+
+if
+     I didn't know if using a keyword as a method name would be legal, but
+     apparently it is.  I also wonder if more than on 'if' statement is
+     allowed per node.
+
+          $ecd->if()
+
+conflicts
+     This is used to explicitly specify a node that conflicts with the
+     current node.  My first thought is that this is just another way to
+     say provides.
+
+          $ecd->conflicts()
+
+build_vars
+     This specifies a list of transformations that can be applied to a
+     .spec file prior to building.
+
+          $ecd->build_vars()
+
+provides
+     This is a list of symbolic names that a node is said to be able to
+     provide.  For example, grep in busybox provides grep.  GNU/grep also
+     provides grep.  According to TargetWizard, these two cannot coexist on
+     the same instance of an Embedix distribution, because they both
+     provide grep.
+
+          $ecd->provides()
+
+requires
+     This is a list of libraries, files, provides, and other nodes required
+     by the current node.
+
+          $ecd->requires()
+
+keeplist
+     This is a list of files and directories provided by a component or
+     option.
+
+          $ecd->keeplist()
+
+choicelist
+     This is used for options in the kernel.
+
+          $ecd->choicelist()
+
+trideps
+     This is used for options in the kernel.
+
+          $ecd->trideps()
+
+Accessors That Take Named Attributes
+------------------------------------
+
+   The most general kind of accessor takes the name of an attribute as a
+parameter and gets or sets it.
+
+getAttribute($name)
+     This gets the attribute called $name.
+
+          $val = $ecd->getAttribute($name)
+
+setAttribute($name, $value)
+     This sets the attribute called $name to $value.
+
+          $ecd->setAttribute($name, $value)
+
+Utility Methods
+---------------
+
+toString(indent => 0, shiftwidth => 4)
+     This will render an $ecd object as ASCII in ECD format.  JavaScript
+     programmers may find this familiar.  An interesting deviation from the
+     JavaScript version of `toString()' is that this one will accept
+     optional parameters that allow one to control the rendering options.
+
+          $string = $ecd->toString(indent => 0, shiftwidth => 4)
+
+    indent
+          This is the number of spaces the first level nodes should be
+          indented.  The default value is 0.
+
+    shiftwidth
+          This is the number of spaces a nested item should be indented.
+          The default value is 4.
+
+mergeWith($the_other_ecd)
+     This combines the information contained in $the_other_ecd with $ecd.
+     In the event that there is conflicting information, the information in
+     $the_other_ecd takes precedence over what already existed in $ecd.
+
+          $ecd->mergeWith($the_other_ecd)
+
+getDepth
+     This method returns how many levels deep one is in the object tree.
+     The root level is considered 0.
+
+          $depth = $ecd->getDepth()
+
+getNodeClass
+     This returns the node class (ie. Group, Component, Option, or
+     Autovar) of an Embedix::ECD object.  It differs from the *ref()*
+     operator in that the string "Embedix::ECD::" is omitted from the
+     returned value.
+
+          $name = $ecd->getNodeClass()
+
+getFormatOptions(@opt);
+     This is used internally by implementations of `toString()' to compute
+     and return spacing information based on the formatting parameters
+     passed to it.
+
+          $opt_hash_ref = $ecd->getFormatOptions(@opt);
+
+attributeToString($opt_hash_ref);
+     This is used internally by implementations of `toString()' to render a
+     node's attributes.
+
+          $string = $ecd->attributeToString($opt_hash_ref);
+
+CLASS VARIABLES
+===============
+
+   You shouldn't be touching these.  This is just here for your
+information.
+
+Embedix::ECD::__grammar
+     This scalar contains the grammar for ECD files.
+
+Embedix::ECD::__parser
+     This contains an instance of Parse::RecDescent.
+
+DIAGNOSTICS
+===========
+
+$line: was expecting $TAGNAME, but found $CRAP instead.
+     This error occurs whenever an imbalanced tag is found.
+
+$line: $ATTRIBUTE not allowed in $NODE_TYPE
+     not implemented
+
+BUGS
+====
+
+   This parser becomes exponentially slower as the size of ECD data
+increases.  busybox.ecd takes 30 seconds to parse.  Don't even try to
+parse linux.ecd - it will sit there for hours just sucking CPU before it
+ultimately fails and gives you back nothing.  I don't know if there's
+anything I can do about it.
+
+   I have noticed that XML::Parser (which wraps around the C library,
+expat) is 60 times faster than my Parse::RecDescent-based parser when
+reading busybox.ecd.  I really want to take advantage of this.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000,2001 John BEPPU.  All rights reserved.  This program
+is free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+AUTHOR
+======
+
+   John BEPPU <beppu@lineo.com>
+
+SEE ALSO
+========
+
+related libraries and programs
+     `ecdlib.py(3)', `config2ecd(1)', `tw(1)'
+
+related perl modules
+     Embedix::ECD::XMLv1(3pm)
+
+CML2
+     The Configuration Menu Language is a constraint-based language
+     developed by Eric Raymond in an attempt to simplify the process of
+     configuring the Linux kernel.
+
+          http://www.tuxedo.org/~esr/kbuild/
+
+CDL
+     The Component Description Language was developed by Cygnus to support
+     configurable compilation for the eCos operating system.
+
+          http://sourceware.cygnus.com/ecos/
+
+the lastest version
+          http://opensource.lineo.com/cgi-bin/cvsweb/pm/Embedix/ECD/
+
+
+File: pm.info,  Node: Embedix/ECD/Autovar,  Next: Embedix/ECD/Component,  Prev: Embedix/ECD,  Up: Module List
+
+an object for AUTOVAR nodes
+***************************
+
+NAME
+====
+
+   Embedix::ECD::Autovar - an object for AUTOVAR nodes
+
+SYNOPSIS
+========
+
+     my $ecd = Embedix::ECD::Autovar->new();
+
+DESCRIPTION
+===========
+
+   Embedix::ECD::Autovar is a subclass of Embedix::ECD for representing
+AUTOVAR nodes.  It differs from its superclass in the following ways.
+
+Differences
+-----------
+
+it doesn't (yet) except in name
+AUTHOR
+======
+
+   John BEPPU <beppu@lineo.com>
+
+SEE ALSO
+========
+
+   Embedix::ECD(3pm)
+
+
+File: pm.info,  Node: Embedix/ECD/Component,  Next: Embedix/ECD/Group,  Prev: Embedix/ECD/Autovar,  Up: Module List
+
+an object for COMPONENT nodes
+*****************************
+
+NAME
+====
+
+   Embedix::ECD::Component - an object for COMPONENT nodes
+
+SYNOPSIS
+========
+
+     my $ecd = Embedix::ECD::Component->new();
+
+DESCRIPTION
+===========
+
+   Embedix::ECD::Component is a subclass of Embedix::ECD for representing
+COMPONENT nodes.  It differs from its superclass in the following ways.
+
+Differences
+-----------
+
+it doesn't (yet) except in name
+AUTHOR
+======
+
+   John BEPPU <beppu@lineo.com>
+
+SEE ALSO
+========
+
+   Embedix::ECD(3pm)
+
+
+File: pm.info,  Node: Embedix/ECD/Group,  Next: Embedix/ECD/Node,  Prev: Embedix/ECD/Component,  Up: Module List
+
+an object for GROUP nodes
+*************************
+
+NAME
+====
+
+   Embedix::ECD::Group - an object for GROUP nodes
+
+SYNOPSIS
+========
+
+     my $ecd = Embedix::ECD::Group->new();
+
+DESCRIPTION
+===========
+
+   Embedix::ECD::Group is a subclass of Embedix::ECD for representing
+GROUP nodes.  It differs from its superclass in the following ways.
+
+Differences
+-----------
+
+it doesn't (yet) except in name
+AUTHOR
+======
+
+   John BEPPU <beppu@lineo.com>
+
+SEE ALSO
+========
+
+   Embedix::ECD(3pm)
+
+
+File: pm.info,  Node: Embedix/ECD/Node,  Next: Embedix/ECD/Option,  Prev: Embedix/ECD/Group,  Up: Module List
+
+a base class for ECD nodes
+**************************
+
+NAME
+====
+
+   Embedix::ECD::Node - a base class for ECD nodes
+
+SYNOPSIS
+========
+
+   instantiation
+
+     # don't instantiate me!
+
+   inheriting
+
+     package Embedix::ECD::Group;
+     use vars qw(@ISA);
+
+     @ISA = qw(Embedix::ECD::Node);
+
+REQUIRES
+========
+
+Some::Module
+DESCRIPTION
+===========
+
+   a brief summary of the module written with users in mind.
+
+METHODS
+=======
+
+   methods
+
+CLASS VARIABLES
+===============
+
+   cvars
+
+DIAGNOSTICS
+===========
+
+   error messages
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000 John BEPPU.  All rights reserved.  This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+AUTHOR
+======
+
+   John BEPPU <beppu@lineo.com>
+
+SEE ALSO
+========
+
+related perl modules
+the latest version
+
+File: pm.info,  Node: Embedix/ECD/Option,  Next: Embedix/ECD/Root,  Prev: Embedix/ECD/Node,  Up: Module List
+
+an object for OPTION nodes
+**************************
+
+NAME
+====
+
+   Embedix::ECD::Option - an object for OPTION nodes
+
+SYNOPSIS
+========
+
+     my $ecd = Embedix::ECD::Option->new();
+
+DESCRIPTION
+===========
+
+   Embedix::ECD::Option is a subclass of Embedix::ECD for representing
+OPTION nodes.  It differs from its superclass in the following ways.
+
+Differences
+-----------
+
+it doesn't (yet) except in name
+AUTHOR
+======
+
+   John BEPPU <beppu@lineo.com>
+
+SEE ALSO
+========
+
+   Embedix::ECD(3pm)
+
+
+File: pm.info,  Node: Embedix/ECD/Root,  Next: Embedix/ECD/Util,  Prev: Embedix/ECD/Option,  Up: Module List
+
+a class for root nodes
+**********************
+
+NAME
+====
+
+   Embedix::ECD::Root - a class for root nodes
+
+SYNOPSIS
+========
+
+   instantiation
+
+     $ecd = Embedix::ECD::Root->new(name => 'ecd');
+
+REQUIRES
+========
+
+Embedix::ECD::Node
+     to inherit from
+
+DESCRIPTION
+===========
+
+   a brief summary of the module written with users in mind.
+
+METHODS
+=======
+
+   methods
+
+CLASS VARIABLES
+===============
+
+   cvars
+
+DIAGNOSTICS
+===========
+
+   error messages
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000 John BEPPU.  All rights reserved.  This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+AUTHOR
+======
+
+   John BEPPU <beppu@lineo.com>
+
+SEE ALSO
+========
+
+related perl modules
+the latest version
+
+File: pm.info,  Node: Embedix/ECD/Util,  Next: Embedix/ECD/XMLWriter,  Prev: Embedix/ECD/Root,  Up: Module List
+
+miscellaneous stuff
+*******************
+
+NAME
+====
+
+   Embedix::ECD::Util - miscellaneous stuff
+
+SYNOPSIS
+========
+
+   import interesting stuff into your namespace
+
+     use Embedix::ECD::Util qw(indent %default @attribute_order)
+
+DESCRIPTION
+===========
+
+   In this module are things that didn't quite fit anywhere else.  I hope
+to keep the contents of this module to a minimum.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000 John BEPPU.  All rights reserved.  This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+AUTHOR
+======
+
+   John BEPPU <beppu@lineo.com>
+
+
+File: pm.info,  Node: Embedix/ECD/XMLWriter,  Next: Embedix/ECD/XMLv1,  Prev: Embedix/ECD/Util,  Up: Module List
+
+adds a method to write ECD data as XML
+**************************************
+
+NAME
+====
+
+   Embedix::ECD::XMLWriter - adds a method to write ECD data as XML
+
+SYNOPSIS
+========
+
+   Load appropriate modules first
+
+     use Embedix::ECD;
+     use Embedix::ECD::XMLWriter qw(xml_from_cons);
+
+   load an ECD and print it as XML
+
+     my $ecd->newFromFile('tinylogin.ecd');
+     print $ecd->toXML;
+
+   If you want to preserve comments, use a cons instead of an Embedix::ECD
+object.
+
+     my $cons = Embedix::ECD->consFromFile('tinylogin.ecd');
+     print xml_from_cons($cons);
+
+REQUIRES
+========
+
+Embedix::ECD
+     This is the module Embedix::ECD::XMLWriter augments.
+
+EXPORTS
+=======
+
+xml_from_cons($cons)
+DESCRIPTION
+===========
+
+   This module adds a few methods to the Embedix::ECD namespace for the
+purposes of XML generation.  The reason it has been separated from the
+main module is to allow one to only load this module when necessary and to
+save memory when you it's not.
+
+METHODS
+=======
+
+Generating XML from a cons
+--------------------------
+
+$xml = xml_from_cons($cons);
+     A cons (or nested arrayref) is generated from the constructors in
+     Embedix::ECD that have names starting with "cons".  This method will
+     take a cons and generate well-formed XML from it.  Because a cons
+     preserves comments in an ECD, xml_from_cons() is able to preserve
+     comments in the XML it generates.
+
+     Although the XML this generates will be well-formed, it runs a high
+     risk of not being valid, because it cannot (yet?) order the
+     attributes in accordance w/ the current DTD.
+
+Add-ons to Embedix::ECD
+-----------------------
+
+$ecd = Embedix::ECD->newFromXML()
+     not implemented.
+
+$xml = $ecd->toXML()
+     This generates an XML expression of an ECD in accordance to the DTD
+     found in $Embedix::ECD::XMLWriter::__dtd.  The generated XML will be
+     well-formed and valid.
+
+$string = $ecd->attributeToXML()
+     This does the same thing as attributeToString() but generates XML,
+     instead.
+
+CLASS VARIABLES
+===============
+
+$Embedix::ECD::XMLWriter::__dtd
+     This contains the Document Type Definition for the XML version of the
+     ECD format.
+
+AUTHOR
+======
+
+   John BEPPU <beppu@lineo.com>
+
+SEE ALSO
+========
+
+related perl modules
+     Embedix::ECD(3pm)
+
+
+File: pm.info,  Node: Embedix/ECD/XMLv1,  Next: Emotion,  Prev: Embedix/ECD/XMLWriter,  Up: Module List
+
+adds a method to write ECD data as XML
+**************************************
+
+NAME
+====
+
+   Embedix::ECD::XMLv1 - adds a method to write ECD data as XML
+
+SYNOPSIS
+========
+
+   Load appropriate modules first
+
+     use Embedix::ECD;
+     use Embedix::ECD::XMLv1 qw(xml_from_cons);
+
+   load an ECD and print it as XML
+
+     my $ecd->newFromFile('tinylogin.ecd');
+     print $ecd->toXML;
+
+   If you want to preserve comments, use a cons instead of an Embedix::ECD
+object.
+
+     my $cons = Embedix::ECD->consFromFile('tinylogin.ecd');
+     print xml_from_cons($cons);
+
+REQUIRES
+========
+
+Embedix::ECD
+     This is the module Embedix::ECD::XMLv1 augments.
+
+EXPORTS
+=======
+
+xml_from_cons($cons)
+DESCRIPTION
+===========
+
+   This module adds a few methods to the Embedix::ECD namespace for the
+purposes of XML generation.  The reason it has been separated from the
+main module is to allow one to only load this module when necessary and to
+save memory when you it's not.
+
+METHODS
+=======
+
+Generating XML from a cons
+--------------------------
+
+$xml = xml_from_cons($cons);
+     A cons (or nested arrayref) is generated from the constructors in
+     Embedix::ECD that have names starting with "cons".  This method will
+     take a cons and generate well-formed XML from it.  Because a cons
+     preserves comments in an ECD, xml_from_cons() is able to preserve
+     comments in the XML it generates.
+
+     Although the XML this generates will be well-formed, it runs a high
+     risk of not being valid, because it cannot (yet?) order the
+     attributes in accordance w/ the current DTD.
+
+Add-ons to Embedix::ECD
+-----------------------
+
+$ecd = Embedix::ECD->newFromXML()
+     not implemented.
+
+$xml = $ecd->toXML()
+     This generates an XML expression of an ECD in accordance to the DTD
+     found in $Embedix::ECD::XMLv1::__dtd.  The generated XML will be
+     well-formed and valid.
+
+$string = $ecd->attributeToXML()
+     This does the same thing as attributeToString() but generates XML,
+     instead.
+
+CLASS VARIABLES
+===============
+
+$Embedix::ECD::XMLv1::__dtd
+     This contains the Document Type Definition for the XML version of the
+     ECD format.
+
+AUTHOR
+======
+
+   John BEPPU <beppu@lineo.com>
+
+SEE ALSO
+========
+
+related perl modules
+     Embedix::ECD(3pm)
+
+
+File: pm.info,  Node: Emotion,  Next: End,  Prev: Embedix/ECD/XMLv1,  Up: Module List
+
+discrete emotion annotation processing
+**************************************
+
+NAME
+====
+
+   Emotion - discrete emotion annotation processing
+
+SYNOPSIS
+========
+
+     empathize <transcript>
+     empathize --index <transcript> [<transcript> ...]
+
+DESCRIPTION
+===========
+
+   The most difficult part of this module is learning how to annotate
+free-form text with information about what competition is taking place.
+If you haven't studied http://ghost-wheel.net then go do that now.
+
+   The first part of this document describes the XML representation of 3rd
+person annotations and the validation rules.  The second part describes
+the perl API.
+
+XML TUTORIAL
+============
+
+The Basics
+----------
+
+   The minimum situation consists of the type of competition and two
+opponents.
+
+     abbreviation  type of competition (situation)
+     ------------  -------------------------------
+     destroys      [-] destroys [-]
+     steals        [-] steals from [+]
+     uneasy        [-] is made uneasy by [0]
+     exposes       [+] exposes [-]
+     impasse       [+] and [+] are at an impasse
+     admires       [+] admires [0]
+     observes      [0] observes [-]
+     accepts       [0] accepts [+]
+     ready         [0] and [0] are at readiness
+
+   Each opponent is labelled either left or right, indicating on which
+side of the situation he or she participates.  For example:
+
+     <observes left="student" right="teacher">
+       A student watches the teacher make a presentation.
+     </observes>
+
+     <observes right="student" left="teacher">
+       The teacher watches a student make a presentation.
+     </observes>
+
+   Of course a teacher is probably more accustomed to lecturing in front
+of a class than a student.  This information can be captured with the
+`intensity' attribute:
+
+     <observes left="student" right="teacher" intensity="gentle">
+       A student watches the teacher make a presentation.
+     </observes>
+
+     <observes right="student" left="teacher" intensity="forceful">
+       The teacher watches a student make a presentation.
+     </observes>
+
+   Now it is clear that the teacher's presentation involves some gentle
+excitement, but a student presentation is an exciting test of
+self-control.  Since no spin is involved, the emotion is roughly the same
+regardless of whether we empathize with the presenter or the audience.  To
+contrast, situations involving spin require some additional structure.
+For example:
+
+     <steals left="thief" right="child">
+       The thief steals the teddy bear from the child.
+     </steals>
+
+   Here it is not clear which emotion is intended.  Opponents experience
+the situation very differently.  Perhaps the thief is drunk with
+accomplishment, but the child is probably quite angry.  To avoid this
+ambiguity, situations involving spin follow a transactional structure:
+
+     initiator:   (1) before ---+---> (3) after
+                                |
+                                v
+     victim:             (2) tension
+
+   Here is a hypothetical trace of a `steals' situation decomposed into
+the three transaction phases:
+
+     <steals left="thief" right="child" before="focused">
+       The thief eyes the teddy bear maliciously and wrenches it
+       from the child's passionate grip.
+     </steals>
+
+     <steals left="thief" right="child" tension="focused">
+       The child becomes furious and starts crying.
+     </steals>
+
+     <steals left="thief" right="child" after="focused">
+       The thief triumphantly stows the teddy bear in his backpack.
+     </steals>
+
+   Perhaps this sequence of events is ghastly, but here the goal is merely
+to model emotions accurately.  In this example, the three phases
+unambiguously correspond to "anxiety," "anger," and "drunk with
+accomplishment."
+
+   The attributes before, `tension', and after describe the emotional
+tension.  Tension modifies a general emotion to fit the precise situation.
+For example:
+
+     <steals left="thief" right="child" before="relaxed">
+       The thief grabs the teddy bear with abandon.
+     </steals>
+
+     <steals left="thief" right="child" before="stifled">
+       The thief studies whether the teddy bear can be stolen.
+     </steals>
+
+   A tension modifier is either `focused', `relaxed', or `stifled'.
+Emotion correspondance charts can assist in fitting the most accurate
+modifier to the situation.  Of course a thief is not always successful:
+
+     <steals left="thief" right="child" before="stifled">
+       The thief studies whether the teddy bear can be stolen.
+     </steals>
+
+     <impasse left="child" right="thief" tension="focused">
+       The child grips the teddy bear even more tightly.
+     </impasse>
+
+   The four situations involving spin (`steals', `exposes', `admires', and
+`accepts') mostly follow the three phase transaction structure.  However,
+flexibility offered by `accepts' shows the need to explicitly indicate an
+initiator.  For example:
+
+     <accepts left="chef" right="child" before="focused">
+       I am hungry.  Is dinner ready?
+     </accepts>
+
+     <accepts left="chef" right="child" before="focused">
+       You are hungry!
+     </accepts>
+
+   Looking just at the annotation, a reader cannot determine whether the
+child is making a demand, or the chef is voicing the child's expression of
+hunger.  An `initiator' attribute eliminates the ambiguity:
+
+     <accepts left="chef" right="child" before="focused" initiator="right">
+       I am hungry.  Is dinner ready?
+     </accepts>
+
+     <accepts left="chef" right="child" before="focused" initiator="left">
+       You are hungry!
+     </accepts>
+
+   Now the situations can be distinguish.  While the annotation is
+precise, it is also quite a lot of typing.  To reduce the burden on the
+analyst, the parser is capable of guessing reasonable defaults by
+consideration of who is talking.  For example:
+
+     <accepts left="chef" initiator="child" before="focused">
+       I am hungry.  Is dinner ready?
+     </accepts>
+
+   Or alternately:
+
+     <talk who="child">
+       <accepts left="chef" before="focused">
+         I am hungry.  Is dinner ready?
+       </accepts>
+     </talk>
+
+   We covered most of the simple variations.  Here is a summary:
+
+     situation  variations
+     ---------- ---------------------------------
+     steals     before|tension|after, initiator
+     exposes    before|tension|after, initiator
+     admires    before|tension|after, initiator
+     accepts    before|tension|after, initiator
+     impasse    tension
+     observes   intensity, [initiator]
+     uneasy     intensity, [initiator]
+     ready      intensity
+     destroys   -
+
+   The square brackets denote optional attributes.  More will be said
+about this later.
+
+Reaction
+--------
+
+   Question & answer (Q&A) format is a common way to structure discussion.
+This section looks at the Q&A structure in comparison with the
+competition model.  It will be shown that there are some conflicts in the
+corresponce, however, the complementary features can be embraced.
+
+   Questions usually end with a question mark.  Even so, from the point of
+view of competition, questions are essentially demands.  For example:
+
+     <accepts left="child" initiator="parent" before="focused">
+       Does your teddy bear have brown fur?
+     </accepts>
+
+   In answer, the child's choices include:
+
+     <accepts initiator="child" right="parent" before="focused">
+       Yes!
+     </accepts>
+
+   Or:
+
+     <impasse initiator="child" right="parent" tension="relaxed">
+       Which teddy bear?
+     </accepts>
+
+   Notice that similar replies could be expected from the non-question
+demand, "I want the teddy bear."  For example, `accepts' ("OK, here it
+is.") or `impasse' ("Which teddy bear?").  While the question mark
+inflects the demand somehow, its presence or absence does not seem
+particularly significant in the context of competition.
+
+   The answer side of Q&A will now be considered.  Answers are generally
+offered in reaction to questions.  However, it is easy to demonstrate
+ambiguity.  For example:
+
+     <accepts left="child" initiator="parent" before="focused">
+       Does your teddy bear have brown fur?
+     </accepts>
+
+     <impasse initiator="child" right="parent" tension="relaxed">
+       Which teddy bear?
+     </accepts>
+
+   Is the child's reply a question or an answer?  Perhaps both, but
+clearly the Q&A terminology is imprecise.  Despite these problems, some
+kind of contextual relationship definitely exists.  To encode the Q&A
+relationship precisely, a clear standard is needed to recognize it.
+
+   The standard suggested here is that the participants must match but the
+initiator must flip-flop.  These rules were discovered by surveying many
+Q&A style exchanges and the rules seem to work well in practice.  re
+(meaning "in reaction to") and id attributes serve the purpose.  For
+example:
+
+     <accepts id="q1" right="child" initiator="adult" before="focused">
+       Does your teddy bear have brown fur?
+     </accepts>
+
+     <accepts re="q1" left="parent" initiator="child" before="focused">
+       Yes!
+     </accepts>
+
+Quality
+-------
+
+   So far, the chosen markup may seem somewhat arbitrary.  For example,
+why indicate merely `accepts'?
+
+     <accepts id="q1" right="child" initiator="adult" before="focused">
+       Does your teddy bear have brown fur?
+     </accepts>
+
+   Why not more detail, such as:
+
+     <accepts id="q1" right="child" initiator="adult" before="focused">
+       Does your
+         <admires initiator="child" right="teddy bear" tension="relaxed">
+           teddy bear
+         </admires>
+       have brown fur?
+     </accepts>
+
+   In fact, either annotation could be accurate.  Part of the problem is
+that both the story and annotation are being written by the same person.
+This is a conflict of interest because i can adjust the story to improve
+my annotations, and visa-versa.  Recall that the goal here is to develop
+the best quality annotations *without* changing the story.
+
+   Another problem is that written text is not rich enough as a medium to
+thoroughly convey life's emotional textual.  To contrast, film (or the
+actual life experience itself) is quite sufficiently expressive.  So
+assuming we are watching a film, what consistitutes best quality markup?
+For example:
+
+     <steals initiator="Yupi" right="Lon" before="focused">
+       Yupi gives Lon a beautiful and fragrant flower.
+     </steals>
+
+   Most likely this markup is wrong.  A proposed criteria for judging the
+quality of markup follows:
+
+   * Is it detailed enough to isolate single emotions?
+
+     Looking at a scene as a sequences of moments, every moment can be
+     consider an *independent* competition event.  The question is: into
+     how many intervals must we divide the timeline such that each interval
+     is exactly one emotion?
+
+   * Does it span the entire duration of the emotion?
+
+     Some clarity is lost if a single emotion is sub-divided excessively.
+     A single annotation should span as much time as is practical.  The
+     duration criteria is also consided in the next section, "Resolution."
+
+Resolution
+----------
+
+   The parser tries to keep track of situations which remain unresolved
+(or pending).  For example:
+
+     <accepts id="o1" initiator="clerk" left="Joey" before="focused">
+       What toppings do you want on your pizza?
+     </accepts>
+
+     <impasse id="o2" re="o1" left="Joey" right="cleck" tension="stifled">
+       Joey puts the phone on hold.
+     </impasse>
+
+   In general, stories don't stop abruptly leaving unresolved
+cliffhangers.  Here is a clue that can be used to debug annotations.
+After processing a transcript, `empathize' outputs all the situations
+which do not find closure.  In the above example, the situation is pending
+until Joey picks up the phone or the clerk gives up in disgust or whatever.
+
+   Similarly, a warning is triggered when the same situation is resolved
+more than once.  For example:
+
+     <accepts id="o3" initiator="clerk" left="Joey" before="focused">
+       How many pizzas do you want?
+     </accepts>
+
+     <accepts re="o3" initiator="Joey" before="focused">
+       i want exactly three pizzas.
+     </accepts>
+
+     <accepts re="o3" initiator="Joey" before="focused">
+       i want exactly two pizzas.
+     </accepts>
+
+   Notice the situation `o3' is listed in the re attribute twice.  This is
+unnecessarily ambiguous.  There are a variety of ways to better model the
+scenario.
+
+Revoke / Amend
+--------------
+
+   Sometimes i say something which i wish i never said.  The `revoke'
+attribute reflects this scenario.
+
+     <accepts id="q1" initiator="Spike" left="Jeff" before="focused">
+       What time is it?
+     </accepts>
+
+     <impasse id="a1" re="q1" tension="focused" right="Spike" initiator="Jeff">
+       No idea!
+     </observes>
+
+     <uneasy id="q2" amend="q1" initiator="Spike" left="Jeff" intensity="gentle">
+       Spike gives Jeff a threatening look.
+     </uneasy>
+
+     <accepts id="a2" revoke="a1" re="q1" before="focused" left="Spike"
+              initiator="Jeff">
+       Eleven hundred hours!  Sir!
+     </accepts>
+
+   `q1' is resolved by `a1' until `q1' becomes pending again when `a1' is
+revoked by `a2'.  Now that `q1' is again pending, the re attribute can be
+used in `a2' to substitute a revised reaction.
+
+   To contrast, Spike's demand for the time in `q1' is not revoked by his
+subsequent threatening look in `q2'.  Here, what needs to be reflected is
+Spike's change in tone, but not change in fact.  The `amend' attribute
+serves this purpose.
+
+Echo
+----
+
+   The echo attribute represents the repeated emphasis of the same
+situation.
+
+     <impasse id="m1" left="child" right="mother" tension="focused"
+              absent="right">
+       Where is my mother?
+     </impasse>
+
+     <impasse echo="m1" id="m2" left="child" right="mother" tension="stifled">
+       i miss my mom!  :-(
+     </impasse>
+
+   Once echo'd, `m1' is no longer pending.  Only `m2' remains pending.
+
+Absent
+------
+
+   Another way to manage resolution is to declare the victim absent.  Here
+is an example:
+
+     <talk who="teacher">
+       <accepts left="students" before="focused" absent="left">
+         The students listen to the teacher's tedious monologue.
+       </accepts>
+     </talk>
+
+   In fact, the teacher may never know whether the situation was truly
+`accepts', `observes', or even merely:
+
+     <ready intensity="gentle" left="students" right="teacher">
+       The students are intermittently aware that the
+       teacher continues to talk.
+     </ready>
+
+   Notice that the `absent' attribute is unnecessary in this case.  A few
+situations do not trigger any need for resolution, and `ready' is one of
+them.
+
+Wildcards
+---------
+
+     <accepts left="*" initiator="Crawford" before="focused">
+       Does anyone know the time?
+     </accepts>
+
+   Talk about anthropomorphic rivals. XXX
+
+Context
+-------
+
+   Here is a prior example updated with new markup:
+
+     <steals id="p1" initiator="thief" right="child" before="focused">
+       The thief eyes the teddy bear maliciously and wrenches it
+       from the child's passionate grip.
+     </steals>
+
+     <steals re="p1" left="thief" initiator="child" tension="focused">
+       The child becomes furious and starts crying.
+     </steals>
+
+     <steals context="p1" initiator="thief" right="child" after="focused">
+       The thief triumphantly stows the teddy bear in his backpack.
+     </steals>
+
+   This last situation describing the thief gloating over his
+accomplishment is not really an `answer' to "p1", but there is certainly
+some kind of direct contextual connection.  The context attribute is
+available for such cases.  context is a catch-all.  It is appropriate for
+any kind of generic relationship for which a more specific classification
+is not available.
+
+EMOTION LIBRARY API
+===================
+
+   * Emotion::set_transcript($xml_file)
+
+   * my $dialog_id = Emotion::set_speaker($who)
+
+   * my @pending = Emotion::unresolved()
+
+Emotion::Atom Methods
+---------------------
+
+   * my $situation = Emotion::Atom->new($expat, $attr)
+
+   * my $emotion = $atom->emotion;
+
+SEE ALSO
+========
+
+   http://ghost-wheel.net
+
+

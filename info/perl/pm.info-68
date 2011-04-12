@@ -1,0 +1,1749 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Bio/Tools/pSW,  Next: Bio/UnivAln,  Prev: Bio/Tools/WWW,  Up: Module List
+
+pairwise Smith Waterman object
+******************************
+
+NAME
+====
+
+   Bio::Tools::pSW - pairwise Smith Waterman object
+
+SYNOPSIS
+========
+
+     $factory = new Bio::Tools::pSW( '-matrix' => 'blosum62.bla',
+     				    '-gap' => 12,
+     				    '-ext' => 2,
+     				   );
+
+     #use the factory to make some output
+
+     $factory->align_and_show($seq1,$seq2,STDOUT);
+
+     # make a Bio::SimpleAlign and do something with it
+
+     $aln = $factory->pairwise_alignment($seq1,$seq2);
+
+     $aln->write_MSF(\*STDOUT);
+
+INSTALLATION
+============
+
+   This module is included with the central Bioperl distribution:
+
+     http://bio.perl.org/Core/Latest
+     ftp://bio.perl.org/pub/DIST
+
+   Follow the installation instructions included in the README file.
+
+DESCRIPTION
+===========
+
+   pSW is an Alignment Factory. It builds pairwise alignments using the
+smith waterman algorithm. The alignment algorithm is implemented in C and
+added in using an XS extension. The XS extension basically comes from the
+Wise2 package, but has been slimmed down to only be the alignment part of
+that (this is a good thing!). The XS extension comes from the bioperl-ext
+package which is distributed along with bioperl.  Warning This package
+will not work if you have not compiled the bioperl-ext package.
+
+   The mixture of C and Perl is ideal for this sort of problem. Here are
+some plus points for this strategy:
+
+Speed and Memory
+     The algorithm is actually implemented in C, which means it is faster
+     than a pure perl implementation (I have never done one, so I have no
+     idea how faster) and will use considerably less memory, as it
+     efficiently assigns memory for the calculation.
+
+Algorithm efficiency
+     The algorithm was written using Dynamite, and so contains an automatic
+     switch to the linear space divide and conquor method. This means you
+     could effectively align very large sequences without killing your
+     machine (it could take a while though!).
+
+IN_DEVELOPMENT
+==============
+
+   warning - this module is under active development. Eventually it should
+contain the ability to make alignment objects such as Bio::SimpleAlign or
+Bio::UnivAlign
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules.  Send your comments and suggestions preferably to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     bioperl-l@bioperl.org              - General discussion
+     http://bioperl.org/MailList.html  - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution. Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bioperl.org/bioperl-bugs/
+
+AUTHOR
+======
+
+   Ewan Birney, birney@sanger.ac.uk
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with an underscore "_".
+
+pairwise_alignment
+------------------
+
+     Title   : pairwise_alignment
+     Usage   : $aln = $factory->pairwise_alignment($seq1,$seq2)
+     Function: Makes a SimpleAlign object from two sequences
+     Returns : A SimpleAlign object
+     Args    :
+
+align_and_show    Title   : align_and_show  Usage   : $factory->align_and_show($seq1,$seq2,STDOUT)
+--------------------------------------------------------------------------------------------------
+
+matrix
+------
+
+     Title     : matrix()
+     Usage     : $factory->matrix('blosum62.bla');
+     Function  : Reads in comparison matrix based on name
+               :
+     Returns   :
+     Argument  : comparison matrix
+
+gap
+---
+
+     Title     : gap
+     Usage     : $gap = $factory->gap() #get
+               : $factory->gap($value) #set
+     Function  : the set get for the gap penalty
+     Example   :
+     Returns   : gap value
+     Arguments : new value
+
+ext
+---
+
+     Title     : ext
+     Usage     : $ext = $factory->ext() #get
+               : $factory->ext($value) #set
+     Function  : the set get for the ext penalty
+     Example   :
+     Returns   : ext value
+     Arguments : new value
+
+
+File: pm.info,  Node: Bio/UnivAln,  Next: Bio/Variation/AAChange,  Prev: Bio/Tools/pSW,  Up: Module List
+
+Bioperl alignment object
+************************
+
+NAME
+====
+
+   Bio::UnivAln - Bioperl alignment object
+
+SYNOPSIS
+========
+
+   This Perl module is intended to simplify the handling of biosequence
+alignments.  When in doubt, always check our Homepage for the newest
+version, contact emails, help files, etc:
+http://www.techfak.uni-bielefeld.de/bcd/Perl/Bio/welcome.html
+
+   See the `REVISION HISTORY' in this node for recent bugfixes and
+enhancements.
+
+Object Creation in a Nutshell
+-----------------------------
+
+     use Bio::UnivAln;
+
+     my $aln = Bio::UnivAln->new('t/alnfile.fasta');
+     $aln = Bio::UnivAln->new(-file=>'t/alnfile.aa',
+                          -desc=>'Sample alignment',
+                          -type=>'amino',
+                          -ffmt=>'raw'      # 1 line in file -> 1 sequence
+                         );
+     $aln = Bio::UnivAln->new(-seqs=>"TCCCGCGTCAACTG\nTGGTGCTTCAACCG\nACTTG--TCAACTG");
+     $aln = Bio::UnivAln->new(-seqs=>[$sequence_strg,\@character_list,$bioSeqObject]);
+     $aln = Bio::UnivAln->new(-seqs=> ['ACCCGCGTCAACTG',
+              ['A','G','G','G','G','C','T','T','C','A','A','C','C','G'],
+              Bio::Seq->new(-seq=>'ACTTG--TCAACTG')
+            ]);
+     $aln = Bio::UnivAln->new($file,$seqs,$id,$desc,$names,$row_ids,$col_ids,
+              $row_descs,$col_descs,$numbering,$type,$ffmt,$descffmt,$inplace);
+
+Object Manipulation in a Nutshell
+---------------------------------
+
+     OUTPUT
+
+     $aln->ffmt('fasta');   # set default output format
+     print "\n aln in default format:\n", $aln->layout();
+     print "\n aln in raw format:\n", $aln->layout("raw");
+     print "\n aln in fasta format:\n", $aln->layout("fasta"), "\n";
+     print "\n aln in MSF format (via readseq):\n", $aln->layout("MSF"), "\n";
+
+     SLICING
+
+     my $alnSlice = $aln->seqs(1,3,1,2); # multiline string of rows 1-3, columns 1-2
+         print $alnSlice, "\n";
+     my @alnSlice = $aln->seqs([1..3], [1,4]); # multidimensional array
+                                               # of rows 1-3, columns 1+4
+         for $aref ( @alnSlice ) { print @$aref, "\n"; }
+     $alnSlice = $aln->seqs([3,2,3,1], [1,3..5]); # rows 3,2,3,1, cols 1,3..5
+
+     ADVANCED SLICING
+
+     sub has_purine {
+       my $str = join "", @{ $_[0] };
+       if ($str =~ /[AaGgRr]+/) {return 1;} else {return 0;}
+     }
+       @alnSlice = $aln->seqs([1,2,3], \&has_purine); # rows 1-3, and from these
+     # only the entries of columns for which has_purine returns 1
+       $alnSlice = $aln->seqs({ids=>'SeqA SeqB'},{ids=>'ColA ColB ColC'});
+       $aln->inplace(1); $aln->seqs({ids=>'A B'},[1..6]); $aln->inplace(0);
+     # manipulates the object itself, assigning the slice internally
+
+     MAPPING
+
+     @resSlice = $aln->map_r(\&has_purine, [1..3]); # 1,0,1 if row 1+3 has purine
+     @resSlice = $aln->map_c(\&has_purine, [1,4]); # 1,0 if column 1 has purine
+
+     UTILITIES
+
+     $resSlice = $aln->consensus(); # 75% majority needed for consensus letter
+     $resSlice = $aln->consensus(0.6, [1,3]); # 60% majority, columns 1+3 only
+     $resSlice = $aln->var_sites(); # no columns that are invariable ...
+     $indices = $aln->var_inds();   # ... and their indices
+     $resSlice = $aln->invar_sites(); # only columns that are invariable
+     $indices = $aln->invar_inds();   # (..inds() is available for most utilities)
+     $resSlice = $aln->var_sites(0.6); # no columns with >= 60% maj. of 1 letter
+     $resSlice = $aln->invar_sites(0.6); # only columns with >= 60% majority
+     $resSlice = $aln->gap_free_sites();
+     $resSlice = $aln->no_allgap_sites(); # exclude sites that only have gaps
+     $resSlice = $aln->reverse([1,3]); # reverse of rows 1+3 only
+     $resSlice = $aln->complement([1,3]); # dna/rna complement of rows 1+3 only
+     $resSlice = $aln->revcom([1,3]); # reverse complement, rows 1+3 only
+     $resSlice = $aln->remove_gaps(); # original sequences without gaps
+
+INSTALLATION
+============
+
+   This module is included with the central Bioperl distribution:
+
+     http://bio.perl.org/Core/Latest
+     ftp://bio.perl.org/pub/DIST
+
+   Follow the installation instructions included in the README file.
+
+   The following are the installation instructions from the original
+UnivAlign distribution for installing UnivAlign.pm by itself. These are
+not necessary if installing from the central Bioperl distribution. Note
+that the central distribution does not currently run the more extensive
+univaln.t2 test harness.
+
+   The original installation package is available from:
+
+     http://www.techfak.uni-bielefeld.de/bcd/Perl/Bio/#univaln
+
+   To install, untar it and run the following commands in the module
+directory created by tar:
+
+     % perl Makefile.PL
+     % make
+     % make test
+     % make install
+
+   For intensive testing, see t/univaln.t2. Run that script via
+
+     % perl t/univaln.t2 > t/my_univaln
+
+   and compare the output with the file t/univaln.o .  Expected error
+messages can be found in t/univaln2_expected_errors .
+
+   If you do not have superuser installation privileges, or to install in
+a different directory, you can do one of two things:
+
+   1) Either copy the UnivAln.pm module into the "Bio" subdirectory of an
+accessible Perl module directory (e.g. /my/perl/lib/Bio/).  (One possible
+"accessible Perl module directory" is your current working directory;
+there you can create a subdirectory named "Bio" and place UnivAln.pm in
+that subdirectory. Then, you can start scripts using Bio::UnivAln from
+your current working directory.)
+
+   2) Or, run the above commands but specify an alternate location for the
+module by supplying a PREFIX argument to the first command:
+
+     % perl Makefile.PL PREFIX=/my/perl/stuff
+
+   This will place the module into '/my/perl/stuff/lib/site_lib/'. To
+specify a directory for the module file, set the $INSTALLSITELIB variable
+in Makefile.PL (e.g., $INSTALLSITELIB = '/my/perl/lib');
+
+   The make install command may report problems with creating documentation
+files (pod2man/perllocal.pod); please find the documentation in
+UnivAln.pm.html instead.
+
+   If you have Bio::Seq installed and want to test Bio::Seq usage by
+Bio::UnivAln, you need enable the line "use Bio::Seq;" at the beginning of
+t/univaln.t2; Bio::Seq can be found via
+http://www.techfak.uni-bielefeld.de/bcd/Perl/Bio/ .  Note that the test
+script will also test error handling; you can expect the error messages
+included in the file univaln.t2_expected_errors - these are OK.
+
+   If you wish that the module uses Don Gilbert's readseq package for
+sequence format conversion (Version 1 Feb 1993), you can set the
+environment variable `READSEQ_DIR'" appropriately. (Currently, only
+"fasta" and "raw" format are supported directly by UnivAln.pm.)  Then, the
+program detects and uses `readseq' automatically, if it is in the
+specified directory (the default directory is "./"). Modifying the
+environment variable `READSEQ' changes the expected name of the executable.
+For example, $ENV{READSEQ_DIR} may be "/vol/biotools/bin/" and
+$ENV{READSEQ} "readseq2.0". Readseq will give you support for PIR/CODATA,
+MSF/GCG and PAUP/NEXUS formats; ASN.1 does not seem to work reliably.
+(URLs: http://iubio.bio.indiana.edu/IUBio-Software+Data/molbio/readseq/
+http://dot.imgen.bcm.tmc.edu:9331/seq-util/Help/readseq.html
+http://bimas.dcrt.nih.gov/molbio/readseq/formats.html )
+
+   Similar support for conversion from Clustal format, using Clustal as a
+converter, is implemented, but not properly tested and documented.  The
+relevant environment variables are `CLUSTAL_DIR' and `CLUSTAL'.  (URL:
+http://www-igbmc.u-strasbg.fr/BioInfo/ClustalW/Top.html )
+
+   (Thanks to Steve A. Chervitz for his help with bundling the module !)
+
+DESCRIPTION
+===========
+
+   This module is the Bio::UnivAln alignment object which is part of the
+Bioperl project. Currently it has some nice methods for accessing an
+alignment after reading it in from certain formats, incl. utilities like
+consensus and reverse complement. Bio::Seq (single sequences) is only
+needed if you explicitly want to use these.
+
+   (Most examples below are taken from the test script(s) that can be
+found in directory "t" of the Bio::UnivAln distribution.  There you will
+also find a CGI script producing some graphics, which is currently in
+alpha status: I suspect it needs some refitting to run on a different
+server. If you'd like to know more about multiple alignments, in theory
+and practice, check out the tutorial at
+http://www.techfak.uni-bielefeld.de/bcd/Curric/MulAli/mulali.html )
+
+CREATION OF ALIGNMENTS
+----------------------
+
+   Alignments can be constructed from files, (multi-line) strings, arrays
+and Bio::Seq objects. Files need to be in a standard format, as described
+below, under the header `ALIGNMENT FORMATS' in this node.
+
+     my $aln = Bio::UnivAln->new('t/alnfile.fasta');
+
+   The first parameter is regarded as a file name; if you pass additional
+parameters, they will overwrite the parameters read in from the file. You
+can use named parameters; take a look at the documentation on the new()
+method in the appendix for a list of all parameters, and their names. In
+the following example, description, sequence type, and file format are
+provided. The file format will relieve Bio::UnivAln from guessing it;
+however, there are no guarantees if you bypass Bio::UnivAln's guessing
+_and_ provide an incorrect file format.
+
+     $aln = Bio::UnivAln->new(-file=>'t/alnfile.aa',
+                          -desc=>'Sample alignment',
+                          -type=>'amino',
+                          -ffmt=>'raw'      # 1 line in file -> 1 sequence
+                         );
+
+   If no description ("-desc") is given, a default one will be based on the
+file name.  The format type is also the default format for output; if both
+differ, you need to specify the input format when you construct the $aln
+object, and then use the accessor ffmt() to set the default output format.
+Bio::UnivAln can be passed the aligned sequences directly, using the named
+parameter "-seqs". It takes a multi-line string, or any mix of strings,
+array references, and Bio::Seq objects:
+
+     $aln = Bio::UnivAln->new(-seqs=>"TCCCGCGTCAACTG\nTGGTGCTTCAACCG\nACTTG--TCAACTG");
+     $aln = Bio::UnivAln->new(-seqs=>[$sequence_strg,\@character_list,$bioSeqObject]);
+     $aln = Bio::UnivAln->new(-seqs=> ['ACCCGCGTCAACTG',
+              ['A','G','G','G','G','C','T','T','C','A','A','C','C','G'],
+              Bio::Seq->new(-seq=>'ACTTG--TCAACTG')
+            ]);
+
+ACCESS TO THE DATA, AND MANIPULATION
+------------------------------------
+
+   The layout() method returns the sequence in a specified format;
+supported formats are listed under the header `ALIGNMENT FORMATS' in this
+node.
+
+     $aln->ffmt('fasta');   # set default output format
+     print "\n aln in default format:\n", $aln->layout();
+     print "\n aln in raw format:\n", $aln->layout("raw");
+     print "\n aln in fasta format:\n", $aln->layout("fasta"), "\n";
+     print "\n aln in MSF format (via readseq):\n", $aln->layout("MSF"), "\n";
+
+Access by Specifying Boundaries
+-------------------------------
+
+   You can calculate slices of alignments in a very flexible way; interval
+slices like the intersection of rows 1-3 and columns 1-2 are calculated
+using seqs(). Here, intersection means that those elements are returned
+that are both in rows 1-3 and in columns 1-2.
+
+     $alnSlice = $aln->seqs(1,3,1,2);  # rows 1-3, columns 1-2
+     $alnSlice = $aln->seqs();  # returns the whole alignment
+
+   Here's a diagram illustrating the general case, intersecting rows $y_lo
+to $y_hi, and columns $x_lo to $x_hi.
+
+     $x_lo      $x_hi
+      :           :
+          .. $y_lo ...:...........:.................
+      :::::::::::::
+      :: SELECTED :
+      ::: PART ::::
+      :::::::::::::
+          .. $y_hi ...:::::::::::::.................
+      :           :
+                                 Fig.1
+
+   Maximal intervals will be assumed if no parameters are provided.  Per
+default, the first row (sequence) has index 1 (not 0), and the first
+column has index 1 (not 0). The latter can be modified using numbering().
+
+Access by Index Lists
+---------------------
+
+   If you desire non-consecutive row / column elements, you can specify
+the indices as lists, one list of desired row indices and one list of
+desired column indices.
+
+     $alnSlice = $aln->seqs([1..3], [1,4]);  # rows 1-3, columns 1+4
+
+   Here, letters in columns 2+3 will not be returned. Another example:
+
+     $alnSlice = $aln->seqs([3,2,3,1], [1,3..5]);  # rows 3,2,3,1, cols 1,3..5
+
+   If you specify the empty list ("[]"), all rows/columns will be returned.
+The following diagram shows the case where the list of row indices is
+[$r1,$r2,$r3,$r4], and the list of column indices is [$c1,$c2,$c3].
+
+     :    :          :
+     :    :          :
+          ............*....*..........*.............  $r1
+     :    :          :
+          ............*....*..........*.............  $r2
+          ............*....*..........*.............  $r3
+     :    :          :
+          ............*....*..........*.............  $r4
+     :    :          :
+     :    :          :
+                     $c1  $c2        $c3           Fig.2
+
+   Again, an element is selected for the slice if and only if it lies in
+the intersection of a row and a column which are both desired according to
+the index lists.
+
+Return Values
+-------------
+
+   In the examples above, a string (scalar) is returned; the standard
+sequence accessor seqs() always returns a (multi-line) string in a scalar
+context. In a list context, it returns an array; each element of such an
+array is a reference to another array holding the letters of one sequence,
+i.e. one single row.
+
+     @alnSlice = $aln->seqs([1..3], [1,4]);  # rows 1-3, columns 1+4
+         for $aref ( @alnSlice ) { print @$aref, "\n"; }
+
+   If you use the result of an accessor or a utility function in the
+"-seqs" slot of new(), you may need to force that result into a scalar
+context, because the accessor, etc, returns a list in a list context, and
+the constructor naturally provides such a list context since it expects a
+list of parameters.
+
+     $aln = new Bio::UnivAln(-seqs=>scalar($aln2->seqs()));
+
+   In the example above, the list-context return value of `$aln2->seqs()',
+i.e. the list of rows of $aln2, would be fed one by one as additional
+parameters into the constructor, if you didn't "protect" it by scalar().
+You will be warned about the problem because Bio::UnivAln detects any
+named parameters that it can't use.
+
+Access by Id
+------------
+
+   (The following access method is currently in alpha status, it may need
+some revision until the code is fully released.)
+
+   Any list of desired row/column indices can be replaced by a hash of
+desired ids, which are recognized if they are in the object's own list of
+row or column ids. You need to pass a reference to a hash that has one
+key, "ids", and one value, which is a string containing the ids seperated
+by " "(blank) :
+
+     $alnSlice = $aln->seqs({ids=>'SeqA SeqB'},{ids=>'ColA ColB ColC'});
+
+   Row (sequence) ids are automatically extracted when reading fasta files
+and Bio::Seq objects. Otherwise, they are set to the default numerical
+index list, like (1..20) if the alignment has 20 rows. Since there's
+currently no way to extract column (site) ids (none of the supported
+formats has this feature), these always hold the default numerical
+indices. However, both lists may be set using the accessors row_ids() and
+col_ids(). Note that arbitrary numbering schemes can be supported this way.
+
+Access by Selector Function
+---------------------------
+
+   Finally, you can specify a function such that seqs() returns exactly
+those letters which lie in a row (or column) for which your function
+returns true. E.g. has_purine() returns true if the row/column contains A,
+a, T, t, R, or r; the following $alnSlice will contain only columns that
+have one of these letters in them.
+
+     sub has_purine {
+       my $str = join "", @{ $_[0] };
+       if ($str =~ /[AaGgRr]+/) {return 1;} else {return 0;}
+     }
+       $alnSlice = $aln->seqs([1..3], \&has_purine); # rows 1-3, and from these
+     # only the columns for which has_purine returns 1
+
+   Similarly, the list of row indices, [1..3], could be replaced by a
+function, which is then used to designate the desired rows. (It has the
+same role that the expression EXPR has in the Perl code template *grep
+EXPR, LIST*, see the perlfunc manpage. Bio::UnivAln also provides the
+equivalent to *map EXPR, LIST*; this "Mapping" will be discussed soon.)
+
+   In other words, any list of indices can be replaced by the reference to
+a function r or c. The function then selects those elements (*) that lie in
+a row or column which meets a criterion, returning true if the criterion
+is met, and false otherwise.  If both lists of indices are replaced by
+functions, the picture is like this:
+
+     :    :          :
+     :    :          :
+          ............*....*..........*.............  r(row) = true
+     :    :          :
+          ............*....*..........*.............  r(row) = true
+          ............*....*..........*.............  r(row) = true
+     :    :          :
+          ............*....*..........*.............  r(row) = true
+     :    :          :
+     :    :          :
+                c(column) c(column)  c(column)
+                 = true    = true     = true       Fig.3
+
+   The function out_fasta observes all types of selectors that seqs() does,
+and returns the result in fasta format :
+
+     print "\n aln in fasta format:\n", $aln->out_fasta([1..3],\&has_purine), "\n";
+
+Mapping functions onto Sequences and Columns
+--------------------------------------------
+
+   You can map a function onto selected rows or columns, and receive the
+results as a list:
+
+     @resSlice = $aln->map_r(\&has_purine, [1..3]); # 1,0,1 if row 1+3 has purine
+     @resSlice = $aln->map_c(\&has_purine, [1,4]); # 1,0 if column 1 has purine
+
+   As you may expect, maximal index lists (i.e, all rows / all columns)
+will be assumed if no second parameter is provided. In the same way as
+before, any one if the index lists may be replaced by a hash of ids, or a
+selector function. In the section on `User-defined Utility Functions' in
+this node, map_r() and map_c() are used to implement user-defined
+consensus, reverse, complement, etc.
+
+   By the way, the following map is the same as @alnSlice =
+$aln->seqs([1..3]) since mapping the identity function "sub id { return @_
+}" to desired row/column subsets and collecting the result is just like
+slicing.
+
+     @alnSlice = $aln->map_r(\&id, [ 1..3 ]);
+
+   The number of rows/columns of an alignment can be obtained by using
+height() and width() respectively. Ids and descriptions of rows (sequences)
+and columns (sites) can be manipulated using row_ids(), col_ids(),
+row_descs() and col_descs(). Be *warned* that these accessors just return
+a reference to the array of ids/descriptions; if you'd like to process the
+array without changing the object's data, you need to create your own
+copy. This decision was taken because especially the result of col_ids()
+can be huge, and for a lot of applications a deep copy is unnecessary.
+
+Inplace Manipulation
+--------------------
+
+   Slices can be applied to the object itself, replacing the old alignment
+by a new one that is sliced from the old ('inplace' manipulation).  This
+is particularly useful is the alignment is large. The row (sequence) and
+column (site) ids are taken over from the old alignment. They are used as
+the lookup tables for `Access by Id' in this node, and available via
+row_ids() and col_ids().
+
+   The following code sets the "inplace" flag, and overwrites the current
+alignment with the rows named A and B, and columns 1-6:
+
+     $aln->inplace(1);
+     $aln->seqs({ids=>'A B'},[1..6]);
+     $aln->inplace(0);
+
+   'inplace' manipulation is also available for most utility functions
+below, with the notable exception of consensus(). A full list is given in
+the description of inplace(), see the Appendix.
+
+UTILITY FUNCTIONS LIKE CONSENSUS, AND REVERSE COMPLEMENT
+--------------------------------------------------------
+
+   In the following paragraph, Bio::UnivAln's direct support for utility
+functions like consensus, (in)variable sites, gap-free sites, reverse,
+complement, and reverse complement is explained.
+
+     $resSlice = $aln->consensus();
+
+   calculates the consensus of the columns, i.e. those columns for which
+there exists a letter which has an absolute majority of 75% or more. The
+letter '!' designates the case that no consensus is given.  To bypass the
+default threshold, write
+
+     $resSlice = $aln->consensus(0.6);
+
+   Note that for values smaller or equal to 0.5, two letters may have an
+equal (relative) majority, and the tie is currently broken arbitrarily.
+Thresholds larger than or equal to 1 imply that the site that has a
+consensus letter must be invariant.
+
+     $resSlice = $aln->consensus(1, [1..10]);
+
+   Just like seqs() and map_c()/map_r(), consensus() can be passed a
+reference to a hash of desired column ids, a function that selects the
+columns, or the desired column indices themselves. (Here, it's columns 1
+to 10.  Internally, map_c() is used to implement consensus().)
+
+   The methods var_sites() and invar_sites() are using consensus(), just
+checking whether there is a consensus letter ('invariable'), or not
+('variable'). Naturally, the default threshold is 1, i.e.  sites must be
+truly invariable (100% majority of 1 letter), or truly variable (strictly
+less than 100% majority). Per default, var_sites() and invar_sites()
+return a *multiline string of rows* (sequences), with elements from the
+desired columns (sites) only. They do not return the alignment in a
+column-by-column fashion ! Also, don't be confused by the possibilty to
+specify a list of desired row indices / ids, or a selector function: It
+just constrains the output further, without influencing which columns are
+selected. (Internally, seqs() is used to implement these functions; it is
+passed a row selector, and a function that returns true if there is a
+consensus letter.)
+
+     $resSlice = $aln->var_sites();
+     $resSlice = $aln->invar_sites();
+     $resSlice = $aln->var_sites(0.6, [1,3]); # no columns with >= 60% majority
+                                        # of one letter; also, print rows 1+3 only
+     $resSlice = $aln->invar_sites(0.6, [1,3]);  # only columns with >= 60% maj.
+     $resSlice = $aln->no_allgap_sites([1,3]); # exclude sites that only have gaps
+     $resSlice = $aln->gap_free_sites([1,3]); # exclude sites that have >= 1 gaps
+
+   In a similar fashion, the last example selects gap-free columns, and
+from those only prints the elements that happen to be in rows 1+3.  All
+these utilities support `Inplace Manipulation' in this node:
+
+     $aln->inplace(1);
+     $aln->var_sites(0.6, {ids=>'1 2'});
+     $aln->inplace(0);
+
+   The utilities reverse(), complement(), and revcom() also allow for
+`Inplace Manipulation' in this node, and again you can specify the rows
+which shall form the new alignment by overwriting the old, or be returned
+as reverse'd, complement'ed, or reverse complement'ed :
+
+     $resSlice = $aln->reverse([1,3]);
+     $resSlice = $aln->complement([1,3]);
+     $resSlice = $aln->revcom([1,3]);
+
+   If an inplace manipulation reverses column order, e.g. in the case of
+reverse(), this will be reflected in the column ids available via
+col_ids().  Note that complement is defined according to the IUPAC code,
+using the same substitutions that Bio::Seq uses, such that results
+obtained for e.g. Amino Acid sequences are probably nonsensical.
+
+   For all functions that have "sites" in their name, a corresponding
+"inds" function is available that returns the relevant array of indices
+instead of the sites themselves:
+
+     $indices = $aln->var_inds(); # array of indices of the variable sites
+     $indices = $aln->no_allgap_inds([1,3]);
+
+   Finally, the original sequences (without gaps) are available via
+remove_gaps().
+
+     $some_original_sequences = $aln->remove_gaps([1,3]);
+
+   In a list context, all these utility functions return an array of array
+references, just like seqs(); the exception is consensus(), which then
+returns a simple array of consensus letters.
+
+ALIGNMENT FORMATS
+-----------------
+
+   The directly supported formats are fasta and raw (1 line in file -> 1
+sequence, where "\n" (newline) is the delimiter.) If available (see
+`INSTALLATION' in this node), readseq is used to parse and write
+PIR/CODATA, MSF/GCG and PAUP/NEXUS formats; ASN.1 does not seem to work
+reliably. Clustal is used to parse in clustal format, if available.
+
+ADVANCED STUFF
+--------------
+
+   An exhaustive list of accessors and methods is given in the appendix.
+E.g., Alignments may be copied using copy(), and compared for equality
+modulo gaps with equal_nogaps().
+
+   Bio::UnivAln doesn't really care whether the sequences passed in are
+indeed from an alignment (i.e. have the same length); sequence bags (i.e.
+multisets of sequences where the same element may occur more than once) are
+therefore handled, too. However, you need to be careful with some methods
+(e.g. the accessor seqs(), and width()) because their default behavior may
+depend on inspecting the first sequence only (or the first requested
+sequence, if this information is available - new feature in 1.006) : If
+you use seqs() on a sequence bag, and don't provide the number of columns
+explicitly, you may be surprised to find out that the length of the first
+sequence is used as the default length, and not the length of the longest
+sequence. width() uses the same heuristic.
+
+   You can add gap symbols to the elements of a multiset so that each
+element takes the length of the longest sequence by calling
+equalize_length(); you can even pad more gap characters by specifying the
+new width yourself, as an argument to equalize_length().
+
+   If you need to have the alignment in an intermediate form, i.e.
+neither an array of array references, nor a single multiline string, but
+an array of strings, just request the output as a multiline string, and
+split it on "\n". For example, to just extract a single column, you can do
+
+     @col = split "\n", $aln->seqs([],[$colindex]);
+
+   Checking an alignment for characters that should not be there according
+to the Alignment Type is currently not well-supported; see alphabet_check()
+for a _preliminary_ way of doing manual checkup, though.
+
+   The hash referenced by $names stores {loc,name} pairs of other database
+locations and corresponding names where the alignment is located.
+Currently, loc and name must both be set as text, and must consist
+entirely of a string matching the regexp /^[A-Za-z]\w*$/.  That is, they
+must be a single "word" of at least one character, without a leading
+underscore.  This restriction is not enforced, but code which deviates is
+subject to break in future releases.  Note also that the object may place
+any other sort of items in the name string, so users of this hash should
+not rely on accessing entries conforming the requirements above.
+
+Alignment Types
+---------------
+
+   The supported sequence types and corresponding alphabets are the same
+as reported in the documentation of the Bio::Seq object: "dna", "rna", and
+"amino". They are carried along without much checking, etc.
+
+User-defined Utility Functions
+------------------------------
+
+   Here are some user-defined auxiliary functions which can be applied to
+rows and columns of an alignment; this technique can be used if no
+appropriate built-in functions are available, or if you don't want to use
+them.
+
+   maj_dominance returns false if all letters in a column/row are the same.
+
+     sub maj_dominance {
+       my $str = join "", @{ $_[0] };
+       my $first_res = @{ $_[0] }[0];
+       $str =~ s/$first_res//g;
+       if ($str) {return 0;} else {return 1;}
+     }
+
+   consensus returns the letter that has the (relative) majority among all
+residues, if it exceeds a certain threshold. (For simplicity, the threshold
+is hard-wired.)
+
+     sub consensus {
+       my @chars = @{ $_[0] };
+       my %temp = ();
+       my $threshold = 0.34;  # more than 1/3
+       my @list = sort { $temp{$a}<=>$temp{$b} }
+                       grep ++$temp{$_} >= $threshold * ($#chars+1), @chars;
+         # In case of a tie, it's not specified which residue is in $list[-1]
+       return (defined($list[-1]) ? $list[-1] : '!');
+     }
+
+   reverse_ and complement implement reversing a sequence (note the
+underscore; I'm looking for better ways to implement function passing),
+and complementing it according to IUPAC conventions.
+
+     sub reverse_ {
+       return [ reverse @{ $_[0] } ];
+     }
+     sub complement {
+       my $str = join "", @{ $_[0] };
+       $str =~ tr/acgtrymkswhbvdnxACGTRYMKSWHBVDNX/tgcayrkmswdvbhnxTGCAYRKMSWDVBHNX/;
+       return [ split "", $str ];
+     }
+
+   Here, the functions above are applied:
+
+     @resSlice = $aln->map_c(\&maj_dominance);
+     print "\nDominated sites:\n", @resSlice, "\n";
+
+     @resSlice = $aln->map_c(\&consensus);
+     @resSlice = $aln->map_c(\&consensus, \&has_purine);
+     print "\nConsensus of the columns that have purine\n", @resSlice, "\n";
+
+     @resSlice = $aln->map_r(\&reverse_);
+
+     @resSlice = $aln->map_r(\&complement);
+
+   You can also parametrize your functions by using "closures" (See
+"Programming Perl", 2nd Ed., p.253). Basically, you set up a function that
+has the parameter built into it, and pass around the reference to that
+function. Here's a function that does the set-up:
+
+     sub _setup_consensus_with_threshold {
+       my $threshold = shift;
+       return sub {
+         my @chars = @{ $_[0] };
+         my %temp = ();
+         my @list = sort { $temp{$a}<=>$temp{$b} }
+                         grep ++$temp{$_} >= $threshold * ($#chars+1), @chars;
+           # In case of a tie, it's not specified which residue is in $list[-1]
+         return (defined($list[-1]) ? $list[-1] : 'N');
+       }
+     }
+
+   Here, you create an instance of the function, incl. the parameter.
+$consensus holds a reference to the new instance.
+
+     my $consensus = _setup_consensus_with_threshold(0.75);
+
+   and finally, you pass the reference to the function around, e.g. to
+map_c().
+
+     @resSlice = $aln->map_c(\&$consensus);
+
+   (You can do pretty cute tricks using closures, e.g. you can set a
+counter to 1 in the setup function, and increment it in the "real"
+function.)
+
+Bio::UnivAln Guts
+=================
+
+   Currently, the object hash has the following keys. This may be subject
+to change; in particular the alignment data may at some point be stored
+more efficiently in a PDL (Perl Data Language) array.
+
+     $self->{'seqs'}   : An array of array references, each of which holds
+                       one sequence of the alignment
+     $self->{'id'}     : String specifying the ID; shall be in \w+ (i.e. composed
+                       of characters in [a-zA-Z_0-9]; only \S+ is enforced, though)
+     $self->{'desc'}   : String giving a description, (later) to be formatted
+                       according to $descffmt
+     $self->{'names'}  : A reference to a hash which stores {loc,name} pairs of
+                       other database locations and corresponding names where
+                       the alignment is located.
+     $self->{'row_ids'}: A reference to an array which stores row (sequence) ids
+     $self->{'col_ids'}: Same as $self->{'row_ids'}, for the columns (sites)
+     $self->{'row_descs'}: A reference to an array which stores row (sequence)
+                       descriptions
+     $self->{'col_descs'}: Same as $self->{'row_descs'}, for the columns (sites)
+     $self->{'numbering'}: The offset of the first column, an integer
+     $self->{'type'}   : The type of the alignment, concatenated from the molecule
+                       type (see L<Alignment Types>) and a flag that is not
+                       currently used, but intended to flag sequence bags
+     $self->{'ffmt'}   : alignment format, see L<ALIGNMENT FORMATS>.
+     $self->{'descffmt'}: format of $desc; right now this should be ``raw''
+                       or ``fasta'' which just implies that no specific
+                       format is being followed, any text is allowed
+                       excluding ``\n''(newline). More support is planned.
+     $self->{'inplace'}: Flag which is set to true if accessors (and utility
+                       functions) should make the modification to the object
+                       itself, and just return true on success. (See inplace().)
+
+   Some more helpful comments...  In Perl, false is 0 or "", true is
+everything else.  Not all internal functions have a POD/HTML documentation.
+If you read the code of this module, you need to be familiar with map and
+grep...
+
+TO-DO
+=====
+
+   Soon:
+
+   Better handling of access, copying and slicing of `$self->{'row_ids'}',
+etc.  Add pointer to a UnivAln demo page based on the draft at
+http://www.techfak.uni-bielefeld.de/bcd/Perl/Bio/Docs/phylosnapshot.html.
+Fix alphabet_check() (current workaround cannot be generalized), Fix
+UnivAlnAlph{UnivAlnType{"unknown"}} (current setting is not so nice;
+what's the easiest way to set it to all word characters ?), Support more
+formats, especially Nexus, Improved sequence alphabet support; not just
+providing a function alphabet_check() for manual checking.  Then, maybe
+use strings to represent alphabets.  Test and document aln() for returning
+a slice as an alignment.
+
+   Later:
+
+   Validity marker for correctly initialized/manipulated objects.  Assign
+_unique_ IDs if none are provided.  Functions like has_seqs(), etc.  Using
+`undef' during initialization, and functions for regaining such a state.
+Use Perl Data Language ?!
+
+DISCLAIMER
+==========
+
+   How is this for a maximum of disclaiming warranty ? In short, I'm
+developing this module in my spare time and it's for free, don't sue me :-)
+
+     IN NO EVENT SHALL THE GLOBEWIDE NETWORK ACADEMY, THE VIRTUAL SCHOOL OF NATURAL
+     SCIENCES, THE AUTHOR OR THE UNIVERSITY OF BIELEFELD BE LIABLE TO ANY PARTY
+     FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING
+     OUT OF THE USE OF THIS CODE, EVEN IF THE GLOBEWIDE NETWORK ACADEMY,
+     THE VIRTUAL SCHOOL OF NATURAL SCIENCES, THE AUTHOR OR THE UNIVERSITY OF
+     BIELEFELD HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+     THE GLOBEWIDE NETWORK ACADEMY, THE VIRTUAL SCHOOL OF NATURAL SCIENCES, THE
+     AUTHOR AND THE UNIVERSITY OF BIELEFELD SPECIFICALLY DISCLAIM ANY WARRANTIES,
+     INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+     AND FITNESS FOR A PARTICULAR PURPOSE.  THE CODE PROVIDED HEREUNDER IS ON AN
+     "AS IS" BASIS, AND THERE IS NO OBLIGATION WHATSOEVER TO PROVIDE MAINTENANCEE,
+     SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   Copyright (c) 1996, 1997, 1998 Georg Fuellen. All Rights Reserved.
+Some pieces of the code were contributed by Steven E. Brenner, Richard
+Resnick and Chris Dagdigian. Thanks !!!!
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules.  Send your comments and suggestions preferably to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     bioperl-l@bioperl.org          - General discussion
+     http://bio.perl.org/MailList.html             - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution. Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR
+======
+
+   Georg Fuellen
+
+   Technische Fakultaet - AG Praktische Informatik, Universitaet Bielefeld,
+D-33501 Bielefeld, Germany, georg.fuellen@uni-bielefeld.de
+
+   http://www.techfak.uni-bielefeld.de/~fuellen/
+
+ACKNOWLEDGEMENTS
+================
+
+   Steven E. Brenner, Steve A. Chervitz, Michael Constant, Richard Resnick,
+Chris Dagdigian, Lew Gramer [more to follow]
+
+SEE ALSO
+========
+
+     Bio::Seq.pm - The biosequence object
+
+     http://bio.perl.org/Projects/modules.html  - Online module documentation
+     http://bio.perl.org/Projects/SeqAlign/     - Bioperl sequence alignment project
+     http://bio.perl.org/                       - Bioperl Project Homepage
+
+REFERENCES
+==========
+
+   If you'd like to acknowledge use of Bio::UnivAln in your work, please
+cite
+
+   Fuellen, G. (1997). Bio::UnivAln - bioperl alignment object
+[WWW-Document].  URL
+http://www.techfak.uni-bielefeld.de/bcd/Perl/Bio/welcome.html
+
+   And please drop me a note :-) An article for the Perl Journal is
+planned. The page is mirrored at
+
+   http://merlin.mbcr.bcm.tmc.edu:8001/bcd/Perl/Bio/welcome.html
+http://www.biotech.ist.unige.it/bcd/Perl/Bio/welcome.html
+
+REVISION HISTORY
+================
+
+   Version 1.000 on 12 Feb 1997.
+
+   Version 1.001 on 19 Feb 1997. Fixed a bug that triggered _rowbounds()
+and _colbounds() to use maximal index lists whenever the first index in an
+index list was 0. New example in POD:
+
+     $aln = new Bio::UnivAln(-seqs=>scalar($aln2->var_sites()));
+
+   Internal: Now avoiding any global parameter passing by using closures,
+for the utility functions.
+
+   Version 1.002 on 21 Feb 1997. Renamed the module to UnivAln, see the
+discussion (Feb 1997) in the vsns-bcd-perl mailing list archive.  Fixed
+hopefully all problems in out_graph(), all of them triggered by
+bugs/features of PGPLOT.
+
+   Version 1.003 on 25 Feb 1997. Added POD on using closures.  Moved
+out_graph() into the cgi-script t/univaln.cgi (this is alpha-code !)  so
+that "use PGPLOT" is no longer required.
+
+   Version 1.004 on 13 Mar 1997. Fixed bug with reading fasta files.
+Changed file format identifiers "Fasta" and "Raw" to "fasta" and "raw".
+Added support for arbitrary numeration schemes by providing access by
+name/id for rows (sequences) and columns (sites).  Made _arys() and
+_strs() accept same row/column designations like seqs().  Added 'inplace'
+manipulation for slicing and most utilities.  Improved speed a little.
+Deriving default description string from file name, if available.
+
+   Version 1.005 on 18 Jun 1997. Using simple filename ("basename") as
+default decription. Changed type identifiers "Unknown", "Dna", "Rna",
+"Amino" to "unknown", "dna", "rna", "amino". The old acronyms should still
+be supported for the forseeable future.
+
+   Version 1.006 on 15 Dec 1997. Added function no_allgap_sites();
+out_fasta() now accepts same row/column designations like seqs(). For
+advanced users: the width() of sequence bags can now be controlled by
+supplying the index of the row whose width is taken - by default the width
+of the first row is used.
+
+   Version 1.007 on 15 Mar 1998.  * Added functions that return indices
+instead of actual sequence data: var_inds(), invar_inds(),
+gap_free_inds(), unknown_free_inds(), special_free_inds() and
+no_allgap_inds() return the indices of (in)variable, gap-free,
+unknown-free, gap+unknown-free and non-gap-only columns; they are the
+counterparts of var_sites(), etc.  * Added remove_gaps() to return
+ungapped (original) sequence data * Added equal_no_gaps() to check for
+equality ignoring gaps * Added equalize_lengths() for padding a sequence
+bag with gaps such that all rows have equal length (current procedure is
+slow) * The default id is now "_" (was: "No_Id_Given") * Internal
+functions _rowbounds() and _colbounds() now return indices from the user's
+perspective, but WITHOUT substracting offset.  Instead, all functions
+subtract offset after applying _rowbounds()/_colbounds()
+
+   Version 1.008 on 13 May 1998.  * Added readseq conversion support,
+making it possible to read and write the following formats: MSF, Paup,
+PIR/Codata, ASN.1. (ASN.1 was not parsed successfully: readseq seems to be
+unable to read in its own ASN.1 output). Technically, readseq is now used
+to parse files that have been processed as "raw" before; now "raw" format
+is recognized using the expression
+/^[A-Z_0-9$_GAP_SYMBOL$_UNKN_SYMBOL\s]+$/im, i.e. the file may only have
+alphanumerical characters, gap and unknown-symbol, and whitespace. If
+commata, etc, are detected, readseq is used for parsing.  Readseq itself
+seems to be unable to detect "raw" format in some cases, causing weird
+results.  * Added Clustal support for parsing; still to be tested and
+documented.
+
+   Version 1.009 on 25 May 1998.  * The module can now be "built" in the
+standard way (perl Makefile.PL, etc).
+
+APPENDIX
+========
+
+   Please note that functions starting with an underscore ("_") are
+intended for internal use only: Use them only if you know what you're
+doing :-)
+
+_initialize()
+-------------
+
+     Usage    : n/a (internal function)
+     Function : Assigns initial parameters to a blessed object.
+     Returns  : 1 on success
+     Argument : As Bio::UnivAln->new, allows for named or listed parameters.
+                See ->new for the legal types of these values.
+
+_rearrange()
+------------
+
+     Usage    : n/a (internal function)
+     Function : Rearranges named parameters to requested order.
+     Returns  : @params - an array of parameters in the requested order.
+     Argument : $order : a reference to an array which describes the desired
+                         order of the named parameters.
+                @param : an array of parameters, either as a list (in
+                         which case the function simply returns the list),
+                         or as an associative array (in which case the
+                         function sorts the values according to @{$order}
+                         and returns that new array.
+
+_rowbounds()
+------------
+
+     Usage    : $corrected_bounds = $aln->_rowbounds($uncorrected_bounds);
+     Function : create default row index list if necessary,
+                create row index list if specified by a hash of ids or
+                by a selector function that acts on rows and returns true/false,
+                check row index list for bounds errors,
+                NO LONGER DONE IN VERSION 1.007 AND HIGHER: substract offset of 1.
+     Returns  : reference to corrected row index list
+     Argument : reference to uncorrected row index list
+
+_colbounds()
+------------
+
+     Usage    : $corrected_bounds = $aln->_colbounds($uncorrected_bounds);
+     Function : create default column index list if necessary,
+                create column index list if specified by a hash of ids or
+                by a selector function that acts on columns and returns true/false,
+                check column index list for bounds errors,
+                NOT IN 1.007 and higher: substract offset (according to numbering scheme).
+     Returns  : reference to corrected column index list
+     Argument : reference to uncorrected column index list
+                reference to row index list: its first row is used to
+                provide the width of the alignment considered, which matters
+                if the alignment is really a sequence bag
+
+_fixbounds()
+------------
+
+     Usage    : ($corrected_rowbounds,$corrected_colbounds) =
+                   $aln->_fixbounds($uncorrected_rowbounds,$uncorrected_colbounds);
+                        OR
+                ($corrected_rowbounds,$corrected_colbounds) =
+                   $aln->_fixbounds($firstpos1,$lastpos1,$firstpos2,$lastpos2)
+     Function : Convert unfixed index list information into the standard internal
+                one, allowing as input either max. 2 references or max. 4 boundary
+                coordinates (2 coord. for row indices and 2 for column indices).
+                Call functions to create maximal default index lists if needed,
+                to create index lists if specified by a hash of ids or by a selector
+                function that acts on rows/columns and returns true/false,
+                to check index lists for bounds errors, and to substract offsets.
+     Returns  : 2 references to corrected index lists
+     Argument : EITHER max. 2 references to uncorrected index lists,
+                OR max. 4 boundary coordinates (integers)
+
+_select()
+---------
+
+     Usage    : @alnSlice = $aln->_select($rrowsel2,$rcolsel2);
+     Function : select elements from the 2-dimensional array $self->{'seqs'}
+                using index lists
+     Returns  : array of references to array of characters
+     Argument : 2 index lists, one for the rows and one for the columns,
+     Comment  : Here's a diagram of dependencies of some methods relying on _select:
+
+     seqs()
+                           /    |
+                         |/_   \|/
+                     _arys() <-- _strs()
+                       |
+                      \|/
+                    _select()
+
+_arys()
+-------
+
+     Usage    : @alnSlice = $aln->_arys([$row1,$row2,$rowx],[col1,$col2,$colx])
+                  (other usages see seqs())
+     Function : Same as seqs(), except that an array is returned always
+     Returns  : array of references to array of characters
+     Argument : Same as seqs()
+
+_strs()
+-------
+
+     Usage    : $alnSlice = $aln->_strs([$row1,$row2,$rowx],[col1,$col2,$colx])
+                  (other usages see seqs())
+     Function : Same as seqs(), except that a multiline string is returned always
+     Returns  : multiline string (including newline characters)
+     Argument : Same as seqs()
+
+seqs()
+------
+
+     Usage    : (1) $alnSlice = $aln->seqs($firstpos1,$lastpos1,$firstpos2,$lastpos2)
+                (2) $alnSlice = $aln->seqs([$row1,$row2,$rowx],[col1,$col2,$colx])
+                (3) $alnSlice = $aln->seqs(\&function_of_row,\&function_of_column)
+                (4) $alnSlice = $aln->seqs({ids=>'r1 r2 r3'},{ids=>'c1 c2 c3'})
+                   [ (2),(3) and (4) can be intermixed ]
+     Function : (1) Returns part of an alignment, from row $firstpos1 to row
+                $lastpos1, and from column $firstpos2 to column $lastpos2
+                Missing parameters are replaced by default (maximal possible)
+                values, where the length of the first row of the _returned_ (*)
+                `alignment' determines the default length in case the alignment is
+                really a sequence bag. ((*) is a new feature in 1.006.)
+                (2) Returns part of an alignment, i.e. those elements that lie
+                in a row designated by an index from the first list
+                ([$row1,$row2,$rowx]), and at the same time lie in a column
+                designated in the second list ([col1,$col2,$colx]).
+                The empty list (``[]'') is replaced by default (maximal possible)
+                values, where the length of the first row of the _returned_
+                `alignment' determines the default length in case the alignment is
+                really a sequence bag. (Note that the first element
+                of rows/columns has index 1 per default.)
+                (3) Instead of an index list, a function acting on a row / column
+                may be supplied; whenever the function returns true, the
+                row / column is designated.
+                (4) Instead of an index list, a hash of ids may be supplied;
+                the ids are looked up in the alignment's list of row (sequence)
+                ids / list of column (site) ids. The former list may be set
+                during the construction of the alignment (e.g. it may be read
+                from the fasta file, or the Bio::Seq objects), or it may be
+                manipulated using row_ids(). col_ids() sets the the latter list.
+     Returns  : in a scalar context: multiline string (including newline characters)
+                in an array context: array of references to arrays of characters
+     Argument : (1) $firstpos1,$lastpos1,$firstpos2,$lastpos2 (all integers; note
+                that the first element of rows/columns has index 1 per default.)
+                (2-4) 2 selectors, one for the rows and one for the columns,
+                each of which may be a reference to a list of indices, or a
+                reference to a hash that has the format ``{ids=>'id1 id2 idx'}''
+                where ids is the mandatory key, and the value is a string
+                containing the desired ids, seperated by `` '' (space), or a
+                function that acts on a list and returns true/false.
+
+_map_r()
+--------
+
+     Usage    : n/a (internal function)
+     Function : apply a row function to selected rows,
+                then return the list of all return values
+     Returns  : list of all return values
+     Argument : $rowf: Reference to the function that is applied to selected rows,
+                its results are put into a list and returned.
+                $rrowsel: Reference to the selector designating the rows
+                to which rowf is applied, as in cases (2)-(4) in seqs().
+
+_map_c()
+--------
+
+     Usage    : n/a (internal function)
+     Function : apply a column function to selected columns,
+                then return the list of all return values
+     Returns  : list of all return values
+     Argument : analogous to _map_r()
+
+map_r()
+-------
+
+     Usage    : @resSlice = $aln->map_r($rowf,$rrowsel);
+     Function : apply a function to selected rows,
+                then return the list of all return values
+     Returns  : list of all return values
+     Argument : $rowf: Reference to the function that is applied to selected rows,
+                its results are put into a list and returned.
+                $rrowsel: Reference to the selector designating the rows
+                to which rowf is applied, as in cases (2)-(4) in seqs().
+
+map_c()
+-------
+
+     Usage    : @resSlice = $aln->map_c($colf,$rcolsel,$rrowsel);
+     Function : apply a function to selected columns,
+                then return the list of all return values
+     Returns  : list of all return values
+     Argument : $colf: Reference to the function that is applied to selected
+                columns, its results are put into a list and returned.
+                $rcolsel: Reference to the selector designating the columns
+                to which colf is applied, as in cases (2)-(4) in seqs().
+                $rrowsel: NOT used as a selector, but as a hint for
+                determining the width of a sequence bag if $rcolsel is undef:
+                The last index of the first row specified by $rrowsel is
+                taken as the maximum column index.
+
+consensus()
+-----------
+
+     Usage    : $cons_letters = $aln->consensus($threshold,$rcolsel);
+     Function : return the consensus of a (subset of) the columns; the letter '!'
+                ($_NO_CONSENSUS_SYMBOL) indicates that no consensus letter exists
+     Returns  : in a scalar context: string of consensus letters
+                in an array context: array of consensus letters
+     Argument : $threshold: A letter is considered consensus of a column
+                if the fraction of the letters in the column that form a
+                (relative) majority is >= $threshold. Ties between 2 letters with
+                an equal relative majority are broken arbitrarily.
+                The default value is 0.75.
+                $rcolsel: Reference to the selector designating the columns
+                of which the consensus is calculated, as in cases (2)-(4) in seqs().
+
+var_sites()
+-----------
+
+     Usage    : $resSlice = $aln->var_sites($threshold,$rrowsel);
+     Function : return the variable sites of an alignment
+     Returns  : in a scalar context: multiline string (including newline characters)
+                in an array context: array of references to arrays of characters
+     Argument : $threshold: A column is considered variable
+                if the fraction of the letters in the column that form a
+                (relative) majority is NOT >= $threshold.
+                The default $threshold is 1, i.e. only constant, INvariable columns
+                are excluded.
+                $rrowsel: Reference to the selector designating the rows
+                of which in turn the letters in the variable columns are printed,
+                as in cases (2)-(4) in seqs(). $rrowsel DOES NOT influence the
+                calculation of the variable sites, it just constrains the output
+                further !
+
+var_inds()
+----------
+
+     Usage    : $indices = $aln->var_inds($threshold,$rrowsel);
+     Function : return the _indices_ of the variable sites of an alignment
+     Returns  : reference to array of indices
+     Argument : $threshold: A column is considered variable
+                if the fraction of the letters in the column that form a
+                (relative) majority is NOT >= $threshold.
+                The default $threshold is 1, i.e. only constant, INvariable columns
+                are excluded.
+                $rrowsel: the first row in $rrowsel is used for
+                determining the width of a sequence bag. In other words,
+                the last index of the first row specified by $rrowsel is
+                taken as the maximum column index.
+
+invar_sites()
+-------------
+
+     Usage    : $resSlice = $aln->invar_sites($threshold,$rrowsel);
+     Function : return the INvariable columns of an alignment
+     Returns  : in a scalar context: multiline string (including newline characters)
+                in an array context: array of references to arrays of characters
+     Argument : $threshold: A column is considered INvariable
+                if the fraction of the letters in the column that form a
+                (relative) majority is >= $threshold.
+                The default $threshold is 1, i.e. no variability is allowed.
+                $rrowsel: see var_sites()
+
+invar_inds()
+------------
+
+     Comment  : This is the indices-returning version of invar_sites(),
+                cf. var_sites() and var_inds().
+
+gap_free_sites()
+----------------
+
+     Usage    : $resSlice = $aln->gap_free_sites($rrowsel);
+     Function : return the gap-free columns of an alignment.
+     Returns  : in a scalar context: multiline string (including newline characters)
+                in an array context: array of references to arrays of characters
+     Argument : $rrowsel: see var_sites()
+
+gap_free_inds()
+---------------
+
+     Comment  : This is the indices-returning version of gap_free_sites(),
+                cf. var_sites() and var_inds().
+
+unknown_free_sites()
+--------------------
+
+     Usage    : $resSlice = $aln->unknown_free_sites($rrowsel);
+     Function : return the unknown-free columns of an alignment.
+     Returns  : in a scalar context: multiline string (including newline characters)
+                in an array context: array of references to arrays of characters
+     Argument : $rrowsel: see var_sites()
+
+unknown_free_inds()
+-------------------
+
+     Comment  : This is the indices-returning version of unknown_free_sites(),
+                cf. var_sites() and var_inds().
+
+no_allgap_sites()
+-----------------
+
+     Usage    : $resSlice = $aln->no_allgap_sites($rrowsel);
+     Function : return the columns which do not have gaps only, of an alignment.
+     Returns  : in a scalar context: multiline string (including newline characters)
+                in an array context: array of references to arrays of characters
+     Argument : $rrowsel: see var_sites()
+
+no_allgap_inds()
+----------------
+
+     Comment  : This is the indices-returning version of no_allgap_sites(),
+                cf. var_sites() and var_inds().
+
+special_free_sites()
+--------------------
+
+     Usage    : $resSlice = $aln->special_free_sites($rrowsel);
+     Function : return the special-free (neither gap nor unknown-symbols) columns
+                of an alignment.
+     Returns  : in a scalar context: multiline string (including newline characters)
+                in an array context: array of references to arrays of characters
+     Argument : $rrowsel: see var_sites()
+
+special_free_inds()
+-------------------
+
+     Comment  : This is the indices-returning version of special_free_sites(),
+                cf. var_sites() and var_inds().
+
+reverse()
+---------
+
+     Usage    : $resSlice = $aln->reverse($rrowsel);
+     Function : return the rows of an alignment, in reversed form (right->left)
+     Returns  : in a scalar context: multiline string (including newline characters)
+                in an array context: array of references to arrays of characters
+     Argument : $rrowsel: Reference to the selector designating the rows
+                which are returned in reversed form, as in cases (2)-(4) in seqs().
+
+remove_gaps()
+-------------
+
+     Usage    : $resSlice = $aln->remove_gaps($rrowsel);
+     Function : return the rows of an alignment, gaps removed (i.e. the original
+                sequences)
+     Returns  : in a scalar context: multiline string (including newline characters)
+                in an array context: array of references to arrays of characters
+     Argument : $rrowsel: Reference to the selector designating the rows
+                which are returned without gaps, as in cases (2)-(4) in seqs().
+
+complement()
+------------
+
+     Usage    : $resSlice = $aln->complement($rrowsel);
+     Function : return the rows of an alignment, in complemented form
+                In the case of dna/rna, the complement is given according to the
+                IUPAC code; in other cases the result is currently calculated in the
+                same way and probably meaningless
+     Returns  : in a scalar context: multiline string (including newline characters)
+                in an array context: array of references to arrays of characters
+     Argument : $rrowsel: see reverse()
+
+revcom()
+--------
+
+     Usage    : $aln->revcom($rrowsel);
+     Function : return the rows of an alignment, in reversed complement form
+                In the case of dna/rna, the complement is given according to the
+                IUPAC code; otherwise the result is currently calculated in the
+                same way and probably nonsensical.
+     Returns  : in a scalar context: multiline string (including newline characters)
+                in an array context: array of references to arrays of characters
+     Argument : $rrowsel: see reverse()
+
+equal_nogaps()
+--------------
+
+     Usage    : $aln->equal_nogaps($other_aln);
+     Function : checks whether two alignments have the same original sequences
+                (i.e. gaps are removed and the rows are compared for equality)
+     Returns  : 1 if alignments are equal modulo gaps, 0 otherwise
+     Argument : $other_aln: the other alignment
+
+equalize_lengths()
+------------------
+
+     Usage    : $aln->equalize_lengths($width);
+     Function : modifies the alignment / sequence bag such that all rows
+                have length $width; in the case of sequence bags, this
+                is a primitive way to obtain a true alignment with
+                rows of equal length
+                * The current procedure is straightforward but slow *
+     Returns  : 1 if alignments are equal modulo gaps, 0 otherwise
+     Argument : $width: the length until which sequences should be padded;
+                per default the length of the longest row is taken
+
+_seqs()
+-------
+
+     Usage    : @oldSeqs = $aln->_seqs(@sequences,$start)
+                @oldSeqs = $aln->_seqs($sequences,$start)
+     Function : to APPEND/OVERWRITE sequences to an alignment
+     Returns  : old list of sequences, i.e. ($self->{'seqs'})
+     Argument : 1. EITHER a reference to a list of either Bio::Seq objects, or
+                   arrays of letters, or strings, or any mix of these,
+                   OR a single (multi-line) string
+                2. $rrowsel: Reference to the selector designating the rows
+                   which shall be appended/overwritten (feature in alpha status)
+
+id()
+----
+
+     Usage    : $aln_id = $aln->id();
+                $aln->id($id_string);
+     Function : Accessor, also sets field if an ID is passed in.
+     Returns  : (original) ID value
+     Argument : sequence string with no whitespace
+
+desc()
+------
+
+     Usage    : $aln_desc = $aln->desc();
+                $aln->desc($desc_string);
+     Function : Accessor, also sets field if a description string is passed in.
+     Returns  : (original) description value
+     Argument : sequence string
+
+names()
+-------
+
+     Usage    : %names = $aln->names;
+                $aln->names($hash_ref)
+     Function : Accessor, also sets field if names hash is passed in.
+                The names hash is 'human-readable' data; each key is a
+                location (whether it be URL, database, database query, etc.)
+                and each value is the id at that location.
+     Returns  : (original) names hash value
+     Argument : reference to a hash
+
+row_ids()
+---------
+
+     Usage    : $row_ids = $aln->row_ids();
+                $aln->row_ids($row_ids);
+     Function : Accessor, also sets field.
+     Returns  : A reference to the (original) array of row (sequence) ids
+     Argument : A reference to an array of row (sequence) ids
+
+col_ids()
+---------
+
+     Usage    : $col_ids = $aln->col_ids();
+                $aln->col_ids($col_ids);
+     Function : Accessor, also sets field.
+     Returns  : A reference to the (original) array of column (site) ids
+     Argument : A reference to an array of column (site) ids
+
+row_descs()
+-----------
+
+     Usage    : $row_descs = $aln->row_descs();
+                $aln->row_descs($row_descs);
+     Function : Accessor, also sets field.
+     Returns  : A reference to the (original) array of row (sequence) descriptions
+     Argument : A reference to an array of row (sequence) descriptions
+
+col_descs()
+-----------
+
+     Usage    : $col_descs = $aln->col_descs();
+                $aln->col_descs($col_descs);
+     Function : Accessor, also sets field.
+     Returns  : A reference to the (original) array of column (site) descriptions
+     Argument : A reference to an array of column (site) descriptions
+
+numbering()
+-----------
+
+     Usage    : $num_start = $aln->numbering;
+                $aln->numbering($value);
+     Function : Accessor, also sets field if a new numbering scheme is passed in.
+     Returns  : (original) numbering value
+     Argument : number that is used as the offset of the first column
+
+type()
+------
+
+     Usage    : $aln_type = $aln->type;
+                $aln->type($value); # May be dangerous !
+     Function : Accessor, also sets field if a new type is passed in.
+                The latter is considered dangerous !
+     Returns  : (original) type value
+     Argument : new type, see the list %UnivAlnTypes in the code
+                (currently, ``dna'', ``rna'', ``amino'')
+
+ffmt()
+------
+
+     Usage    : $ffmt = $aln->ffmt;
+                $aln->ffmt($value);
+     Function : Accessor, also sets field if a new format acronym is passed in.
+                This can be done before reading from a file, so that
+                the presumably correct parsing routine is called, or
+                the value can be set before writing the object using
+                layout(), so that layout uses a specified default format.
+     Returns  : (original) format acronym
+     Argument : string describing the format, see ``Alignment Formats''
+
+inplace()
+---------
+
+     Usage    : $inplace = $aln->inplace();
+                $aln->inplace($value);
+     Function : Accessor, also sets field if a value is passed in.
+                'inplace' is a flag which is set to true if accessors and
+                functions should make the modification to the object itself,
+                and just return true on success. Currently, inplace manipulation
+                is supported for seqs(), _arys(), _strs(), remove_gaps(),
+                var_sites(), invar_sites(), gap_free_sites(), no_allgap_sites(),
+                reverse(), complement(), and revcom() (reverse complement).
+     Returns  : (original) inplace value
+     Argument : currently 0 or 1
+
+width()
+-------
+
+     Usage    : $width = $aln->width();
+     Function : number of columns (of the first row per default)
+     Returns  : number of columns (of the first row per default)
+     Argument : row
+
+height()
+--------
+
+     Usage    : $height = $aln->height();
+     Function : number of rows (sequences)
+     Returns  : number of rows (sequences)
+     Argument : ./.
+
+alphabet_check()
+----------------
+
+     Usage    : @offendig_characters = $aln->alphabet_check($rowsel);
+     Function : Check rows of the alignment for ``offending characters'', i.e.
+                characters that are not (currently) expected to be found in the
+                aligned sequences, because they're not in the default alphabet
+                that belongs to the specified L<Alignment Type>.
+                Currently, the Alignment Type can only be set explicitly
+                via the constructor, or accessor. Since the default alphabet
+                is not the IUPAC code (e.g. just A,C,G,T,-,? in case of DNA),
+                this is just a proof of concept.
+     Returns  : an array containing the offending characters, one string per row
+     Argument : $rrowsel: Reference to the selector designating the rows
+                to which the check is applied, as in cases (2)-(4) in seqs().
+
+_file_read()
+------------
+
+     Usage    : n/a (internal function)
+     Function : Read data from file, and call the parsing system to store data
+                into the object fields
+     Returns  : 1 on success
+     Argument : filename, and (optionally) the format if known.
+
+_parse()
+--------
+
+     Usage    : $aln->_parse($ent,[$ffmt]);
+     Function : Parses $ent into the object fields, according to
+                $ffmt or $self->{'ffmt'}.
+     Returns  : 1 on success
+     Argument : the prospective alignment to be parsed,
+                and optionally its format so that it doesn't need to be estimated
+                Note that ``raw'' is not estimated in a reliable way by readseq
+                if readseq is installed; I presume it is then estimated only if
+                the sequence(s) are longer than 111 basepairs
+
+_parse_unknown()
+----------------
+
+     Usage    : $aln->_parse_unknown($ent);
+     Function : tries to figure out the format of $ent and then
+                calls the appropriate function to parse it into $self->{'seqs'}.
+     Returns  : 1 on success
+     Argument : $ent : the rough multi-line string to be parsed
+
+_parse_bad()
+------------
+
+     Usage    : $aln->_parse_bad;
+     Function : Carp on the bad data that the user gave us.
+     Returns  : undef
+     Argument : (multiline) string that cannot be parsed
+
+_parse_readseq()
+----------------
+
+     Usage    : $aln->_parse_readseq;
+     Function : Try readseq to parse data.
+     Returns  : 1 on success
+     Argument : $ent : the rough multi-line string to be parsed
+
+_parse_raw()
+------------
+
+     Usage    : $aln->_parse_raw;
+     Function : parses $ent into the $self->{'seqs'} field, using raw
+                file format.
+     Returns  : 1 on success
+     Argument : (multiline) string to be parsed
+
+_parse_fasta()
+--------------
+
+     Usage    : $aln->_parse_fasta;
+     Function : parses $ent into the 'seqs' field, using fasta
+                file format.
+     Returns  : 1 on success
+     Argument : (multiline) string to be parsed
+
+copy()
+------
+
+     Usage    : $copyOfObj = $myUnivAln->copy;
+     Function : Returns an identical copy of the object.
+     Returns  : Bio::UnivAln
+     Argument : n/a
+
+layout()
+--------
+
+     Usage    : $aln->layout($format);
+     Function : Returns the alignment in whichever format the user specifies,
+                or according to the "ffmt" field if the user does not specify
+                a format.
+     Returns  : varies; "" if unsuccessful
+     Argument : $format (one of the formats as defined in $UnivAlnForm).
+
+out_bad()
+---------
+
+     Usage    : $aln->out_bad;
+     Function : Carp if we don't know the output format.
+     Returns  : undef
+     Argument : n/a
+
+out_raw()
+---------
+
+     Usage    : $aln->out_raw;
+     Function : Returns the alignment in raw format.
+     Returns  : multiline string
+     Argument : n/a
+
+out_fasta()
+-----------
+
+     Usage    : $aln->out_fasta;
+     Function : Returns the alignment as a string in fasta format.
+     Returns  : multiline string
+     Argument : Same as seqs()
+     Comment  : The old ``out_fasta()'' function with no arguments
+                is slightly faster and simpler; still available as out_fasta2().
+
+

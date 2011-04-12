@@ -1,0 +1,3439 @@
+This is Info file perl.info, produced by Makeinfo version 1.68 from the
+input file bigperl.texi.
+
+   settitle perl
+
+
+File: perl.info,  Node: perlapio,  Next: perldebguts,  Prev: perlembed,  Up: Top
+
+perl's IO abstraction interface.
+********************************
+
+NAME
+====
+
+   perlapio - perl's IO abstraction interface.
+
+SYNOPSIS
+========
+
+     PerlIO *PerlIO_stdin(void);
+     PerlIO *PerlIO_stdout(void);
+     PerlIO *PerlIO_stderr(void);
+
+     PerlIO *PerlIO_open(const char *,const char *);
+     int     PerlIO_close(PerlIO *);
+
+     int     PerlIO_stdoutf(const char *,...)
+     int     PerlIO_puts(PerlIO *,const char *);
+     int     PerlIO_putc(PerlIO *,int);
+     int     PerlIO_write(PerlIO *,const void *,size_t);
+     int     PerlIO_printf(PerlIO *, const char *,...);
+     int     PerlIO_vprintf(PerlIO *, const char *, va_list);
+     int     PerlIO_flush(PerlIO *);
+
+     int     PerlIO_eof(PerlIO *);
+     int     PerlIO_error(PerlIO *);
+     void    PerlIO_clearerr(PerlIO *);
+
+     int     PerlIO_getc(PerlIO *);
+     int     PerlIO_ungetc(PerlIO *,int);
+     int     PerlIO_read(PerlIO *,void *,size_t);
+
+     int     PerlIO_fileno(PerlIO *);
+     PerlIO *PerlIO_fdopen(int, const char *);
+     PerlIO *PerlIO_importFILE(FILE *, int flags);
+     FILE   *PerlIO_exportFILE(PerlIO *, int flags);
+     FILE   *PerlIO_findFILE(PerlIO *);
+     void    PerlIO_releaseFILE(PerlIO *,FILE *);
+
+     void    PerlIO_setlinebuf(PerlIO *);
+
+     long    PerlIO_tell(PerlIO *);
+     int     PerlIO_seek(PerlIO *,off_t,int);
+     int     PerlIO_getpos(PerlIO *,Fpos_t *)
+     int     PerlIO_setpos(PerlIO *,Fpos_t *)
+     void    PerlIO_rewind(PerlIO *);
+
+     int     PerlIO_has_base(PerlIO *);
+     int     PerlIO_has_cntptr(PerlIO *);
+     int     PerlIO_fast_gets(PerlIO *);
+     int     PerlIO_canset_cnt(PerlIO *);
+
+     char   *PerlIO_get_ptr(PerlIO *);
+     int     PerlIO_get_cnt(PerlIO *);
+     void    PerlIO_set_cnt(PerlIO *,int);
+     void    PerlIO_set_ptrcnt(PerlIO *,char *,int);
+     char   *PerlIO_get_base(PerlIO *);
+     int     PerlIO_get_bufsiz(PerlIO *);
+
+DESCRIPTION
+===========
+
+   Perl's source code should use the above functions instead of those
+defined in ANSI C's *stdio.h*.  The perl headers will `#define' them to
+the I/O mechanism selected at Configure time.
+
+   The functions are modeled on those in *stdio.h*, but parameter order
+has been "tidied up a little".
+
+*PerlIO **
+     This takes the place of FILE *. Like FILE * it should be treated as
+     opaque (it is probably safe to assume it is a pointer to something).
+
+*PerlIO_stdin()*, *PerlIO_stdout()*, *PerlIO_stderr()*
+     Use these rather than stdin, stdout, stderr. They are written to look
+     like "function calls" rather than variables because this makes it
+     easier to *make them* function calls if platform cannot export data
+     to loaded modules, or if (say) different "threads" might have
+     different values.
+
+*PerlIO_open(path, mode)*, *PerlIO_fdopen(fd,mode)*
+     These correspond to fopen()/fdopen() arguments are the same.
+
+*PerlIO_printf(f,fmt,...)*, *PerlIO_vprintf(f,fmt,a)*
+     These are fprintf()/vfprintf() equivalents.
+
+PerlIO_stdoutf(fmt,...)
+     This is printf() equivalent. printf is #defined to this function, so
+     it is (currently) legal to use `printf(fmt,...)' in perl sources.
+
+*PerlIO_read(f,buf,count)*, *PerlIO_write(f,buf,count)*
+     These correspond to fread() and fwrite(). Note that arguments are
+     different, there is only one "count" and order has "file" first.
+
+PerlIO_close(f)
+*PerlIO_puts(f,s)*, *PerlIO_putc(f,c)*
+     These correspond to fputs() and fputc().  Note that arguments have
+     been revised to have "file" first.
+
+PerlIO_ungetc(f,c)
+     This corresponds to ungetc().  Note that arguments have been revised
+     to have "file" first.
+
+PerlIO_getc(f)
+     This corresponds to getc().
+
+PerlIO_eof(f)
+     This corresponds to feof().
+
+PerlIO_error(f)
+     This corresponds to ferror().
+
+PerlIO_fileno(f)
+     This corresponds to fileno(), note that on some platforms, the
+     meaning of "fileno" may not match Unix.
+
+PerlIO_clearerr(f)
+     This corresponds to clearerr(), i.e., clears 'eof' and 'error' flags
+     for the "stream".
+
+PerlIO_flush(f)
+     This corresponds to fflush().
+
+PerlIO_tell(f)
+     This corresponds to ftell().
+
+PerlIO_seek(f,o,w)
+     This corresponds to fseek().
+
+*PerlIO_getpos(f,p)*, *PerlIO_setpos(f,p)*
+     These correspond to fgetpos() and fsetpos(). If platform does not
+     have the stdio calls then they are implemented in terms of
+     PerlIO_tell() and PerlIO_seek().
+
+PerlIO_rewind(f)
+     This corresponds to rewind(). Note may be redefined in terms of
+     PerlIO_seek() at some point.
+
+PerlIO_tmpfile()
+     This corresponds to tmpfile(), i.e., returns an anonymous PerlIO
+     which will automatically be deleted when closed.
+
+Co-existence with stdio
+-----------------------
+
+   There is outline support for co-existence of PerlIO with stdio.
+Obviously if PerlIO is implemented in terms of stdio there is no problem.
+However if perlio is implemented on top of (say) sfio then mechanisms must
+exist to create a FILE * which can be passed to library code which is
+going to use stdio calls.
+
+PerlIO_importFILE(f,flags)
+     Used to get a PerlIO * from a FILE *.  May need additional arguments,
+     interface under review.
+
+PerlIO_exportFILE(f,flags)
+     Given an PerlIO * return a 'native' FILE * suitable for passing to
+     code expecting to be compiled and linked with ANSI C *stdio.h*.
+
+     The fact that such a FILE * has been 'exported' is recorded, and may
+     affect future PerlIO operations on the original PerlIO *.
+
+PerlIO_findFILE(f)
+     Returns previously 'exported' FILE * (if any).  Place holder until
+     interface is fully defined.
+
+PerlIO_releaseFILE(p,f)
+     Calling PerlIO_releaseFILE informs PerlIO that all use of FILE * is
+     complete. It is removed from list of 'exported' FILE *s, and
+     associated PerlIO * should revert to original behaviour.
+
+PerlIO_setlinebuf(f)
+     This corresponds to setlinebuf(). Use is deprecated pending further
+     discussion. (Perl core uses it *only* when "dumping"; it has nothing
+     to do with $| auto-flush.)
+
+   In addition to user API above there is an "implementation" interface
+which allows perl to get at internals of PerlIO.  The following calls
+correspond to the various FILE_xxx macros determined by Configure. This
+section is really of interest to only those concerned with detailed
+perl-core behaviour or implementing a PerlIO mapping.
+
+PerlIO_has_cntptr(f)
+     Implementation can return pointer to current position in the "buffer"
+     and a count of bytes available in the buffer.
+
+PerlIO_get_ptr(f)
+     Return pointer to next readable byte in buffer.
+
+PerlIO_get_cnt(f)
+     Return count of readable bytes in the buffer.
+
+PerlIO_canset_cnt(f)
+     Implementation can adjust its idea of number of bytes in the buffer.
+
+PerlIO_fast_gets(f)
+     Implementation has all the interfaces required to allow perl's fast
+     code to handle <FILE> mechanism.
+
+          PerlIO_fast_gets(f) = PerlIO_has_cntptr(f) && \
+                                PerlIO_canset_cnt(f) && \
+                                `Can set pointer into buffer'
+
+PerlIO_set_ptrcnt(f,p,c)
+     Set pointer into buffer, and a count of bytes still in the buffer.
+     Should be used only to set pointer to within range implied by
+     previous calls to `PerlIO_get_ptr' and `PerlIO_get_cnt'.
+
+PerlIO_set_cnt(f,c)
+     Obscure - set count of bytes in the buffer. Deprecated.  Currently
+     used in only doio.c to force count < -1 to -1.  Perhaps should be
+     PerlIO_set_empty or similar.  This call may actually do nothing if
+     "count" is deduced from pointer and a "limit".
+
+PerlIO_has_base(f)
+     Implementation has a buffer, and can return pointer to whole buffer
+     and its size. Used by perl for -T / -B tests.  Other uses would be
+     very obscure...
+
+PerlIO_get_base(f)
+     Return start of buffer.
+
+PerlIO_get_bufsiz(f)
+     Return *total size* of buffer.
+
+
+File: perl.info,  Node: perlbook,  Next: perlembed,  Prev: perlpod,  Up: Top
+
+Perl book information
+*********************
+
+NAME
+====
+
+   perlbook - Perl book information
+
+DESCRIPTION
+===========
+
+   The Camel Book, officially known as *Programming Perl, Second Edition*,
+by Larry Wall et al, is the definitive reference work covering nearly all
+of Perl.  You can order it and other Perl books from O'Reilly &
+Associates, 1-800-998-9938.  Local/overseas is +1 707 829 0515.  If you
+can locate an O'Reilly order form, you can also fax to +1 707 829 0104.
+If you're web-connected, you can even mosey on over to http://www.ora.com/
+for an online order form.
+
+   Other Perl books from various publishers and authors can be found
+listed in *Note Perlfaq2: perlfaq2,.
+
+
+File: perl.info,  Node: perlboot,  Next: perltoot,  Prev: perllol,  Up: Top
+
+Beginner's Object-Oriented Tutorial
+***********************************
+
+NAME
+====
+
+   perlboot - Beginner's Object-Oriented Tutorial
+
+DESCRIPTION
+===========
+
+   If you're not familiar with objects from other languages, some of the
+other Perl object documentation may be a little daunting, such as *Note
+Perlobj: perlobj,, a basic reference in using objects, and *Note Perltoot:
+perltoot,, which introduces readers to the peculiarities of Perl's object
+system in a tutorial way.
+
+   So, let's take a different approach, presuming no prior object
+experience. It helps if you know about subroutines (*Note Perlsub:
+perlsub,), references (*Note Perlref: perlref, et. seq.), and packages
+(*Note Perlmod: perlmod,), so become familiar with those first if you
+haven't already.
+
+If we could talk to the animals...
+----------------------------------
+
+   Let's let the animals talk for a moment:
+
+     sub Cow::speak {
+       print "a Cow goes moooo!\n";
+     }
+     sub Horse::speak {
+       print "a Horse goes neigh!\n";
+     }
+     sub Sheep::speak {
+       print "a Sheep goes baaaah!\n"
+     }
+
+     Cow::speak;
+     Horse::speak;
+     Sheep::speak;
+
+   This results in:
+
+     a Cow goes moooo!
+     a Horse goes neigh!
+     a Sheep goes baaaah!
+
+   Nothing spectacular here.  Simple subroutines, albeit from separate
+packages, and called using the full package name.  So let's create an
+entire pasture:
+
+     # Cow::speak, Horse::speak, Sheep::speak as before
+     @pasture = qw(Cow Cow Horse Sheep Sheep);
+     foreach $animal (@pasture) {
+       &{$animal."::speak"};
+     }
+
+   This results in:
+
+     a Cow goes moooo!
+     a Cow goes moooo!
+     a Horse goes neigh!
+     a Sheep goes baaaah!
+     a Sheep goes baaaah!
+
+   Wow.  That symbolic coderef de-referencing there is pretty nasty.
+We're counting on `no strict subs' mode, certainly not recommended for
+larger programs.  And why was that necessary?  Because the name of the
+package seems to be inseparable from the name of the subroutine we want to
+invoke within that package.
+
+   Or is it?
+
+Introducing the method invocation arrow
+---------------------------------------
+
+   For now, let's say that `< Class-'method >> invokes subroutine method
+in package Class.  (Here, "Class" is used in its "category" meaning, not
+its "scholastic" meaning.) That's not completely accurate, but we'll do
+this one step at a time.  Now let's use it like so:
+
+     # Cow::speak, Horse::speak, Sheep::speak as before
+     Cow->speak;
+     Horse->speak;
+     Sheep->speak;
+
+   And once again, this results in:
+
+     a Cow goes moooo!
+     a Horse goes neigh!
+     a Sheep goes baaaah!
+
+   That's not fun yet.  Same number of characters, all constant, no
+variables.  But yet, the parts are separable now.  Watch:
+
+     $a = "Cow";
+     $a->speak; # invokes Cow->speak
+
+   Ahh!  Now that the package name has been parted from the subroutine
+name, we can use a variable package name.  And this time, we've got
+something that works even when `use strict refs' is enabled.
+
+Invoking a barnyard
+-------------------
+
+   Let's take that new arrow invocation and put it back in the barnyard
+example:
+
+     sub Cow::speak {
+       print "a Cow goes moooo!\n";
+     }
+     sub Horse::speak {
+       print "a Horse goes neigh!\n";
+     }
+     sub Sheep::speak {
+       print "a Sheep goes baaaah!\n"
+     }
+
+     @pasture = qw(Cow Cow Horse Sheep Sheep);
+     foreach $animal (@pasture) {
+       $animal->speak;
+     }
+
+   There!  Now we have the animals all talking, and safely at that,
+without the use of symbolic coderefs.
+
+   But look at all that common code.  Each of the speak routines has a
+similar structure: a print operator and a string that contains common
+text, except for two of the words.  It'd be nice if we could factor out
+the commonality, in case we decide later to change it all to `says'
+instead of `goes'.
+
+   And we actually have a way of doing that without much fuss, but we have
+to hear a bit more about what the method invocation arrow is actually
+doing for us.
+
+The extra parameter of method invocation
+----------------------------------------
+
+   The invocation of:
+
+     Class->method(@args)
+
+   attempts to invoke subroutine `Class::method' as:
+
+     Class::method("Class", @args);
+
+   (If the subroutine can't be found, "inheritance" kicks in, but we'll
+get to that later.)  This means that we get the class name as the first
+parameter (the only parameter, if no arguments are given).  So we can
+rewrite the `Sheep' speaking subroutine as:
+
+     sub Sheep::speak {
+       my $class = shift;
+       print "a $class goes baaaah!\n";
+     }
+
+   And the other two animals come out similarly:
+
+     sub Cow::speak {
+       my $class = shift;
+       print "a $class goes moooo!\n";
+     }
+     sub Horse::speak {
+       my $class = shift;
+       print "a $class goes neigh!\n";
+     }
+
+   In each case, $class will get the value appropriate for that
+subroutine.  But once again, we have a lot of similar structure.  Can we
+factor that out even further?  Yes, by calling another method in the same
+class.
+
+Calling a second method to simplify things
+------------------------------------------
+
+   Let's call out from speak to a helper method called sound.  This method
+provides the constant text for the sound itself.
+
+     { package Cow;
+       sub sound { "moooo" }
+       sub speak {
+     	my $class = shift;
+     	print "a $class goes ", $class->sound, "!\n"
+       }
+     }
+
+   Now, when we call `< Cow-'speak >>, we get a $class of `Cow' in speak.
+This in turn selects the `< Cow-'sound >> method, which returns `moooo'.
+But how different would this be for the `Horse'?
+
+     { package Horse;
+       sub sound { "neigh" }
+       sub speak {
+     	my $class = shift;
+     	print "a $class goes ", $class->sound, "!\n"
+       }
+     }
+
+   Only the name of the package and the specific sound change.  So can we
+somehow share the definition for speak between the Cow and the Horse?
+Yes, with inheritance!
+
+Inheriting the windpipes
+------------------------
+
+   We'll define a common subroutine package called `Animal', with the
+definition for speak:
+
+     { package Animal;
+       sub speak {
+     	my $class = shift;
+     	print "a $class goes ", $class->sound, "!\n"
+       }
+     }
+
+   Then, for each animal, we say it "inherits" from `Animal', along with
+the animal-specific sound:
+
+     { package Cow;
+       @ISA = qw(Animal);
+       sub sound { "moooo" }
+     }
+
+   Note the added `@ISA' array.  We'll get to that in a minute.
+
+   But what happens when we invoke `< Cow-'speak >> now?
+
+   First, Perl constructs the argument list.  In this case, it's just
+`Cow'.  Then Perl looks for `Cow::speak'.  But that's not there, so Perl
+checks for the inheritance array `@Cow::ISA'.  It's there, and contains
+the single name `Animal'.
+
+   Perl next checks for speak inside `Animal' instead, as in
+`Animal::speak'.  And that's found, so Perl invokes that subroutine with
+the already frozen argument list.
+
+   Inside the `Animal::speak' subroutine, $class becomes `Cow' (the first
+argument).  So when we get to the step of invoking `< $class-'sound >>,
+it'll be looking for `< Cow-'sound >>, which gets it on the first try
+without looking at `@ISA'.  Success!
+
+A few notes about @ISA
+----------------------
+
+   This magical `@ISA' variable (pronounced "is a" not "ice-uh"), has
+declared that `Cow' "is a" `Animal'.  Note that it's an array, not a
+simple single value, because on rare occasions, it makes sense to have
+more than one parent class searched for the missing methods.
+
+   If `Animal' also had an `@ISA', then we'd check there too.  The search
+is recursive, depth-first, left-to-right in each `@ISA'.  Typically, each
+`@ISA' has only one element (multiple elements means multiple inheritance
+and multiple headaches), so we get a nice tree of inheritance.
+
+   When we turn on `use strict', we'll get complaints on `@ISA', since
+it's not a variable containing an explicit package name, nor is it a
+lexical ("my") variable.  We can't make it a lexical variable though (it
+has to belong to the package to be found by the inheritance mechanism), so
+there's a couple of straightforward ways to handle that.
+
+   The easiest is to just spell the package name out:
+
+     @Cow::ISA = qw(Animal);
+
+   Or allow it as an implicitly named package variable:
+
+     package Cow;
+     use vars qw(@ISA);
+     @ISA = qw(Animal);
+
+   If you're bringing in the class from outside, via an object-oriented
+module, you change:
+
+     package Cow;
+     use Animal;
+     use vars qw(@ISA);
+     @ISA = qw(Animal);
+
+   into just:
+
+     package Cow;
+     use base qw(Animal);
+
+   And that's pretty darn compact.
+
+Overriding the methods
+----------------------
+
+   Let's add a mouse, which can barely be heard:
+
+     # Animal package from before
+     { package Mouse;
+       @ISA = qw(Animal);
+       sub sound { "squeak" }
+       sub speak {
+         my $class = shift;
+     	print "a $class goes ", $class->sound, "!\n";
+     	print "[but you can barely hear it!]\n";
+       }
+     }
+
+     Mouse->speak;
+
+   which results in:
+
+     a Mouse goes squeak!
+     [but you can barely hear it!]
+
+   Here, Mouse has its own speaking routine, so `< Mouse-'speak >> doesn't
+immediately invoke `< Animal-'speak >>.  This is known as "overriding".
+In fact, we didn't even need to say that a Mouse was an `Animal' at all,
+since all of the methods needed for speak are completely defined with
+Mouse.
+
+   But we've now duplicated some of the code from `< Animal-'speak >>, and
+this can once again be a maintenance headache.  So, can we avoid that?
+Can we say somehow that a Mouse does everything any other `Animal' does,
+but add in the extra comment?  Sure!
+
+   First, we can invoke the `Animal::speak' method directly:
+
+     # Animal package from before
+     { package Mouse;
+       @ISA = qw(Animal);
+       sub sound { "squeak" }
+       sub speak {
+         my $class = shift;
+         Animal::speak($class);
+     	print "[but you can barely hear it!]\n";
+       }
+     }
+
+   Note that we have to include the $class parameter (almost surely the
+value of `"Mouse"') as the first parameter to `Animal::speak', since we've
+stopped using the method arrow.  Why did we stop?  Well, if we invoke `<
+Animal-'speak >> there, the first parameter to the method will be
+`"Animal"' not `"Mouse"', and when time comes for it to call for the
+sound, it won't have the right class to come back to this package.
+
+   Invoking `Animal::speak' directly is a mess, however.  What if
+`Animal::speak' didn't exist before, and was being inherited from a class
+mentioned in `@Animal::ISA'?  Because we are no longer using the method
+arrow, we get one and only one chance to hit the right subroutine.
+
+   Also note that the `Animal' classname is now hardwired into the
+subroutine selection.  This is a mess if someone maintains the code,
+changing `@ISA' for <Mouse> and didn't notice `Animal' there in speak.
+So, this is probably not the right way to go.
+
+Starting the search from a different place
+------------------------------------------
+
+   A better solution is to tell Perl to search from a higher place in the
+inheritance chain:
+
+     # same Animal as before
+     { package Mouse;
+       # same @ISA, &sound as before
+       sub speak {
+         my $class = shift;
+         $class->Animal::speak;
+         print "[but you can barely hear it!]\n";
+       }
+     }
+
+   Ahh.  This works.  Using this syntax, we start with `Animal' to find
+speak, and use all of `Animal''s inheritance chain if not found
+immediately.  And yet the first parameter will be $class, so the found
+speak method will get Mouse as its first entry, and eventually work its
+way back to `Mouse::sound' for the details.
+
+   But this isn't the best solution.  We still have to keep the `@ISA' and
+the initial search package coordinated.  Worse, if Mouse had multiple
+entries in `@ISA', we wouldn't necessarily know which one had actually
+defined speak.  So, is there an even better way?
+
+The SUPER way of doing things
+-----------------------------
+
+   By changing the `Animal' class to the SUPER class in that invocation,
+we get a search of all of our super classes (classes listed in `@ISA')
+automatically:
+
+     # same Animal as before
+     { package Mouse;
+       # same @ISA, &sound as before
+       sub speak {
+         my $class = shift;
+         $class->SUPER::speak;
+         print "[but you can barely hear it!]\n";
+       }
+     }
+
+   So, `SUPER::speak' means look in the current package's `@ISA' for
+speak, invoking the first one found.
+
+Where we're at so far...
+------------------------
+
+   So far, we've seen the method arrow syntax:
+
+     Class->method(@args);
+
+   or the equivalent:
+
+     $a = "Class";
+     $a->method(@args);
+
+   which constructs an argument list of:
+
+     ("Class", @args)
+
+   and attempts to invoke
+
+     Class::method("Class", @Args);
+
+   However, if `Class::method' is not found, then `@Class::ISA' is examined
+(recursively) to locate a package that does indeed contain method, and
+that subroutine is invoked instead.
+
+   Using this simple syntax, we have class methods, (multiple)
+inheritance, overriding, and extending.  Using just what we've seen so
+far, we've been able to factor out common code, and provide a nice way to
+reuse implementations with variations.  This is at the core of what
+objects provide, but objects also provide instance data, which we haven't
+even begun to cover.
+
+A horse is a horse, of course of course - or is it?
+---------------------------------------------------
+
+   Let's start with the code for the `Animal' class and the `Horse' class:
+
+     { package Animal;
+       sub speak {
+         my $class = shift;
+         print "a $class goes ", $class->sound, "!\n"
+       }
+     }
+     { package Horse;
+       @ISA = qw(Animal);
+       sub sound { "neigh" }
+     }
+
+   This lets us invoke `< Horse-'speak >> to ripple upward to
+`Animal::speak', calling back to `Horse::sound' to get the specific sound,
+and the output of:
+
+     a Horse goes neigh!
+
+   But all of our Horse objects would have to be absolutely identical.  If
+I add a subroutine, all horses automatically share it.  That's great for
+making horses the same, but how do we capture the distinctions about an
+individual horse?  For example, suppose I want to give my first horse a
+name.  There's got to be a way to keep its name separate from the other
+horses.
+
+   We can do that by drawing a new distinction, called an "instance".  An
+"instance" is generally created by a class.  In Perl, any reference can be
+an instance, so let's start with the simplest reference that can hold a
+horse's name: a scalar reference.
+
+     my $name = "Mr. Ed";
+     my $talking = \$name;
+
+   So now `$talking' is a reference to what will be the instance-specific
+data (the name).  The final step in turning this into a real instance is
+with a special operator called bless:
+
+     bless $talking, Horse;
+
+   This operator stores information about the package named `Horse' into
+the thing pointed at by the reference.  At this point, we say `$talking'
+is an instance of `Horse'.  That is, it's a specific horse.  The reference
+is otherwise unchanged, and can still be used with traditional
+dereferencing operators.
+
+Invoking an instance method
+---------------------------
+
+   The method arrow can be used on instances, as well as names of packages
+(classes).  So, let's get the sound that `$talking' makes:
+
+     my $noise = $talking->sound;
+
+   To invoke sound, Perl first notes that `$talking' is a blessed
+reference (and thus an instance).  It then constructs an argument list, in
+this case from just `($talking)'.  (Later we'll see that arguments will
+take their place following the instance variable, just like with classes.)
+
+   Now for the fun part: Perl takes the class in which the instance was
+blessed, in this case `Horse', and uses that to locate the subroutine to
+invoke the method.  In this case, `Horse::sound' is found directly
+(without using inheritance), yielding the final subroutine invocation:
+
+     Horse::sound($talking)
+
+   Note that the first parameter here is still the instance, not the name
+of the class as before.  We'll get `neigh' as the return value, and
+that'll end up as the `$noise' variable above.
+
+   If Horse::sound had not been found, we'd be wandering up the
+`@Horse::ISA' list to try to find the method in one of the superclasses,
+just as for a class method.  The only difference between a class method
+and an instance method is whether the first parameter is an instance (a
+blessed reference) or a class name (a string).
+
+Accessing the instance data
+---------------------------
+
+   Because we get the instance as the first parameter, we can now access
+the instance-specific data.  In this case, let's add a way to get at the
+name:
+
+     { package Horse;
+       @ISA = qw(Animal);
+       sub sound { "neigh" }
+       sub name {
+         my $self = shift;
+         $$self;
+       }
+     }
+
+   Now we call for the name:
+
+     print $talking->name, " says ", $talking->sound, "\n";
+
+   Inside `Horse::name', the `@_' array contains just `$talking', which
+the shift stores into `$self'.  (It's traditional to shift the first
+parameter off into a variable named `$self' for instance methods, so stay
+with that unless you have strong reasons otherwise.)  Then, `$self' gets
+de-referenced as a scalar ref, yielding `Mr. Ed', and we're done with
+that.  The result is:
+
+     Mr. Ed says neigh.
+
+How to build a horse
+--------------------
+
+   Of course, if we constructed all of our horses by hand, we'd most
+likely make mistakes from time to time.  We're also violating one of the
+properties of object-oriented programming, in that the "inside guts" of a
+Horse are visible.  That's good if you're a veterinarian, but not if you
+just like to own horses.  So, let's let the Horse class build a new horse:
+
+     { package Horse;
+       @ISA = qw(Animal);
+       sub sound { "neigh" }
+       sub name {
+         my $self = shift;
+         $$self;
+       }
+       sub named {
+         my $class = shift;
+         my $name = shift;
+         bless \$name, $class;
+       }
+     }
+
+   Now with the new `named' method, we can build a horse:
+
+     my $talking = Horse->named("Mr. Ed");
+
+   Notice we're back to a class method, so the two arguments to
+`Horse::named' are `Horse' and `Mr. Ed'.  The bless operator not only
+blesses $name, it also returns the reference to $name, so that's fine as a
+return value.  And that's how to build a horse.
+
+   We've called the constructor `named' here, so that it quickly denotes
+the constructor's argument as the name for this particular `Horse'.  You
+can use different constructors with different names for different ways of
+"giving birth" to the object (like maybe recording its pedigree or date of
+birth).  However, you'll find that most people coming to Perl from more
+limited languages use a single constructor named new, with various ways of
+interpreting the arguments to new.  Either style is fine, as long as you
+document your particular way of giving birth to an object.  (And you
+*were* going to do that, right?)
+
+Inheriting the constructor
+--------------------------
+
+   But was there anything specific to `Horse' in that method?  No.
+Therefore, it's also the same recipe for building anything else that
+inherited from `Animal', so let's put it there:
+
+     { package Animal;
+       sub speak {
+         my $class = shift;
+         print "a $class goes ", $class->sound, "!\n"
+       }
+       sub name {
+         my $self = shift;
+         $$self;
+       }
+       sub named {
+         my $class = shift;
+         my $name = shift;
+         bless \$name, $class;
+       }
+     }
+     { package Horse;
+       @ISA = qw(Animal);
+       sub sound { "neigh" }
+     }
+
+   Ahh, but what happens if we invoke speak on an instance?
+
+     my $talking = Horse->named("Mr. Ed");
+     $talking->speak;
+
+   We get a debugging value:
+
+     a Horse=SCALAR(0xaca42ac) goes neigh!
+
+   Why?  Because the `Animal::speak' routine is expecting a classname as
+its first parameter, not an instance.  When the instance is passed in,
+we'll end up using a blessed scalar reference as a string, and that shows
+up as we saw it just now.
+
+Making a method work with either classes or instances
+-----------------------------------------------------
+
+   All we need is for a method to detect if it is being called on a class
+or called on an instance.  The most straightforward way is with the ref
+operator.  This returns a string (the classname) when used on a blessed
+reference, and undef when used on a string (like a classname).  Let's
+modify the name method first to notice the change:
+
+     sub name {
+       my $either = shift;
+       ref $either
+         ? $$either # it's an instance, return name
+         : "an unnamed $either"; # it's a class, return generic
+     }
+
+   Here, the `?:' operator comes in handy to select either the dereference
+or a derived string.  Now we can use this with either an instance or a
+class.  Note that I've changed the first parameter holder to `$either' to
+show that this is intended:
+
+     my $talking = Horse->named("Mr. Ed");
+     print Horse->name, "\n"; # prints "an unnamed Horse\n"
+     print $talking->name, "\n"; # prints "Mr Ed.\n"
+
+   and now we'll fix speak to use this:
+
+     sub speak {
+       my $either = shift;
+       print $either->name, " goes ", $either->sound, "\n";
+     }
+
+   And since sound already worked with either a class or an instance,
+we're done!
+
+Adding parameters to a method
+-----------------------------
+
+   Let's train our animals to eat:
+
+     { package Animal;
+       sub named {
+         my $class = shift;
+         my $name = shift;
+         bless \$name, $class;
+       }
+       sub name {
+         my $either = shift;
+         ref $either
+     	? $$either # it's an instance, return name
+     	: "an unnamed $either"; # it's a class, return generic
+       }
+       sub speak {
+         my $either = shift;
+         print $either->name, " goes ", $either->sound, "\n";
+       }
+       sub eat {
+         my $either = shift;
+         my $food = shift;
+         print $either->name, " eats $food.\n";
+       }
+     }
+     { package Horse;
+       @ISA = qw(Animal);
+       sub sound { "neigh" }
+     }
+     { package Sheep;
+       @ISA = qw(Animal);
+       sub sound { "baaaah" }
+     }
+
+   And now try it out:
+
+     my $talking = Horse->named("Mr. Ed");
+     $talking->eat("hay");
+     Sheep->eat("grass");
+
+   which prints:
+
+     Mr. Ed eats hay.
+     an unnamed Sheep eats grass.
+
+   An instance method with parameters gets invoked with the instance, and
+then the list of parameters.  So that first invocation is like:
+
+     Animal::eat($talking, "hay");
+
+More interesting instances
+--------------------------
+
+   What if an instance needs more data?  Most interesting instances are
+made of many items, each of which can in turn be a reference or even
+another object.  The easiest way to store these is often in a hash.  The
+keys of the hash serve as the names of parts of the object (often called
+"instance variables" or "member variables"), and the corresponding values
+are, well, the values.
+
+   But how do we turn the horse into a hash?  Recall that an object was
+any blessed reference.  We can just as easily make it a blessed hash
+reference as a blessed scalar reference, as long as everything that looks
+at the reference is changed accordingly.
+
+   Let's make a sheep that has a name and a color:
+
+     my $bad = bless { Name => "Evil", Color => "black" }, Sheep;
+
+   so `< $bad-'{Name} >> has `Evil', and `< $bad-'{Color} >> has `black'.
+But we want to make `< $bad-'name >> access the name, and that's now
+messed up because it's expecting a scalar reference.  Not to worry,
+because that's pretty easy to fix up:
+
+     ## in Animal
+     sub name {
+       my $either = shift;
+       ref $either ?
+         $either->{Name} :
+         "an unnamed $either";
+     }
+
+   And of course `named' still builds a scalar sheep, so let's fix that as
+well:
+
+     ## in Animal
+     sub named {
+       my $class = shift;
+       my $name = shift;
+       my $self = { Name => $name, Color => $class->default_color };
+       bless $self, $class;
+     }
+
+   What's this `default_color'?  Well, if `named' has only the name, we
+still need to set a color, so we'll have a class-specific initial color.
+For a sheep, we might define it as white:
+
+     ## in Sheep
+     sub default_color { "white" }
+
+   And then to keep from having to define one for each additional class,
+we'll define a "backstop" method that serves as the "default default",
+directly in `Animal':
+
+     ## in Animal
+     sub default_color { "brown" }
+
+   Now, because name and `named' were the only methods that referenced the
+"structure" of the object, the rest of the methods can remain the same, so
+speak still works as before.
+
+A horse of a different color
+----------------------------
+
+   But having all our horses be brown would be boring.  So let's add a
+method or two to get and set the color.
+
+     ## in Animal
+     sub color {
+       $_[0]->{Color}
+     }
+     sub set_color {
+       $_[0]->{Color} = $_[1];
+     }
+
+   Note the alternate way of accessing the arguments: `$_[0]' is used
+in-place, rather than with a shift.  (This saves us a bit of time for
+something that may be invoked frequently.)  And now we can fix that color
+for Mr. Ed:
+
+     my $talking = Horse->named("Mr. Ed");
+     $talking->set_color("black-and-white");
+     print $talking->name, " is colored ", $talking->color, "\n";
+
+   which results in:
+
+     Mr. Ed is colored black-and-white
+
+Summary
+-------
+
+   So, now we have class methods, constructors, instance methods, instance
+data, and even accessors.  But that's still just the beginning of what
+Perl has to offer.  We haven't even begun to talk about accessors that
+double as getters and setters, destructors, indirect object notation,
+subclasses that add instance data, per-class data, overloading, "isa" and
+"can" tests, UNIVERSAL class, and so on.  That's for the rest of the Perl
+documentation to cover.  Hopefully, this gets you started, though.
+
+SEE ALSO
+========
+
+   For more information, see *Note Perlobj: perlobj, (for all the gritty
+details about Perl objects, now that you've seen the basics), *Note
+Perltoot: perltoot, (the tutorial for those who already know objects),
+*Note Perlbot: perlbot, (for some more tricks), and books such as Damian
+Conway's excellent *Object Oriented Perl*.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1999, 2000 by Randal L. Schwartz and Stonehenge
+Consulting Services, Inc.  Permission is hereby granted to distribute this
+document intact with the Perl distribution, and in accordance with the
+licenses of the Perl distribution; derived documents must include this
+copyright notice intact.
+
+   Portions of this text have been derived from Perl Training materials
+originally appearing in the *Packages, References, Objects, and Modules*
+course taught by instructors for Stonehenge Consulting Services, Inc. and
+used with permission.
+
+   Portions of this text have been derived from materials originally
+appearing in *Linux Magazine* and used with permission.
+
+
+File: perl.info,  Node: perlbot,  Next: perlipc,  Prev: perltie,  Up: Top
+
+Bag'o Object Tricks (the BOT)
+*****************************
+
+NAME
+====
+
+   perlbot - Bag'o Object Tricks (the BOT)
+
+DESCRIPTION
+===========
+
+   The following collection of tricks and hints is intended to whet curious
+appetites about such things as the use of instance variables and the
+mechanics of object and class relationships.  The reader is encouraged to
+consult relevant textbooks for discussion of Object Oriented definitions
+and methodology.  This is not intended as a tutorial for object-oriented
+programming or as a comprehensive guide to Perl's object oriented features,
+nor should it be construed as a style guide.
+
+   The Perl motto still holds:  There's more than one way to do it.
+
+OO SCALING TIPS
+===============
+
+  1. Do not attempt to verify the type of $self.  That'll break if the
+     class is inherited, when the type of $self is valid but its package
+     isn't what you expect.  See rule 5.
+
+  2. If an object-oriented (OO) or indirect-object (IO) syntax was used,
+     then the object is probably the correct type and there's no need to
+     become paranoid about it.  Perl isn't a paranoid language anyway.  If
+     people subvert the OO or IO syntax then they probably know what
+     they're doing and you should let them do it.  See rule 1.
+
+  3. Use the two-argument form of bless().  Let a subclass use your
+     constructor.  See `INHERITING A CONSTRUCTOR' in this node.
+
+  4. The subclass is allowed to know things about its immediate
+     superclass, the superclass is allowed to know nothing about a
+     subclass.
+
+  5. Don't be trigger happy with inheritance.  A "using", "containing", or
+     "delegation" relationship (some sort of aggregation, at least) is
+     often more appropriate.  See `OBJECT RELATIONSHIPS' in this node,
+     `USING RELATIONSHIP WITH SDBM' in this node, and `"DELEGATION"' in
+     this node.
+
+  6. The object is the namespace.  Make package globals accessible via the
+     object.  This will remove the guess work about the symbol's home
+     package.  See `CLASS CONTEXT AND THE OBJECT' in this node.
+
+  7. IO syntax is certainly less noisy, but it is also prone to
+     ambiguities that can cause difficult-to-find bugs.  Allow people to
+     use the sure-thing OO syntax, even if you don't like it.
+
+  8. Do not use function-call syntax on a method.  You're going to be
+     bitten someday.  Someone might move that method into a superclass and
+     your code will be broken.  On top of that you're feeding the paranoia
+     in rule 2.
+
+  9. Don't assume you know the home package of a method.  You're making it
+     difficult for someone to override that method.  See `THINKING OF CODE
+     REUSE' in this node.
+
+
+INSTANCE VARIABLES
+==================
+
+   An anonymous array or anonymous hash can be used to hold instance
+variables.  Named parameters are also demonstrated.
+
+     package Foo;
+
+     sub new {
+     	my $type = shift;
+     	my %params = @_;
+     	my $self = {};
+     	$self->{'High'} = $params{'High'};
+     	$self->{'Low'}  = $params{'Low'};
+     	bless $self, $type;
+     }
+
+     package Bar;
+
+     sub new {
+     	my $type = shift;
+     	my %params = @_;
+     	my $self = [];
+     	$self->[0] = $params{'Left'};
+     	$self->[1] = $params{'Right'};
+     	bless $self, $type;
+     }
+
+     package main;
+
+     $a = Foo->new( 'High' => 42, 'Low' => 11 );
+     print "High=$a->{'High'}\n";
+     print "Low=$a->{'Low'}\n";
+
+     $b = Bar->new( 'Left' => 78, 'Right' => 40 );
+     print "Left=$b->[0]\n";
+     print "Right=$b->[1]\n";
+
+SCALAR INSTANCE VARIABLES
+=========================
+
+   An anonymous scalar can be used when only one instance variable is
+needed.
+
+     package Foo;
+
+     sub new {
+     	my $type = shift;
+     	my $self;
+     	$self = shift;
+     	bless \$self, $type;
+     }
+
+     package main;
+
+     $a = Foo->new( 42 );
+     print "a=$$a\n";
+
+INSTANCE VARIABLE INHERITANCE
+=============================
+
+   This example demonstrates how one might inherit instance variables from
+a superclass for inclusion in the new class.  This requires calling the
+superclass's constructor and adding one's own instance variables to the new
+object.
+
+     package Bar;
+
+     sub new {
+     	my $type = shift;
+     	my $self = {};
+     	$self->{'buz'} = 42;
+     	bless $self, $type;
+     }
+
+     package Foo;
+     @ISA = qw( Bar );
+
+     sub new {
+     	my $type = shift;
+     	my $self = Bar->new;
+     	$self->{'biz'} = 11;
+     	bless $self, $type;
+     }
+
+     package main;
+
+     $a = Foo->new;
+     print "buz = ", $a->{'buz'}, "\n";
+     print "biz = ", $a->{'biz'}, "\n";
+
+OBJECT RELATIONSHIPS
+====================
+
+   The following demonstrates how one might implement "containing" and
+"using" relationships between objects.
+
+     package Bar;
+
+     sub new {
+     	my $type = shift;
+     	my $self = {};
+     	$self->{'buz'} = 42;
+     	bless $self, $type;
+     }
+
+     package Foo;
+
+     sub new {
+     	my $type = shift;
+     	my $self = {};
+     	$self->{'Bar'} = Bar->new;
+     	$self->{'biz'} = 11;
+     	bless $self, $type;
+     }
+
+     package main;
+
+     $a = Foo->new;
+     print "buz = ", $a->{'Bar'}->{'buz'}, "\n";
+     print "biz = ", $a->{'biz'}, "\n";
+
+OVERRIDING SUPERCLASS METHODS
+=============================
+
+   The following example demonstrates how to override a superclass method
+and then call the overridden method.  The SUPER pseudo-class allows the
+programmer to call an overridden superclass method without actually knowing
+where that method is defined.
+
+     package Buz;
+     sub goo { print "here's the goo\n" }
+
+     package Bar; @ISA = qw( Buz );
+     sub google { print "google here\n" }
+
+     package Baz;
+     sub mumble { print "mumbling\n" }
+
+     package Foo;
+     @ISA = qw( Bar Baz );
+
+     sub new {
+     	my $type = shift;
+     	bless [], $type;
+     }
+     sub grr { print "grumble\n" }
+     sub goo {
+     	my $self = shift;
+     	$self->SUPER::goo();
+     }
+     sub mumble {
+     	my $self = shift;
+     	$self->SUPER::mumble();
+     }
+     sub google {
+     	my $self = shift;
+     	$self->SUPER::google();
+     }
+
+     package main;
+
+     $foo = Foo->new;
+     $foo->mumble;
+     $foo->grr;
+     $foo->goo;
+     $foo->google;
+
+USING RELATIONSHIP WITH SDBM
+============================
+
+   This example demonstrates an interface for the SDBM class.  This
+creates a "using" relationship between the SDBM class and the new class
+Mydbm.
+
+     package Mydbm;
+
+     require SDBM_File;
+     require Tie::Hash;
+     @ISA = qw( Tie::Hash );
+
+     sub TIEHASH {
+         my $type = shift;
+         my $ref  = SDBM_File->new(@_);
+         bless {'dbm' => $ref}, $type;
+     }
+     sub FETCH {
+         my $self = shift;
+         my $ref  = $self->{'dbm'};
+         $ref->FETCH(@_);
+     }
+     sub STORE {
+         my $self = shift;
+         if (defined $_[0]){
+     	my $ref = $self->{'dbm'};
+     	$ref->STORE(@_);
+         } else {
+     	die "Cannot STORE an undefined key in Mydbm\n";
+         }
+     }
+
+     package main;
+     use Fcntl qw( O_RDWR O_CREAT );
+
+     tie %foo, "Mydbm", "Sdbm", O_RDWR|O_CREAT, 0640;
+     $foo{'bar'} = 123;
+     print "foo-bar = $foo{'bar'}\n";
+
+     tie %bar, "Mydbm", "Sdbm2", O_RDWR|O_CREAT, 0640;
+     $bar{'Cathy'} = 456;
+     print "bar-Cathy = $bar{'Cathy'}\n";
+
+THINKING OF CODE REUSE
+======================
+
+   One strength of Object-Oriented languages is the ease with which old
+code can use new code.  The following examples will demonstrate first how
+one can hinder code reuse and then how one can promote code reuse.
+
+   This first example illustrates a class which uses a fully-qualified
+method call to access the "private" method BAZ().  The second example will
+show that it is impossible to override the BAZ() method.
+
+     package FOO;
+
+     sub new {
+     	my $type = shift;
+     	bless {}, $type;
+     }
+     sub bar {
+     	my $self = shift;
+     	$self->FOO::private::BAZ;
+     }
+
+     package FOO::private;
+
+     sub BAZ {
+     	print "in BAZ\n";
+     }
+
+     package main;
+
+     $a = FOO->new;
+     $a->bar;
+
+   Now we try to override the BAZ() method.  We would like FOO::bar() to
+call GOOP::BAZ(), but this cannot happen because FOO::bar() explicitly
+calls FOO::private::BAZ().
+
+     package FOO;
+
+     sub new {
+     	my $type = shift;
+     	bless {}, $type;
+     }
+     sub bar {
+     	my $self = shift;
+     	$self->FOO::private::BAZ;
+     }
+
+     package FOO::private;
+
+     sub BAZ {
+     	print "in BAZ\n";
+     }
+
+     package GOOP;
+     @ISA = qw( FOO );
+     sub new {
+     	my $type = shift;
+     	bless {}, $type;
+     }
+
+     sub BAZ {
+     	print "in GOOP::BAZ\n";
+     }
+
+     package main;
+
+     $a = GOOP->new;
+     $a->bar;
+
+   To create reusable code we must modify class FOO, flattening class
+FOO::private.  The next example shows a reusable class FOO which allows the
+method GOOP::BAZ() to be used in place of FOO::BAZ().
+
+     package FOO;
+
+     sub new {
+     	my $type = shift;
+     	bless {}, $type;
+     }
+     sub bar {
+     	my $self = shift;
+     	$self->BAZ;
+     }
+
+     sub BAZ {
+     	print "in BAZ\n";
+     }
+
+     package GOOP;
+     @ISA = qw( FOO );
+
+     sub new {
+     	my $type = shift;
+     	bless {}, $type;
+     }
+     sub BAZ {
+     	print "in GOOP::BAZ\n";
+     }
+
+     package main;
+
+     $a = GOOP->new;
+     $a->bar;
+
+CLASS CONTEXT AND THE OBJECT
+============================
+
+   Use the object to solve package and class context problems.  Everything
+a method needs should be available via the object or should be passed as a
+parameter to the method.
+
+   A class will sometimes have static or global data to be used by the
+methods.  A subclass may want to override that data and replace it with new
+data.  When this happens the superclass may not know how to find the new
+copy of the data.
+
+   This problem can be solved by using the object to define the context of
+the method.  Let the method look in the object for a reference to the
+data.  The alternative is to force the method to go hunting for the data
+("Is it in my class, or in a subclass?  Which subclass?"), and this can be
+inconvenient and will lead to hackery.  It is better just to let the
+object tell the method where that data is located.
+
+     package Bar;
+
+     %fizzle = ( 'Password' => 'XYZZY' );
+
+     sub new {
+     	my $type = shift;
+     	my $self = {};
+     	$self->{'fizzle'} = \%fizzle;
+     	bless $self, $type;
+     }
+
+     sub enter {
+     	my $self = shift;
+
+     # Don't try to guess if we should use %Bar::fizzle
+     # or %Foo::fizzle.  The object already knows which
+     # we should use, so just ask it.
+     #
+     my $fizzle = $self->{'fizzle'};
+
+     print "The word is ", $fizzle->{'Password'}, "\n";
+     	}
+
+     package Foo;
+     @ISA = qw( Bar );
+
+     %fizzle = ( 'Password' => 'Rumple' );
+
+     sub new {
+     	my $type = shift;
+     	my $self = Bar->new;
+     	$self->{'fizzle'} = \%fizzle;
+     	bless $self, $type;
+     }
+
+     package main;
+
+     $a = Bar->new;
+     $b = Foo->new;
+     $a->enter;
+     $b->enter;
+
+INHERITING A CONSTRUCTOR
+========================
+
+   An inheritable constructor should use the second form of bless() which
+allows blessing directly into a specified class.  Notice in this example
+that the object will be a BAR not a FOO, even though the constructor is in
+class FOO.
+
+     package FOO;
+
+     sub new {
+     	my $type = shift;
+     	my $self = {};
+     	bless $self, $type;
+     }
+
+     sub baz {
+     	print "in FOO::baz()\n";
+     }
+
+     package BAR;
+     @ISA = qw(FOO);
+
+     sub baz {
+     	print "in BAR::baz()\n";
+     }
+
+     package main;
+
+     $a = BAR->new;
+     $a->baz;
+
+DELEGATION
+==========
+
+   Some classes, such as SDBM_File, cannot be effectively subclassed
+because they create foreign objects.  Such a class can be extended with
+some sort of aggregation technique such as the "using" relationship
+mentioned earlier or by delegation.
+
+   The following example demonstrates delegation using an AUTOLOAD()
+function to perform message-forwarding.  This will allow the Mydbm object
+to behave exactly like an SDBM_File object.  The Mydbm class could now
+extend the behavior by adding custom FETCH() and STORE() methods, if this
+is desired.
+
+     package Mydbm;
+
+     require SDBM_File;
+     require Tie::Hash;
+     @ISA = qw(Tie::Hash);
+
+     sub TIEHASH {
+     	my $type = shift;
+     	my $ref = SDBM_File->new(@_);
+     	bless {'delegate' => $ref};
+     }
+
+     sub AUTOLOAD {
+     	my $self = shift;
+
+     # The Perl interpreter places the name of the
+     # message in a variable called $AUTOLOAD.
+
+     # DESTROY messages should never be propagated.
+     return if $AUTOLOAD =~ /::DESTROY$/;
+
+     # Remove the package name.
+     $AUTOLOAD =~ s/^Mydbm:://;
+
+     # Pass the message to the delegate.
+     $self->{'delegate'}->$AUTOLOAD(@_);
+     	}
+
+     package main;
+     use Fcntl qw( O_RDWR O_CREAT );
+
+     tie %foo, "Mydbm", "adbm", O_RDWR|O_CREAT, 0640;
+     $foo{'bar'} = 123;
+     print "foo-bar = $foo{'bar'}\n";
+
+
+File: perl.info,  Node: perlcall,  Next: perlapi,  Prev: perlguts,  Up: Top
+
+Perl calling conventions from C
+*******************************
+
+NAME
+====
+
+   perlcall - Perl calling conventions from C
+
+DESCRIPTION
+===========
+
+   The purpose of this document is to show you how to call Perl subroutines
+directly from C, i.e., how to write *callbacks*.
+
+   Apart from discussing the C interface provided by Perl for writing
+callbacks the document uses a series of examples to show how the interface
+actually works in practice.  In addition some techniques for coding
+callbacks are covered.
+
+   Examples where callbacks are necessary include
+
+   * An Error Handler
+
+     You have created an XSUB interface to an application's C API.
+
+     A fairly common feature in applications is to allow you to define a C
+     function that will be called whenever something nasty occurs. What we
+     would like is to be able to specify a Perl subroutine that will be
+     called instead.
+
+   * An Event Driven Program
+
+     The classic example of where callbacks are used is when writing an
+     event driven program like for an X windows application.  In this case
+     you register functions to be called whenever specific events occur,
+     e.g., a mouse button is pressed, the cursor moves into a window or a
+     menu item is selected.
+
+   Although the techniques described here are applicable when embedding
+Perl in a C program, this is not the primary goal of this document.  There
+are other details that must be considered and are specific to embedding
+Perl. For details on embedding Perl in C refer to *Note Perlembed:
+perlembed,.
+
+   Before you launch yourself head first into the rest of this document,
+it would be a good idea to have read the following two documents - *Note
+Perlxs: perlxs, and *Note Perlguts: perlguts,.
+
+THE CALL_ FUNCTIONS
+===================
+
+   Although this stuff is easier to explain using examples, you first need
+be aware of a few important definitions.
+
+   Perl has a number of C functions that allow you to call Perl
+subroutines.  They are
+
+     I32 call_sv(SV* sv, I32 flags) ;
+     I32 call_pv(char *subname, I32 flags) ;
+     I32 call_method(char *methname, I32 flags) ;
+     I32 call_argv(char *subname, I32 flags, register char **argv) ;
+
+   The key function is call_sv.  All the other functions are fairly simple
+wrappers which make it easier to call Perl subroutines in special cases.
+At the end of the day they will all call call_sv to invoke the Perl
+subroutine.
+
+   All the *call_** functions have a flags parameter which is used to pass
+a bit mask of options to Perl.  This bit mask operates identically for
+each of the functions.  The settings available in the bit mask are
+discussed in `FLAG VALUES' in this node.
+
+   Each of the functions will now be discussed in turn.
+
+call_sv
+     call_sv takes two parameters, the first, sv, is an SV*.  This allows
+     you to specify the Perl subroutine to be called either as a C string
+     (which has first been converted to an SV) or a reference to a
+     subroutine. The section, Using call_sv, shows how you can make use of
+     call_sv.
+
+call_pv
+     The function, call_pv, is similar to call_sv except it expects its
+     first parameter to be a C char* which identifies the Perl subroutine
+     you want to call, e.g., `call_pv("fred", 0)'.  If the subroutine you
+     want to call is in another package, just include the package name in
+     the string, e.g., `"pkg::fred"'.
+
+call_method
+     The function call_method is used to call a method from a Perl class.
+     The parameter `methname' corresponds to the name of the method to be
+     called.  Note that the class that the method belongs to is passed on
+     the Perl stack rather than in the parameter list. This class can be
+     either the name of the class (for a static method) or a reference to
+     an object (for a virtual method).  See *Note Perlobj: perlobj, for
+     more information on static and virtual methods and `Using
+     call_method' in this node for an example of using call_method.
+
+call_argv
+     call_argv calls the Perl subroutine specified by the C string stored
+     in the `subname' parameter. It also takes the usual flags parameter.
+     The final parameter, `argv', consists of a NULL terminated list of C
+     strings to be passed as parameters to the Perl subroutine.  See Using
+     call_argv.
+
+   All the functions return an integer. This is a count of the number of
+items returned by the Perl subroutine. The actual items returned by the
+subroutine are stored on the Perl stack.
+
+   As a general rule you should always check the return value from these
+functions.  Even if you are expecting only a particular number of values
+to be returned from the Perl subroutine, there is nothing to stop someone
+from doing something unexpected-don't say you haven't been warned.
+
+FLAG VALUES
+===========
+
+   The flags parameter in all the *call_** functions is a bit mask which
+can consist of any combination of the symbols defined below, OR'ed
+together.
+
+G_VOID
+------
+
+   Calls the Perl subroutine in a void context.
+
+   This flag has 2 effects:
+
+  1. It indicates to the subroutine being called that it is executing in a
+     void context (if it executes wantarray the result will be the
+     undefined value).
+
+  2. It ensures that nothing is actually returned from the subroutine.
+
+        The value returned by the *call_** function indicates how many
+items have been returned by the Perl subroutine - in this case it will be
+0.
+
+G_SCALAR
+--------
+
+   Calls the Perl subroutine in a scalar context.  This is the default
+context flag setting for all the *call_** functions.
+
+   This flag has 2 effects:
+
+  1. It indicates to the subroutine being called that it is executing in a
+     scalar context (if it executes wantarray the result will be false).
+
+  2. It ensures that only a scalar is actually returned from the
+     subroutine.  The subroutine can, of course,  ignore the wantarray and
+     return a list anyway. If so, then only the last element of the list
+     will be returned.
+
+        The value returned by the *call_** function indicates how many
+items have been returned by the Perl subroutine - in this case it will be
+either 0 or 1.
+
+   If 0, then you have specified the G_DISCARD flag.
+
+   If 1, then the item actually returned by the Perl subroutine will be
+stored on the Perl stack - the section Returning a Scalar shows how to
+access this value on the stack.  Remember that regardless of how many
+items the Perl subroutine returns, only the last one will be accessible
+from the stack - think of the case where only one value is returned as
+being a list with only one element.  Any other items that were returned
+will not exist by the time control returns from the *call_** function.
+The section *Returning a list in a scalar context* shows an example of
+this behavior.
+
+G_ARRAY
+-------
+
+   Calls the Perl subroutine in a list context.
+
+   As with G_SCALAR, this flag has 2 effects:
+
+  1. It indicates to the subroutine being called that it is executing in an
+     array context (if it executes wantarray the result will be true).
+
+  2. It ensures that all items returned from the subroutine will be
+     accessible when control returns from the *call_** function.
+
+        The value returned by the *call_** function indicates how many
+items have been returned by the Perl subroutine.
+
+   If 0, then you have specified the G_DISCARD flag.
+
+   If not 0, then it will be a count of the number of items returned by
+the subroutine. These items will be stored on the Perl stack.  The section
+Returning a list of values gives an example of using the G_ARRAY flag and
+the mechanics of accessing the returned items from the Perl stack.
+
+G_DISCARD
+---------
+
+   By default, the *call_** functions place the items returned from by the
+Perl subroutine on the stack.  If you are not interested in these items,
+then setting this flag will make Perl get rid of them automatically for
+you.  Note that it is still possible to indicate a context to the Perl
+subroutine by using either G_SCALAR or G_ARRAY.
+
+   If you do not set this flag then it is *very* important that you make
+sure that any temporaries (i.e., parameters passed to the Perl subroutine
+and values returned from the subroutine) are disposed of yourself.  The
+section Returning a Scalar gives details of how to dispose of these
+temporaries explicitly and the section *Using Perl to dispose of
+temporaries* discusses the specific circumstances where you can ignore the
+problem and let Perl deal with it for you.
+
+G_NOARGS
+--------
+
+   Whenever a Perl subroutine is called using one of the *call_**
+functions, it is assumed by default that parameters are to be passed to
+the subroutine.  If you are not passing any parameters to the Perl
+subroutine, you can save a bit of time by setting this flag.  It has the
+effect of not creating the `@_' array for the Perl subroutine.
+
+   Although the functionality provided by this flag may seem
+straightforward, it should be used only if there is a good reason to do
+so.  The reason for being cautious is that even if you have specified the
+G_NOARGS flag, it is still possible for the Perl subroutine that has been
+called to think that you have passed it parameters.
+
+   In fact, what can happen is that the Perl subroutine you have called
+can access the `@_' array from a previous Perl subroutine.  This will
+occur when the code that is executing the *call_** function has itself
+been called from another Perl subroutine. The code below illustrates this
+
+     sub fred
+       { print "@_\n"  }
+
+     sub joe
+       { &fred }
+
+     &joe(1,2,3) ;
+
+   This will print
+
+     1 2 3
+
+   What has happened is that `fred' accesses the `@_' array which belongs
+to `joe'.
+
+G_EVAL
+------
+
+   It is possible for the Perl subroutine you are calling to terminate
+abnormally, e.g., by calling die explicitly or by not actually existing.
+By default, when either of these events occurs, the process will terminate
+immediately.  If you want to trap this type of event, specify the G_EVAL
+flag.  It will put an *eval { }* around the subroutine call.
+
+   Whenever control returns from the *call_** function you need to check
+the `$@' variable as you would in a normal Perl script.
+
+   The value returned from the *call_** function is dependent on what
+other flags have been specified and whether an error has occurred.  Here
+are all the different cases that can occur:
+
+   * If the *call_** function returns normally, then the value returned is
+     as specified in the previous sections.
+
+   * If G_DISCARD is specified, the return value will always be 0.
+
+   * If G_ARRAY is specified and an error has occurred, the return value
+     will always be 0.
+
+   * If G_SCALAR is specified and an error has occurred, the return value
+     will be 1 and the value on the top of the stack will be undef. This
+     means that if you have already detected the error by checking `$@' and
+     you want the program to continue, you must remember to pop the undef
+     from the stack.
+
+   See Using G_EVAL for details on using G_EVAL.
+
+G_KEEPERR
+---------
+
+   You may have noticed that using the G_EVAL flag described above will
+always clear the `$@' variable and set it to a string describing the error
+iff there was an error in the called code.  This unqualified resetting of
+`$@' can be problematic in the reliable identification of errors using the
+`eval {}' mechanism, because the possibility exists that perl will call
+other code (end of block processing code, for example) between the time
+the error causes `$@' to be set within `eval {}', and the subsequent
+statement which checks for the value of `$@' gets executed in the user's
+script.
+
+   This scenario will mostly be applicable to code that is meant to be
+called from within destructors, asynchronous callbacks, signal handlers,
+__DIE__ or `__WARN__' hooks, and tie functions.  In such situations, you
+will not want to clear `$@' at all, but simply to append any new errors to
+any existing value of `$@'.
+
+   The G_KEEPERR flag is meant to be used in conjunction with G_EVAL in
+*call_** functions that are used to implement such code.  This flag has no
+effect when G_EVAL is not used.
+
+   When G_KEEPERR is used, any errors in the called code will be prefixed
+with the string "\t(in cleanup)", and appended to the current value of
+`$@'.
+
+   The G_KEEPERR flag was introduced in Perl version 5.002.
+
+   See Using G_KEEPERR for an example of a situation that warrants the use
+of this flag.
+
+Determining the Context
+-----------------------
+
+   As mentioned above, you can determine the context of the currently
+executing subroutine in Perl with wantarray.  The equivalent test can be
+made in C by using the GIMME_V macro, which returns G_ARRAY if you have
+been called in an array context, G_SCALAR if in a scalar context, or
+G_VOID if in a void context (i.e. the return value will not be used).  An
+older version of this macro is called GIMME; in a void context it returns
+G_SCALAR instead of G_VOID.  An example of using the GIMME_V macro is
+shown in section Using GIMME_V.
+
+KNOWN PROBLEMS
+==============
+
+   This section outlines all known problems that exist in the *call_**
+functions.
+
+  1. If you are intending to make use of both the G_EVAL and G_SCALAR flags
+     in your code, use a version of Perl greater than 5.000.  There is a
+     bug in version 5.000 of Perl which means that the combination of
+     these two flags will not work as described in the section FLAG VALUES.
+
+     Specifically, if the two flags are used when calling a subroutine and
+     that subroutine does not call die, the value returned by *call_**
+     will be wrong.
+
+  2. In Perl 5.000 and 5.001 there is a problem with using *call_** if the
+     Perl sub you are calling attempts to trap a die.
+
+     The symptom of this problem is that the called Perl sub will continue
+     to completion, but whenever it attempts to pass control back to the
+     XSUB, the program will immediately terminate.
+
+     For example, say you want to call this Perl sub
+
+          sub fred
+          {
+              eval { die "Fatal Error" ; }
+              print "Trapped error: $@\n"
+                  if $@ ;
+          }
+
+     via this XSUB
+
+          void
+          Call_fred()
+              CODE:
+              PUSHMARK(SP) ;
+              call_pv("fred", G_DISCARD|G_NOARGS) ;
+              fprintf(stderr, "back in Call_fred\n") ;
+
+     When `Call_fred' is executed it will print
+
+          Trapped error: Fatal Error
+
+     As control never returns to `Call_fred', the `"back in Call_fred"'
+     string will not get printed.
+
+     To work around this problem, you can either upgrade to Perl 5.002 or
+     higher, or use the G_EVAL flag with *call_** as shown below
+
+          void
+          Call_fred()
+              CODE:
+              PUSHMARK(SP) ;
+              call_pv("fred", G_EVAL|G_DISCARD|G_NOARGS) ;
+              fprintf(stderr, "back in Call_fred\n") ;
+
+
+EXAMPLES
+========
+
+   Enough of the definition talk, let's have a few examples.
+
+   Perl provides many macros to assist in accessing the Perl stack.
+Wherever possible, these macros should always be used when interfacing to
+Perl internals.  We hope this should make the code less vulnerable to any
+changes made to Perl in the future.
+
+   Another point worth noting is that in the first series of examples I
+have made use of only the call_pv function.  This has been done to keep
+the code simpler and ease you into the topic.  Wherever possible, if the
+choice is between using call_pv and call_sv, you should always try to use
+call_sv.  See Using call_sv for details.
+
+No Parameters, Nothing returned
+-------------------------------
+
+   This first trivial example will call a Perl subroutine, *PrintUID*, to
+print out the UID of the process.
+
+     sub PrintUID
+     {
+         print "UID is $<\n" ;
+     }
+
+   and here is a C function to call it
+
+     static void
+     call_PrintUID()
+     {
+         dSP ;
+
+     PUSHMARK(SP) ;
+     call_pv("PrintUID", G_DISCARD|G_NOARGS) ;
+         }
+
+   Simple, eh.
+
+   A few points to note about this example.
+
+  1. Ignore dSP and `PUSHMARK(SP)' for now. They will be discussed in the
+     next example.
+
+  2. We aren't passing any parameters to *PrintUID* so G_NOARGS can be
+     specified.
+
+  3. We aren't interested in anything returned from *PrintUID*, so
+     G_DISCARD is specified. Even if *PrintUID* was changed to return some
+     value(s), having specified G_DISCARD will mean that they will be
+     wiped by the time control returns from call_pv.
+
+  4. As call_pv is being used, the Perl subroutine is specified as a C
+     string. In this case the subroutine name has been 'hard-wired' into
+     the code.
+
+  5. Because we specified G_DISCARD, it is not necessary to check the value
+     returned from call_pv. It will always be 0.
+
+
+Passing Parameters
+------------------
+
+   Now let's make a slightly more complex example. This time we want to
+call a Perl subroutine, `LeftString', which will take 2 parameters-a
+string ($s) and an integer ($n).  The subroutine will simply print the
+first $n characters of the string.
+
+   So the Perl subroutine would look like this
+
+     sub LeftString
+     {
+         my($s, $n) = @_ ;
+         print substr($s, 0, $n), "\n" ;
+     }
+
+   The C function required to call *LeftString* would look like this.
+
+     static void
+     call_LeftString(a, b)
+     char * a ;
+     int b ;
+     {
+         dSP ;
+
+     ENTER ;
+             SAVETMPS ;
+
+     PUSHMARK(SP) ;
+     XPUSHs(sv_2mortal(newSVpv(a, 0)));
+     XPUSHs(sv_2mortal(newSViv(b)));
+     PUTBACK ;
+
+     call_pv("LeftString", G_DISCARD);
+
+     FREETMPS ;
+     LEAVE ;
+         }
+
+   Here are a few notes on the C function *call_LeftString*.
+
+  1. Parameters are passed to the Perl subroutine using the Perl stack.
+     This is the purpose of the code beginning with the line dSP and
+     ending with the line PUTBACK.  The dSP declares a local copy of the
+     stack pointer.  This local copy should always be accessed as SP.
+
+  2. If you are going to put something onto the Perl stack, you need to
+     know where to put it. This is the purpose of the macro dSP-it declares
+     and initializes a local copy of the Perl stack pointer.
+
+     All the other macros which will be used in this example require you to
+     have used this macro.
+
+     The exception to this rule is if you are calling a Perl subroutine
+     directly from an XSUB function. In this case it is not necessary to
+     use the dSP macro explicitly-it will be declared for you
+     automatically.
+
+  3. Any parameters to be pushed onto the stack should be bracketed by the
+     PUSHMARK and PUTBACK macros.  The purpose of these two macros, in
+     this context, is to count the number of parameters you are pushing
+     automatically.  Then whenever Perl is creating the `@_' array for the
+     subroutine, it knows how big to make it.
+
+     The PUSHMARK macro tells Perl to make a mental note of the current
+     stack pointer. Even if you aren't passing any parameters (like the
+     example shown in the section No Parameters, Nothing returned) you
+     must still call the PUSHMARK macro before you can call any of the
+     *call_** functions-Perl still needs to know that there are no
+     parameters.
+
+     The PUTBACK macro sets the global copy of the stack pointer to be the
+     same as our local copy. If we didn't do this call_pv wouldn't know
+     where the two parameters we pushed were-remember that up to now all
+     the stack pointer manipulation we have done is with our local copy,
+     not the global copy.
+
+  4. The only flag specified this time is G_DISCARD. Because we are
+     passing 2 parameters to the Perl subroutine this time, we have not
+     specified G_NOARGS.
+
+  5. Next, we come to XPUSHs. This is where the parameters actually get
+     pushed onto the stack. In this case we are pushing a string and an
+     integer.
+
+     See `"XSUBs and the Argument Stack"', *Note Perlguts: perlguts, for
+     details on how the XPUSH macros work.
+
+  6. Because we created temporary values (by means of sv_2mortal() calls)
+     we will have to tidy up the Perl stack and dispose of mortal SVs.
+
+     This is the purpose of
+
+          ENTER ;
+          SAVETMPS ;
+
+     at the start of the function, and
+
+          FREETMPS ;
+          LEAVE ;
+
+     at the end. The ENTER/SAVETMPS pair creates a boundary for any
+     temporaries we create.  This means that the temporaries we get rid of
+     will be limited to those which were created after these calls.
+
+     The FREETMPS/LEAVE pair will get rid of any values returned by the
+     Perl subroutine (see next example), plus it will also dump the mortal
+     SVs we have created.  Having ENTER/SAVETMPS at the beginning of the
+     code makes sure that no other mortals are destroyed.
+
+     Think of these macros as working a bit like using `{' and `}' in Perl
+     to limit the scope of local variables.
+
+     See the section Using Perl to dispose of temporaries for details of
+     an alternative to using these macros.
+
+  7. Finally, *LeftString* can now be called via the call_pv function.
+
+
+Returning a Scalar
+------------------
+
+   Now for an example of dealing with the items returned from a Perl
+subroutine.
+
+   Here is a Perl subroutine, *Adder*, that takes 2 integer parameters and
+simply returns their sum.
+
+     sub Adder
+     {
+         my($a, $b) = @_ ;
+         $a + $b ;
+     }
+
+   Because we are now concerned with the return value from *Adder*, the C
+function required to call it is now a bit more complex.
+
+     static void
+     call_Adder(a, b)
+     int a ;
+     int b ;
+     {
+         dSP ;
+         int count ;
+
+     ENTER ;
+     SAVETMPS;
+
+     PUSHMARK(SP) ;
+     XPUSHs(sv_2mortal(newSViv(a)));
+     XPUSHs(sv_2mortal(newSViv(b)));
+     PUTBACK ;
+
+     count = call_pv("Adder", G_SCALAR);
+
+     SPAGAIN ;
+
+     if (count != 1)
+         croak("Big trouble\n") ;
+
+     printf ("The sum of %d and %d is %d\n", a, b, POPi) ;
+
+     PUTBACK ;
+     FREETMPS ;
+     LEAVE ;
+         }
+
+   Points to note this time are
+
+  1. The only flag specified this time was G_SCALAR. That means the `@_'
+     array will be created and that the value returned by *Adder* will
+     still exist after the call to call_pv.
+
+  2. The purpose of the macro SPAGAIN is to refresh the local copy of the
+     stack pointer. This is necessary because it is possible that the
+     memory allocated to the Perl stack has been reallocated whilst in the
+     call_pv call.
+
+     If you are making use of the Perl stack pointer in your code you must
+     always refresh the local copy using SPAGAIN whenever you make use of
+     the *call_** functions or any other Perl internal function.
+
+  3. Although only a single value was expected to be returned from *Adder*,
+     it is still good practice to check the return code from call_pv
+     anyway.
+
+     Expecting a single value is not quite the same as knowing that there
+     will be one. If someone modified *Adder* to return a list and we
+     didn't check for that possibility and take appropriate action the Perl
+     stack would end up in an inconsistent state. That is something you
+     *really* don't want to happen ever.
+
+  4. The POPi macro is used here to pop the return value from the stack.
+     In this case we wanted an integer, so POPi was used.
+
+     Here is the complete list of POP macros available, along with the
+     types they return.
+
+          POPs	SV
+          POPp	pointer
+          POPn	double
+          POPi	integer
+          POPl	long
+
+  5. The final PUTBACK is used to leave the Perl stack in a consistent
+     state before exiting the function.  This is necessary because when we
+     popped the return value from the stack with POPi it updated only our
+     local copy of the stack pointer.  Remember, PUTBACK sets the global
+     stack pointer to be the same as our local copy.
+
+
+Returning a list of values
+--------------------------
+
+   Now, let's extend the previous example to return both the sum of the
+parameters and the difference.
+
+   Here is the Perl subroutine
+
+     sub AddSubtract
+     {
+        my($a, $b) = @_ ;
+        ($a+$b, $a-$b) ;
+     }
+
+   and this is the C function
+
+     static void
+     call_AddSubtract(a, b)
+     int a ;
+     int b ;
+     {
+         dSP ;
+         int count ;
+
+     ENTER ;
+     SAVETMPS;
+
+     PUSHMARK(SP) ;
+     XPUSHs(sv_2mortal(newSViv(a)));
+     XPUSHs(sv_2mortal(newSViv(b)));
+     PUTBACK ;
+
+     count = call_pv("AddSubtract", G_ARRAY);
+
+     SPAGAIN ;
+
+     if (count != 2)
+         croak("Big trouble\n") ;
+
+     printf ("%d - %d = %d\n", a, b, POPi) ;
+     printf ("%d + %d = %d\n", a, b, POPi) ;
+
+     PUTBACK ;
+     FREETMPS ;
+     LEAVE ;
+         }
+
+   If *call_AddSubtract* is called like this
+
+     call_AddSubtract(7, 4) ;
+
+   then here is the output
+
+     7 - 4 = 3
+     7 + 4 = 11
+
+   Notes
+
+  1. We wanted array context, so G_ARRAY was used.
+
+  2. Not surprisingly POPi is used twice this time because we were
+     retrieving 2 values from the stack. The important thing to note is
+     that when using the `POP*' macros they come off the stack in reverse
+     order.
+
+
+Returning a list in a scalar context
+------------------------------------
+
+   Say the Perl subroutine in the previous section was called in a scalar
+context, like this
+
+     static void
+     call_AddSubScalar(a, b)
+     int a ;
+     int b ;
+     {
+         dSP ;
+         int count ;
+         int i ;
+
+     ENTER ;
+     SAVETMPS;
+
+     PUSHMARK(SP) ;
+     XPUSHs(sv_2mortal(newSViv(a)));
+     XPUSHs(sv_2mortal(newSViv(b)));
+     PUTBACK ;
+
+     count = call_pv("AddSubtract", G_SCALAR);
+
+     SPAGAIN ;
+
+     printf ("Items Returned = %d\n", count) ;
+
+     for (i = 1 ; i <= count ; ++i)
+         printf ("Value %d = %d\n", i, POPi) ;
+
+     PUTBACK ;
+     FREETMPS ;
+     LEAVE ;
+         }
+
+   The other modification made is that *call_AddSubScalar* will print the
+number of items returned from the Perl subroutine and their value (for
+simplicity it assumes that they are integer).  So if *call_AddSubScalar*
+is called
+
+     call_AddSubScalar(7, 4) ;
+
+   then the output will be
+
+     Items Returned = 1
+     Value 1 = 3
+
+   In this case the main point to note is that only the last item in the
+list is returned from the subroutine, *AddSubtract* actually made it back
+to *call_AddSubScalar*.
+
+Returning Data from Perl via the parameter list
+-----------------------------------------------
+
+   It is also possible to return values directly via the parameter list -
+whether it is actually desirable to do it is another matter entirely.
+
+   The Perl subroutine, *Inc*, below takes 2 parameters and increments
+each directly.
+
+     sub Inc
+     {
+         ++ $_[0] ;
+         ++ $_[1] ;
+     }
+
+   and here is a C function to call it.
+
+     static void
+     call_Inc(a, b)
+     int a ;
+     int b ;
+     {
+         dSP ;
+         int count ;
+         SV * sva ;
+         SV * svb ;
+
+     ENTER ;
+     SAVETMPS;
+
+     sva = sv_2mortal(newSViv(a)) ;
+     svb = sv_2mortal(newSViv(b)) ;
+
+     PUSHMARK(SP) ;
+     XPUSHs(sva);
+     XPUSHs(svb);
+     PUTBACK ;
+
+     count = call_pv("Inc", G_DISCARD);
+
+     if (count != 0)
+         croak ("call_Inc: expected 0 values from 'Inc', got %d\n",
+                count) ;
+
+     printf ("%d + 1 = %d\n", a, SvIV(sva)) ;
+     printf ("%d + 1 = %d\n", b, SvIV(svb)) ;
+
+     FREETMPS ;
+             LEAVE ;
+         }
+
+   To be able to access the two parameters that were pushed onto the stack
+after they return from call_pv it is necessary to make a note of their
+addresses-thus the two variables `sva' and `svb'.
+
+   The reason this is necessary is that the area of the Perl stack which
+held them will very likely have been overwritten by something else by the
+time control returns from call_pv.
+
+Using G_EVAL
+------------
+
+   Now an example using G_EVAL. Below is a Perl subroutine which computes
+the difference of its 2 parameters. If this would result in a negative
+result, the subroutine calls die.
+
+     sub Subtract
+     {
+         my ($a, $b) = @_ ;
+
+     die "death can be fatal\n" if $a < $b ;
+
+     $a - $b ;
+         }
+
+   and some C to call it
+
+     static void
+     call_Subtract(a, b)
+     int a ;
+     int b ;
+     {
+         dSP ;
+         int count ;
+
+     ENTER ;
+     SAVETMPS;
+
+     PUSHMARK(SP) ;
+     XPUSHs(sv_2mortal(newSViv(a)));
+     XPUSHs(sv_2mortal(newSViv(b)));
+     PUTBACK ;
+
+     count = call_pv("Subtract", G_EVAL|G_SCALAR);
+
+     SPAGAIN ;
+
+     /* Check the eval first */
+     if (SvTRUE(ERRSV))
+     {
+     	    STRLEN n_a;
+         printf ("Uh oh - %s\n", SvPV(ERRSV, n_a)) ;
+         POPs ;
+     }
+     else
+     {
+         if (count != 1)
+            croak("call_Subtract: wanted 1 value from 'Subtract', got %d\n",
+                     count) ;
+
+     printf ("%d - %d = %d\n", a, b, POPi) ;
+             }
+
+     PUTBACK ;
+     FREETMPS ;
+     LEAVE ;
+         }
+
+   If *call_Subtract* is called thus
+
+     call_Subtract(4, 5)
+
+   the following will be printed
+
+     Uh oh - death can be fatal
+
+   Notes
+
+  1. We want to be able to catch the die so we have used the G_EVAL flag.
+     Not specifying this flag would mean that the program would terminate
+     immediately at the die statement in the subroutine *Subtract*.
+
+  2. The code
+
+          if (SvTRUE(ERRSV))
+          {
+          	STRLEN n_a;
+              printf ("Uh oh - %s\n", SvPV(ERRSV, n_a)) ;
+              POPs ;
+          }
+
+     is the direct equivalent of this bit of Perl
+
+          print "Uh oh - $@\n" if $@ ;
+
+     `PL_errgv' is a perl global of type `GV *' that points to the symbol
+     table entry containing the error.  `ERRSV' therefore refers to the C
+     equivalent of `$@'.
+
+  3. Note that the stack is popped using POPs in the block where
+     `SvTRUE(ERRSV)' is true.  This is necessary because whenever a
+     *call_** function invoked with G_EVAL|G_SCALAR returns an error, the
+     top of the stack holds the value undef. Because we want the program
+     to continue after detecting this error, it is essential that the
+     stack is tidied up by removing the undef.
+
+
+Using G_KEEPERR
+---------------
+
+   Consider this rather facetious example, where we have used an XS
+version of the call_Subtract example above inside a destructor:
+
+     package Foo;
+     sub new { bless {}, $_[0] }
+     sub Subtract {
+         my($a,$b) = @_;
+         die "death can be fatal" if $a < $b ;
+         $a - $b;
+     }
+     sub DESTROY { call_Subtract(5, 4); }
+     sub foo { die "foo dies"; }
+
+     package main;
+     eval { Foo->new->foo };
+     print "Saw: $@" if $@;             # should be, but isn't
+
+   This example will fail to recognize that an error occurred inside the
+`eval {}'.  Here's why: the call_Subtract code got executed while perl was
+cleaning up temporaries when exiting the eval block, and because
+call_Subtract is implemented with call_pv using the G_EVAL flag, it
+promptly reset `$@'.  This results in the failure of the outermost test
+for `$@', and thereby the failure of the error trap.
+
+   Appending the G_KEEPERR flag, so that the call_pv call in call_Subtract
+reads:
+
+     count = call_pv("Subtract", G_EVAL|G_SCALAR|G_KEEPERR);
+
+   will preserve the error and restore reliable error handling.
+
+Using call_sv
+-------------
+
+   In all the previous examples I have 'hard-wired' the name of the Perl
+subroutine to be called from C.  Most of the time though, it is more
+convenient to be able to specify the name of the Perl subroutine from
+within the Perl script.
+
+   Consider the Perl code below
+
+     sub fred
+     {
+         print "Hello there\n" ;
+     }
+
+     CallSubPV("fred") ;
+
+   Here is a snippet of XSUB which defines *CallSubPV*.
+
+     void
+     CallSubPV(name)
+     	char *	name
+     	CODE:
+     	PUSHMARK(SP) ;
+     	call_pv(name, G_DISCARD|G_NOARGS) ;
+
+   That is fine as far as it goes. The thing is, the Perl subroutine can
+be specified as only a string.  For Perl 4 this was adequate, but Perl 5
+allows references to subroutines and anonymous subroutines.  This is where
+call_sv is useful.
+
+   The code below for *CallSubSV* is identical to *CallSubPV* except that
+the name parameter is now defined as an SV* and we use call_sv instead of
+call_pv.
+
+     void
+     CallSubSV(name)
+     	SV *	name
+     	CODE:
+     	PUSHMARK(SP) ;
+     	call_sv(name, G_DISCARD|G_NOARGS) ;
+
+   Because we are using an SV to call *fred* the following can all be used
+
+     CallSubSV("fred") ;
+     CallSubSV(\&fred) ;
+     $ref = \&fred ;
+     CallSubSV($ref) ;
+     CallSubSV( sub { print "Hello there\n" } ) ;
+
+   As you can see, call_sv gives you much greater flexibility in how you
+can specify the Perl subroutine.
+
+   You should note that if it is necessary to store the SV (name in the
+example above) which corresponds to the Perl subroutine so that it can be
+used later in the program, it not enough just to store a copy of the
+pointer to the SV. Say the code above had been like this
+
+     static SV * rememberSub ;
+
+     void
+     SaveSub1(name)
+     	SV *	name
+     	CODE:
+     	rememberSub = name ;
+
+     void
+     CallSavedSub1()
+     	CODE:
+     	PUSHMARK(SP) ;
+     	call_sv(rememberSub, G_DISCARD|G_NOARGS) ;
+
+   The reason this is wrong is that by the time you come to use the
+pointer `rememberSub' in `CallSavedSub1', it may or may not still refer to
+the Perl subroutine that was recorded in `SaveSub1'.  This is particularly
+true for these cases
+
+     SaveSub1(\&fred) ;
+     CallSavedSub1() ;
+
+     SaveSub1( sub { print "Hello there\n" } ) ;
+     CallSavedSub1() ;
+
+   By the time each of the `SaveSub1' statements above have been executed,
+the SV*s which corresponded to the parameters will no longer exist.
+Expect an error message from Perl of the form
+
+     Can't use an undefined value as a subroutine reference at ...
+
+   for each of the `CallSavedSub1' lines.
+
+   Similarly, with this code
+
+     $ref = \&fred ;
+     SaveSub1($ref) ;
+     $ref = 47 ;
+     CallSavedSub1() ;
+
+   you can expect one of these messages (which you actually get is
+dependent on the version of Perl you are using)
+
+     Not a CODE reference at ...
+     Undefined subroutine &main::47 called ...
+
+   The variable $ref may have referred to the subroutine `fred' whenever
+the call to `SaveSub1' was made but by the time `CallSavedSub1' gets
+called it now holds the number 47. Because we saved only a pointer to the
+original SV in `SaveSub1', any changes to $ref will be tracked by the
+pointer `rememberSub'. This means that whenever `CallSavedSub1' gets
+called, it will attempt to execute the code which is referenced by the SV*
+`rememberSub'.  In this case though, it now refers to the integer 47, so
+expect Perl to complain loudly.
+
+   A similar but more subtle problem is illustrated with this code
+
+     $ref = \&fred ;
+     SaveSub1($ref) ;
+     $ref = \&joe ;
+     CallSavedSub1() ;
+
+   This time whenever `CallSavedSub1' get called it will execute the Perl
+subroutine `joe' (assuming it exists) rather than `fred' as was originally
+requested in the call to `SaveSub1'.
+
+   To get around these problems it is necessary to take a full copy of the
+SV.  The code below shows `SaveSub2' modified to do that
+
+     static SV * keepSub = (SV*)NULL ;
+
+     void
+     SaveSub2(name)
+         SV *	name
+     	CODE:
+      	/* Take a copy of the callback */
+     	if (keepSub == (SV*)NULL)
+     	    /* First time, so create a new SV */
+     	    keepSub = newSVsv(name) ;
+     	else
+     	    /* Been here before, so overwrite */
+     	    SvSetSV(keepSub, name) ;
+
+     void
+     CallSavedSub2()
+     	CODE:
+     	PUSHMARK(SP) ;
+     	call_sv(keepSub, G_DISCARD|G_NOARGS) ;
+
+   To avoid creating a new SV every time `SaveSub2' is called, the
+function first checks to see if it has been called before.  If not, then
+space for a new SV is allocated and the reference to the Perl subroutine,
+name is copied to the variable `keepSub' in one operation using newSVsv.
+Thereafter, whenever `SaveSub2' is called the existing SV, `keepSub', is
+overwritten with the new value using SvSetSV.
+
+Using call_argv
+---------------
+
+   Here is a Perl subroutine which prints whatever parameters are passed
+to it.
+
+     sub PrintList
+     {
+         my(@list) = @_ ;
+
+     foreach (@list) { print "$_\n" }
+         }
+
+   and here is an example of call_argv which will call *PrintList*.
+
+     static char * words[] = {"alpha", "beta", "gamma", "delta", NULL} ;
+
+     static void
+     call_PrintList()
+     {
+         dSP ;
+
+     call_argv("PrintList", G_DISCARD, words) ;
+         }
+
+   Note that it is not necessary to call PUSHMARK in this instance.  This
+is because call_argv will do it for you.
+
+Using call_method
+-----------------
+
+   Consider the following Perl code
+
+     {
+         package Mine ;
+
+     sub new
+     {
+         my($type) = shift ;
+         bless [@_]
+     }
+
+     sub Display
+     {
+         my ($self, $index) = @_ ;
+         print "$index: $$self[$index]\n" ;
+     }
+
+     sub PrintID
+     {
+         my($class) = @_ ;
+         print "This is Class $class version 1.0\n" ;
+     }
+         }
+
+   It implements just a very simple class to manage an array.  Apart from
+the constructor, new, it declares methods, one static and one virtual. The
+static method, `PrintID', prints out simply the class name and a version
+number. The virtual method, Display, prints out a single element of the
+array.  Here is an all Perl example of using it.
+
+     $a = new Mine ('red', 'green', 'blue') ;
+     $a->Display(1) ;
+     PrintID Mine;
+
+   will print
+
+     1: green
+     This is Class Mine version 1.0
+
+   Calling a Perl method from C is fairly straightforward. The following
+things are required
+
+   * a reference to the object for a virtual method or the name of the
+     class for a static method.
+
+   * the name of the method.
+
+   * any other parameters specific to the method.
+
+   Here is a simple XSUB which illustrates the mechanics of calling both
+the `PrintID' and Display methods from C.
+
+     void
+     call_Method(ref, method, index)
+         SV *	ref
+         char *	method
+         int		index
+         CODE:
+         PUSHMARK(SP);
+         XPUSHs(ref);
+         XPUSHs(sv_2mortal(newSViv(index))) ;
+         PUTBACK;
+
+     call_method(method, G_DISCARD) ;
+
+     void
+     call_PrintID(class, method)
+         char *	class
+         char *	method
+         CODE:
+         PUSHMARK(SP);
+         XPUSHs(sv_2mortal(newSVpv(class, 0))) ;
+         PUTBACK;
+
+     call_method(method, G_DISCARD) ;
+
+   So the methods `PrintID' and Display can be invoked like this
+
+     $a = new Mine ('red', 'green', 'blue') ;
+     call_Method($a, 'Display', 1) ;
+     call_PrintID('Mine', 'PrintID') ;
+
+   The only thing to note is that in both the static and virtual methods,
+the method name is not passed via the stack-it is used as the first
+parameter to call_method.
+
+Using GIMME_V
+-------------
+
+   Here is a trivial XSUB which prints the context in which it is
+currently executing.
+
+     void
+     PrintContext()
+         CODE:
+         I32 gimme = GIMME_V;
+         if (gimme == G_VOID)
+             printf ("Context is Void\n") ;
+         else if (gimme == G_SCALAR)
+             printf ("Context is Scalar\n") ;
+         else
+             printf ("Context is Array\n") ;
+
+   and here is some Perl to test it
+
+     PrintContext ;
+     $a = PrintContext ;
+     @a = PrintContext ;
+
+   The output from that will be
+
+     Context is Void
+     Context is Scalar
+     Context is Array
+
+Using Perl to dispose of temporaries
+------------------------------------
+
+   In the examples given to date, any temporaries created in the callback
+(i.e., parameters passed on the stack to the *call_** function or values
+returned via the stack) have been freed by one of these methods
+
+   * specifying the G_DISCARD flag with *call_**.
+
+   * explicitly disposed of using the ENTER/SAVETMPS - FREETMPS/LEAVE
+     pairing.
+
+   There is another method which can be used, namely letting Perl do it
+for you automatically whenever it regains control after the callback has
+terminated.  This is done by simply not using the
+
+     ENTER ;
+     SAVETMPS ;
+     ...
+     FREETMPS ;
+     LEAVE ;
+
+   sequence in the callback (and not, of course, specifying the G_DISCARD
+flag).
+
+   If you are going to use this method you have to be aware of a possible
+memory leak which can arise under very specific circumstances.  To explain
+these circumstances you need to know a bit about the flow of control
+between Perl and the callback routine.
+
+   The examples given at the start of the document (an error handler and
+an event driven program) are typical of the two main sorts of flow control
+that you are likely to encounter with callbacks.  There is a very
+important distinction between them, so pay attention.
+
+   In the first example, an error handler, the flow of control could be as
+follows.  You have created an interface to an external library.  Control
+can reach the external library like this
+
+     perl --> XSUB --> external library
+
+   Whilst control is in the library, an error condition occurs. You have
+previously set up a Perl callback to handle this situation, so it will get
+executed. Once the callback has finished, control will drop back to Perl
+again.  Here is what the flow of control will be like in that situation
+
+     perl --> XSUB --> external library
+                       ...
+                       error occurs
+                       ...
+                       external library --> call_* --> perl
+                                                           |
+     perl <-- XSUB <-- external library <-- call_* <----+
+
+   After processing of the error using *call_** is completed, control
+reverts back to Perl more or less immediately.
+
+   In the diagram, the further right you go the more deeply nested the
+scope is.  It is only when control is back with perl on the extreme left
+of the diagram that you will have dropped back to the enclosing scope and
+any temporaries you have left hanging around will be freed.
+
+   In the second example, an event driven program, the flow of control
+will be more like this
+
+     perl --> XSUB --> event handler
+                       ...
+                       event handler --> call_* --> perl
+                                                        |
+                       event handler <-- call_* <----+
+                       ...
+                       event handler --> call_* --> perl
+                                                        |
+                       event handler <-- call_* <----+
+                       ...
+                       event handler --> call_* --> perl
+                                                        |
+                       event handler <-- call_* <----+
+
+   In this case the flow of control can consist of only the repeated
+sequence
+
+     event handler --> call_* --> perl
+
+   for practically the complete duration of the program.  This means that
+control may never drop back to the surrounding scope in Perl at the
+extreme left.
+
+   So what is the big problem? Well, if you are expecting Perl to tidy up
+those temporaries for you, you might be in for a long wait.  For Perl to
+dispose of your temporaries, control must drop back to the enclosing scope
+at some stage.  In the event driven scenario that may never happen.  This
+means that as time goes on, your program will create more and more
+temporaries, none of which will ever be freed. As each of these
+temporaries consumes some memory your program will eventually consume all
+the available memory in your system-kapow!
+
+   So here is the bottom line-if you are sure that control will revert
+back to the enclosing Perl scope fairly quickly after the end of your
+callback, then it isn't absolutely necessary to dispose explicitly of any
+temporaries you may have created. Mind you, if you are at all uncertain
+about what to do, it doesn't do any harm to tidy up anyway.
+
+Strategies for storing Callback Context Information
+---------------------------------------------------
+
+   Potentially one of the trickiest problems to overcome when designing a
+callback interface can be figuring out how to store the mapping between
+the C callback function and the Perl equivalent.
+
+   To help understand why this can be a real problem first consider how a
+callback is set up in an all C environment.  Typically a C API will
+provide a function to register a callback.  This will expect a pointer to
+a function as one of its parameters.  Below is a call to a hypothetical
+function `register_fatal' which registers the C function to get called
+when a fatal error occurs.
+
+     register_fatal(cb1) ;
+
+   The single parameter `cb1' is a pointer to a function, so you must have
+defined `cb1' in your code, say something like this
+
+     static void
+     cb1()
+     {
+         printf ("Fatal Error\n") ;
+         exit(1) ;
+     }
+
+   Now change that to call a Perl subroutine instead
+
+     static SV * callback = (SV*)NULL;
+
+     static void
+     cb1()
+     {
+         dSP ;
+
+     PUSHMARK(SP) ;
+
+     /* Call the Perl sub to process the callback */
+     call_sv(callback, G_DISCARD) ;
+         }
+
+     void
+     register_fatal(fn)
+         SV *	fn
+         CODE:
+         /* Remember the Perl sub */
+         if (callback == (SV*)NULL)
+             callback = newSVsv(fn) ;
+         else
+             SvSetSV(callback, fn) ;
+
+     /* register the callback with the external library */
+     register_fatal(cb1) ;
+
+   where the Perl equivalent of `register_fatal' and the callback it
+registers, `pcb1', might look like this
+
+     # Register the sub pcb1
+     register_fatal(\&pcb1) ;
+
+     sub pcb1
+     {
+         die "I'm dying...\n" ;
+     }
+
+   The mapping between the C callback and the Perl equivalent is stored in
+the global variable callback.
+
+   This will be adequate if you ever need to have only one callback
+registered at any time. An example could be an error handler like the code
+sketched out above. Remember though, repeated calls to `register_fatal'
+will replace the previously registered callback function with the new one.
+
+   Say for example you want to interface to a library which allows
+asynchronous file i/o.  In this case you may be able to register a
+callback whenever a read operation has completed. To be of any use we want
+to be able to call separate Perl subroutines for each file that is opened.
+As it stands, the error handler example above would not be adequate as it
+allows only a single callback to be defined at any time. What we require
+is a means of storing the mapping between the opened file and the Perl
+subroutine we want to be called for that file.
+
+   Say the i/o library has a function `asynch_read' which associates a C
+function `ProcessRead' with a file handle fh-this assumes that it has also
+provided some routine to open the file and so obtain the file handle.
+
+     asynch_read(fh, ProcessRead)
+
+   This may expect the C *ProcessRead* function of this form
+
+     void
+     ProcessRead(fh, buffer)
+     int	fh ;
+     char *	buffer ;
+     {
+          ...
+     }
+
+   To provide a Perl interface to this library we need to be able to map
+between the fh parameter and the Perl subroutine we want called.  A hash
+is a convenient mechanism for storing this mapping.  The code below shows
+a possible implementation
+
+     static HV * Mapping = (HV*)NULL ;
+
+     void
+     asynch_read(fh, callback)
+         int	fh
+         SV *	callback
+         CODE:
+         /* If the hash doesn't already exist, create it */
+         if (Mapping == (HV*)NULL)
+             Mapping = newHV() ;
+
+     /* Save the fh -> callback mapping */
+     hv_store(Mapping, (char*)&fh, sizeof(fh), newSVsv(callback), 0) ;
+
+     /* Register with the C Library */
+     asynch_read(fh, asynch_read_if) ;
+
+   and `asynch_read_if' could look like this
+
+     static void
+     asynch_read_if(fh, buffer)
+     int	fh ;
+     char *	buffer ;
+     {
+         dSP ;
+         SV ** sv ;
+
+     /* Get the callback associated with fh */
+     sv =  hv_fetch(Mapping, (char*)&fh , sizeof(fh), FALSE) ;
+     if (sv == (SV**)NULL)
+         croak("Internal error...\n") ;
+
+     PUSHMARK(SP) ;
+     XPUSHs(sv_2mortal(newSViv(fh))) ;
+     XPUSHs(sv_2mortal(newSVpv(buffer, 0))) ;
+     PUTBACK ;
+
+     /* Call the Perl sub */
+     call_sv(*sv, G_DISCARD) ;
+         }
+
+   For completeness, here is `asynch_close'.  This shows how to remove the
+entry from the hash `Mapping'.
+
+     void
+     asynch_close(fh)
+         int	fh
+         CODE:
+         /* Remove the entry from the hash */
+         (void) hv_delete(Mapping, (char*)&fh, sizeof(fh), G_DISCARD) ;
+
+     /* Now call the real asynch_close */
+     asynch_close(fh) ;
+
+   So the Perl interface would look like this
+
+     sub callback1
+     {
+         my($handle, $buffer) = @_ ;
+     }
+
+     # Register the Perl callback
+     asynch_read($fh, \&callback1) ;
+
+     asynch_close($fh) ;
+
+   The mapping between the C callback and Perl is stored in the global
+hash `Mapping' this time. Using a hash has the distinct advantage that it
+allows an unlimited number of callbacks to be registered.
+
+   What if the interface provided by the C callback doesn't contain a
+parameter which allows the file handle to Perl subroutine mapping?  Say in
+the asynchronous i/o package, the callback function gets passed only the
+buffer parameter like this
+
+     void
+     ProcessRead(buffer)
+     char *	buffer ;
+     {
+         ...
+     }
+
+   Without the file handle there is no straightforward way to map from the
+C callback to the Perl subroutine.
+
+   In this case a possible way around this problem is to predefine a
+series of C functions to act as the interface to Perl, thus
+
+     #define MAX_CB		3
+     #define NULL_HANDLE	-1
+     typedef void (*FnMap)() ;
+
+     struct MapStruct {
+         FnMap    Function ;
+         SV *     PerlSub ;
+         int      Handle ;
+       } ;
+
+     static void  fn1() ;
+     static void  fn2() ;
+     static void  fn3() ;
+
+     static struct MapStruct Map [MAX_CB] =
+         {
+             { fn1, NULL, NULL_HANDLE },
+             { fn2, NULL, NULL_HANDLE },
+             { fn3, NULL, NULL_HANDLE }
+         } ;
+
+     static void
+     Pcb(index, buffer)
+     int index ;
+     char * buffer ;
+     {
+         dSP ;
+
+     PUSHMARK(SP) ;
+     XPUSHs(sv_2mortal(newSVpv(buffer, 0))) ;
+     PUTBACK ;
+
+     /* Call the Perl sub */
+     call_sv(Map[index].PerlSub, G_DISCARD) ;
+         }
+
+     static void
+     fn1(buffer)
+     char * buffer ;
+     {
+         Pcb(0, buffer) ;
+     }
+
+     static void
+     fn2(buffer)
+     char * buffer ;
+     {
+         Pcb(1, buffer) ;
+     }
+
+     static void
+     fn3(buffer)
+     char * buffer ;
+     {
+         Pcb(2, buffer) ;
+     }
+
+     void
+     array_asynch_read(fh, callback)
+         int		fh
+         SV *	callback
+         CODE:
+         int index ;
+         int null_index = MAX_CB ;
+
+     /* Find the same handle or an empty entry */
+     for (index = 0 ; index < MAX_CB ; ++index)
+     {
+         if (Map[index].Handle == fh)
+             break ;
+
+     if (Map[index].Handle == NULL_HANDLE)
+         null_index = index ;
+             }
+
+     if (index == MAX_CB && null_index == MAX_CB)
+         croak ("Too many callback functions registered\n") ;
+
+     if (index == MAX_CB)
+         index = null_index ;
+
+     /* Save the file handle */
+     Map[index].Handle = fh ;
+
+     /* Remember the Perl sub */
+     if (Map[index].PerlSub == (SV*)NULL)
+         Map[index].PerlSub = newSVsv(callback) ;
+     else
+         SvSetSV(Map[index].PerlSub, callback) ;
+
+     asynch_read(fh, Map[index].Function) ;
+
+     void
+     array_asynch_close(fh)
+         int	fh
+         CODE:
+         int index ;
+
+     /* Find the file handle */
+     for (index = 0; index < MAX_CB ; ++ index)
+         if (Map[index].Handle == fh)
+             break ;
+
+     if (index == MAX_CB)
+         croak ("could not close fh %d\n", fh) ;
+
+     Map[index].Handle = NULL_HANDLE ;
+     SvREFCNT_dec(Map[index].PerlSub) ;
+     Map[index].PerlSub = (SV*)NULL ;
+
+     asynch_close(fh) ;
+
+   In this case the functions `fn1', `fn2', and `fn3' are used to remember
+the Perl subroutine to be called. Each of the functions holds a separate
+hard-wired index which is used in the function `Pcb' to access the Map
+array and actually call the Perl subroutine.
+
+   There are some obvious disadvantages with this technique.
+
+   Firstly, the code is considerably more complex than with the previous
+example.
+
+   Secondly, there is a hard-wired limit (in this case 3) to the number of
+callbacks that can exist simultaneously. The only way to increase the
+limit is by modifying the code to add more functions and then recompiling.
+None the less, as long as the number of functions is chosen with some
+care, it is still a workable solution and in some cases is the only one
+available.
+
+   To summarize, here are a number of possible methods for you to consider
+for storing the mapping between C and the Perl callback
+
+  1. Ignore the problem - Allow only 1 callback For a lot of situations,
+     like interfacing to an error handler, this may be a perfectly
+     adequate solution.
+
+  2. Create a sequence of callbacks - hard wired limit If it is impossible
+     to tell from the parameters passed back from the C callback what the
+     context is, then you may need to create a sequence of C callback
+     interface functions, and store pointers to each in an array.
+
+  3. Use a parameter to map to the Perl callback A hash is an ideal
+     mechanism to store the mapping between C and Perl.
+
+
+Alternate Stack Manipulation
+----------------------------
+
+   Although I have made use of only the `POP*' macros to access values
+returned from Perl subroutines, it is also possible to bypass these macros
+and read the stack using the ST macro (See *Note Perlxs: perlxs, for a
+full description of the ST macro).
+
+   Most of the time the `POP*' macros should be adequate, the main problem
+with them is that they force you to process the returned values in
+sequence. This may not be the most suitable way to process the values in
+some cases. What we want is to be able to access the stack in a random
+order. The ST macro as used when coding an XSUB is ideal for this purpose.
+
+   The code below is the example given in the section *Returning a list of
+values* recoded to use ST instead of `POP*'.
+
+     static void
+     call_AddSubtract2(a, b)
+     int a ;
+     int b ;
+     {
+         dSP ;
+         I32 ax ;
+         int count ;
+
+     ENTER ;
+     SAVETMPS;
+
+     PUSHMARK(SP) ;
+     XPUSHs(sv_2mortal(newSViv(a)));
+     XPUSHs(sv_2mortal(newSViv(b)));
+     PUTBACK ;
+
+     count = call_pv("AddSubtract", G_ARRAY);
+
+     SPAGAIN ;
+     SP -= count ;
+     ax = (SP - PL_stack_base) + 1 ;
+
+     if (count != 2)
+         croak("Big trouble\n") ;
+
+     printf ("%d + %d = %d\n", a, b, SvIV(ST(0))) ;
+     printf ("%d - %d = %d\n", a, b, SvIV(ST(1))) ;
+
+     PUTBACK ;
+     FREETMPS ;
+     LEAVE ;
+         }
+
+   Notes
+
+  1. Notice that it was necessary to define the variable `ax'.  This is
+     because the ST macro expects it to exist.  If we were in an XSUB it
+     would not be necessary to define `ax' as it is already defined for
+     you.
+
+  2. The code
+
+          SPAGAIN ;
+          SP -= count ;
+          ax = (SP - PL_stack_base) + 1 ;
+
+     sets the stack up so that we can use the ST macro.
+
+  3. Unlike the original coding of this example, the returned values are
+     not accessed in reverse order.  So `ST(0)' refers to the first value
+     returned by the Perl subroutine and `ST(count-1)' refers to the last.
+
+
+Creating and calling an anonymous subroutine in C
+-------------------------------------------------
+
+   As we've already shown, call_sv can be used to invoke an anonymous
+subroutine.  However, our example showed a Perl script invoking an XSUB to
+perform this operation.  Let's see how it can be done inside our C code:
+
+     ...
+
+     SV *cvrv = eval_pv("sub { print 'You will not find me cluttering any namespace!' }", TRUE);
+
+     ...
+
+     call_sv(cvrv, G_VOID|G_NOARGS);
+
+   eval_pv is used to compile the anonymous subroutine, which will be the
+return value as well (read more about eval_pv in `eval_pv', *Note Perlapi:
+perlapi,).  Once this code reference is in hand, it can be mixed in with
+all the previous examples we've shown.
+
+SEE ALSO
+========
+
+   *Note Perlxs: perlxs,, *Note Perlguts: perlguts,, *Note Perlembed:
+perlembed,
+
+AUTHOR
+======
+
+   Paul Marquess
+
+   Special thanks to the following people who assisted in the creation of
+the document.
+
+   Jeff Okamoto, Tim Bunce, Nick Gianniotis, Steve Kelem, Gurusamy Sarathy
+and Larry Wall.
+
+DATE
+====
+
+   Version 1.3, 14th Apr 1997
+
+

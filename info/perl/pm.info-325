@@ -1,0 +1,2151 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: RCGI,  Next: RCU,  Prev: RAS/PortMaster,  Up: Module List
+
+Remote CGI distributed processing
+*********************************
+
+NAME
+====
+
+   RCGI - Remote CGI distributed processing
+
+SYNOPSIS
+========
+
+     use RCGI;
+     @result = Invoke('jobone',@arguments);
+     $result = Invoke('jobtwo',@arguments);
+
+     $remote_subroutine = new RCGI($base_url,$library_path,$module,$subroutine);
+     @my_result = $remote_subroutine->Call(@arguments);
+     if ($remote_subroutine->Success()) {
+          print @my_result,'';
+     } else {
+          print STDERR "Call to " . $remote_subroutine->Base_URL() .
+     	   " failed with status: " . $remote_subroutine->Status() .
+     	          ' ' . $remote_subroutine->Error_Message() . "\n";
+     }
+     $remote_subroutine->Async(1);
+     $remote_subroutine->Wantarray(1);
+     $remote_subroutine->Call(@arguments);
+     while(! $remote_subroutine->Done()) {
+         # This should really be something usefull--like calls to other servers!
+         sleep 1;
+     }
+     @my_result = $remote_subroutine->Read();
+     if ($remote_subroutine->Success()) {
+          print @my_result,'';
+     } else {
+          print STDERR "Call to " . $remote_subroutine->Base_URL() .
+     	   " failed with status: " . $remote_subroutine->Status() .
+     	          ' ' . $remote_subroutine->Error_Message() . "\n";
+     }
+
+     $result = RCGI::run_cgi_command($base_url, \%cgi_form,
+     	                            method => $method,
+                                     username => $username,
+                                     password => $password,
+                                     timeout => $timeout,
+                                     user_agent => $user_agent,
+                                     nph => $bool_nph);
+
+     # In a CGI script
+     ($cgi_form, %options) = RCGI::Process_Parameters( new CGI );
+     $result = RCGI::run_cgi_command($base_url, $cgi_form, %options);
+
+ABSTRACT
+========
+
+   This perl library provides remote execution using CGI on remote web
+servers.
+
+INSTALLATION:
+=============
+
+Installation overview
+---------------------
+
+   The installation of RCGI for full functionality consists of the
+following steps:
+
+   1) Edit RCGI/Config.pm to change the location of the configuration
+directory to an appropriate place.
+
+   2) Install the RCGI library itself by doing:         perl Makefile.PL
+     make         make test         make install
+
+   3) Put the *perlcall.cgi* CGI script and the *SAR.pm* module on every
+computer which will be running remote subroutines in the computer's
+webserver's cgi-bin directory.
+
+   4) Create sard.conf, server.conf, and jobs.conf files in the
+*/usr/rcgi* directory.
+
+   5) Start the *sard* daemon running on a computer which has read and
+write access to the */usr/rcgi* directory.
+
+   6) (Optional) Edit the line in sardcheck ($sard_user = 'sard_user'), to
+be the user which ran the the *sard* daemon in step five.  As the same use
+as step five, add a crontab entry which looks similar to:
+
+   30 * * * * /usr/local/bin/perl /path_to_sardcheck/sardcheck
+
+   Steps 2 and 3 are the only steps necessary if the load balancing calls:
+*Invoke*, *Async_Invoke*, or *new_job RCGI* will not be used.  Step 3 may
+be neglected if only *RCGI::run_cgi_command* will be used.
+
+The /usr/rcgi directory
+-----------------------
+
+   If you wish to change the location of the configuration directory from
+the default value of */usr/rcgi*, edit *RCGI/Config.pm*.  The
+configuration must then be made, *mkdir /usr/rcgi* and set to the correct
+permissions: *chgrp rcgi /usr/rcgi ; chmod g+rw /usr/rcgi*.  The DBM
+files: *load.dir* and *load.pag* are created in this directory and must be
+writable by any user process attempting to *Invoke* remote subroutines.
+
+   The sard.conf, server.conf, and jobs.conf files need to then be created
+in the */usr/rcgi* directory.  Following is the format for those files:
+
+sard.conf
+---------
+
+     # machine URL_of_perlcall.cgi path_to_SAR.pm_module
+     # Items on a line must be seperated by a single tab
+     machine_name	http://www.webserver.url/cgi-bin/perlcall.cgi	path_to_SAR.pm_module
+
+sard daemon
+-----------
+
+   Usage is: sard /usr/rcgi/sard.conf /usr/rcgi/sar
+[timeperiod_in_seconds] [bool_verbose]
+
+   The sard (System Activity Report Daemon) runs in the background to
+collect usage from the machines configured in the sard.conf file.  It uses
+the RCGI library to call (via perlcall.cgi) the SAR.pm module which, on
+Unix, uses the sar program to collect system activity over, by default, 10
+minute periods.  This information is stored in the DBM *sar* file located
+in the */usr/rcgi* directory.
+
+   This system activity information is used by the RCGI library to
+implement load balancing of job requests.
+
+server.conf
+-----------
+
+     # machine number_of_processors processes_per_processor reserve_idle(in percent)
+     # the high reserve_idle should prevent those machines from being used
+     # Items on a line must be seperated by a single tab
+     medium	4	2	10
+     shared	4	1	50
+     dud	1	2	100000
+     mine	1	1	100000
+     super	12	1	10
+
+jobs.conf
+---------
+
+     # job_type server task_url library_path module subroutine option option_value
+     # where option can be: timeout, username, password, user_agent
+     # Items on a line must be seperated by a single tab
+     jobone	machine1	http://webserver1/cgi-bin/perlcall.cgi	module_path	Module	subroutine	option_name	option_value
+     jobone	machine2	http://webserver2/cgi-bin/perlcall.cgi	module_path	Module	subroutine	option_name	option_value
+     jobtwo	machine2	http://webserver2/cgi-bin/perlcall.cgi	module_path	Module	subroutine	option_name	option_value
+     jobtwo	machine3	http://webserver3/cgi-bin/perlcall.cgi	module_path	Module	subroutine	option_name	option_value
+
+perlcall.cgi and SAR.pm and other user modules installation
+-----------------------------------------------------------
+
+   The *perlcall.cgi* perl CGI script and the *SAR.pm* module will need to
+be installed in a *cgi-bin* directory of the web server of every computer
+which will be set up to allow jobs to be *Invoke*'ed or Call'ed.  The
+*SAR.pm* module can alternatively be installed anywhere in the standard
+perl *@INC* path.
+
+   Perl modules to call must be in the standard perl *@INC* path or in the
+library path given in the calls or in jobs.conf.
+
+RCGI libraries installation
+---------------------------
+
+   To install this package, just change to the directory in which this
+file is found and type the following:
+
+     perl Makefile.PL
+     make
+     make test
+     make install
+
+   In order for a job to be invoked, the sard daemon must be running to
+collect computer processor loads.  The *perlcall.cgi* CGI script and the
+*SAR.pm* module must be installed properly on each computer.
+
+DESCRIPTION
+===========
+
+   The RCGI library allows calling Perl subroutines in modules on remote
+computers with load balancing.
+
+Load balancing using RCGI
+-------------------------
+
+   RCGI calculates which machine to invoke a job on by using the machine
+which has the maximum idle time as determined by:
+
+   1) Take the measured idle time for each machine if it is newer than the
+last calculated idle time for the machine.
+
+   2) Subtract the reserve_idle for each machine.
+
+   3) If two machines have similar resulting idle times, use the machine
+with the most increase in measured idle time.
+
+   The resulting idle time then has a process usage amount subtracted from
+it and which is then stored in the DBM load file stored in the */usr/rcgi*
+directory for subsequent usage for other job requests.
+
+   The process usage for a machine is calculated according to the
+following formula:
+
+     process_usage = (100 / (machine_processors * processes_per_processor));
+
+Usage of RCGI
+-------------
+
+   A perl program which is written as:
+
+     use lib 'module_path';
+     use Module;
+     $result = Module::subroutine(@arguments); # or
+     @result = Module::subroutine(@arguments);
+
+   can be converted to use a job, jobone:
+
+   jobs.conf entry:
+
+     jobone	machine1	http://webserver1/cgi-bin/perlcall.cgi	module_path	Module	subroutine
+     jobone	machine2	http://webserver2/cgi-bin/perlcall.cgi	module_path	Module	subroutine
+
+   by being rewritten as:
+
+     use RCGI;
+     $remote_subroutine = new_job RCGI('jobone');
+     $result = $remote_subroutine->Call(@arguments); # or
+     @result = $remote_subroutine->Call(@arguments);
+
+   or
+
+     use RCGI;
+     $result = Invoke('jobone',@arguments); # or
+     @result = Invoke('jobone',@arguments);
+
+   or can be rewritten to directly call a specific machine, machine1, as:
+
+     use RCGI;
+     $remote_subroutine = new RCGI('http://webserver1/cgi-bin/perlcall.cgi',
+     				  'module_path',
+     				  'Module',
+     				  'subroutine');
+     $result = $remote_subroutine->Call(@arguments); # or
+     @result = $remote_subroutine->Call(@arguments);
+
+   with the error checking for failure of the remote call by:
+
+     if ($remote_subroutine->Success()) {
+     	print $result;
+     } else {
+     	print "Call to " . $remote_subroutine->Base_URL() .
+     	    " failed with status: " . $remote_subroutine->Status() .
+     		' ' . $remote_subroutine->Error_Message() . "\n";
+     }
+
+RCGI Structure
+--------------
+
+   There are four possible uses or layers for RCGI:
+
+     1. Invoking a module subroutine as a job via perlcall.cgi on the least busy computer defined for that job type.  This may be either synchronous or asynchronous.
+
+     2. Getting a RCGI remote subroutine object for the least busy computer defined for that job type.
+
+     3. Calling a module subroutine via perlcall.cgi on a particular computer.  This may be either synchronous or asynchronous.
+
+     4. Retrieving HTML pages from static HTML pages or CGI scripts using RCGI::run_cgi_command.
+
+RCGI Structure Diagram
+----------------------
+
+   The arrows, '# ==>', show the usable API of RCGI.
+
+     sard.conf
+                                                                   /
+                                                                  L
+                                                              sard
+                                                              |
+        1 ==> Invoke or Async_Invoke                          V
+                        |             jobs.conf, server,conf, DBM file sar
+                        |            /
+                        V           L
+        2 ==>           new_job RCGI <-----> DBM file load
+                             |
+                             |
+                             V
+        3 ==>             new RCGI
+                             |
+                             |
+                             V
+                        $remote_subroutine->Call ==> http://www/cgi-bin/perlcall.cgi
+                        |                     /|         A
+                        |                     /|         |
+                        |                    / |         V
+                        V                   /  |     return( eval '
+        4 ==> RCGI::run_cgi_command        /   |     use lib 'library_path';
+                                          /    |     use Module;
+                                         /     |     Module::subroutine(@arguments);
+                                        L      |     ' );
+                        $result or @result     V
+               $remote_subroutine->Success     $remote_subroutine->Done
+         $remote_subroutine->Error_Message            |
+                                                      |
+                                                      V
+                                               $remote_subroutine->Read
+                                                      |
+                                                      |
+                                                      V
+                                                    result
+                                              $remote_subroutine->Sucess
+                                              $remote_subroutine->Error_Message
+
+Functions and Methods
+=====================
+
+Invoke a job request
+--------------------
+
+     @my_result = Invoke('job_name',@arguments);
+
+   Invoke a job to synchronously call a remote subroutine.
+
+   Where @arguments is the normal list of arguments for the remote
+subroutine.
+
+Async_Invoke a job request
+--------------------------
+
+     $remote_subroutine = Async_Invoke('job_name',@arguments);
+
+   Invoke a job to asynchronously call a remote subroutine.
+
+   Where @arguments is the normal list of arguments for the remote
+subroutine.
+
+Get a new RCGI object using a job type
+--------------------------------------
+
+     $remote_subroutine = new_job RCGI('job_name');
+
+     OR
+
+     $remote_subroutine = new_job RCGI('job_name',$minimum_load);
+
+   This will create a new object which will allow a remote subroutine call
+for a particular job type.  *$minimum_load* is the minimum percentage of
+idle to leave when assigning jobs.
+
+Creating a new RCGI object:
+---------------------------
+
+     $remote_subroutine = new RCGI($base_url,$library_path,$module,$subroutine)
+
+     OR
+
+     $remote_subroutine = new RCGI($base_url,$library_path,$module,$subroutine,
+     				  -option => value)
+
+   The arguments are:
+
+   *$base_url* - the base URL for the remote subroutine call.  This is the
+URL for perlcall.cgi on the remote web server.
+
+   *$library_path* - the location of the module which contains the
+subroutine for the remote subroutine call.  This is optional-undef may be
+passed instead if the module is located relative to the perl *@INC* path.
+A '.' may be passed to specify the cgi-bin directory on the remote web
+server.
+
+   *$module* - the module which contains the subroutine for the remote
+subroutine call.
+
+   *$subroutine* - the name of the subroutine to call for the remote
+subroutine call.  This subroutine must be callable in the form
+*Module_Name::subroutine();*.  Please remember that no executation state
+is maintained by default on the remote computer.
+
+   Options are passed as: -option => value, where -option is one of:
+
+     -async          Do an asynchronous call.
+     -wantarray      Force array or scalar result (useful for using with async).
+     -username       Username to login to remote web server, if any.
+     -password       Password to login to remote web server, if any.
+     -user_agent     User_agent to use for remote web server.
+     -timeout        Timeout in seconds for web connection (default is 180).
+
+   This will create a new object which allows remote subroutine calls.
+
+Calling the remote subroutine with Call
+---------------------------------------
+
+   Synchronous Call
+
+     @my_result = $remote_subroutine->Call(@arguments);
+
+     OR
+
+     $my_result = $remote_subroutine->Call(@arguments);
+
+   Where @arguments is the normal list of arguments for the remote
+subroutine.
+
+   Asynchronous Call
+
+     $remote_subroutine->Call(@arguments);
+
+     while(! $remote_subroutine->Done()) {
+     	# This should really be something useful
+     	sleep 1;
+     }
+     @my_result = $remote_subroutine->Read();
+
+     OR
+
+     $my_result = $remote_subroutine->Read();
+
+   Where @arguments is the normal list of arguments for the remote
+subroutine.
+
+Check to see if an asynchronous call is Done
+--------------------------------------------
+
+     $remote_subroutine->Done();
+
+   Return true when the asynchronous call has completed.
+
+Read the results from an asynchronous call
+------------------------------------------
+
+     @my_result = $remote_subroutine->Read();
+
+     OR
+
+     $my_result = $remote_subroutine->Read();
+
+   Fetch the result from an asynchronous call.
+
+Success or failure of the remote subroutine call
+------------------------------------------------
+
+     $remote_subroutine->Success()
+
+   This returns true if the remote subroutine call was completed with no
+errors.
+
+The return Status of rhte remote subroutine call
+------------------------------------------------
+
+     $remote_subroutine->Status()
+
+   This returns the status code from the remote subroutine call.  Possible
+values are:
+
+     -30 -- Machines are busy, the load is less than the load minimum (default is zero idle)
+
+     -27 -- Missing task_url, module, or subroutine for job type definition for assigned machine
+
+     -26 -- Missing job type definition for assigned machine
+
+     -25 -- Missing sar measurement for assigned machine
+
+     -24 -- Unable to assign machine
+
+     -20 -- No job types defined match asked for job type
+
+     -13 -- Unable to open load file
+
+     -12 -- Unable to open sar file
+
+     -11 -- Unable to open server.conf file
+
+     -10 -- Unable to open jobs.conf file
+
+     -1 -- The base URL, the module, or the subroutine were not given.
+
+     -2 -- Unable to fork background process for asynchronous call.
+
+     200 -- Successful call.
+
+     >200 -- Error code from remote web server or CGI script
+
+Error_Message
+-------------
+
+     $remote_subroutine->Error_Message()
+
+   This returns the associated error message, if any, from an unsuccessful
+remote subroutine call.  If the Status is greater than 200, then the error
+message is from the remote web server.
+
+Base_URL
+--------
+
+     $base_url = $remote_subroutine->Base_URL();
+
+     OR
+
+     $remote_subroutine->Base_URL($base_url);
+
+   Get or set the base URL for the remote subroutine call.  This is the
+URL for *perlcall.cgi* on the remote web server.
+
+Library_Path
+------------
+
+     $library_path = $remote_subroutine->Library_Path();
+
+     OR
+
+     $remote_subroutine->Library_Path($library_path);
+
+   Get or set the location of the module which contains the subroutine for
+the remote subroutine call.  This is optional-undef may be passed instead
+if the module is located relative to the perl *@INC* path.  A '.' may be
+passed to specify the cgi-bin directory on the remote web server.
+
+Module
+------
+
+     $module = $remote_subroutine->Module();
+
+     OR
+
+     $remote_subroutine->Module($module);
+
+   Get or set the module which contains the subroutine for the remote
+subroutine call.
+
+Subroutine
+----------
+
+     $subroutine = $remote_subroutine->Subroutine();
+
+     OR
+
+     $remote_subroutine->Subroutine($subroutine);
+
+   Get or set the name of the subroutine to call for the remote subroutine
+call.  This subroutine must be callable in the form
+*Module_Name::subroutine();*.  Please remember that no executation state
+is maintained by default on the remote computer.
+
+Async
+-----
+
+     $async = $remote_subroutine->Async();
+
+     OR
+
+     $remote_subroutine->Async($async);
+
+   Get or set whether the call is asynchronous.
+
+Wantarray
+---------
+
+     $wantarray = $remote_subroutine->Wantarray();
+
+     OR
+
+     $remote_subroutine->Wantarray($wantarray);
+
+   Get or set whether the call returns a scalar or an array (or
+associative array).
+
+Username
+--------
+
+     $username = $remote_subroutine->Username();
+
+     OR
+
+     $remote_subroutine->Username($username);
+
+   Get or set the username, if any, used to login to the remote server.
+
+Password
+--------
+
+     $password = $remote_subroutine->Password();
+
+     OR
+
+     $remote_subroutine->Password($password);
+
+   Get or set the password, if any, used to login to the remote server.
+
+User_Agent
+----------
+
+     $user_agent = $remote_subroutine->User_Agent();
+
+     OR
+
+     $remote_subroutine->User_Agent($user_agent);
+
+   Get or set the user_agent used to when connecting to the remote server.
+
+Timeout
+-------
+
+     $timeout = $remote_subroutine->Timeout();
+
+     OR
+
+     $remote_subroutine->Timeout($timeout);
+
+   Get or set the timeout in seconds used in the connection to the remote
+server.  Default is 180 seconds.
+
+Process_Parameters
+------------------
+
+     ($cgi_form, %options) = RCGI::Process_Parameters( new CGI , \%TRANSLATE, \%IGNORE );
+
+   This processes the CGI parameters, using the passed CGI object
+reference.  The optional %TRANSLATE associative array allows passing CGI
+parameters with a different parameter field name (i.e., translate paramter
+foo=1 to bar=1).  The optional %IGNORE associative array specifies CGI
+parameters which should not be passed on.
+
+   Returned are *$cgi_form* which is a reference to an associative array
+which contains the CGI parameters in a form ready to pass to
+*RCGI::run_cgi_command()* and the %options associative array of options to
+pass to *RCGI::run_cgi_command()*.
+
+run_cgi_command
+---------------
+
+     $result = RCGI::run_cgi_command($base_url, \%cgi_form, %options);
+
+   This fetches an HTML page from either a static HTML page or a CGI
+script.
+
+   *$base_url* is the URL of the page to get.  \%cgi_form is an associate
+array whose index is CGI parameters to pass and whose values are the CGI
+parameter values to pass to the remote CGI script.  If a parameter's name
+has 'upload:' prepended to it, then the values will be passed using the
+multipart/form-data file upload method.  (Example $cgi_form = {
+'upload:seq_file' => "> sequence\nAAAAA\n" }.)
+
+   Options are passed as: -option => value, where -option is one of:
+
+     -method         CGI method to use (GET is default).
+                     Values are 0 or undef for GET and 1 for POST
+     -nph            Use 1 to treat the remote CGI script as NPH.
+     -username       Username to login to remote web server, if any.
+     -password       Password to login to remote web server, if any.
+     -user_agent     User_agent to use for remote web server.
+     -timeout        Timeout in seconds for web connection (default is 180).
+
+Example Job Invoke Script
+=========================
+
+     #!/usr/local/bin/perl
+     
+     use RCGI;
+     @result = Invoke('jobtest1','one');
+     print @result;
+
+     $result = Invoke('jobtest2','two');
+     print $result;
+     exit;
+
+     $remote = new_job RCGI('jobtest1');
+     @out = $remote->Call('one');
+     if ( $remote->Success() == 0) {
+     	print " Failed with error: " .
+     	    $remote->Error_Message() . "\n";
+     	undef @out;
+     }
+
+Example Remote Subroutine Call Script
+=====================================
+
+     #!/usr/local/bin/perl
+     #
+     #
+     
+     use RCGI;
+     
+     $base_url = 'http://www.sandrock.edu/cgi-bin/perlcall.cgi';
+     $library_path = '/my/module/directory';
+     $module = 'MyModule';
+     $subroutine = 'my_subroutine';
+     $remote_subroutine = new RCGI($base_url,$library_path,$module,$subroutine);
+     
+     @my_result = $remote_subroutine->Call(0, 'a', 'b');
+     $, = "\n";
+     if ($remote_subroutine->Success()) {
+         print @my_result,'';
+     } else {
+         print STDERR "Call to " . $remote_subroutine->Base_URL() .
+     	" failed with status: " . $remote_subroutine->Status() .
+     	    ' ' . $remote_subroutine->Error_Message() . "\n";
+     }
+     
+     $my_result = $remote_subroutine->Call(0, 'a', 'b', 'c');
+     if ($remote_subroutine->Success()) {
+         print $my_result,'';
+     } else {
+         print STDERR "Call to " . $remote_subroutine->Base_URL() .
+     	" failed with status: " . $remote_subroutine->Status() .
+     	    ' ' . $remote_subroutine->Error_Message() . "\n";
+     }
+     
+     $remote_subroutine->Async(1);
+     $remote_subroutine->Wantarray(1);
+     $remote_subroutine->Call(5, 'async', 'hronous');
+     $| = 1;
+     while(! $remote_subroutine->Done()) {
+         # This should really be something usefull--like calls to other servers!
+         sleep 1;
+         print ".";
+     }
+     @my_result = $remote_subroutine->Read();
+     $, = "\n";
+     if ($remote_subroutine->Success()) {
+         print @my_result,'';
+     } else {
+         print STDERR "Call to " . $remote_subroutine->Base_URL() .
+     	" failed with status: " . $remote_subroutine->Status() .
+     	    ' ' . $remote_subroutine->Error_Message() . "\n";
+     }
+
+REPORTING BUGS
+==============
+
+   When reporting bugs/problems please include as much information as
+possible.
+
+   A small script which yields the problem will probably be of help.  If
+you cannot include a small script then please include a Debug trace from a
+run of your program which does yield the problem.
+
+AUTHOR INFORMATION
+==================
+
+   Brian H. Dunford-Shore   brian@ibc.wustl.edu David J. States
+states@ibc.wustl.edu
+
+   Copyright 1998, Washington University School of Medicine, Institute for
+Biomedical Computing.  All rights reserved.
+
+   This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   Address bug reports and comments to: www@ibc.wustl.edu
+
+TODO
+====
+
+Save the result dump in a file for batch mode
+Save the arguments in a file for queued batch mode
+SEE ALSO
+========
+
+CREDITS
+=======
+
+BUGS
+====
+
+   You really mean 'extra' features ;).  None known.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997 Washington University, St. Louis, Missouri. All
+rights reserved.  This program is free software; you can redistribute it
+and/or modify it under the same terms as Perl itself.
+
+
+File: pm.info,  Node: RCU,  Next: RCU/Context,  Prev: RCGI,  Up: Module List
+
+Remote Control Unit Interface
+*****************************
+
+NAME
+====
+
+   RCU - Remote Control Unit Interface
+
+SYNOPSIS
+========
+
+     use RCU;
+
+DESCRIPTION
+===========
+
+   This module provides a generic interface to remote control units (only
+receivers at the moment, as I cannot test more). It only provides an
+abstract management interface, other modules are required for the hardware
+access (RCU::Irman and RCU::Lirc are included, however).
+
+GETTING STARTED
+---------------
+
+   Please read *Note RCU/Receipts: RCU/Receipts, to get some idea on how
+to proceed after you installed the module (testing & standard techniques).
+
+THE RCU CLASS
+=============
+
+   The RCU class provides a general interface to anything you might want to
+do to, it represents your application.
+
+$rcu = new RCU "interface-spec"
+     Creates a new RCU application. interface must be an interface
+     specification similar to DBI's DSN:
+
+          RCU:ifname:arg:arg...
+
+     Examples: low-level interface (without `RCU::' prefix) or an arrayref
+     containing name and constructor arguments. If the interface name has
+     a `::' prefix it will be used as-is (without that prefix, of course).
+
+     For a much better interface, see *Note RCU/Event: RCU/Event,.
+
+$rcu->interface
+     Return the RCU::Interface object used by this RCU object.
+
+($keycode, $repeat) = $rcu->get
+($keycode, $repeat) = $rcu->poll
+     Simplified interface to the RCU (See also *Note RCU/Event:
+     RCU/Event,), return a cooked keycode and a repeat count (initial
+     keypress = 0, increasing while the key is pressed). If get is called
+     in scalar context it only returns unrepeated keycodes.
+
+     This interface is problematic: no key-up events are generated, and
+     the repeat events occur pseudo-randomly and have no time relation
+     between each other, so better use the event-based interface provided
+     by `RCU::Event|RCU::Event' in this node.
+
+THE RCU::Key CLASS
+==================
+
+   This class collects information about rcu keys.
+
+THE RCU::Interface CLASS
+========================
+
+   `RCU::Interface' provides the base class for all rcu interfaces, it is
+rarely used directly.
+
+fd
+     Return a unix filehandle that can be polled, or -1 if this is not
+     possible.
+
+($time, $raw, $cooked) = $if->get
+($time, $raw, $cooked) = $if->poll
+     Wait until a RCU event happens and return it. If the device can
+     translate raw keys events (e.g. hex key codes) into meaningful names
+     ("cooked" keys) it will return the cooked name as second value,
+     otherwise both return values are identical.
+
+     get always returns an event, waiting if neccessary, while poll only
+     checks for an event: If one is pending it is returned, otherwise poll
+     returns nothing.
+
+SEE ALSO
+========
+
+   *Note RCU/Irman: RCU/Irman,, *Note RCU/Lirc: RCU/Lirc,.
+
+AUTHOR
+======
+
+   This perl extension was written by Marc Lehmann <pcg@goof.com>.
+
+BUGS
+====
+
+   No send interface.
+
+
+File: pm.info,  Node: RCU/Context,  Next: RCU/Event,  Prev: RCU,  Up: Module List
+
+Remote Control Unit Interface
+*****************************
+
+NAME
+====
+
+   RCU::Context - Remote Control Unit Interface
+
+SYNOPSIS
+========
+
+     use RCU::Context;
+
+DESCRIPTION
+===========
+
+$ctx = new RCU::Context;
+     Create a new key context.
+
+$ctx->bind(event, action)
+     Bind the given action to an event (see EVENT SYNTAX, below, for an
+     explanation of this string).
+
+     action must be one of the following:
+
+          A code-reference
+            This code reference will be called with the event name, generating rcu,
+            timestamp and any additional arguments (usually none) fiven to the
+            inject method.
+
+          "enter", $context
+          "enter*", $context
+            Enter the given context object. The forms with an appended star "re-exec"
+            the event in the new context.
+          
+          "leave"
+          "leave*"
+            leave the current context (restoring the context active before it was
+            "enter"'ed)
+
+          "switch", $context
+          "switch*", $context
+            switch to the given context object
+
+     For every keypress, *only the first* (in order of their definition)
+     matching event handler is being executed.
+
+$ctx->inject(event, time, rcu, args...)
+     Simulate the given event (see "EVENT SYNTAX", below).
+
+$ctx->enter($rcu)
+$ctx->leave($rcu)
+     "Enter" ("Leave") the context (and create an <enter> (<leave>")
+     event). Not usually called by application code.
+
+EVENT SYNTAX
+============
+
+   The simplest way to specify events is using the (cooked) keyname, e.g.
+the event `cd-shuffle' occurs when the key named "cd-shuffle" was pressed
+down.
+
+   Since events are regular expressions, you have to quote any special
+characters (like . or *, where ^, `$' and . stop at keys boundaries) if
+you want to use them. On the other hand, regexes give you great freedom,
+if you specify the event:
+
+     rcu-key-(\d+)
+
+   ... you can then use "$1" in your callback to find out which digit was
+pressed.
+
+   You can prefix a keyname with a "~" which means the key was released
+(deactivates, switched off) instead of being pressed. If you want to force
+interpretation as a key-down event you can prefix the keyname with an "="
+character.
+
+   Every key will always generate two events: one key-down (activate) event
+when it is pressed and one "~" (key-up) event when it is released again.
+It is not possible that two keys are active at the same time.
+
+   To make matters slightly more complicated, you can also prepend a
+"history" of key names (all seperated by ":") before the current event.
+This means that the event depends on previous key-presses (no prefix
+characters are there).
+
+   Examples (all key names are, of course, hypothetical):
+
+     <enter>          enter the current context
+     key-ff           the fast forward key was pressed down
+     =key-ff          same as above
+     ~key-rev         the "rev"-key was released
+     key-tuner:key-4  first the tuner key was pressed (and released), then "4"
+     key-tuner:~key-4 first the tuner key was pressed, then "4" was released
+     k1:k2:k3         the keys "1", "2" were pressed and released, then
+                      "3" was pressed.
+
+   EBNF-Grammar
+
+   For those of you who need it...
+
+     event     := history prefix eventname
+     history   := <empty> | keyname ":" history
+     prefix    := <empty> | "=" | "~"
+     eventname := keyname | "<enter>" | "<leave>"
+     keyname   := any string consisting of printable, non-whitespace
+                  characters without ":"
+
+SEE ALSO
+========
+
+   *Note RCU: RCU,.
+
+AUTHOR
+======
+
+   This perl extension was written by Marc Lehmann <pcg@goof.com>.
+
+
+File: pm.info,  Node: RCU/Event,  Next: RCU/Irman,  Prev: RCU/Context,  Up: Module List
+
+Event-based RCU operation
+*************************
+
+NAME
+====
+
+   RCU::Event - Event-based RCU operation
+
+SYNOPSIS
+========
+
+     use RCU::Event;
+
+     $rcu = connect RCU::Event "interfac-spec", [initial-context]
+
+DESCRIPTION
+===========
+
+   This module provides a superset of the standard `RCU' interface by
+adding an event-based interface. Basically, you create one or more
+*contexts* (See `RCU::Context') and bind it to a RCU::Event object. All
+key events will then be directed to the current context.
+
+$ctx = connect RCU::Event "interface-desc";
+     Create a new RCU interface. The functionality is the same as
+     `RCU|RCU' in this node, with the functions added below.
+
+$rcu->inject(key)
+     Act as if key key was pressed (key starts with "=") or released (when
+     key starts with `~').  This is rarely used but is useful to
+     "simulate" key presses.
+
+$rcu->set_context(new_context)
+     Leave the current context (if any) and enter the `new_context', to
+     which all new events are directed to.
+
+$rcu->push_context(new_context)
+     Enter the given `new_context' without leaving the current one.
+
+$rcu->pop_context
+     Leave the current context and restore the previous context that was
+     saved in `push_context'.
+
+SEE ALSO
+========
+
+   *Note RCU: RCU,.
+
+AUTHOR
+======
+
+   This perl extension was written by Marc Lehmann <pcg@goof.com>.
+
+
+File: pm.info,  Node: RCU/Irman,  Next: RCU/Lirc,  Prev: RCU/Event,  Up: Module List
+
+RCU interface to libirman.
+**************************
+
+NAME
+====
+
+   RCU::Irman - RCU interface to libirman.
+
+SYNOPSIS
+========
+
+     use RCU::Irman;
+
+DESCRIPTION
+===========
+
+   See *Note RCU: RCU,.
+
+new <path>
+     Create an interface to the RCU receiver at serial port <path> (default
+     from in irman.conf used if omitted).
+
+AUTHOR
+======
+
+   This perl extension was written by Marc Lehmann <pcg@goof.com>.
+
+
+File: pm.info,  Node: RCU/Lirc,  Next: RCU/Receipts,  Prev: RCU/Irman,  Up: Module List
+
+RCU interface to linux-infrared-remote-control
+**********************************************
+
+NAME
+====
+
+   RCU::Lirc - RCU interface to linux-infrared-remote-control
+
+SYNOPSIS
+========
+
+     use RCU::Lirc;
+
+DESCRIPTION
+===========
+
+   See *Note RCU: RCU,.
+
+new progname
+     Create an interface to lircd using the configuration for program
+     "progname".
+
+AUTHOR
+======
+
+   This perl extension was written by Marc Lehmann <pcg@goof.com>.
+
+
+File: pm.info,  Node: RCU/Receipts,  Next: RDBAL,  Prev: RCU/Lirc,  Up: Module List
+
+RCU::Receipts
+=============
+
+   This manpage contains some examples that should help you getting started
+with the module and solving common problems.
+
+THE BASICS
+----------
+
+Debugging The Connection
+     To find out wether the connection actually works, you can try this
+     very simple program:
+
+          use RCU;
+
+          $rcu = new RCU "RCU:Lirc";
+
+          # endless loop
+          while () {
+             my ($key, $repeat) = $rcu->get;
+             print "EVENT $key (= $repeat)\n";
+          }
+
+     If you do not use the lirc interface you would have to specify another
+     one on the call to new, like `RCU:Irman' for your irman (very nice)
+     or `RCU:Irman:/dev/ttyS1' if you know that your irman is connected to
+     `/dev/ttyS1'.
+
+     Here is some example output:
+
+          EVENT sony-cd-next (= 0)
+          EVENT sony-cd-next (= 1)
+          EVENT sony-cd-next (= 0)
+          EVENT sony-cd-next (= 1)
+          EVENT sony-cd-next (= 2)
+          EVENT sony-cd-fwd (= 0)
+          EVENT sony-cd-fwd (= 1)
+          EVENT sony-cd-4 (= 0)
+          EVENT sony-cd-4 (= 1)
+
+     ... correspong to two times "sony-cd-next", and one press for
+     "sony-cd-fwd" and "sony-cd-4".
+
+Using Event
+     If you don't know how the Event module works you should read about
+     that one first and come back.
+
+     In general, the Event-API is easy to use. The only (seeming)
+     complication is that you have to think a bit about your setup. The
+     reason you should use this API is that using repeated keypresses has
+     one major drawback: It does not let you know when the user stopped
+     pressing the key (the events just do not occur) and different remotes
+     repeat their pulses with different frequency. The only thing that you
+     should use to measure the duration of a keypress is therefore
+     wallclock time.
+
+     This is what the Event-API does: It translates normal key-events into
+     key-down/key-up pairs, on which you can bind any action you want (See
+     *Note RCU/Context: RCU/Context,). Since keypresses usually do not
+     happen in some informational void but depend on previous keys and
+     e.g. the mode of the application, you have to put all your events
+     into some context (actually, into some *Note RCU/Context:
+     RCU/Context,-object), like this:
+
+          use Event;
+          use RCU::Event;
+          use RCU::Context;
+
+          # create a new context
+          $ctx = new RCU::Context;
+
+          # and bind some actions to some events
+          $ctx->bind(
+                "sony-cd-stop" => sub { print "T$_[1]: STOP pressed\n" },
+                "~sony-cd-1"   => sub { print "T$_[1]: 'one' key released\n" },
+                "=.*"          => sub { print "T$_[1]: unknown event '$_[0]'\n" },
+          );
+
+          # connect to the RCU
+          $rcu = new RCU::Event "RCU:Irman";
+          $rcu->set_context($ctx);
+
+          # jump into the main event loop
+          Event::loop;
+
+     Here is some sample output:
+
+          T965403699.132146: STOP pressed
+          T965403703.059969: unknown event 'sony-cd-stop:=sony-cd-1'
+          T965403703.621847: 'one' key released
+
+     As you can see, I first pressed the STOP button, followed by a press
+     of the "1" button, for which the default handler was used, since we
+     haven't bound "STOP followed by 1" to any event, followed by the
+     button-release event.
+
+RECEIPTS
+--------
+
+   ... not written yet ...
+
+A Volume Slider
+Digit Input
+AUTHOR
+======
+
+   This document was wirtten by Marc Lehmann <pcg@goof.com>
+
+
+File: pm.info,  Node: RDBAL,  Next: RDBAL/Schema,  Prev: RCU/Receipts,  Up: Module List
+
+Relational DataBase Abstraction Layer class (ReDBALl)
+*****************************************************
+
+NAME
+====
+
+   RDBAL - Relational DataBase Abstraction Layer class (ReDBALl)
+
+SYNOPSIS
+========
+
+     use RDBAL;
+     
+     $connection = RDBAL::Connect('username', 'password', 'server');
+
+     $connection->Query("SQL query"); #	Execute an SQL select and return the results in an array
+
+     $connection->Sql("SQL command(s)"); #	Execute an arbitrary SQL command
+
+     $connection->PrintTable(); #	print the results of the most recent select
+
+     $connection->PrintTables(); #	print the results of one or more selects
+
+     $connection->ColumnNames(); #	get column names for results table
+
+     $connection->ColumnTypes(); #	get column data types for results table
+
+     $connection->ColumnLengths(); #	get column lengths for results table
+
+DESCRIPTION
+===========
+
+   RDBAL is a perl module to work with a SQL Relational database.  A
+middle layer driver may be written for any database connection layer.  It
+is also possible to write middle layer drivers which would parse SQL
+statements and implement them in some arbitrary fashion.
+
+   Currently available are: Pg (PostgreSQL), Apache::Sybase::DBlib,
+Sybase::DBlib, ODBC middle layer drivers, and dbi:Sybase.
+
+   The presence of a given middle layer driver may be checked by checking
+to see if: $RDBAL::Layer{'Pg'}, $RDBAL::Layer{'ApacheSybaseDBlib'},
+$RDBAL::Layer{'SybaseDBlib'}, $RDBAL::Layer{'ODBC'}, or
+$RDBAL::Layer{'dbi:Sybase'} is defined.
+
+FUNCTIONS
+=========
+
+$connection = RDBAL::Connect('username', 'password', 'server', ['preferred_layer']);
+------------------------------------------------------------------------------------
+
+   Create/get a connection to a database (server).
+
+   Username and password are mandatory for database servers which require
+logins.  For Win32::ODBC, server is the name of an existing DSN.
+
+   Possible values for preferred_layer are (in the order of default
+preference):
+
+Pg
+ApacheSybaseDBlib
+SybaseDBlib
+ODBC
+dbi:Sybase
+dbi:Oracle
+$connection->Query("SQL query")
+-------------------------------
+
+   Execute an SQL select and return the results in an array.
+
+$connection->Sql("SQL command(s)")
+----------------------------------
+
+   execute an arbitrary SQL command.
+
+$connection->RowCount()
+-----------------------
+
+   Fetch the number of rows that were affected by the previous SQL command.
+
+@row = $connection->NextRow();
+------------------------------
+
+   fetch the next row from a result set
+
+$bool_regular_row = $connection->Regular_Row();
+-----------------------------------------------
+
+   see if the row just fetched is a regular data set row
+
+$bool_no_more_result_sets = $connection->More_Results();
+--------------------------------------------------------
+
+   see if there are any more result sets
+
+$connection->PrintTable()
+-------------------------
+
+   Print the results of the most recent select.
+
+$connection->PrintTables()
+--------------------------
+
+   Print the results of one or more selects.
+
+$connection->ColumnNames()
+--------------------------
+
+   Get column names for results table.
+
+$connection->ColumnTypes()
+--------------------------
+
+   Get column data types for results table.
+
+$connection->ColumnLengths()
+----------------------------
+
+   Get column lengths for results table.
+
+REPORTING BUGS
+==============
+
+   When reporting bugs/problems please include as much information as
+possible.
+
+   A small script which yields the problem will probably be of help.  If
+you cannot include a small script then please include a Debug trace from a
+run of your program which does yield the problem.
+
+AUTHOR INFORMATION
+==================
+
+   Brian H. Dunford-Shore   brian@ibc.wustl.edu
+
+   Copyright 1998, Washington University School of Medicine, Institute for
+Biomedical Computing.  All rights reserved.
+
+   This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   Address bug reports and comments to: www@ibc.wustl.edu
+
+TODO
+====
+
+   These are features that would be nice to have and might even happen
+someday (especially if YOU write it).
+
+Other types of database servers:
+     (mSQL, mySQL, etc.).
+
+SEE ALSO
+========
+
+   *Sybase::DBlib* - http://www.ibc.wustl.edu/perl5/other/sybperl.html
+
+   *Win32::odbc* - http://www.ibc.wustl.edu/perl5/other/Win32/odbc.html
+
+CREDITS
+=======
+
+   Thanks very much to:
+
+   *David J. States* (states@ibc.wustl.edu)
+
+   and
+
+   *Fyodor Krasnov* (fyodor@bws.aha.ru)
+
+     for suggestions and bug fixes.
+
+BUGS
+====
+
+   You really mean 'extra' features ;).  None known.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997, 1998, 1999 Washington University, St. Louis,
+Missouri. All rights reserved.  This program is free software; you can
+redistribute it and/or modify it under the same terms as Perl itself.
+
+
+File: pm.info,  Node: RDBAL/Schema,  Next: RDFStore,  Prev: RDBAL,  Up: Module List
+
+RDBAL Schema information object
+*******************************
+
+NAME
+====
+
+   RDBAL::Schema - RDBAL Schema information object
+
+SYNOPSIS
+========
+
+     use RDBAL;
+     use RDBAL::Schema;
+     $X = RDBAL::Connect('username', 'password', 'server');
+     $schema = new($X,$database);
+     $database = $schema->Database();
+     @user_tables = $schema->User_Tables();
+     @views = $schema->Views();
+     @procedures = $schema->Procedures();
+     @system_tables = $schema->System_Tables();
+     @fields = $schema->Table_Fields($table);
+     @fields = $schema->System_Table_Fields($table);
+     @fields = $schema->View_Fields($view);
+     @fields = $schema->Procedure_Parameters($procedure);
+     @fields = $schema->Fields($object,$object_type);
+     $field_info = $schema->Field_Info($object,$field,$object_type,$info_type);
+     $primary_key_number = $schema->Primary_Key($object,$field,$object_type);
+     $field_type = $schema->Field_Type($object,$field,$object_type);
+     $field_length = $schema->Field_Length($object,$field,$object_type);
+     $field_width = $schema->Field_Width($object,$field,$object_type);
+     $field_precision = $schema->Field_Precision($object,$field,$object_type);
+     $field_scale = $schema->Field_Scale($object,$field,$object_type);
+     $field_identity = $schema->Field_Identity($object,$field,$object_type);
+     $field_null = $schema->Field_Null($object,$field,$object_type);
+     @indexes = $schema->Indexes($table,$object_type);
+     @primary_keys = $schema->Primary_Keys($table,$object_type);
+     @keys = $schema->Keys($table,$object_type);
+     @children_tables = $schema->Children($table);
+     @parent_tables = $schema->Parents($table);
+     @field_equivalences = $schema->Relation($parent,$child);
+     # Get comments (views' and procedures' definitions)
+     $comments = $schema->Comments($object,$object_type)
+     # Get view's tables
+     @tables = $schema->View_Tables($view)
+
+ABSTRACT
+========
+
+   This perl library uses perl5 objects to make it easy to retrieve
+information about a particular PostgreSQL, Sybase, MS SQL, or Oracle
+databases's schema.
+
+INSTALLATION:
+=============
+
+   If you wish to change the location of the schema cache directory from
+the default value of '/usr/local/schema_cache', edit Config.pm.
+
+   To install this package, just change to the directory in which this
+file is found and type the following:
+
+     perl Makefile.PL
+     make
+     make test
+     make install
+
+   and to create the schema cache directory:
+
+     make schema_cache
+
+Installation of pg_schema.pl
+----------------------------
+
+   An example script for converting a DDL in Transact SQL format to
+PostgreSQL format with foreign key relational integrity enforced and
+remembered by PostgreSQL rules is included and must be manually installed
+(change the first line from #!/usr/local/bin/perl if your perl lives
+elsewhere).  See pg_schema.pl below for more.
+
+DESCRIPTION
+===========
+
+   The schema information available includes:
+
+Objects:     tables, views, and procedures
+Objects' fields (or parameters)
+Objects' fields' properties:           type, length, precision, scale, identity column, nullable
+Tables' indexes and primary keys
+Parent => child relations between tables including primary key/foreign key equivalences.
+Views' and Procedures' definitions (Comments).
+A view's underlying tables.
+   The database connection is cached in the schema object.  Objects and
+their fields properties and index information are retrieved when the
+schema object is created.  Table relationship information is retrieved for
+all tables when the first relationship information is requested.
+
+pg_schema.pl
+------------
+
+   The rules this script creates are necessary for RDBAL to have foreign
+key relation information.  It translates a foreign key reference into
+PostgreSQL rules:
+
+   FROM:
+
+     alter table table2
+         add foreign key  (field1, field2)
+            references table1 (field1, field2)
+     go
+
+   TO:
+
+   Insert RI:
+
+     create rule fk_table2_insert as on insert to table2
+     where new.field1 <> table1.field1 and new.field2 <> table1.field1
+             do instead nothing;
+
+   Update RI:
+
+     create rule fk_table2_update as on update to table2
+     where new.field1 <> table1.field1 and new.field2 <> table1.field2
+             do instead nothing;
+
+     create rule pk_table1_update as on update to table1
+     where old.field1 = table2.field1 and old.field2 = table2.field2
+             do instead nothing;
+
+   NOTE: the pk_update rule must list all children!
+
+   Delete RI:
+
+     create rule pk_table1_delete as on delete to table1
+     where old.field1 = table2.field1 and old.field2 = table2.field2
+             do instead nothing;
+
+   NOTE: the delete rule must list all children!
+
+   This script also maps datatypes:
+
+smalldatetime to datetime
+tinyint to int
+
+float4 or float8 to float
+   pg_schema.pl reads the input DDL on standard input and writes the
+output DDL to standard output.
+
+CREATING A NEW RDBAL::Schema OBJECT:
+------------------------------------
+
+     $query = new RDBAL::Schema($connection,$database);
+
+     OR
+
+     $query = new RDBAL::Schema($connection,$database, -option => value);
+
+   Options are passed as: -option => value, where -option is one of:
+
+     -server         Database server name.  This is used to differentiate
+                     between databases when caching.
+     -server_type    Database server type.  This is used to differentiate
+                     how to retrieve the schema.  The default is Transact-SQL
+                     or a hand-crafted schema cache file.  Currently, the
+                     only correct values for this are I<undef>, I<pg>,
+                     I<oracle>, I<dbi:Sybase>, or I<dbi:Oracle>.
+     -get_system     1 or undef.  A true value for this option causes retrieval
+                     (and caching) of schema for system tables.
+     -nocache        1 or undef.  A true value causes the cached schema to not
+                     be used and a new cache to be written.
+     -username       Database username.  This is used to differentiate
+                     between different users views of a database when caching.
+
+   This will create a new schema object for the database.  This must be
+given an open connection to a RDBAL database server object:
+
+     use RDBAL;
+     $connection = RDBAL::Connect('username', 'password', 'server');
+
+Fetching the database from the schema object:
+---------------------------------------------
+
+     $database = $schema->Database();
+
+   The database may be retrieved from the database schema object.
+
+Fetching the user tables from the schema:
+-----------------------------------------
+
+     @user_tables = $schema->User_Tables();
+
+   The user tables may be retrieved from the database schema.
+
+Fetching the views from the schema:
+-----------------------------------
+
+     @views = $schema->Views();
+
+   The views may be retrieved from the database schema.
+
+Fetching the procedures from the schema:
+----------------------------------------
+
+     @procedures = $schema->Procedures();
+
+   The procedures may be retrieved from the database schema.
+
+Fetching the system tables from the schema:
+-------------------------------------------
+
+     @system_tables = $schema->System_Tables();
+
+   The system tables may be retrieved from the database schema if the
+-get_system option was given when the schema object (or its cache) was
+created.
+
+Fetching the fields from the schema for a user table:
+-----------------------------------------------------
+
+     @fields = $schema->Table_Fields($table);
+
+   A user table's fields may be retrieved from the database schema.
+
+Fetching the fields from the schema for a system table:
+-------------------------------------------------------
+
+     @fields = $schema->System_Table_Fields($table);
+
+   A system table's fields may be retrieved from the database schema if
+the -get_system option was given when the schema object (or its cache) was
+created.
+
+Fetching the fields from the schema for a view:
+-----------------------------------------------
+
+     @fields = $schema->View_Fields($view);
+
+   A view's fields may be retrieved from the database schema.
+
+Fetching the parameters from the schema for a procedure:
+--------------------------------------------------------
+
+     @parameters = $schema->Procedure_Parameters($procedure);
+
+   A procedure's parameters may be retrieved from the database schema.
+
+Fetching the fields from the schema:
+------------------------------------
+
+     @fields = $schema->Fields($object,$object_type);
+
+   *$object_type* is optional and defaults to *'User Table'*.
+
+   The fields may be retrieved from the database schema for
+*$object_type*'s of:
+
+'User Table'
+'System Table'
+'View'
+'Procedure'
+Fetching the primary key number from the schema for a field:
+------------------------------------------------------------
+
+     $primary_key_number = $schema->Primary_Key($object,$field,$object_type);
+
+   *$object_type* is optional and defaults to *'User Table'*.
+
+   The primary key number may be retrieved from the database schema for a
+field.  undef is returned if the field is not a primary key.
+
+Fetching the field type from the schema:
+----------------------------------------
+
+     $field_type = $schema->Field_Type($object,$field,$object_type);
+
+   *$object_type* is optional and defaults to *'User Table'*.
+
+   The field type may be retrieved from the database schema.
+
+Fetching the field length from the schema:
+------------------------------------------
+
+     $field_length = $schema->Field_Length($object,$field,$object_type);
+
+   *$object_type* is optional and defaults to *'User Table'*.
+
+   The field length may be retrieved from the database schema.
+
+Fetching the field width from the schema:
+-----------------------------------------
+
+     $field_width = $schema->Field_Width($object,$field,$object_type);
+
+   *$object_type* is optional and defaults to *'User Table'*.
+
+   A value for the character string width of a field may be retrieved from
+the database schema.
+
+Fetching the field precision from the schema:
+---------------------------------------------
+
+     $field_precision = $schema->Field_Precision($object,$field,$object_type);
+
+   *$object_type* is optional and defaults to *'User Table'*.
+
+   The field precision may be retrieved from the database schema.
+
+Fetching the field scale from the schema:
+-----------------------------------------
+
+     $field_scale = $schema->Field_Scale($object,$field,$object_type);
+
+   *$object_type* is optional and defaults to *'User Table'*.
+
+   The field scale may be retrieved from the database schema.  If the
+field datatype does not have a scale, the value is undef.
+
+Fetching the field's identity column status from the schema:
+------------------------------------------------------------
+
+     $field_identity = $schema->Field_Identity($object,$field,$object_type);
+
+   *$object_type* is optional and defaults to *'User Table'*.
+
+   The field's identity column status may be retrieved from the database
+schema.  Nonzero implies the field is an identity column.
+
+Fetching the field nullable from the schema:
+--------------------------------------------
+
+     $field_null = $schema->Field_Null($object,$field,$object_type);
+
+   *$object_type* is optional and defaults to *'User Table'*.
+
+   Whether a field is nullable may be retrieved from the database schema.
+It is a 1 if the field is nullable.
+
+Fetching a field's (or parameter's) information from the schema:
+----------------------------------------------------------------
+
+     $field_info = $schema->Field_Info($object,$field,$object_type,$info_type);
+
+   *$object_type* is optional and defaults to *'User Table'*.
+*$info_type* is optional and defaults to 'Type'.
+
+   A field's information may be retrieved from the database schema for
+*$object_type*'s of:
+
+'User Table'
+'System Table'
+'View'
+'Procedure'
+   and *$info_type*'s of:
+
+'Primary_Key'
+'Type'
+'Length'
+'Precision'
+'Scale'
+'Identity'
+'Null'
+
+The primary key number may be retrieved from the database schema for a field.      undef is returned if the field is not a primary key.
+The field type may be retrieved from the database schema.
+The field length may be retrieved from the database schema.
+The field precision may be retrieved from the database schema.
+The field scale may be retrieved from the database schema.
+The field's identity column status may be retrieved from the database schema.      Nonzero implies the field is an identity column.
+Whether a field is nullable may be retrieved from the database schema.      It is a 1 if the field is nullable.
+Fetching the indexes from the schema:
+-------------------------------------
+
+     @indexes = $schema->Indexes($table,$object_type);
+
+   *$object_type* is optional and defaults to *'User Table'*.
+
+   The indexes may be retrieved from the database schema.  Each index is
+reported as (each item seperated by tabs):
+
+     index_name	index_description	comma_seperated_index_field_list
+
+   Example:
+
+     PK_STS	clustered, unique located on default	chromosome, arm, id_number
+
+Fetching the primary key fields from the schema:
+------------------------------------------------
+
+     @primary_keys = $schema->Primary_Keys($table,$object_type);
+
+   *$object_type* is optional and defaults to *'User Table'*.
+
+   The primary key fields may be retrieved from the database schema.
+
+Fetching all index keys from the schema:
+----------------------------------------
+
+     @keys = $schema->Keys($table,$object_type);
+
+   *$object_type* is optional and defaults to *'User Table'*.
+
+   All of the index keys may be retrieved from the database schema.  Each
+array element is a comma delimited list of the index's keys.
+
+Fetching the children tables from the schema:
+---------------------------------------------
+
+     @children_tables = $schema->Children($table);
+
+   A table's children tables may be retrieved from the database schema.
+
+Fetching the parent tables from the schema:
+-------------------------------------------
+
+     @parent_tables = $schema->Parents($table);
+
+   A table's parent tables may be retrieved from the database schema.
+
+Fetching the field equivalences from the schema:
+------------------------------------------------
+
+     @field_equivalences = $schema->Relation($parent,$child);
+
+   The key field equivalences may be retrieved from the database schema.
+Each key field equivalence array element is given as:
+parent_key_field=child_key_field
+
+Fetching the comments (views' and procedures' definitions) from the schema:
+---------------------------------------------------------------------------
+
+     $comments = $schema->Comments($object,$object_type)
+
+   *$object_type* is optional and defaults to 'Procedure'.
+
+   The comments (views' and procedures' definitions) may be retrieved from
+the database schema.
+
+Getting a view's underlying tables from the schema:
+---------------------------------------------------
+
+     @tables = $schema->View_Tables($view)
+
+   A view's underlying tables may be retrieved from the database schema.
+
+Quote a field's value if necessary
+----------------------------------
+
+     $quoted_field = $schema->Quote_Field($object,$field,$value,$object_type);
+
+   Appropriately put quote marks around a field's value.  Single quote
+marks get doubled, example: dont't  ==> "don"t".
+
+Schema Cache File Format
+========================
+
+   The schema cache file contains individual lines which describe some
+part of a schema (a descriptor).  Each descriptor is a tab delimited line
+with the first element on the line specifying what is being described (the
+type).  Carriage returns (not newlines) may be embedded in the comment
+(definition) descriptor elements.  Blank lines follow each group of index
+descriptors for a table.  Line feeds seperate different types of
+descriptors.
+
+Object Descriptor
+-----------------
+
+   An object descriptor describes the fields or parameters of a system or
+user table, a view, or a procedure.  It contains the following (tab
+delimited) elements:
+
+Type = 'O'
+Object = owner.object (owner defaults to 'dbo')
+Object type:
+          S => 'System Table'
+          U => 'User Table'
+          V => 'View'
+          P => 'Procedure'
+          TABLE => 'User Table'
+          VIEW => 'View'
+          PROCEDURE => 'Procedure'
+
+Field name
+Field type
+Field length
+Field precision
+Field scale
+Identity field (1 if true)
+Nullable field (1 if true)
+Primary Key Descriptor
+----------------------
+
+   A primary key descriptor lists the primary key for a table and the
+fields which comprise the primary key.  It contains the following (tab
+delimited) elements:
+
+Type = 'PK'
+Name of object having primary key
+Object type ('User Table' or 'System Table')
+Database
+Owner (default is 'dbo')
+Object (table)
+Primary Key field
+Position in primary key
+Primary Key name (optional)
+Foreign Key Descriptor
+----------------------
+
+   A foreign key descriptor lists the foreign key relationships for a
+table.  Each descriptor pairs a primary key field name of one table with
+the corresponding foreign key field name of another table.  It also gives
+the position each of those fields within the primary and foreign key
+tuples.  It contains the following (tab delimited) elements:
+
+Type = 'FK'
+Object type ('User Table' or 'System Table')
+Database
+Owner (default is 'dbo')
+Primary Key Object (table)
+Primary Key field
+Database
+Owner (default is 'dbo')
+Foreign Key Object (table)
+Foreign Key field
+Foreign key field position in tuple
+Update rule number - always 1, if present
+Delete rule number - always 1, if present
+Foreign Key name (Optional)
+Primary Key name (Optional)
+Index Descriptors
+-----------------
+
+   An index descriptor lists the indexes for a table and the fields which
+comprise that index.  It contains the following (tab delimited) elements
+(blank lines follow each set of indexes for a table):
+
+Type = 'I'
+Index Object (table)
+Index Object type ('User Table' or 'System Table')
+Index Name
+Index description
+Comma seperated, ordered index field list
+Comments (and stored procedure definitions) Descriptors
+-------------------------------------------------------
+
+   A comment (or definition) descriptor contains the following (tab
+delimited) elements:
+
+Type = 'C'
+Object
+Object Type is one of: 'User Table', 'System Table', 'View', 'Procedure'
+Comment or definition (carriage returns replace newlines and tabs are replaced by five spaces
+Example Script
+==============
+
+     #!/usr/local/bin/perl
+     
+     use RDBAL
+     use RDBAL::Schema;
+     
+     $server   = shift;
+     $database = shift;
+     $username = shift;
+     $password = shift;
+     
+     # Check to see if we want to use a different name for the server
+     if ($RDBAL::Layer{'SybaseDBlib'} || $RDBAL::Layer{'ApacheSybaseDBlib'}) {
+         $server = 'sybase_sql';
+     } else {
+         $server = 'odbc_sql';
+     }
+     if (!defined($server) ||
+         !defined($database) ||
+         !defined($username) ||
+         !defined($password)) {
+         die "Usage is: get_schema.pl server database username password\n";
+     }
+     
+     # Get connnection to database server
+     ( $X = RDBAL::Connect($username,$password,$server)
+      or (die "Failed to connect to $server $username"));
+     
+     $schema = new RDBAL::Schema($X,$database, -get_system => 1);
+     
+     $, = "\t";
+     print "Info for database: " . $schema->Database() . "\n";
+     print "User Tables:\n";
+     map {
+         $table = $_;
+         print "\tTable: $table\n";
+         map {
+     	print "\t\t". $_ . (($schema->Primary_Key($table,$_)) ? '*' : ''),
+     	$schema->Field_Type($table,$_),
+     	$schema->Field_Length($table,$_),
+     	$schema->Field_Precision($table,$_),
+     	$schema->Field_Scale($table,$_),
+     	(($schema->Field_Identity($table,$_)) ? 'Identity' : ''),
+     	(($schema->Field_Null($table,$_)) ? 'NULL' : 'NONNULL')
+     	  . "\n";
+         } $schema->Table_Fields($table);
+         print "\t\tPrimary keys:", $schema->Primary_Keys($table,'User Table'),"\n";
+         map {
+     	@keys = split(',',$_);
+     	print "\t\tIndex keys:", @keys ,"\n";
+         } $schema->Keys($table,'User Table');
+         map {
+     	($index_name, $index_description, $keys) = split("\t",$_);
+     	print "\t\tIndexes:\t$index_name\t$keys\t$index_description\n";
+         } $schema->Indexes($table,'User Table');
+         print "\t\tComments:", $schema->Comments($table,'User Table'), "\n";
+         map {
+     	print "\t\tParents: $_ (Reverse)", $schema->Relation($_,$table),"\n";
+         } $schema->Parents($table);
+         map {
+     	print "\t\tChildren: $_", $schema->Relation($table,$_),"\n";
+         } $schema->Children($table);
+     } $schema->User_Tables();
+     
+     print "System Tables:\n";
+     map {
+         $table = $_;
+         print "\tTable: $table\n";
+         map {
+     	print "\t\t". $_ . (($schema->Primary_Key($table,$_,'System Table')) ? '*' : ''),
+     	$schema->Field_Type($table,$_,'System Table'),
+     	$schema->Field_Length($table,$_,'System Table'),
+     	$schema->Field_Precision($table,$_,'System Table'),
+     	$schema->Field_Scale($table,$_,'System Table'),
+     	(($schema->Field_Identity($table,$_,'System Table')) ? 'Identity' : ''),
+     	(($schema->Field_Null($table,$_,'System Table')) ? 'NULL' : 'NONNULL')
+     	    . "\n";
+         } $schema->System_Table_Fields($table);
+         print "\t\tComments:", $schema->Comments($table,'System Table'), "\n";
+     } $schema->System_Tables();
+     
+     print "Views:\n";
+     map {
+         $table = $_;
+         print "\tView: $table (Tables:", $schema->View_Tables($_), ")\n";
+         map {
+     	print "\t\t". $_,
+     	$schema->Field_Type($table,$_,'View'),
+     	$schema->Field_Length($table,$_,'View'),
+     	$schema->Field_Precision($table,$_,'View'),
+     	$schema->Field_Scale($table,$_,'View'),
+     	(($schema->Field_Null($table,$_,'View')) ? 'NULL' : 'NONNULL')
+     	  . "\n";
+         } $schema->View_Fields($table);
+         print "\tComments:", $schema->Comments($table,'View'), "\n";
+     } $schema->Views();
+     
+     print "Procedures:\n";
+     map {
+         $table = $_;
+         print "\tProcedure: $table\n";
+         map {
+     	print "\t\t". $_,
+     	$schema->Field_Type($table,$_,'Procedure'),
+     	$schema->Field_Length($table,$_,'Procedure'),
+     	$schema->Field_Precision($table,$_,'Procedure'),
+     	$schema->Field_Scale($table,$_,'Procedure'),
+     	(($schema->Field_Null($table,$_,'Procedure')) ? 'NULL' : 'NONNULL')
+     	 . "\n";
+         } $schema->Procedure_Parameters($table);
+         print "\tComments:", $schema->Comments($table,'Procedure'), "\n";
+     } $schema->Procedures();
+
+REPORTING BUGS
+==============
+
+   When reporting bugs/problems please include as much information as
+possible.
+
+   A small script which yields the problem will probably be of help.  If
+you cannot include a small script then please include a Debug trace from a
+run of your program which does yield the problem.
+
+AUTHOR INFORMATION
+==================
+
+   Brian H. Dunford-Shore   brian@ibc.wustl.edu
+
+   Copyright 1998, Washington University School of Medicine, Institute for
+Biomedical Computing.  All rights reserved.
+
+   This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   Address bug reports and comments to: www@ibc.wustl.edu
+
+TODO
+====
+
+   These are features that would be nice to have and might even happen
+someday (especially if YOU write it).
+
+Other types of database servers:
+     (mSQL, mySQL, etc.).
+
+SEE ALSO
+========
+
+   *RDBAL* - http://www.ibc.wustl.edu/perl5/other/RDBAL.html
+
+   *Sybase::DBlib* - http://www.ibc.wustl.edu/perl5/other/sybperl.html
+
+   *Win32::odbc* - http://www.ibc.wustl.edu/perl5/other/Win32/odbc.html
+
+CREDITS
+=======
+
+   Thanks very much to:
+
+   *David J. States* (states@ibc.wustl.edu)
+
+     for suggestions and bug fixes.
+
+BUGS
+====
+
+   You really mean 'extra' features ;).  None known.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997, 1998, 1999 Washington University, St. Louis,
+Missouri. All rights reserved.  This program is free software; you can
+redistribute it and/or modify it under the same terms as Perl itself.
+
+

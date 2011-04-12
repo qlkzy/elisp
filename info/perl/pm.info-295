@@ -1,0 +1,1335 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: POE/Component/IRC,  Next: POE/Component/IRC/Onjoin,  Prev: POE/Component,  Up: Module List
+
+a fully event-driven IRC client module.
+***************************************
+
+NAME
+====
+
+   POE::Component::IRC - a fully event-driven IRC client module.
+
+SYNOPSIS
+========
+
+     use POE::Component::IRC;
+
+   # Do this when you create your sessions. 'my client' is just a # kernel
+alias to christen the new IRC connection with. (Returns # only a true or
+false success flag, not an object.)  POE::Component::IRC->new('my client')
+or die "Oh noooo! $!";
+
+   # Do stuff like this from within your sessions. This line tells the #
+connection named "my client" to send your session the following # events
+when they happen.  $kernel->post('my client', 'register', qw(connected msg
+public cdcc cping)); # You can guess what this line does.
+$kernel->post('my client', 'connect', 	      { Nick     => 'Boolahman',
+Server   => 'irc-w.primenet.com', 		Port     => 6669, 		Username => 'quetzal',
+Ircname  => 'Ask me about my colon!', } );
+
+DESCRIPTION
+===========
+
+   POE::Component::IRC is a POE component (who'd have guessed?) which acts
+as an easily controllable IRC client for your other POE components and
+sessions. You create an IRC component and tell it what events your session
+cares about and where to connect to, and it sends back interesting IRC
+events when they happen. You make the client do things by sending it
+events. That's all there is to it. Cool, no?
+
+   [Note that using this module requires some familiarity with the details
+of the IRC protocol. I'd advise you to read up on the gory details of RFC
+1459 <http://cs-pub.bu.edu/pub/irc/support/rfc1459.txt> before you get
+started. Keep the list of server numeric codes handy while you program.
+Needless to say, you'll also need a good working knowledge of POE, or this
+document will be of very little use to you.]
+
+   So you want to write a POE program with POE::Component::IRC? Listen up.
+The short version is as follows: Create your session(s) and an alias for a
+new POE::Component::IRC client. (Conceptually, it helps if you think of
+them as little IRC clients.) In your session's _start handler, send the
+IRC client a 'register' event to tell it which IRC events you want to
+receive from it. Send it a 'connect' event at some point to tell it to
+join the server, and it should start sending you interesting events every
+once in a while. If you want to tell it to perform an action, like joining
+a channel and saying something witty, send it the appropriate events like
+so:
+
+     $kernel->post( 'my client', 'join', '#perl' );
+     $kernel->post( 'my client', 'privmsg', '#perl', 'Pull my finger!' );
+
+   The long version is the rest of this document.
+
+METHODS
+=======
+
+   Well, OK, there's only actually one, so it's more like "METHOD".
+
+new
+     Takes one argument: a name (kernel alias) which this new connection
+     will be known by. WARNING: This method, for all that it's named "new"
+     and called in an OO fashion, doesn't actually return an object. It
+     returns a true or false value which indicates if the new session was
+     created or not. If it returns false, check $! for the POE::Session
+     error code.
+
+INPUT
+=====
+
+   How to talk to your new IRC component... here's the events we'll accept.
+
+Important Commands
+------------------
+
+ctcp and ctcpreply
+     Sends a CTCP query or response to the nick(s) or channel(s) which you
+     specify. Takes 2 arguments: the nick or channel to send a message to
+     (use an array reference here to specify multiple recipients), and the
+     plain text of the message to send (the CTCP quoting will be handled
+     for you).
+
+connect
+     Takes one argument: a hash reference of attributes for the new
+     connection (see the `SYNOPSIS' in this node section of this doc for an
+     example). This event tells the IRC client to connect to a
+     new/different server. If it has a connection already open, it'll close
+     it gracefully before reconnecting. Possible attributes for the new
+     connection are "Server", the server name; "Password", an optional
+     password for restricted servers; "Port", the remote port number,
+     "LocalAddr", which local IP address on a multihomed box to connect as;
+     "LocalPort", the local TCP port to open your socket on; "Nick", your
+     client's IRC nickname; "Username", your client's username; and
+     "Ircname", some cute comment or something. connect() will supply
+     reasonable defaults for any of these attributes which are missing, so
+     don't feel obliged to write them all out.
+
+dcc
+     Send a DCC SEND or CHAT request to another person. Takes at least two
+     arguments: the nickname of the person to send the request to and the
+     type of DCC request (SEND or CHAT). For SEND requests, be sure to add
+     a third argument for the filename you want to send. Optionally, you
+     can add a fourth argument for the DCC transfer blocksize, but the
+     default of 1024 should usually be fine.
+
+     Incidentally, you can send other weird nonstandard kinds of DCCs too;
+     just put something besides 'SEND' or 'CHAT' (say, "FOO") in the type
+     field, and you'll get back "irc_dcc_foo" events when activity happens
+     on its DCC connection.
+
+dcc_accept
+     Accepts an incoming DCC connection from another host. Takes one
+     argument: the magic cookie from an 'irc_dcc_request' event. (See the
+     'irc_dcc_request' section below for more details.)
+
+dcc_chat
+     Sends lines of data to the person on the other side of a DCC CHAT
+     connection. Takes any number of arguments: the magic cookie from an
+     'irc_dcc_start' event, followed by the data you wish to send. (It'll
+     be chunked into lines by a POE::Filter::Line for you, don't worry.)
+
+dcc_close
+     Terminates a DCC SEND or GET connection prematurely, and causes DCC
+     CHAT connections to close gracefully. Takes one argument: the magic
+     cookie from an 'irc_dcc_start' or 'irc_dcc_request' event.
+
+join
+     Tells your IRC client to join a single channel of your choice. Takes
+     at least one arg: the channel name (required) and the channel key
+     (optional, for password-protected channels).
+
+kick
+     Tell the IRC server to forcibly evict a user from a particular
+     channel. Takes at least 2 arguments: a channel name, the nick of the
+     user to boot, and an optional witty message to show them as they sail
+     out the door.
+
+mode
+     Request a mode change on a particular channel or user. Takes at least
+     one argument: the mode changes to effect, as a single string (e.g.,
+     "+sm-p+o"), and any number of optional operands to the mode changes
+     (nicks, hostmasks, channel keys, whatever.) Or just pass them all as
+     one big string and it'll still work, whatever. I regret that I
+     haven't the patience now to write a detailed explanation, but serious
+     IRC users know the details anyhow.
+
+nick
+     Allows you to change your nickname. Takes exactly one argument: the
+     new username that you'd like to be known as.
+
+notice
+     Sends a NOTICE message to the nick(s) or channel(s) which you
+     specify. Takes 2 arguments: the nick or channel to send a notice to
+     (use an array reference here to specify multiple recipients), and the
+     text of the notice to send.
+
+part
+     Tell your IRC client to leave the channels which you pass to it. Takes
+     any number of arguments: channel names to depart from.
+
+privmsg
+     Sends a public or private message to the nick(s) or channel(s) which
+     you specify. Takes 2 arguments: the nick or channel to send a message
+     to (use an array reference here to specify multiple recipients), and
+     the text of the message to send.
+
+quit
+     Tells the IRC server to disconnect you. Takes one optional argument:
+     some clever, witty string that other users in your channels will see
+     as you leave. You can expect to get an `irc_disconnect' event shortly
+     after sending this.
+
+register
+     Takes N arguments: a list of event names that your session wants to
+     listen for, minus the "irc_" prefix. So, for instance, if you just
+     want a bot that keeps track of which people are on a channel, you'll
+     need to listen for JOINs, PARTs, QUITs, and KICKs to people on the
+     channel you're in. You'd tell POE::Component::IRC that you want those
+     events by saying this:
+
+          $kernel->post( 'my client', 'register', qw(join part quit kick) );
+
+     Then, whenever people enter or leave a channel your bot is on
+     (forcibly or not), your session will receive events with names like
+     "irc_join", "irc_kick", etc., which you can use to update a list of
+     people on the channel.
+
+     Registering for `'all'' will cause it to send all IRC-related events
+     to you; this is the easiest way to handle it. See the test script for
+     an example.
+
+unregister
+     Takes N arguments: a list of event names which you *don't* want to
+     receive. If you've previously done a 'register' for a particular event
+     which you no longer care about, this event will tell the IRC
+     connection to stop sending them to you. (If you haven't, it just
+     ignores you. No big deal.)
+
+Not-So-Important Commands
+-------------------------
+
+admin
+     Asks your server who your friendly neighborhood server administrators
+     are. If you prefer, you can pass it a server name to query, instead of
+     asking the server you're currently on.
+
+away
+     When sent with an argument (a message describig where you went), the
+     server will note that you're now away from your machine or otherwise
+     preoccupied, and pass your message along to anyone who tries to
+     communicate with you. When sent without arguments, it tells the server
+     that you're back and paying attention.
+
+info
+     Basically the same as the "version" command, except that the server is
+     permitted to return any information about itself that it thinks is
+     relevant. There's some nice, specific standards-writing for ya, eh?
+
+invite
+     Invites another user onto an invite-only channel. Takes 2 arguments:
+     the nick of the user you wish to admit, and the name of the channel to
+     invite them to.
+
+ison
+     Asks the IRC server which users out of a list of nicknames are
+     currently online. Takes any number of arguments: a list of nicknames
+     to query the IRC server about.
+
+links
+     Asks the server for a list of servers connected to the IRC network.
+     Takes two optional arguments, which I'm too lazy to document here, so
+     all you would-be linklooker writers should probably go dig up the RFC.
+
+motd
+     Request the server's "Message of the Day", a document which typically
+     contains stuff like the server's acceptable use policy and admin
+     contact email addresses, et cetera. Normally you'll automatically
+     receive this when you log into a server, but if you want it again,
+     here's how to do it. If you'd like to get the MOTD for a server other
+     than the one you're logged into, pass it the server's hostname as an
+     argument; otherwise, no arguments.
+
+names
+     Asks the server for a list of nicknames on particular channels. Takes
+     any number of arguments: names of channels to get lists of users for.
+     If called without any channel names, it'll tell you the nicks of
+     everyone on the IRC network. This is a really big list, so don't do
+     this much.
+
+sl
+     Sends a raw line of text to the server. Takes one argument: a string
+     of a raw IRC command to send to the server. It is more optimal to use
+     the events this module supplies instead of writing raw IRC commands
+     yourself.
+
+stats
+     Returns some information about a server. Kinda complicated and not
+     terribly commonly used, so look it up in the RFC if you're curious.
+     Takes as many arguments as you please.
+
+time
+     Asks the server what time it thinks it is, which it will return in a
+     human-readable form. Takes one optional argument: a server name to
+     query. If not supplied, defaults to current server.
+
+topic
+     Retrieves or sets the topic for particular channel. If called with
+     just the channel name as an argument, it will ask the server to
+     return the current topic. If called with the channel name and a
+     string, it will set the channel topic to that string.
+
+trace
+     If you pass a server name or nick along with this request, it asks the
+     server for the list of servers in between you and the thing you
+     mentioned. If sent with no arguments, it will show you all the servers
+     which are connected to your current server.
+
+userhost
+     Asks the IRC server for information about particular nicknames. (The
+     RFC doesn't define exactly what this is supposed to return.) Takes any
+     number of arguments: the nicknames to look up.
+
+users
+     Asks the server how many users are logged into it. Defaults to the
+     server you're currently logged into; however, you can pass a server
+     name as the first argument to query some other machine instead.
+
+version
+     Asks the server about the version of ircd that it's running. Takes one
+     optional argument: a server name to query. If not supplied, defaults
+     to current server.
+
+who
+     Lists the logged-on users matching a particular channel name,
+     hostname, nickname, or what-have-you. Takes one optional argument: a
+     string for it to search for. Wildcards are allowed; in the absence of
+     this argument, it will return everyone who's currently logged in (bad
+     move). Tack an "o" on the end if you want to list only IRCops, as per
+     the RFC.
+
+whois
+     Queries the IRC server for detailed information about a particular
+     user. Takes any number of arguments: nicknames or hostmasks to ask for
+     information about.
+
+whowas
+     Asks the server for information about nickname which is no longer
+     connected. Takes at least one argument: a nickname to look up (no
+     wildcards allowed), the optional maximum number of history entries to
+     return, and the optional server hostname to query.
+
+Purely Esoteric Commands
+------------------------
+
+oper
+     In the exceedingly unlikely event that you happen to be an IRC
+     operator, you can use this command to authenticate with your IRC
+     server. Takes 2 arguments: your username and your password.
+
+rehash
+     Tells the IRC server you're connected to to rehash its configuration
+     files. Only useful for IRCops. Takes no arguments.
+
+restart
+     Tells the IRC server you're connected to to shut down and restart
+     itself.  Only useful for IRCops, thank goodness. Takes no arguments.
+
+sconnect
+     Tells one IRC server (which you have operator status on) to connect to
+     another. This is actually the CONNECT command, but I already had an
+     event called 'connect', so too bad. Takes the args you'd expect: a
+     server to connect to, an optional port to connect on, and an optional
+     remote server to connect with, instead of the one you're currently on.
+
+summon
+     Don't even ask.
+
+wallops
+     Another opers-only command. This one sends a message to all currently
+     logged-on opers (and +w users); sort of a mass PA system for the IRC
+     server administrators. Takes one argument: some clever, witty message
+     to send.
+
+OUTPUT
+======
+
+   The events you will receive (or can ask to receive) from your running
+IRC component. Note that all incoming event names your session will
+receive are prefixed by "irc_", to inhibit event namespace pollution.
+
+   If you wish, you can ask the client to send you every event it
+generates. Simply register for the event name "all". This is a lot easier
+than writing a huge list of things you specifically want to listen for.
+FIXME: I'd really like to classify these somewhat ("basic", "oper",
+"ctcp", "dcc", "raw" or some such), and I'd welcome suggestions for ways
+to make this easier on the user, if you can think of some.
+
+Important Events
+----------------
+
+irc_connected
+     The IRC component will send an "irc_connected" event as soon as it
+     establishes a connection to an IRC server, before attempting to log
+     in. ARG0 is the server name.
+
+     NOTE: When you get an "irc_connected" event, this doesn't mean you
+     can start sending commands to the server yet. Wait until you receive
+     an irc_001 event (the server welcome message) before actually sending
+     anything back to the server.
+
+
+     irc_ctcp_whatever events are generated upon receipt of CTCP messages.
+     For instance, receiving a CTCP PING request generates an irc_ctcp_ping
+     event, CTCP SOURCE generates an irc_ctcp_source event, blah blah, so
+     on and so forth. ARG0 is the nick!hostmask of the sender. ARG1 is the
+     channel/recipient name(s). ARG2 is the text of the CTCP message.
+
+     Note that DCCs are handled separately - see the 'irc_dcc_request'
+     event, below.
+
+
+     irc_ctcpreply_whatever messages are just like irc_ctcp_whatever
+     messages, described above, except that they're generated when a
+     response to one of your CTCP queries comes back. They have the same
+     arguments and such as irc_ctcp_* events.
+
+irc_disconnected
+     The counterpart to irc_connected, sent whenever a socket connection
+     to an IRC server closes down (whether intentionally or
+     unintentionally). ARG0 is the server name.
+
+irc_error
+     You get this whenever the server sends you an ERROR message. Expect
+     this to usually be accompanied by the sudden dropping of your
+     connection. ARG0 is the server's explanation of the error.
+
+irc_join
+     Sent whenever someone joins a channel that you're on. ARG0 is the
+     person's nick!hostmask. ARG1 is the channel name.
+
+irc_kick
+     Sent whenever someone gets booted off a channel that you're on. ARG0
+     is the kicker's nick!hostmask. ARG1 is the channel name. ARG2 is the
+     nick of the unfortunate kickee. ARG3 is the explanation string for the
+     kick.
+
+irc_mode
+     Sent whenever someone changes a channel mode in your presence, or when
+     you change your own user mode. ARG0 is the nick!hostmask of that
+     someone. ARG1 is the channel it affects (or your nick, if it's a user
+     mode change). ARG2 is the mode string (i.e., "+o-b"). The rest of the
+     args (ARG3 .. $#_) are the operands to the mode string (nicks,
+     hostmasks, channel keys, whatever).
+
+irc_msg
+     Sent whenever you receive a PRIVMSG command that was addressed to you
+     privately. ARG0 is the nick!hostmask of the sender. ARG1 is an array
+     reference containing the nick(s) of the recipients. ARG2 is the text
+     of the message.
+
+irc_nick
+     Sent whenever you, or someone around you, changes nicks. ARG0 is the
+     nick!hostmask of the changer. ARG1 is the new nick that they changed
+     to.
+
+irc_notice
+     Sent whenever you receive a NOTICE command. ARG0 is the nick!hostmask
+     of the sender. ARG1 is an array reference containing the nick(s) or
+     channel name(s) of the recipients. ARG2 is the text of the NOTICE
+     message.
+
+irc_part
+     Sent whenever someone leaves a channel that you're on. ARG0 is the
+     person's nick!hostmask. ARG1 is the channel name.
+
+irc_ping
+     An event sent whenever the server sends a PING query to the client.
+     (Don't confuse this with a CTCP PING, which is another beast
+     entirely. If unclear, read the RFC.) Note that POE::Component::IRC
+     will automatically take care of sending the PONG response back to the
+     server for you, although you can still register to catch the event for
+     informational purposes.
+
+irc_public
+     Sent whenever you receive a PRIVMSG command that was sent to a
+     channel. ARG0 is the nick!hostmask of the sender. ARG1 is an array
+     reference containing the channel name(s) of the recipients. ARG2 is
+     the text of the message.
+
+irc_quit
+     Sent whenever someone on a channel with you quits IRC (or gets
+     KILLed). ARG0 is the nick!hostmask of the person in question. ARG1 is
+     the clever, witty message they left behind on the way out.
+
+irc_socketerr
+     Sent when a connection couldn't be established to the IRC server. ARG0
+     is probably some vague and/or misleading reason for what failed.
+
+All numeric events (see RFC 1459)
+     Most messages from IRC servers are identified only by three-digit
+     numeric codes with undescriptive constant names like RPL_UMODEIS and
+     ERR_NOTOPLEVEL. (Actually, the list of codes in the RFC is kind of
+     out-of-date... the list in the back of Net::IRC::Event.pm is more
+     complete, and different IRC networks have different and incompatible
+     lists. Ack!) As an example, say you wanted to handle event 376
+     (RPL_ENDOFMOTD, which signals the end of the MOTD message). You'd
+     register for '376', and listen for 'irc_376' events. Simple, no? ARG0
+     is the name of the server which sent the message. ARG1 is the text of
+     the message.
+
+Somewhat Less Important Events
+------------------------------
+
+irc_dcc_chat
+     Notifies you that one line of text has been received from the client
+     on the other end of a DCC CHAT connection. ARG0 is the connection's
+     magic cookie, ARG1 is the nick of the person on the other end, ARG2
+     is the port number, and ARG3 is the text they sent.
+
+irc_dcc_done
+     You receive this event when a DCC connection terminates normally.
+     Abnormal terminations are reported by "irc_dcc_error", below. ARG0 is
+     the connection's magic cookie, ARG1 is the nick of the person on the
+     other end, ARG2 is the DCC type (CHAT, SEND, GET, etc.), and ARG3 is
+     the port number. For DCC SEND and GET connections, ARG4 will be the
+     filename, ARG5 will be the file size, and ARG6 will be the number of
+     bytes transferred. (ARG5 and ARG6 should always be the same.)
+
+irc_dcc_error
+     You get this event whenever a DCC connection or connection attempt
+     terminates unexpectedly or suffers some fatal error. ARG0 will be the
+     connection's magic cookie, ARG1 will be a string describing the error.
+     ARG2 will be the nick of the person on the other end of the
+     connection.  ARG3 is the DCC type (SEND, GET, CHAT, etc.). ARG4 is
+     the port number of the DCC connection, if any. For SEND and GET
+     connections, ARG5 is the filename.
+
+irc_dcc_get
+     Notifies you that another block of data has been successfully received
+     from to the client on the other end of a DCC SEND connection. ARG0 is
+     the connection's magic cookie, ARG1 is the nick of the person on the
+     other end, ARG2 is the port number, ARG3 is the filename, ARG4 is the
+     total file size, and ARG5 is the number of bytes successfully
+     transferred so far.
+
+irc_dcc_request
+     You receive this event when another IRC client sends you a DCC SEND or
+     CHAT request out of the blue. You can examine the request and decide
+     whether or not to accept it here. ARG0 is the nick of the client on
+     the other end. ARG1 is the type of DCC request (CHAT, SEND, etc.).
+     ARG2 is the port number. ARG3 is a "magic cookie" argument, suitable
+     for sending with 'dcc_accept' events to signify that you want to
+     accept the connection (see the 'dcc_accept' docs). For DCC SEND and
+     GET connections, ARG4 will be the filename, and ARG5 will be the file
+     size.
+
+irc_dcc_send
+     Notifies you that another block of data has been successfully
+     transferred from you to the client on the other end of a DCC SEND
+     connection. ARG0 is the connection's magic cookie, ARG1 is the nick of
+     the person on the other end, ARG2 is the port number, ARG3 is the
+     filename, ARG4 is the total file size, and ARG5 is the number of bytes
+     successfully transferred so far.
+
+irc_dcc_start
+     This event notifies you that a DCC connection has been successfully
+     established. ARG0 is a unique "magic cookie" argument which you can
+     pass to 'dcc_chat' or 'dcc_close'. ARG1 is the nick of the person on
+     the other end, ARG2 is the DCC type (CHAT, SEND, GET, etc.), and ARG3
+     is the port number. For DCC SEND and GET connections, ARG4 will be
+     the filename and ARG5 will be the file size.
+
+irc_snotice
+     A weird, non-RFC-compliant message from an IRC server. Don't worry
+     about it. ARG0 is the text of the server's message.
+
+AUTHOR
+======
+
+   Dennis Taylor, <dennis@funkplanet.com>
+
+MAD PROPS
+=========
+
+   The maddest of mad props go out to Rocco "dngor" Caputo
+<troc@netrus.net>, for inventing something as mind-bogglingly cool as POE,
+and to Kevin "oznoid" Lenzo <lenzo@cs.cmu.edu>, for being the attentive
+parent of our precocious little infobot on #perl.
+
+   Further props to a few of the studly bughunters who made this module not
+suck: Abys <abys@web1-2-3.com>, Addi <addi@umich.edu>, ResDev
+<ben@reser.org>, and Roderick <roderick@argon.org>. Woohoo!
+
+SEE ALSO
+========
+
+   Net::IRC, RFC 1459, http://www.irchelp.org/,
+http://www.newts.org/~troc/poe.html, http://www.cs.cmu.edu/~lenzo/perl/,
+http://www.infobot.org/,
+http://newyork.citysearch.com/profile?fid=2&id=7104760,
+http://www.pobox.com/~schwern/img/fishpants.jpg
+
+
+File: pm.info,  Node: POE/Component/IRC/Onjoin,  Next: POE/Component/Pcap,  Prev: POE/Component/IRC,  Up: Module List
+
+Provides IRC moved message & onjoin services
+********************************************
+
+NAME
+====
+
+   POE::Component::IRC::Onjoin - Provides IRC moved message & onjoin
+services
+
+SYNOPSIS
+========
+
+   use POE::Component::IRC::Onjoin;
+
+   my $onjoin  = POE::Component::IRC::Onjoin->new (   -nick     =>
+'OnJoinBot',   -channel  => '#onjoinbot',   -servers  =>
+[qw(token.rhizomatic.net binky.rhizomatic.net)],   -message  => q(Hello!
+Just as an fyi, we moved to #blah), );
+
+   $onjoin->engage();
+
+DESCRIPTION
+===========
+
+   This module implements a class that provides moved message and onjoin
+services as an IRC bot. Based on the configuration parameters passed to it
+via it's constructor it will connect to a channel on a server and
+immediately send everyone on that channel a message privately. It will
+also send the same message to the channel itself publically at the
+specified interval. All users joining the channel thereafter will also
+recieve the message.
+
+   An useful example of this would be when a channel moves either to a new
+channel or network, you would be able to effectively inform anyone
+connecting to the old channel about the new one.
+
+   Class methods:
+
+     new (constructor)
+
+     Takes the following arguments:
+
+     PARAMETER  TYPE      DEFAULT  DESCRIPTION
+
+     -switches  optional  n/a      Currently only '-debug', which will spew
+                                   massive debugging data.
+     -nick      mandatory n/a      The nick you want the bot to be.
+     -username  optional  n/a      The ident, ie username the bot will have.
+     -ircname   optional  seedesc  The name visible from a /whois bot. This will
+                                   default to 'POE::Component::IRC::Session'.
+     -exitmsg   optional  'bye!'   Message shown when the bot is disconnected.
+     -channel   mandatory n/a      The channel you want the bot to connect to.
+     -servers   mandatory n/a      The servers you want the bot to connect to.
+                                   It will choose one in a random fashion.
+     -port      optional  6667     The port on the server you want the bot to
+                                   connect to.
+     -interval  optional  30       How often in minutes you want the bot to
+                                   send the message publically to the channel.
+     -message   mandatory n/a      The message you want to be sent to the
+                                   channel and users.
+     -delay     optional  5        Number of seconds to wait between messaging
+                                   users. If this is set too low you will
+                                   probably be knocked off per "Excess Flood".
+
+   Oject methods:
+
+     engage -- Takes no arguments. Initiates the connection.
+
+TODO
+====
+
+   - Option to remember who we have messaged so we don't annoy   people by
+messaging them multiple times when they join.
+
+     If you have any ideas, suggestions, or comments by all means
+     drop me an e-mail. Thank you.  ;)
+
+AUTHOR
+======
+
+   Adam J. Foxson <afoxson@guild.net>
+
+CREDITS
+=======
+
+   Thanks to fimmtiu@#perl for assistance with tracking down some
+particularly nasty early poe bugs, and to uri@#perl for an excellent code
+review.
+
+SEE ALSO
+========
+
+   POE::Component::IRC::Onjoin::EventProcessor(3) perl(1).
+
+
+File: pm.info,  Node: POE/Component/Pcap,  Next: POE/Component/RSS,  Prev: POE/Component/IRC/Onjoin,  Up: Module List
+
+POE Interface to Net::Pcap
+**************************
+
+NAME
+====
+
+   POE::Component::Pcap - POE Interface to Net::Pcap
+
+SYNOPSIS
+========
+
+     use POE::Component::Pcap;
+
+     POE::Component::Pcap->spawn(
+     			      Alias => 'pcap',
+     			      Device => 'eth0',
+     			      Filter => 'host fooble or host blort',
+     			      Dispatch => 'got_packet',
+     			      Session => $my_session_id,
+     			     );
+
+     $poe_kernel->post( pcap => open_live =>
+     		     'eth0', 80, 1, 100 );
+
+     $poe_kernel->post( pcap => set_filter => 'arp or host zooble' );
+
+     $poe_kernel->post( pcap => set_dispatch => 'target_state' );
+
+     $poe_kernel->post( pcap => 'run' );
+
+     $poe_kernel->post( pcap => 'shutdown' );
+
+DESCRIPTION
+===========
+
+   POE::Component::Pcap provides a wrapper for using the Net::Pcap module
+from POE programs.  The component creates a separate session which posts
+events to a specified session and state when packets are available.
+
+ARGUMENTS
+---------
+
+Alias
+     The alias for the Pcap session.  Used to post events such as run and
+     shutdown to control the component.  Defaults to `pcap' if not
+     specified.
+
+Device
+     As a shortcut, the device for Net::Pcap to watch may be specified when
+     creating the component.  If this argument is used,
+     Net::Pcap::open_live will be called with a snaplen of 80 octets, a
+     timeout of 100ms, and the interface will be put in promiscuous mode.
+     If these values are not suitable, post an open_live event instead.
+
+Filter
+     Another shortcut, calls Net::Pcap::compile and Net::Pcap::setfilter to
+     set a packet filter.  This can only be used if the Device argument is
+     also given; otherwise a set_filter event should be posted after an
+     open_live event (since Net::Pcap must have a `pcap_t' descriptor to
+     work with).
+
+Dispatch
+Session
+     These specify the session and state to which events should be posted
+     when packets are received.
+
+EVENTS
+------
+
+   The following examples assume that the component's alias has been set
+to the default value of *pcap*.
+
+open_live
+          $_[KERNEL]->post( pcap => open_live
+          		    => 'device', [snaplen], [promsic?], [timeout] );
+
+     Calls Net::Pcap::open_live.  The device name must be specified.  The
+     snaplen, promiscuous, and timeout parameters default to 80, 1, and 100
+     respectively.  This event must be posted (or the Device argument must
+     have been passed to spawn()) before anything else can be done with
+     the component.
+
+set_filter
+          $_[KERNEL]->post( pcap => set_filter
+          		    => 'host fooble or host blort' )
+
+     Sets the Net::Pcap capture filter.  See tcpdump(8) for details on the
+     filter language used by pcap(3).
+
+set_dispatch
+          $_[KERNEL]->post( pcap => set_dispatch
+          		    => 'target_state', 'target_session' );
+
+     Sets the state and session to which events are sent when packets are
+     recevied.  The target session will default to the sender of the event
+     if not specified.
+
+     The event posted will have a single argument (available as ARG0)
+     which will be an array reference containing the `$hdr' and `$pkt'
+     parameters from Net::Pcap.  See the Net::Pcap(3) documentation for
+     more details.
+
+run
+          $_[KERNEL]->post( pcap => 'run' );
+
+     Causes the component to register a select_read and start watching for
+     packets.
+
+shutdown
+          $_[KERNEL]->post( pcap => 'shutdown' );
+
+     Shuts the component down.  Causes Net::Pcap::close to be called.
+
+SEE ALSO
+========
+
+   Net::Pcap(3), pcap(3), tcpdump(8), POE(3), POE::Component(3)
+
+AUTHOR
+======
+
+   Mike Fletcher, <fletch@phydeaux.org>
+
+COPYRIGHT
+=========
+
+   Copyright 2000-2001, Mike Fletcher.  All Rights Reserved.  This is free
+software; you may redistribute it and/or modify it under the same terms as
+Perl itself.
+
+
+File: pm.info,  Node: POE/Component/RSS,  Next: POE/Component/Server/TCP,  Prev: POE/Component/Pcap,  Up: Module List
+
+Event based RSS parsing
+***********************
+
+NAME
+====
+
+   POE::Component::RSS - Event based RSS parsing
+
+SYNOPSIS
+========
+
+     use POE qw(Component::RSS);
+
+     POE::Component::RSS->spawn();
+
+     $kernel->post('rss', 'parse', {
+                            Item => 'item_state',
+                          },
+                        , $rss_string);
+
+DESCRIPTION
+===========
+
+   POE::Component::RSS is an event based RSS parsing module. It wraps
+XML::RSS and provides a POE based framework for accessing the information
+provided.
+
+   RSS parser components are not normal objects, but are instead 'spawned'
+as separate sessions. This is done with PoCo::RSS's 'spawn' method, which
+takes one named parameter:
+
+`Alias =' $alias_name>
+     'Alias' sets the name by which the session is known. If no alias is
+     given, the component defaults to 'rss'. It's possible to spawn
+     several RSS components with different names.
+
+   Sessions communicate asynchronously with PoCo::RSS - they post requests
+to it, and it posts results back.
+
+   Parse requests are posted to the component's 'parse' state, and include
+a hash of states to return results to, and a RSS string to parse, followed
+by an optional identity parameter. For example:
+
+     $kernel->post('rss', 'parse',
+                          { # hash of result states
+                            Item => 'item_state',
+                            Channel => 'channel_state',
+                            Image => 'image_state',
+                            Textinput => 'textinput_state',
+                            Start => 'start_state',
+                            Stop => 'stop_state',
+                          },
+                        , $rss_string, $rss_identity_tag);
+
+   Currently supported result events are:
+
+`Item =' 'item_state'>
+     A state to call every time an item is found within the RSS file.
+     Called with a reference to a hash which contains all attributes of
+     that item.
+
+`Channel =' 'channel_state'>
+     A state to call every time a channel definition is found within the
+     RSS file. Called with a reference to a hash which contains all
+     attributes of that channel.
+
+`Image =' 'image_state'>
+     A state to call every time an image definition is found within the
+     RSS file. Called with a reference to a hash which contains all
+     attributes of that image.
+
+`Textinput =' 'textinput_state'>
+     A state to call every time a textinput definition is found within the
+     RSS file. Called with a reference to a hash which contains all
+     attributes of that textinput.
+
+`Start =' 'start_state'>
+     A state to call at the start of parsing.
+
+`Stop =' 'stop_state'>
+     A state to call at the end of parsing.
+
+   If an identity parameter was supplied with the parse event, the first
+parameter of all result events is that identity string. This allows easy
+identification of which parse a result is for.
+
+TODO
+====
+
+   * Provide event based generation of RSS files.
+
+   * Provide more of the information in an RSS file as events.
+
+   * We depend on the internals of XML::RSS. This is bad and should be
+     fixed.
+
+BUGS
+====
+
+   * Some events may be emitted even if no data was found. Calling code
+     should check return data to verify content.
+
+AUTHOR
+======
+
+   Michael Stevens - michael@etla.org.
+
+SEE ALSO
+========
+
+   perl(1). This component is built upon XML::RSS(3).
+
+
+File: pm.info,  Node: POE/Component/Server/TCP,  Next: POE/Component/SubWrapper,  Prev: POE/Component/RSS,  Up: Module List
+
+simplified TCP server
+*********************
+
+NAME
+====
+
+   POE::Component::Server::TCP - simplified TCP server
+
+SYNOPSIS
+========
+
+     use POE;
+
+     sub accept_handler {
+       my ($socket, $remote_address, $remote_port) = @_[ARG0, ARG1, ARG2];
+       # code goes here to handle the accepted socket
+     }
+
+     sub error_handler {
+       my ($op, $errnum, $errstr) = @_[ARG0, ARG1, ARG2];
+       warn "server encountered $op error $errnum: $errstr";
+       # possibly shut down the server
+     }
+
+     new POE::Component::Server::TCP
+       ( Port     => $bind_port,
+         Acceptor => \&accept_handler,
+         Error    => \&error_handler,  # Optional.
+       );
+
+DESCRIPTION
+===========
+
+   POE::Component::Server::TCP is a wrapper around
+POE::Wheel::SocketFactory.  It abstracts the steps required to create a
+TCP server, taking away equal measures of responsibility and control for
+listening for and accepting remote socket connections.
+
+   At version 1.0, the Server::TCP component takes three arguments:
+
+   * Port
+
+     Port is the port the listening socket will be bound to.
+
+   * Acceptor
+
+     Acceptor is a coderef which will be called to handle accepted sockets.
+     The coderef is used as POE::Wheel::SocketFactory's SuccessState, so it
+     accepts the same parameters.
+
+   * Error
+
+     Error is an optional coderef which will be called to handle server
+     socket errors.  The coderef is used as POE::Wheel::SocketFactory's
+     FailureState, so it accepts the same parameters.  If it is omitted, a
+     fairly standard error handler will be provided.  The default handler
+     will log the error to STDERR and shut down the server.
+
+SEE ALSO
+========
+
+   POE::Wheel::SocketFactory
+
+BUGS
+====
+
+   POE::Component::Server::TCP does not accept many of the options that
+POE::Wheel::SocketFactory does.
+
+AUTHORS & COPYRIGHTS
+====================
+
+   POE::Component::Server::TCP is Copyright 2000 by Rocco Caputo.  All
+rights are reserved.  POE::Component::Server::TCP is free software, and it
+may be redistributed and/or modified under the same terms as Perl itself.
+
+
+File: pm.info,  Node: POE/Component/SubWrapper,  Next: POE/Component/UserBase,  Prev: POE/Component/Server/TCP,  Up: Module List
+
+event based wrapper for subs
+****************************
+
+NAME
+====
+
+   POE::Component::SubWrapper - event based wrapper for subs
+
+SYNOPSIS
+========
+
+     use POE::Component::SubWrapper;
+     POE::Component::SubWrapper->spawn('main');
+     $kernel->post('main', 'my_sub', [ $arg1, $arg2, $arg3 ], 'callback_state');
+
+DESCRIPTION
+===========
+
+   This is a module which provides an event based wrapper for subroutines.
+
+   SubWrapper components are not normal objects, but are instead 'spawned'
+as separate sessions. This is done with with PoCo::SubWrapper's 'spawn'
+method, which takes one required and one optional argument.  The first
+argument is the package name to wrap. This is required. The second
+argument is optional and contains an alias to give to the session created.
+If no alias is supplied, the package name is used as an alias.
+
+   Another way to create SubWrapper components is to use the `poeize'
+method, which is included in the default export list of the package. You
+can simply do:
+
+     poeize Data::Dumper;
+
+   and Data::Dumper will be wrapped into a session with the alias
+'Data::Dumper'.
+
+   When a SubWrapper component is created, it scans the package named for
+subroutines, and creates one state in the session created with the same
+name of the subroutine.
+
+   The states each accept 3 arguments:
+
+   * An arrayref to a list of arguments to give the subroutine.
+
+   * A state to callback with the results.
+
+   * A string, either 'SCALAR', or 'ARRAY', allowing you to decide which
+     context the function handled by this state will be called in.
+
+   The states all call the function with the name matching the state, and
+give it the supplied arguments. They then postback the results to the named
+callback state. The results are contained in ARG0 and are either a scalar
+if the function was called in scalar context, or an arrayref of results if
+the function was called in list context.
+
+EXAMPLES
+========
+
+   The test scripts are the best place to look for examples of
+POE::Component::Subwrapper usage. A short example is given here:
+
+     use Data::Dumper;
+     poeize Data::Dumper;
+     $kernel->post('Data::Dumper', 'Dumper', [ { a => 1, b => 2 ], 'callback_state, 'SCALAR');
+
+     sub callback_handler {
+       my $result = @_[ARG0];
+       # do something with the string returned by Dumper({ a => 1, b => 2})
+     }
+
+   Data::Dumper is the wrapped module, Dumper is the function called, `{a
+=> 1, b => 2}' is the data structure that is dumped, and $result is the
+resulting string form.
+
+EXPORT
+------
+
+   The module exports the following functions by default:
+
+`poeize'
+     A function called with a single bareword argument specifying the
+     package to be wrapped.
+
+AUTHOR
+======
+
+   Michael Stevens - michael@etla.org.
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: POE/Component/UserBase,  Next: POE/Driver,  Prev: POE/Component/SubWrapper,  Up: Module List
+
+a component to manage user authentication
+*****************************************
+
+NAME
+====
+
+   POE::Component::UserBase - a component to manage user authentication
+
+SYNOPSIS
+========
+
+     use POE qw(Component::UserBase);
+
+     # The UserBase can deal with many types of repositories.
+     # The first kind is a simple file.
+     POE::Component::UserBase->spawn
+       ( Alias    => 'userbase', # defaults to 'userbase'.
+         Protocol => 'file',     # The repository type.
+         Cipher   => 'md5',      # defaults to 'crypt'.
+
+     File     => '/home/jgoff/passwd',   # The path to the repository
+     Dir      => '/home/jgoff/.persist', # Directory to store persistent
+                                         # information.
+         );
+
+     POE::Component::UserBase->spawn
+       ( Alias         => 'userbase',   # defaults to 'userbase'.
+         Protocol      => 'dbi',        # The repository type.
+         Cipher        => 'sha1',       # defaults to 'crypt'.
+
+     DBHandle      => $dbh,         # Required, connected to a handle.
+     Table         => 'auth',
+     UserColumn    => 'user_name',  # defaults to 'username'.
+     PassColumn    => 'password',   # defaults to 'password'.
+     PersistColumn => 'persistent', # defaults to 'data'. This is our
+                                    # persistent data storage.
+         );
+
+     # PoCo::UserBase provides generic user-management services to multiple
+     # sessions.
+
+     $kernel->post
+       ( user_base => log_on => user_name  => $user_name,
+                                domain     => $domain,       # optional
+     		             password   => $password,     # optional
+     		             persistent => $persistent_reference,
+     		             response   => $authorized_state,
+       );
+
+     $kernel->post
+       ( user_base => log_off => user_name => $user_name,
+                                 password  => $password,    # optional
+       );
+
+     $kernel->post
+       ( user_base => create => user_name => $user_name,
+                                domain    => $domain,       # optional
+     		             password  => $password,     # optional
+       );
+
+     $kernel->post
+       ( user_base => delete => user_name => $user_name,
+                                domain    => $domain,       # optional
+                                password  => $password,     # optional
+       );
+
+     $kernel->post
+       ( user_base => update => user_name     => $user_name,
+     	                     domain        => $domain,   # optional
+                                password      => $password, # optional
+                                new_user_name => $new_name, # optional
+     		             new_domain    => $new_dom,  # optional
+     		             new_password  => $new_pass, # optional
+       );
+
+DESCRIPTION
+===========
+
+   POE::Component::UserBase handles basic user authentication and
+management tasks for a POE server. It can authenticate from sources such
+as a .htaccess file, database, DBM files, and flat files.
+
+   PoCo::UserBase communicates with the client through a previously created
+SocketFactory. After a client is has connected, PoCo::UserBase interrogates
+the client for its username and password, and returns the connection data
+from the socket along with the username and password authenticated.
+
+   POE::Component::UserBase's spawn method takes a few parameters to
+describe the depository of user names. I'd recommend that you not use any
+crucial system files until you assure yourself that it's indeed safe.
+
+   The spawn method has several common parameters. These are listed below.
+
+Alias => $session_alias
+     Alias sets the name by which the session will be known.  If no alias
+     is given, the component defaults to "userbase".  The alias lets
+     several sessions interact with the user manager without keeping (or
+     even knowing) hard references to them.
+
+Cipher => $cipher_type
+     Cipher sets the cipher that will be used to encrypt the password
+     entries.  If no cipher is given, the component defaults to "crypt".
+     This uses the native crypt() function. Other cipher choices include
+     'md5', 'sha1', 'md5_hex', 'sha1_hex', 'md5_base64', and
+     'sha1_base64'. The 'md5' and 'sha1' cipher types are documented in
+     the *Note Digest/MD5: Digest/MD5, and *Note Digest/SHA1: Digest/SHA1,
+     class.  They're simply different output formats of the original hash.
+
+   These parameters are unique to the file Protocol type.
+
+File => $filename
+     File sets the file name that is used to store user data. This
+     parameter is required.
+
+Dir => $path_to_persistent_directory
+     Dir Sets the directory that is used to hold the persistence
+     information.  This directory holds the frozen persistent data,
+     indexed by the user_name.
+
+   These parameters are unique to the *dbi* Protocol type.
+
+Connection => $dbh_connection
+     Connection stores a handle to a DBI connection. The database must
+     contain a table which will hold the username, password, and
+     persistent data.
+
+PersistentColumn => $persistent_data_column_name
+     PersistentColumn specifies the column name used to hold the persistent
+     data. If you can't allocate enough space to hold your persistent data
+     in the database, then you can use the DataFile parameter to define a
+     MLDBM file that will be used to hold this persistent data. The MLDBM
+     data file will be keyed by the username.
+
+DataFile => $data_file_name
+     DataFile specifies the filename of the MLDBM file used to hold the
+     persistent data store. Use of this parameter is incompatible with
+     Data.
+
+DomainColumn => $domain_column_name
+     DomainColumn specifies the column used to store the domain column.
+     It defaults to domain.
+
+PasswordColumn => $password_column_name
+     PasswordColumn specifies the column used to store the password column.
+     It defaults to password.
+
+Table => $dbi_table
+     Table specifies the table name used to store username, password, and
+     maybe the persistent data stored along with each user.
+
+UserColumn => $user_column_name
+     UserColumn specifies the column used to store the username column. It
+     defaults to username. In the event that you use the DataFile
+     parameter, this column will be kept in sync with the MLDBM file.
+
+   Sessions communicate asynchronously with passive UserBase components.
+They post their requests through several internal states, and receive data
+through a state that you specify.
+
+   Requests are posted to one of the states below:
+
+log_on
+     log_on is to be called when a client wants to authenticate a user.
+
+          $kernel->post
+            ( user_base => log_on => user_name  => $user_name,
+                                     domain     => $domain,       # optional
+          		             password   => $password,     # optional
+          		             persistent => $persistent_reference,
+          		             response   => $authorized_state,
+            );
+
+log_off
+     log_off is to be called when a client is finished with a user.
+
+          $kernel->post
+            ( user_base => log_off => user_name => $user_name,
+                                      password  => $password,    # optional
+            );
+
+create
+     create lets you create a new user.
+
+          $kernel->post
+            ( user_base => create => user_name => $user_name,
+                                     domain    => $domain,       # optional
+          		             password  => $password,     # optional
+            );
+
+delete
+     delete lets you delete a user.
+
+          $kernel->post
+            ( user_base => delete => user_name => $user_name,
+                                     domain    => $domain,       # optional
+                                     password  => $password,     # optional
+            );
+
+update
+     update lets you update a user.
+
+          $kernel->post
+            ( user_base => update => user_name     => $user_name,
+          	                     domain        => $domain,   # optional
+                                     password      => $password, # optional
+                                     new_user_name => $new_name, # optional
+          		             new_domain    => $new_dom,  # optional
+          		             new_password  => $new_pass, # optional
+            );
+
+   For example, authenticating a user is simply a matter of posting a
+request to the `userBase' alias (or whatever you named it). It posts
+responses back to either the 'authorization accepted' or 'authorizaton
+failed' state. If it successfully authenticates the user, it then fills
+the alias referenced in the `Persistence' parameter with the user data it
+stored in the database when the user logged out.
+
+SEE ALSO
+========
+
+   This component is built upon *Note POE: POE,.  Please see its source
+code and the documentation for its foundation modules to learn more.
+
+   Also see the test programs in the t/ directory, and the samples in the
+samples/ directory in the POE/Component/UserBase directory.
+
+BUGS
+====
+
+   None currently known.
+
+AUTHOR & COPYRIGHTS
+===================
+
+   POE::Component::UserBase is Copyright 1999-2000 by Jeff Goff.  All
+rights are reserved.  POE::Component::UserBase is free software; you may
+redistribute it and/or modify it under the same terms as Perl itself.
+
+

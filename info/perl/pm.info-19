@@ -1,0 +1,1849 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Apache/AxKit/Language/XSP/Util,  Next: Apache/AxKit/Plugins/Fragment,  Prev: Apache/AxKit/Language/XSP,  Up: Module List
+
+XSP util: taglib.
+*****************
+
+NAME
+====
+
+   Apache::AxKit::Language::XSP::Util - XSP util: taglib.
+
+SYNOPSIS
+========
+
+   Add the util: namespace to your XSP `<xsp:page'> tag:
+
+     <?xml-stylesheet href="." type="application/x-xsp"?>>
+     <xsp:page
+          language="Perl"
+          xmlns:xsp="http://www.apache.org/1999/XSP/Core"
+          xmlns:util="http://www.apache.org/1999/XSP/Util"
+     >
+
+   And add this taglib to AxKit (via httpd.conf or .htaccess):
+
+     AxAddXSPTaglib Apache::AxKit::Language::XSP::Util
+
+DESCRIPTION
+===========
+
+   The XSP util: taglib seeks to add a short list of basic utility
+functions to the eXtesible Server Pages library. It trivializes the
+inclusion of external fragments and adds a few other useful bells and
+whistles.
+
+Tag Structure
+-------------
+
+   Most of of the tags require some sort of "argument" to be passed (e.g.
+`<util:include-file'> requires the name of the file that is to be read).
+Unless otherwise noted, all tags allow you to pass this information either
+as an attribute of the current  element or as the text node of an
+appropriately named child.
+
+   Thus, both:
+
+     <util:include-file name="foo.xml" />
+
+   and
+
+     <util:include-file>
+     <util:name>foo.xml</util:name>
+     </util:include-file>
+
+   are valid.
+
+Tag Reference
+-------------
+
+`<util:include-file'>
+     Provides a way to include an XML fragment from a local file into the
+     current parse tree. Requires a name argument. The path may be relative
+     or absolute.
+
+`<util:include-uri'>
+     Provides a way to include an XML fragment from a (possibly) remote
+     URI.  Requires an href argument.
+
+`<util:get-file-contents'>
+     Provides a way to include a local file *as plain text*. Requires a
+     name argument. The path may be relative or absolute.
+
+`<util:include-expr'>
+     Provides a way to include an XML fragment from a scalar variable. Note
+     that this tag may *only* pass the required  *expr* argument as a
+     child node. Example:
+
+          <util:include-expr>
+          <util:expr>$xml_fragment</util:expr>
+          </util:include-expr>
+
+`<util:time'>
+     Returns a formatted time/date string. Requires a format argument.
+     The format is defined using the standard strftime() syntax.
+
+AUTHOR
+======
+
+   Kip Hampton, khampton@totalcinema.com
+
+SEE ALSO
+========
+
+   AxKit.
+
+
+File: pm.info,  Node: Apache/AxKit/Plugins/Fragment,  Next: Apache/AxKit/Plugins/Passthru,  Prev: Apache/AxKit/Language/XSP/Util,  Up: Module List
+
+Fragment plugin
+***************
+
+NAME
+====
+
+   Apache::AxKit::Plugins::Fragment - Fragment plugin
+
+DESCRIPTION
+===========
+
+   This module provides direct web access to XML fragments, using an XPath
+syntax. By simply providing a querystring containing an XPath query, this
+module will set the XML to be parsed to be the XML nodes returned by the
+query. The nodes will be wrapped in either <resultset>...</resultset> or
+you can specify the outer tag using:
+
+     PerlSetVar XPathFragmentElement foo
+
+   to wrap it in <foo>...</foo>.
+
+USAGE
+=====
+
+   Simply add this module to the plugin list before StyleFinder:
+
+     PerlHandler Apache::AxKit::Plugins::Fragment \
+     		AxKit
+
+   Then request a URL as follows:
+
+     http://server/myfile.xml?/some/xpath/query
+
+   Queries that match the regular expression: ^\w+= are ignored, as are
+any invalid XPath queries.
+
+   Note that it's important to write your stylesheet to make use of this
+capability! If you intend to use this Fragment plugin, you can't assume
+that your stylesheet will just magically work. It will have to not make
+assumptions about the XML being passed into it. The apply_templates()
+method of XPathScript is extremely useful here, as is the xpath query
+'name(/child::node())' which identifies the top level element's name.
+Here's how I got around this with my first experiments with this:
+
+     <!-- Main document body -->
+     <% if (findvalue('name(/child::node())') eq 'page') { %>
+     	<%= apply_templates('/page/body/section') %>
+     <% } else { %>
+     	<%= apply_templates('/') %>
+     <% } %>
+
+   Which checks that the top level element is called 'page', otherwise it
+simply does apply_templates() on all the nodes.
+
+
+File: pm.info,  Node: Apache/AxKit/Plugins/Passthru,  Next: Apache/AxKit/Provider,  Prev: Apache/AxKit/Plugins/Fragment,  Up: Module List
+
+allow passthru=1 in querystring
+*******************************
+
+NAME
+====
+
+   Apache::AxKit::Plugins::Passthru - allow passthru=1 in querystring
+
+DESCRIPTION
+===========
+
+   This module allows AxKit to pass through raw XML without processing if
+the request contained the option `passthru=1' in the querystring.
+
+   Simply add this module as a handler before the main AxKit handler:
+
+     PerlHandler Apache::AxKit::Plugins::Passthru \
+     		AxKit
+
+   Then simply by referencing your xml files as follows:
+
+     http://xml.server.com/myfile.xml?passthru=1
+
+   You will recieve the raw XML in myfile.xml, rather than it being
+pre-processed by AxKit.
+
+   This module is also an example of how this can be done, should you wish
+to build your own passthru type module that makes the decision to pass
+through based on some other parameter, such as the user agent in use.
+
+
+File: pm.info,  Node: Apache/AxKit/Provider,  Next: Apache/AxKit/StyleChooser/Cookie,  Prev: Apache/AxKit/Plugins/Passthru,  Up: Module List
+
+base Provider class
+*******************
+
+NAME
+====
+
+   Apache::AxKit::Provider - base Provider class
+
+SYNOPSIS
+========
+
+   Override the base Provider class and enable it using:
+
+     AxProvider MyClass
+     
+     # alternatively use:
+     # PerlSetVar AxProvider MyClass
+
+DESCRIPTION
+===========
+
+   The Provider class is used to read in the data source for the given URL.
+The default Provider is Provider::File, which reads from the filesystem,
+although obviously you can read from just about anywhere.
+
+   Should you wish to override the default Provider, these are the methods
+you need to implement:
+
+process()
+---------
+
+   Determine whether or not to process this URL. For example, you don't
+want to process a directory request, or if the resource doesn't exist.
+Return 1 to tell AxKit to process this URL, or die with a Declined
+exception (with a reason) if you do not wish to process this URL.
+
+mtime()
+-------
+
+   Return the last modification time in days before the current time.
+
+get_styles()
+------------
+
+   Extract the stylesheets from the XML resource. Should return an array
+ref of styles. The style entries are hashes refs with required keys 'href'
+and 'type'.
+
+get_fh()
+--------
+
+   This method should return an open filehandle, or die if that's not
+possible.
+
+get_strref()
+------------
+
+   This method returns a reference to a scalar containing the contents of
+the stylesheet, or die if that's not possible. At least one of get_fh or
+get_strref must work.
+
+key()
+-----
+
+   This method should return a "key" value that is unique to this URL.
+
+get_ext_ent_handler()
+---------------------
+
+   This should return a sub reference that can be used instead of
+XML::Parser's default external entity handler. See the XML::Parser
+documentation for what this sub should do (or look at the code in the File
+provider).
+
+exists()
+--------
+
+   Return 1 if the resource exists (and is readable).
+
+
+File: pm.info,  Node: Apache/AxKit/StyleChooser/Cookie,  Next: Apache/AxKit/StyleChooser/FileSuffix,  Prev: Apache/AxKit/Provider,  Up: Module List
+
+Choose stylesheets based on a browser cookie
+********************************************
+
+NAME
+====
+
+   Apache::AxKit::StyleChooser::Cookie - Choose stylesheets based on a
+browser cookie
+
+SYNOPSIS
+========
+
+     PerlHandler Apache::AxKit::StyleChooser::Cookie \
+                 AxKit
+
+DESCRIPTION
+===========
+
+   This module checks for the presence of a cookie named
+'axkit_preferred_style' and sets the preferred style accordingly.
+
+   Remember, use the title attribute in your stylesheet PI to define a
+matching style.
+
+AUTHOR
+======
+
+   Kip Hampton, kip@hampton.ws
+
+SEE ALSO
+========
+
+   AxKit.
+
+
+File: pm.info,  Node: Apache/AxKit/StyleChooser/FileSuffix,  Next: Apache/AxKit/StyleChooser/PathInfo,  Prev: Apache/AxKit/StyleChooser/Cookie,  Up: Module List
+
+Choose stylesheet using file suffix
+***********************************
+
+NAME
+====
+
+   Apache::AxKit::StyleChooser::FileSuffix - Choose stylesheet using file
+suffix
+
+DESCRIPTION
+===========
+
+   This module lets you pick a stylesheet based on the filename suffix. To
+use it, simply add this module to the list of PerlTypeHandlers:
+
+     PerlTypeHandler Apache::AxKit::StyleChooser::FileSuffix
+     SetHandler perl-script
+     PerlHandler AxKit
+
+   Then simply by referencing your xml files as follows:
+
+     http://xml.server.com/myfile.xml.printable
+
+   You will recieve the alternate stylesheets with title "printable". See
+the HTML 4.0 specification for more details on stylesheet choice.
+
+   Note that this installation is different from the other StyleChoosers,
+because the file we're requesting here doesn't actually exist.
+
+   Thanks to Salve J. Nilsen <sjn@foo.no> for this module.
+
+
+File: pm.info,  Node: Apache/AxKit/StyleChooser/PathInfo,  Next: Apache/AxKit/StyleChooser/QueryString,  Prev: Apache/AxKit/StyleChooser/FileSuffix,  Up: Module List
+
+Choose stylesheet using PATH_INFO
+*********************************
+
+NAME
+====
+
+   Apache::AxKit::StyleChooser::PathInfo - Choose stylesheet using
+PATH_INFO
+
+DESCRIPTION
+===========
+
+   This module lets you pick a stylesheet based on the extra PATH_INFO. To
+use it, simply add this module to the list of PerlHandlers prior to AxKit:
+
+     PerlHandler Apache::AxKit::StyleChooser::PathInfo \
+     		AxKit
+
+   Then simply by referencing your xml files as follows:
+
+     http://xml.server.com/myfile.xml/printable
+
+   You will recieve the alternate stylesheets with title "printable". See
+the HTML 4.0 specification for more details on stylesheet choice.
+
+
+File: pm.info,  Node: Apache/AxKit/StyleChooser/QueryString,  Next: Apache/AxKit/StyleChooser/UserAgent,  Prev: Apache/AxKit/StyleChooser/PathInfo,  Up: Module List
+
+Choose stylesheet using querystring
+***********************************
+
+NAME
+====
+
+   Apache::AxKit::StyleChooser::QueryString - Choose stylesheet using
+querystring
+
+DESCRIPTION
+===========
+
+   This module lets you pick a stylesheet based on the querystring. To use
+it, simply add this module to the list of PerlHandlers prior to the main
+AxKit handler:
+
+     PerlHandler Apache::AxKit::StyleChooser::QueryString \
+     		AxKit
+
+   Then simply by referencing your xml files as follows:
+
+     http://xml.server.com/myfile.xml?style=printable
+
+   You will recieve the alternate stylesheets with title "printable". See
+the HTML 4.0 specification for more details on stylesheet choice.
+
+
+File: pm.info,  Node: Apache/AxKit/StyleChooser/UserAgent,  Next: Apache/AxKit/StyleFinder,  Prev: Apache/AxKit/StyleChooser/QueryString,  Up: Module List
+
+Choose stylesheets based on the user agent.
+*******************************************
+
+NAME
+====
+
+   Apache::AxKit::StyleChooser::UserAgent - Choose stylesheets based on
+the user agent.
+
+SYNOPSIS     In your .conf or .htaccess file(s):          PerlHandler Apache::AxKit::StyleChooser::UserAgent \                 AxKit
+====================================================================================================================================
+
+     PerlSetVar AxUAStyleMap "lynx     => Lynx,\
+                              explorer => MSIE,\
+                              opera    => Opera,\
+                              netscape => Mozilla"
+
+DESCRIPTION
+===========
+
+   This module sets the internal preferred style based on the user agent
+string presented by the connecting client.
+
+   Remember, use the title attribute in your stylesheet PI to define a
+matching style.
+
+AUTHOR
+======
+
+   Kip Hampton, khampton@totalcinema.com
+
+SEE ALSO
+========
+
+   AxKit.
+
+
+File: pm.info,  Node: Apache/AxKit/StyleFinder,  Next: Apache/AxKit/StyleProvider,  Prev: Apache/AxKit/StyleChooser/UserAgent,  Up: Module List
+
+Execute module based on <?xml-stylesheet?>
+******************************************
+
+NAME
+====
+
+   Apache::AxKit::StyleFinder - Execute module based on <?xml-stylesheet?>
+
+DESCRIPTION
+===========
+
+   This module is completely deprecated to the point of not working.
+
+
+File: pm.info,  Node: Apache/AxKit/StyleProvider,  Next: Apache/AxKit/XMLFinder,  Prev: Apache/AxKit/StyleFinder,  Up: Module List
+
+DEPRECATED!!!
+*************
+
+NAME
+====
+
+   Apache::AxKit::StyleProvider - DEPRECATED!!!
+
+DESCRIPTION
+===========
+
+   This module is deprecated. Please do not derive from it or use it.
+
+
+File: pm.info,  Node: Apache/AxKit/XMLFinder,  Next: Apache/CIPP,  Prev: Apache/AxKit/StyleProvider,  Up: Module List
+
+Detects XML files
+*****************
+
+NAME
+====
+
+   Apache::AxKit::XMLFinder - Detects XML files
+
+DESCRIPTION
+===========
+
+   This module is deprecated to the point of no longer working. Please see
+*Note AxKit: AxKit, instead.
+
+
+File: pm.info,  Node: Apache/CIPP,  Next: Apache/Clean,  Prev: Apache/AxKit/XMLFinder,  Up: Module List
+
+Use CIPP embedded HTML Pages with mod_perl
+******************************************
+
+NAME
+====
+
+   Apache::CIPP - Use CIPP embedded HTML Pages with mod_perl
+
+SYNOPSIS
+========
+
+     <Location ~ ".*\.cipp" >
+
+     # Advise Apache to use Apache::CIPP as the request
+     # handler for this Location
+     SetHandler "perl-script"
+     PerlHandler Apache::CIPP
+
+     # directory for caching of preprocessed CIPP programs
+     # (this must be writable by the webserver user)
+     PerlSetVar 	cache_dir	/tmp/cipp_cache
+
+     # what language do you prefer for error messages?
+     # (EN=English, DE=German)
+     PerlSetVar	lang		EN
+     
+     # debugging infos to error log?
+     PerlSetVar	debug		1
+
+     # used databases
+     # (comma separated, whitespace is ignored)
+     PerlSetVar	databases	"zyn, foo"
+
+     # default database
+     PerlSetVar	default_db	zyn
+
+     # configuration for the database named 'zyn'
+     # (please refer to the DBI documentation for details)
+     PerlSetVar	db_zyn_data_source      dbi:mysql:zyn
+     PerlSetVar	db_zyn_user             my_username1
+     PerlSetVar	db_zyn_password         my_password1
+     PerlSetVar	db_zyn_auto_commit      1
+
+     # configuration for the database named 'foo'
+     PerlSetVar	db_foo_data_source      dbi:Oracle:foo
+     PerlSetVar	db_foo_user             my_username2
+     PerlSetVar	db_foo_password         my_password2
+     PerlSetVar	db_foo_auto_commit      0
+
+     </Location>
+
+DESCRIPTION
+===========
+
+   This module enables you to use the powerful CIPP HTML embedding
+language together with the Apache webserver.  It is based on mod_perl and
+works as a request handler.  So you can transparently use CIPP pages
+everywhere on your webserver.
+
+WHAT IS CIPP?
+=============
+
+   CIPP is a Perl module for translating CIPP sources to pure Perl
+programs. CIPP defines a HTML embedding language also called CIPP which
+has powerful features for CGI and database developers.
+
+   Many standard CGI and database operations (and much more) are covered
+by CIPP, so the developer does not need to code them again and again.
+
+   CIPP is not part of this distribution, please download it from CPAN.
+
+SIMPLE CIPP EXAMPLE
+===================
+
+   To give you some imagination of what you can do with CIPP: here is a
+(really) simple example of using CIPP in a HTML source to retrieve some
+information from a database. Think this as a HTML page which is "executed"
+on the fly by your Apache webserver.  Note: there is no code to connect to
+the database. This is done implicitely. The configuration is taken from
+the Apache configuration file(s).
+
+     # print table of users who match the given parameter
+     
+     <?INTERFACE INPUT="$search_name">
+
+     <HTML>
+     <HEAD><TITLE>tiny litte CIPP example</TITLE></HEAD>
+     <BODY>
+     <H1>Users matching '$search_name'</H1>
+     <P>
+
+     <TABLE BORDER=1>
+     <TR><TD>Name</TD><TD>Adress</TD><TD>Phone</TD></TR>
+     <?SQL SQL="select name, adress, phone
+                from   people
+     	     where  name like '%' || ? || '%'"
+           PARAMS="$search_name"
+     	MY VAR="$n, $a, $p">
+       <TR><TD>$n</TD><TD>$a</TD><TD>$p</TD></TR>
+     <?/SQL>
+     </TABLE>
+
+     </BODY>
+     </HTML>
+
+CONFIGURATION
+=============
+
+   Place the configuration options listed in the SYNOPSIS into your Apache
+configuration file(s) (e.g. httpd.conf). The SYNOPSIS example configures
+all files with the suffix .cipp to be handled by Apache::CIPP. Please
+refer to the Apache documentation for details about configuring your
+webserver.
+
+   The CIPP PDF documentation contains some more explantation of the
+Apache::CIPP configuration parameters. Also CGI::CIPP explains them
+briefly. You can download the documentation and CGI::CIPP from CPAN.
+
+DOWNLOAD Apache::CIPP
+=====================
+
+   Apache::CIPP and friends can be downloaded from CPAN
+
+     $CPAN/modules/by-authors/id/J/JR/JRED/
+
+INSTALLING Apache::CIPP
+=======================
+
+     perl Makefile.PL
+     make
+     make test
+     make install
+
+AUTHOR
+======
+
+   Joern Reder <joern@dimedis.de>
+
+COPYRIGHT
+=========
+
+   Copyright 1998-1999 Joern Reder, All Rights Reserved
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   perl(1), CIPP(3pm), CGI::CIPP(3pm), CIPP::Manual(3pm)
+
+
+File: pm.info,  Node: Apache/Clean,  Next: Apache/Compress,  Prev: Apache/CIPP,  Up: Module List
+
+mod_perl interface into HTML::Clean
+***********************************
+
+NAME
+====
+
+   Apache::Clean - mod_perl interface into HTML::Clean
+
+SYNOPSIS
+========
+
+   httpd.conf:
+
+     <Location /someplace>
+        SetHandler perl-script
+        PerlHandler Apache::Clean
+
+     PerlSetVar  CleanLevel 3
+      </Location>
+
+   Apache::Clean is Filter aware, meaning that it can be used within
+Apache::Filter framework without modification.  Just include the directives
+
+     PerlModule Apache::Filter
+     PerlSetVar Filter On
+
+   and modify the PerlHandler directive accordingly...
+
+DESCRIPTION
+===========
+
+   Apache::Clean uses HTML::Clean to tidy up large, messy HTML, saving
+bandwidth.  It is particularly useful with Apache::Compress for ultimate
+savings.
+
+   The only current configuration directive is CleanLevel, which defaults
+to 3.  Apache::Clean will only tidy up whitespace (via $h->strip) and will
+not perform other options of HTML::Clean (such as browser compatibility).
+See the HTML::Clean manpage for details.
+
+   Only documents with a content type of "text/html" are affected - all
+others are passed through unaltered.
+
+NOTES
+=====
+
+   Verbose debugging is enabled by setting $Apache::Clean::DEBUG=1 or
+greater.  To turn off all debug information, set your apache LogLevel
+directive above info level.
+
+   This is alpha software, and as such has not been tested on multiple
+platforms or environments.  It requires PERL_LOG_API=1, PERL_FILE_API=1,
+and maybe other hooks to function properly.
+
+FEATURES/BUGS
+=============
+
+     No unknown bugs or features at this time...
+
+SEE ALSO
+========
+
+   perl(1), mod_perl(3), Apache(3), Apache::Filter(3),
+Apache::Compress(3), HTML::Clean(3)
+
+AUTHOR
+======
+
+   Geoffrey Young <geoff@cpan.org>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2001, Geoffrey Young.  All rights reserved.
+
+   This module is free software.  It may be used, redistributed and/or
+modified under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Apache/Compress,  Next: Apache/Constants,  Prev: Apache/Clean,  Up: Module List
+
+Auto-compress web files with Gzip
+*********************************
+
+NAME
+====
+
+   Apache::Compress - Auto-compress web files with Gzip
+
+SYNOPSIS
+========
+
+     PerlModule Apache::Compress
+     
+     # Compress regular files
+     <FilesMatch "\.blah$">
+      PerlHandler Apache::Compress
+     </FilesMatch>
+     
+     # Compress output of Perl scripts
+     PerlModule Apache::Filter
+     <FilesMatch "\.pl$">
+      PerlSetVar Filter on
+      PerlHandler Apache::RegistryFilter Apache::Compress
+     </FilesMatch>
+
+DESCRIPTION
+===========
+
+   This module lets you send the content of an HTTP response as
+gzip-compressed data.  Certain browsers (Netscape, IE) can request content
+compression via the `Content-Encoding' header.  This can speed things up
+if you're sending large files to your users through slow connections.
+
+   Browsers that don't request gzipped data will receive regular
+noncompressed data.
+
+   This module is compatibile with Apache::Filter, so you can compress the
+output of other content-generators.
+
+TO DO
+=====
+
+   Compress::Zlib provides a facility for buffering output until there's
+enough data for efficient compression.  Currently we don't take advantage
+of this facility, we simply compress the whole content body at once.  We
+could achieve better memory usage if we changed this (at a small cost to
+the compression ratio).  See Eagle book, p.185.
+
+AUTHOR
+======
+
+   Ken Williams, ken@forum.swarthmore.edu
+
+   Partially based on the work of several modules, like Doug MacEachern's
+Apache::Gzip (in the Eagle book but not on CPAN), Andreas Koenig's
+Apache::GzipChain, and an unreleased module by Geoffrey Young and Philippe
+Chiasson.
+
+SEE ALSO
+========
+
+   perl(1), mod_perl(1), Apache::Filter(3)
+
+
+File: pm.info,  Node: Apache/Constants,  Next: Apache/ContentHandler,  Prev: Apache/Compress,  Up: Module List
+
+Constants defined in apache header files
+****************************************
+
+NAME
+====
+
+   Apache::Constants - Constants defined in apache header files
+
+SYNOPSIS
+========
+
+     use Apache::Constants;
+     use Apache::Constants ':common';
+     use Apache::Constants ':response';
+
+DESCRIPTION
+===========
+
+   Server constants used by apache modules are defined in *httpd.h* and
+other header files, this module gives Perl access to those constants.
+
+EXPORT TAGS
+===========
+
+common
+     This tag imports the most commonly used constants.
+
+          OK
+          DECLINED
+          DONE
+          NOT_FOUND
+          FORBIDDEN
+          AUTH_REQUIRED
+          SERVER_ERROR
+
+response
+     This tag imports the common response codes, plus these response codes:
+
+          DOCUMENT_FOLLOWS
+          MOVED
+          REDIRECT
+          USE_LOCAL_COPY
+          BAD_REQUEST
+          BAD_GATEWAY
+          RESPONSE_CODES
+          NOT_IMPLEMENTED
+          CONTINUE
+          NOT_AUTHORITATIVE
+
+     *CONTINUE* and *NOT_AUTHORITATIVE* are aliases for *DECLINED*.
+
+methods
+     This are the method numbers, commonly used with the Apache
+     *method_number* method.
+
+          METHODS
+          M_CONNECT
+          M_DELETE
+          M_GET
+          M_INVALID
+          M_OPTIONS
+          M_POST
+          M_PUT
+          M_TRACE
+          M_PATCH
+          M_PROPFIND
+          M_PROPPATCH
+          M_MKCOL
+          M_COPY
+          M_MOVE
+          M_LOCK
+          M_UNLOCK
+
+options
+     These constants are most commonly used with the Apache
+     *allow_options* method:
+
+          OPT_NONE
+          OPT_INDEXES
+          OPT_INCLUDES
+          OPT_SYM_LINKS
+          OPT_EXECCGI
+          OPT_UNSET
+          OPT_INCNOEXEC
+          OPT_SYM_OWNER
+          OPT_MULTI
+          OPT_ALL
+
+satisfy
+     These constants are most commonly used with the Apache *satisfies*
+     method:
+
+          SATISFY_ALL
+          SATISFY_ANY
+          SATISFY_NOSPEC
+
+remotehost
+     These constants are most commonly used with the Apache
+     *get_remote_host* method:
+
+          REMOTE_HOST
+          REMOTE_NAME
+          REMOTE_NOLOOKUP
+          REMOTE_DOUBLE_REV
+
+http
+     This is the full set of HTTP response codes: (NOTE: not all
+     implemented here)
+
+          HTTP_OK
+          HTTP_MOVED_TEMPORARILY
+          HTTP_MOVED_PERMANENTLY
+          HTTP_METHOD_NOT_ALLOWED
+          HTTP_NOT_MODIFIED
+          HTTP_UNAUTHORIZED
+          HTTP_FORBIDDEN
+          HTTP_NOT_FOUND
+          HTTP_BAD_REQUEST
+          HTTP_INTERNAL_SERVER_ERROR
+          HTTP_NOT_ACCEPTABLE
+          HTTP_NO_CONTENT
+          HTTP_PRECONDITION_FAILED
+          HTTP_SERVICE_UNAVAILABLE
+          HTTP_VARIANT_ALSO_VARIES
+
+server
+     These are constants related to server version:
+
+          MODULE_MAGIC_NUMBER
+          SERVER_VERSION
+          SERVER_BUILT
+
+config
+     These are constants related to configuration directives:
+
+          DECLINE_CMD
+
+types
+     These are constants related to internal request types:
+
+          DIR_MAGIC_TYPE
+
+override
+     These constants are used to control and test the context of
+     configuration directives.
+
+          OR_NONE
+          OR_LIMIT
+          OR_OPTIONS
+          OR_FILEINFO
+          OR_AUTHCFG
+          OR_INDEXES
+          OR_UNSET
+          OR_ALL
+          ACCESS_CONF
+          RSRC_CONF
+
+args_how
+          RAW_ARGS
+          TAKE1
+          TAKE2
+          TAKE12
+          TAKE3
+          TAKE23
+          TAKE123
+          ITERATE
+          ITERATE2
+          FLAG
+          NO_ARGS
+
+AUTHORS
+=======
+
+   Doug MacEachern, Gisle Aas and h2xs
+
+
+File: pm.info,  Node: Apache/ContentHandler,  Next: Apache/Cookie,  Prev: Apache/Constants,  Up: Module List
+
+mod_perl extension for uniform application generation.
+******************************************************
+
+NAME
+====
+
+   Apache::ContentHandler - mod_perl extension for uniform application
+generation.
+
+SYNOPSIS
+========
+
+   use Apache::ContentHandler;
+
+   @ISA = 'Apache::ContentHandler';
+
+   sub handler {   my $r = shift;   my $algometer = new
+Apache::Algometer($r);   my $result = $algometer->run;   return $result; }
+
+   sub _init {   my $self = shift || die 'need $self';
+$self->SUPER::_init(@_);
+
+     # overrides
+     $self->{title}     = 'Project Algometer';
+     $self->{subtitle}  = "Version $VERSION";
+     $self->{default_action} = 'hello';
+     # other variable definitions
+     }
+
+   sub hello {   return '<P>Hello World</P>'; }
+
+DESCRIPTION
+===========
+
+   Apache::ContentHandler is a generic framework for creating mod_perl
+based applications. It provides a basic event mechanism and a subclassable
+framework for customizing actions.
+
+AUTHOR
+======
+
+   Ryan Davis, Zen Spider Software <ryand-ch@zenspider.com>
+
+PUBLIC METHODS
+==============
+
+   * $ch = Apache::ContentHandler->new
+          Creates a new ContentHandler. You should not override this, override
+          _init instead.
+
+   * $hc->run
+
+     The main application structure. Provides for a standard header, body,
+     and footer. You probably do not want to override this, override the
+     individual methods instead.
+
+PROTECTED METHODS
+=================
+
+   * _init
+
+     Private: called by new. Override to put your application specific
+     variables here.
+
+   * $val = $self->arg($key)
+
+     Returns a CGI/mod_perl parameter for the key $key.
+
+   * @keys = $self->args
+
+     Returns a list of all of the mod_perl/cgi parameters.
+
+   * $s = $hc->header
+
+     Returns a string containing the preheader, an HTML title, and a
+     postheader. You probably do not want to override this unless you want
+     a different type of title.
+
+   * $s = $hc->work
+
+     Runs a method corresponding to the $action parameter, or the default
+     action, and returns the content as the body of the document. If the
+     $action does not exist, then it puts up a page stating that. This
+     makes rapid prototyping very easy and quick.
+
+   * $s = $hc->footer
+
+     Returns a string containing the prefooter, and postfooter. This used
+     to have a standard footer as well, but I found it annoying.
+
+   * $s = $hc->errors
+
+     Returns a dictionary list detailing the contents of the error hash, if
+     any.
+
+   * $s = $hc->preheader
+
+     Returns the contents of the preheader. Override to add something
+     before the title.
+
+   * $s = $hc->postheader
+
+     Returns the contents of the postheader. Override to add something
+     after the title.
+
+   * $s = $hc->prework
+
+     Returns the contents of the prework. Override to add something before
+     the body.
+
+   * $s = $hc->postwork
+
+     Returns the contents of the postwork. Override to add something after
+     the body.
+
+   * $s = $hc->prefooter
+
+     Returns the contents of the prefooter. Override to add something
+     before the footer.
+
+   * $s = $hc->postfooter
+
+     Returns the contents of the postfooter. Override to add something
+     after the footer.
+
+   * $s = $hc->reportError
+
+     Sends an email to the addresses listed in error_email, detailing an
+     error with as much debugging content as possible. Used for fatal
+     conditions.
+
+   * $s = $hc->dbi
+
+     Returns a DBI connection. Override _init and add values for
+     dbi_driver, dbi_user, and dbi_password to make this connection.
+
+   * $s = $hc->sqlToTable
+
+     Returns an HTML representation of a SQL statement in table form.
+
+   * $s = $hc->sqlToArrays
+
+     Returns an array representing a SQL query.
+
+   * $s = $hc->sqlToHashes
+
+     Returns a hash representing a SQL query.
+
+   * $s = $hc->query1
+
+     Returns a single value from a SQL query. The query must return a
+     single column and row (ie SELECT name FROM users WHERE id=42).
+
+
+File: pm.info,  Node: Apache/Cookie,  Next: Apache/DB,  Prev: Apache/ContentHandler,  Up: Module List
+
+HTTP Cookies Class
+******************
+
+NAME
+====
+
+   Apache::Cookie - HTTP Cookies Class
+
+SYNOPSIS
+========
+
+     use Apache::Cookie ();
+     my $cookie = Apache::Cookie->new($r, ...);
+
+DESCRIPTION
+===========
+
+   The Apache::Cookie module is a Perl interface to the cookie routines in
+*libapreq*.  The interface is based on Lincoln Stein's CGI::Cookie module.
+
+METHODS
+=======
+
+   This interface is identical the to CGI::Cookie interface with one
+exception noted below.  Refer the to CGI::Cookie documentation while these
+docs are "under construction."
+
+new
+---
+
+   Just like CGI::Cookie::new, but requires an Apache request object:
+
+     my $cookie = Apache::Cookie->new($r,
+                          -name    =>  'foo',
+                          -value   =>  'bar',
+                          -expires =>  '+3M',
+                          -domain  =>  '.capricorn.com',
+                          -path    =>  '/cgi-bin/database',
+                          -secure  =>  1
+                         );
+
+bake
+----
+
+   Put cookie in the oven to bake.  (Add a *Set-Cookie* header to the
+outgoing headers table.)
+
+     $cookie->bake;
+
+parse
+-----
+
+   This method parses the given string if present, otherwise, the incoming
+*Cookie* header:
+
+     my $cookies = $cookie->parse; #hash ref
+
+     my %cookies = $cookie->parse;
+
+     my %cookies = $cookie->parse($cookie_string);
+
+fetch
+-----
+
+   Fetch and parse the incoming *Cookie* header:
+
+     my $cookies = Apache::Cookie->fetch; #hash ref
+
+     my %cookies = Apache::Cookie->fetch;
+
+as_string
+---------
+
+   Format the cookie object as a string:
+
+     #same as $cookie->bake
+     $r->err_headers_out->add("Set-Cookie" => $cookie->as_string);
+
+name
+----
+
+   Get or set the name of the cookie:
+
+     my $name = $cookie->name;
+
+     $cookie->name("Foo");
+
+value
+-----
+
+   Get or set the values of the cookie:
+
+     my $value = $cookie->value;
+     my @values = $cookie->value;
+
+     $cookie->value("string");
+     $cookie->value(\@array);
+
+domain
+------
+
+   Get or set the domain for the cookie:
+
+     my $domain = $cookie->domain;
+     $cookie->domain(".cp.net");
+
+path
+----
+
+   Get or set the path for the cookie:
+
+     my $path = $cookie->path;
+     $cookie->path("/");
+
+expires
+-------
+
+   Get or set the expire time for the cookie:
+
+     my $expires = $cookie->expires;
+     $cookie->expires("+3h");
+
+secure
+------
+
+   Get or set the secure flag for the cookie:
+
+     my $secure = $cookie->secure;
+     $cookie->secure(1);
+
+SEE ALSO
+========
+
+   Apache(3), Apache::Request(3)
+
+AUTHOR
+======
+
+   Doug MacEachern
+
+
+File: pm.info,  Node: Apache/DB,  Next: Apache/DBI,  Prev: Apache/Cookie,  Up: Module List
+
+Run the interactive Perl debugger under mod_perl
+************************************************
+
+NAME
+====
+
+   Apache::DB - Run the interactive Perl debugger under mod_perl
+
+SYNOPSIS
+========
+
+     <Location /perl>
+      PerlFixupHandler +Apache::DB
+
+     SetHandler perl-script
+     PerlHandler +Apache::Registry
+     Options +ExecCGI
+      </Location>
+
+DESCRIPTION
+===========
+
+   Perl ships with a very useful interactive debugger, however, it does
+not run "out-of-the-box" in the Apache/mod_perl environment.  Apache::DB
+makes a few adjustments so the two will cooperate.
+
+FUNCTIONS
+=========
+
+init
+     This function initializes the Perl debugger hooks without actually
+     starting the interactive debugger.  In order to debug a certain piece
+     of code, this function must be called before the code you wish debug
+     is compiled.  For example, if you want to insert debugging symbols
+     into code that is compiled at server startup, but do not care to debug
+     until request time, call this function from a PerlRequire'd file:
+
+          #where db.pl is simply:
+          # use Apache::DB ();
+          # Apache::DB->init;
+          PerlRequire conf/db.pl
+
+          #where modules are loaded
+          PerlRequire conf/init.pl
+
+handler
+     This function will start the interactive debugger.  It will invoke
+     *Apache::DB::init* if needed.  Example configuration:
+
+          <Location /my-handler>
+           PerlFixupHandler Apache::DB
+           SetHandler perl-script
+           PerlHandler My::handler
+          </Location>
+
+CAVEATS
+=======
+
+-X
+     The server must be started with the -X to use Apache::DB.
+
+filename/line info
+     The filename of Apache::Registry scripts is not displayed.
+
+SEE ALSO
+========
+
+   perldebug(1)
+
+AUTHOR
+======
+
+   Doug MacEachern
+
+
+File: pm.info,  Node: Apache/DBI,  Next: Apache/DBILogConfig,  Prev: Apache/DB,  Up: Module List
+
+Initiate a persistent database connection
+*****************************************
+
+NAME
+====
+
+   Apache::DBI - Initiate a persistent database connection
+
+SYNOPSIS
+========
+
+     # Configuration in httpd.conf or startup.pl:
+
+     PerlModule Apache::DBI  # this comes before all other modules using DBI
+
+   Do NOT change anything in your scripts. The usage of this module is
+absolutely transparent !
+
+DESCRIPTION
+===========
+
+   This module initiates a persistent database connection.
+
+   The database access uses Perl's DBI. For supported DBI drivers see:
+
+     http://www.symbolstone.org/technology/perl/DBI/
+
+   When loading the DBI module (do not confuse this with the Apache::DBI
+module) it looks if the environment variable GATEWAY_INTERFACE starts with
+'CGI-Perl' and if the module Apache::DBI has been loaded. In this case
+every connect request will be forwarded to the Apache::DBI module. This
+looks if a database handle from a previous connect request is already
+stored and if this handle is still valid using the ping method. If these
+two conditions are fulfilled it just returns the database handle. The
+parameters defining the connection have to be exactly the same, including
+the connect attributes ! If there is no appropriate database handle or if
+the ping method fails, a new connection is established and the handle is
+stored for later re-use. There is no need to remove the disconnect
+statements from your code. They won't do anything because the Apache::DBI
+module overloads the disconnect method.
+
+   The Apache::DBI module still has a limitation: it keeps database
+connections persistent on a per process basis. The problem is, if a user
+accesses several times a database, the http requests will be handled very
+likely by different servers. Every server needs to do its own connect. It
+would be nice, if all servers could share the database handles. Currently
+this is not possible, because of the distinct name-space of every process.
+Also it is not possible to create a database handle upon startup of the
+httpd and then inheriting this handle to every subsequent server. This
+will cause clashes when the handle is used by two processes at the same
+time.
+
+   With this limitation in mind, there are scenarios, where the usage of
+Apache::DBI is depreciated. Think about a heavy loaded Web-site where every
+user connects to the database with a unique userid. Every server would
+create many database handles each of which spawning a new backend process.
+In a short time this would kill the web server.
+
+   Another problem are timeouts: some databases disconnect the client
+after a certain time of inactivity. The module tries to validate the
+database handle using the ping-method of the DBI-module. This method
+returns true as default.  If the database handle is not valid and the
+driver has no implementation for the ping method, you will get an error
+when accessing the database. As a work-around you can try to replace the
+ping method by any database command, which is cheap and safe or you can
+deactivate the usage of the ping method (see CONFIGURATION below).
+
+   Here is generalized ping method, which can be added to the driver
+module:
+
+   {   package DBD::xxx::db; # ====== DATABASE ======     use strict;
+
+     sub ping {
+         my($dbh) = @_;
+         my $ret = 0;
+         eval {
+             local $SIG{__DIE__}  = sub { return (0); };
+             local $SIG{__WARN__} = sub { return (0); };
+             # adapt the select statement to your database:
+             $ret = $dbh->do('select 1');
+         };
+         return ($@) ? 0 : $ret;
+     }
+     }
+
+   Transactions: a standard DBI script will automatically perform a
+rollback whenever the script exits. In the case of persistent database
+connections, the database handle will not be destroyed and hence no
+automatic rollback occurs. At a first glance it seems even to be possible,
+to handle a transaction over multiple requests. But this should be
+avoided, because different requests are handled by different servers and a
+server does not know the state of a specific transaction which has been
+started by another server. In general it is good practice to perform an
+explicit commit or rollback at the end of every script. In order to avoid
+inconsistencies in the database in case AutoCommit is off and the script
+finishes without an explicit rollback, the Apache::DBI module uses a
+PerlCleanupHandler to issue a rollback at the end of every request. Note,
+that this CleanupHandler will only be used, if the initial data_source
+sets AutoCommit = 0. It will not be used, if AutoCommit will be turned
+off, after the connect has been done.
+
+   This module plugs in a menu item for Apache::Status. The menu lists the
+current database connections. It should be considered incomplete because of
+the limitations explained above. It shows the current database connections
+for one specific server, the one which happens to serve the current
+request.  Other servers might have other database connections. The
+Apache::Status module has to be loaded before the Apache::DBI module !
+
+CONFIGURATION
+=============
+
+   The module should be loaded upon startup of the Apache daemon.  Add the
+following line to your httpd.conf or startup.pl:
+
+     PerlModule Apache::DBI
+
+   It is important, to load this module before any other modules using DBI
+!
+
+   A common usage is to load the module in a startup file via the
+PerlRequire directive. See eg/startup.pl for an example.
+
+   There are two configurations which are server-specific and which can be
+done upon server startup:
+
+     Apache::DBI->connect_on_init($data_source, $username, $auth, \%attr)
+
+   This can be used as a simple way to have apache servers establish
+connections on process startup.
+
+     Apache::DBI->setPingTimeOut($data_source, $timeout)
+
+   This configures the usage of the ping method, to validate a connection.
+Setting the timeout to 0 will always validate the database connection
+using the ping method (default). Setting the timeout < 0 will de-activate
+the validation of the database handle. This can be used for drivers, which
+do not implement the ping-method. Setting the timeout > 0 will ping the
+database only if the last access was more than timeout seconds before.
+
+   For the menu item 'DBI connections' you need to call Apache::Status
+BEFORE Apache::DBI ! For an example of the configuration order see
+startup.pl.
+
+   To enable debugging the variable $Apache::DBI::DEBUG must be set. This
+can either be done in startup.pl or in the user script. Setting the
+variable to 1, just reports about a new connect. Setting the variable to 2
+enables full debug output.
+
+PREREQUISITES
+=============
+
+   Note that this module needs mod_perl-1.08 or higher, apache_1.3.0 or
+higher and that mod_perl needs to be configured with the appropriate
+call-back hooks:
+
+     PERL_CHILD_INIT=1 PERL_STACKED_HANDLERS=1.
+
+SEE ALSO
+========
+
+   *Note Apache: Apache,, `mod_perl' in this node, `DBI' in this node
+
+AUTHORS
+=======
+
+   * mod_perl by Doug MacEachern <modperl@apache.org>
+
+   * DBI by Tim Bunce <dbi-users@isc.org>
+
+   * Apache::AuthenDBI by Edmund Mergl <E.Mergl@bawue.de>
+
+COPYRIGHT
+=========
+
+   The Apache::DBI module is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Apache/DBILogConfig,  Next: Apache/DBILogger,  Prev: Apache/DBI,  Up: Module List
+
+Logs access information in a DBI database
+*****************************************
+
+NAME
+====
+
+   Apache::DBILogConfig - Logs access information in a DBI database
+
+SYNOPSIS
+========
+
+     # In httpd.conf
+     PerlLogHandler Apache::DBILogConfig
+     PerlSetVar DBILogConfig_data_source DBI:Informix:log_data
+     PerlSetVar DBILogConfig_username    informix
+     PerlSetVar DBILogConfig_password    informix
+     PerlSetVar DBILogConfig_table	     mysite_log
+     PerlSetVar DBILogConfig_log_format  "%b=bytes_sent %f=filename %h=remote_host %r=request %s=status"
+
+DESCRIPTION
+===========
+
+   This module replicates the functionality of the standard Apache module,
+mod_log_config, but logs information in a DBI-compliant database instead
+of a file.
+
+LIST OF TOKENS
+==============
+
+DBILogConfig_data_source
+     A DBI data source with a format of "DBI::driver:database"
+
+DBILogConfig_username
+     Username passed to the database driver when connecting
+
+DBILogConfig_password
+     Password passed to the database driver when connecting
+
+DBILogConfig_table
+     Table in the database for logging
+
+DBILogConfig_log_format
+     A string consisting of formats seperated by white space that define
+     the data to be looged (see FORMATS below)
+
+FORMATS
+=======
+
+   A format consists of a string with the following syntax:
+
+   *%[conditions][{parameter}]format=field*
+
+format
+------
+
+   Formats specify the type of data to be logged. The following formats
+are accepted:
+
+b Bytes sent
+f Filename
+e Environment variable (specified by parameter)
+h Remote host
+a Remote IP Address
+i Header in the client request (specified by parameter)
+l Remote log name (from identd)
+n Contents of a note from another module (specified by parameter)
+o Header from the reply (specified by parameter)
+p Server port
+P Apache child PID
+r First line of the request
+s Request status
+t Time in common log format (default) or strftime() (parameter)
+T Time taken to serve request
+u Remote user from auth
+U URL
+v Server hostname
+field
+-----
+
+   A database column to log the data to
+
+parameter
+---------
+
+   For formats that take a parameter
+
+   Example: %{DOCUMENT_ROOT}e
+
+conditions
+----------
+
+   Conditions are a comma-seperated list of status codes. If the status of
+the request being logged equals one of the status codes in the condition
+the data specified by the format will be logged. By placing a '!' in front
+of the conditions, data will be logged if the request status does not
+match any of the conditions.
+
+   Example: %!200,304,302s=status will log the status of all requests that
+did not return some sort of normal status
+
+DEBUGGING
+=========
+
+   Debugging statements will be written to the error log if LOGLEVEL is
+set to 'warn' or higher
+
+PREREQUISITES
+=============
+
+   * mod_perl >= 1.11_01 with PerlLogHandler enabled
+
+   * DBI
+
+   * Date::Format
+
+INSTALLATION
+============
+
+   To install this module, move into the directory where this file is
+located and type the following:
+
+     perl Makefile.PL
+     make
+     make test
+     make install
+
+   This will install the module into the Perl library directory.
+
+   Once installed, you will need to modify your web server's configuration
+as above.
+
+AUTHOR
+======
+
+   Copyright (C) 1998, Jason Bodnar <jcbodnar@mail.utexas.edu>. All rights
+reserved.
+
+   This module is free software; you may redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   perl(1), mod_perl(3)
+
+
+File: pm.info,  Node: Apache/DBILogger,  Next: Apache/DBILogin,  Prev: Apache/DBILogConfig,  Up: Module List
+
+Tracks what's being transferred in a DBI database
+*************************************************
+
+NAME
+====
+
+   Apache::DBILogger - Tracks what's being transferred in a DBI database
+
+SYNOPSIS
+========
+
+     # Place this in your Apache's httpd.conf file
+     PerlLogHandler Apache::DBILogger
+
+     PerlSetVar DBILogger_data_source    DBI:mysql:httpdlog
+     PerlSetVar DBILogger_username       httpduser
+     PerlSetVar DBILogger_password       secret
+     PerlSetvar DBILogger_table          requests
+     
+     Create a database with a table named B<requests> like this:
+
+   CREATE TABLE requests (   server varchar(127) DEFAULT " NOT NULL,
+bytes mediumint(9) DEFAULT '0' NOT NULL,   user varchar(15) DEFAULT " NOT
+NULL,   filename varchar(200) DEFAULT " NOT NULL,   remotehost
+varchar(150) DEFAULT " NOT NULL,   remoteip varchar(15) DEFAULT " NOT NULL,
+ status smallint(6) DEFAULT '0' NOT NULL,   timeserved datetime DEFAULT
+'0000-00-00 00:00:00' NOT NULL,   contenttype varchar(50) DEFAULT " NOT
+NULL,   urlpath varchar(200) DEFAULT " NOT NULL,   referer varchar(250)
+DEFAULT " NOT NULL,   useragent varchar(250) DEFAULT " NOT NULL,
+usertrack varchar(100) DEFAULT " NOT NULL,   KEY server_idx (server),
+KEY timeserved_idx (timeserved) );
+
+   Its recommended that you include
+
+   use Apache::DBI; use DBI; use Apache::DBILogger;
+
+   in your startup.pl script. Please read the Apache::DBI documentation for
+further information.
+
+DESCRIPTION
+===========
+
+   This module tracks what's being transfered by the Apache web server in a
+SQL database (everything with a DBI/DBD driver).  This allows to get
+statistics (of almost everything) without having to parse the log files
+(like the Apache::Traffic module, just in a "real" database, and with a
+lot more logged information).
+
+   Apache::DBILogger will track the cookie from 'mod_usertrack' if it's
+there.
+
+   After installation, follow the instructions in the synopsis and restart
+the server.
+
+   The statistics are then available in the database. See the section
+VIEWING STATISTICS for more details.
+
+PREREQUISITES
+=============
+
+   You need to have compiled mod_perl with the LogHandler hook in order to
+use this module. Additionally, the following modules are required:
+
+     o DBI
+     o Date::Format
+
+INSTALLATION
+============
+
+   To install this module, move into the directory where this file is
+located and type the following:
+
+     perl Makefile.PL
+     make
+     make test
+     make install
+
+   This will install the module into the Perl library directory.
+
+   Once installed, you will need to modify your web server's configuration
+file so it knows to use Apache::DBILogger during the logging phase.
+
+VIEWING STATISTICS
+==================
+
+   Please see the bin/ directory in the distribution for a statistics
+script.
+
+   Some funny examples on what you can do might include:
+
+hit count and total bytes transfered from the virtual server www.company.com
+          select count(id),sum(bytes) from requests
+          where server="www.company.com"
+
+hit count and total bytes from all servers, ordered by number of hits
+          select server,count(id) as hits,sum(bytes) from requests
+          group by server order by hits desc
+
+count of hits from macintosh users
+          select count(id) from requests where useragent like "%Mac%"
+
+hits and total bytes in the last 30 days     select count(id),sum(bytes) from requests where     server="www.company.com" and TO_DAYS(NOW()) -     TO_DAYS(timeserved) <= 30
+     This is pretty unoptimal.  It would be faster to calculate the dates
+     in perl and write them in the sql query using f.x. Date::Format.
+
+hits and total bytes from www.company.com on mondays.
+          select count(id),sum(bytes) from requests where
+          server="www.company.com" and dayofweek(timeserved) = 2
+
+   It's often pretty interesting to view the referer info too.
+
+   See your sql server documentation of more examples. I'm a happy mySQL
+user, so I would continue on
+
+   http://www.tcx.se/Manual_chapter/manual_toc.html
+
+LOCKING ISSUES
+==============
+
+   MySQL 'read locks' the table when you do a select. On a big table (like
+a large httpdlog) this might take a while, where your httpds can't insert
+new logentries, which will make them 'hang' until the select is done.
+
+   One way to work around this is to create another table (f.x.
+requests_insert) and get the httpd's to insert to this table.
+
+   Then run a script from crontab once in a while which does something
+like this:
+
+     LOCK TABLES requests WRITE, requests_insert WRITE
+     insert into requests select * from requests_insert
+     delete from requests_insert
+     UNLOCK TABLES
+
+   You can use the moverows.pl script from the bin/ directory.
+
+   Please note that this won't work if you have any unique id field!
+You'll get duplicates and your new rows won't be inserted, just deleted.
+Be careful.
+
+TRAPS
+=====
+
+   I've experienced problems with 'Packets too large' when using
+Apache::DBI, mysql and DBD::mysql 2.00 (from the Msql-mysql 1.18x
+packages).  The DBD::mysql module from Msql-mysql 1.19_17 seems to work
+fine with Apache::DBI.
+
+   You might get problems with Apache 1.2.x. (Not supporting
+post_connection?)
+
+SUPPORT
+=======
+
+   This module is supported via the mod_perl mailinglist
+(modperl@apache.org, subscribe by sending a mail to
+modperl-request@apache.org).
+
+   I would like to know which databases this module have been tested on,
+so please mail me if you try it.
+
+   The latest version can be found on your local CPAN mirror or at
+`ftp://ftp.netcetera.dk/pub/perl/'
+
+AUTHOR
+======
+
+   Copyright (C) 1998, Ask Bjoern Hansen <ask@netcetera.dk>. All rights
+reserved. This module is free software; you may redistribute it and/or
+modify it under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   perl(1), mod_perl(3)
+
+

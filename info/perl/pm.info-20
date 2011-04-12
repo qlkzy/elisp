@@ -1,0 +1,1522 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Apache/DBILogin,  Next: Apache/DProf,  Prev: Apache/DBILogger,  Up: Module List
+
+authenticates and authorizes via a DBI connection
+*************************************************
+
+NAME
+====
+
+   Apache::DBILogin - authenticates and authorizes via a DBI connection
+
+SYNOPSIS
+========
+
+     #in .htaccess
+     AuthName MyAuth
+     AuthType Basic
+     PerlAuthenHandler Apache::DBILogin::authen
+     PerlSetVar Auth_DBI_data_source dbi:Oracle:SQLNetAlias
+     PerlAuthzHandler Apache::DBILogin::authz
+     
+     allow from all
+     require group connect resource dba
+     satisfy all
+
+     #in startup.pl
+     package Apache::DBILogin;
+     
+     # is_member function for authz handler
+     #  expects a request object, database handle, and the group you which to test
+     #  returns a valid response code
+     sub is_member {
+         my ($r, $dbh, $group) = @_;
+     
+         my $sth;
+         eval {
+             # no, Oracle doesn't support binding in SET ROLE statement
+             $sth = $dbh->prepare("SET ROLE $group") or die $DBI::errstr;
+         };
+         return SERVER_ERROR if ( $@ );
+     
+         return ( defined $sth->execute() ) ? OK : FORBIDDEN;
+     }
+
+DESCRIPTION
+===========
+
+   Apache::DBILogin allows authentication and authorization against a
+multi-user database.
+
+   It is intended to facilitate web-based transactions against a database
+server as a particular database user. If you wish authenticate against a
+passwd table instead, please see Edmund Mergl's Apache::AuthDBI module.
+
+   Group authorization is handled by your Apache::DBILogin::is_member()
+function which you must define if you enable the authz handler.
+
+   The above example uses Oracle roles to assign group membership. A role
+is a set of database privileges which can be assigned to users.
+Unfortunately, roles are vendor specific. Under Oracle you can test
+membership with "SET ROLE role_name" statement. You could also query the
+data dictionary, DBA_ROLE_PRIVS, but under Oracle that requires explicit
+privilege.  Documentation patches for other databases are welcome.
+
+ENVIRONMENT
+===========
+
+   Applications may access the clear text password as well as the
+data_source via the environment variables *HTTP_MODPERL_DBILOGIN_PASSWORD*
+and *HTTP_MODPERL_DBILOGIN_DATA_SOURCE*.
+
+     #!/usr/bin/perl -wT
+     
+     use strict;
+     use CGI;
+     use DBI;
+     my $name = $ENV{REMOTE_USER};
+     my $password = $ENV{HTTP_DBILOGIN_PASSWORD};
+     my $data_source = $ENV{HTTP_DBILOGIN_DATA_SOURCE};
+     my $dbh = DBI->connect($data_source, $name, $password)
+     	or die "$DBI::err: $DBI::errstr\n";
+     ...
+
+SECURITY
+========
+
+   The database user's clear text passwd is made available in the server's
+environment. Do you trust your developers?
+
+BUGS
+====
+
+   Probably lots, I'm not the best programmer in the world.
+
+NOTES
+=====
+
+   Feel free to email me with comments, suggestions, flames. Its the only
+way I'll become a better programmer.
+
+SEE ALSO
+========
+
+   mod_perl(1), Apache::DBI(3), and Apache::AuthDBI(3)
+
+AUTHOR
+======
+
+   John Groenveld <groenveld@acm.org>
+
+
+File: pm.info,  Node: Apache/DProf,  Next: Apache/Debug,  Prev: Apache/DBILogin,  Up: Module List
+
+Hook Devel::DProf into mod_perl
+*******************************
+
+NAME
+====
+
+   Apache::DProf - Hook Devel::DProf into mod_perl
+
+SYNOPSIS
+========
+
+     #in httpd.conf
+     PerlModule Apache::DProf
+
+DESCRIPTION
+===========
+
+   The Apache::DProf module will run a Devel::DProf profiler inside each
+child server and write the *tmon.out* file in the directory
+*$ServerRoot/logs/dprof/$$* when the child is shutdown.  Next time the
+parent server pulls in Apache::DProf (via soft or hard restart), the
+*$ServerRoot/logs/dprof* is cleaned out before new profiles are written
+for the new children.
+
+WHY
+===
+
+   It is possible to profile code run under mod_perl with only the
+Devel::DProf module available on CPAN.  You must have apache version 1.3b3
+or higher.  When the server is started, Devel::DProf installs an END block
+to write the *tmon.out* file, which will be run when the server is
+shutdown.  Here's how to start and stop a server with the profiler enabled:
+
+     % setenv PERL5OPT -d:DProf
+     % httpd -X -d `pwd` &
+     ... make some requests to the server here ...
+     % kill `cat logs/httpd.pid`
+     % unsetenv PERL5OPT
+     % dprofpp
+
+   There are downsides to this approach:
+
+   - Setting and unsetting PERL5OPT is a pain.
+
+   - Server startup code will be profiled as well, which we are not
+really concerned with, we're interested in runtime code, right?
+
+   - It will not work unless the server is run in non-forking -X mode
+
+   These limitations are due to the assumption by Devel::DProf that the
+code you are profiling is running under a standard Perl binary (the one
+you run from the command line).  `Devel::Dprof' relies on the Perl -d
+switch for intialization of the Perl debugger, which happens inside
+`perl_parse()' function call.  It also relies on Perl's special END
+subroutines for termination when it writes the raw profile to *tmon.out*.
+Under the standard command line Perl interpreter, these END blocks are run
+when the `perl_run()' function is called.  Also, Devel::DProf will not
+profile any code if it is inside a forked process.  Each time you run a
+Perl script from the command line, the `perl_parse()' and `perl_run()'
+functions are called, Devel::DProf works just fine this way.
+
+   Under mod_perl, the `perl_parse()' and `perl_run()' functions are
+called only once, when the parent server is starting.  Any END blocks
+encountered during server startup or outside of Apache::Registry scripts
+are suspended and run when the server is shutdown via apache's child exit
+callback hook.  The parent server only runs Perl startup code, all request
+time code is run in the forked child processes.  If you followed the
+previous paragraph, you should be able to see, Devel::DProf does not fit
+into the mod_perl model too well.  The Apache::DProf module exists to make
+it fit without modifying the Devel::DProf module or Perl itself.
+
+   The *Apache::DProf* module also requires apache version 1.3b3 or higher
+and `PerlChildInitHandler' enabled.  It is configured simply by adding
+this line to your httpd.conf file:
+
+     PerlModule Apache::DProf
+
+   When the Apache::DProf module is pulled in by the parent server, it
+will push a `PerlChildInitHandler' via the Apache push_handlers method.
+When a child server is starting the `Apache::DProf::handler' subroutine
+will called.  This handler will create a directory `dprof/$$' relative to
+*ServerRoot* where Devel::DProf will create it's *tmon.out* file.  Then,
+the handler will initialize the Perl debugger and pull in Devel::DProf who
+will then install it's hooks into the debugger and start it's profile
+timer.  The END subroutine installed by Devel::DProf will be run when the
+child server is shutdown and the *$ServerRoot/dprof/$$/tmon.out* file will
+be generated and ready for dprofpp.
+
+AUTHOR
+======
+
+   Doug MacEachern
+
+SEE ALSO
+========
+
+   Devel::DProf(3), Apache::DB(3), mod_perl(3), Apache(3)
+
+
+File: pm.info,  Node: Apache/Debug,  Next: Apache/DebugDBI,  Prev: Apache/DProf,  Up: Module List
+
+Utilities for debugging embedded perl code
+******************************************
+
+NAME
+====
+
+   Apache::Debug - Utilities for debugging embedded perl code
+
+SYNOPSIS
+========
+
+     use Apache::Debug ();
+
+     Apache::Debug::dump($r, SERVER_ERROR, "Uh Oh!");
+
+DESCRIPTION
+===========
+
+   This module sends what may be helpful debugging info to the client
+rather that the error log.
+
+
+File: pm.info,  Node: Apache/DebugDBI,  Next: Apache/DebugInfo,  Prev: Apache/Debug,  Up: Module List
+
+Debug Apache::DBI modules
+*************************
+
+NAME
+====
+
+   Apache::DebugDBI - Debug Apache::DBI modules
+
+SYNOPSIS
+========
+
+     # Configuration in httpd.conf or srm.conf:
+
+     PerlModule Apache::DebugDBI # this comes after all other Apache modules
+
+DESCRIPTION
+===========
+
+   This module turns on debugging output in the Apache::DBI modules.
+
+AUTHORS
+=======
+
+   Apache::DebugDBI by Edmund Mergl <E.Mergl@bawue.de>
+
+COPYRIGHT
+=========
+
+   The Apache::DebugDBI module is free software; you can redistribute it
+and/or modify it under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Apache/DebugInfo,  Next: Apache/Dispatch,  Prev: Apache/DebugDBI,  Up: Module List
+
+log various bits of per-request data
+************************************
+
+NAME
+====
+
+   Apache::DebugInfo - log various bits of per-request data
+
+SYNOPSIS
+========
+
+   There are two ways to use this module...
+
+     1) using Apache::DebugInfo to control debugging automatically
+
+     httpd.conf:
+
+     PerlInitHandler Apache::DebugInfo
+     PerlSetVar      DebugInfo On
+
+     PerlSetVar      DebugPID On
+     PerlSetVar      DebugHeadersIn On
+     PerlSetVar      DebugDirConfig On
+     PerlSetVar      DebugHeadersOut On
+     PerlSetVar      DebugNotes On
+     PerlSetVar      DebugPNotes On
+     PerlSetVar      DebugGetHandlers On
+     PerlSetVar      DebugTimestamp On
+     PerlSetVar      DebugMarkPhases On
+
+     PerlSetVar      DebugFile     "/path/to/debug_log"
+     PerlSetVar      DebugIPList   "1.2.3.4 1.2.4."
+     PerlSetVar      DebugTypeList ".html .cgi"
+
+     2) using Apache::DebugInfo on the fly
+
+     in handler or script:
+
+     use Apache::DebugInfo;
+
+     my $r = shift;
+
+     my $debug = Apache::DebugInfo->new($r);
+
+     # set the output file
+     $debug->file("/path/to/debug_log");
+
+     # get the ip addresses for which output is enabled
+     my $ip_list = $debug->ip;
+
+     # dump $r->headers_in right now
+     $debug->headers_in;
+
+     # log $r->headers_out after the response goes to the client
+     $debug->headers_in('PerlCleanupHandler');
+
+     # log all the $r->pnotes at Fixup and at Cleanup
+     $debug->pnotes('PerlCleanupHandler','PerlFixupHandler');
+
+DESCRIPTION
+===========
+
+   Apache::DebugInfo gives the programmer the ability to monitor various
+bits of per-request data.
+
+   You can enable Apache::DebugInfo as a PerlInitHandler, in which case it
+chooses what request phase to display the appropriate data.  The output of
+data can be controlled by setting various variables to On:
+
+     DebugInfo          - enable Apache::DebugInfo handler
+
+     DebugPID           - dumps apache child pid during request init
+     DebugHeadersIn     - dumps request headers_in during request init
+     DebugDirConfig     - dumps PerlSetVar and PerlAddVar during request init
+     DebugGetHandlers   - dumps enabled request handlers during init
+
+     DebugHeadersOut    - dumps request headers_out during request cleanup
+     DebugNotes         - dumps request notes during request cleanup
+     DebugPNotes        - dumps request pnotes during request cleanup
+
+     DebugTimestamp     - prints localtime at the start of each request
+     DebugMarkPhases    - prints the name of the request phase when the
+                          phase is entered, prior to any other handlers
+
+   Alternatively, you can control output activity on the fly by calling
+Apache::DebugInfo methods directly (see METHODS below).
+
+   Additionally, the following optional variables hold special arguments:
+
+     DebugFile          - absolute path of file that will store the info
+                          don't forget to make the file writable by
+                          whichever user Apache runs as (likely nobody)
+                          defaults to STDERR (which is likely error_log)
+
+     DebugIPList        - a space delimited list of IP address for which
+                          debugging is enabled
+                          this can be a partial IP - 1.2.3 will match
+                          1.2.3.5 and 1.2.3.6
+                          if absent, defaults to all remote ip addresses
+
+     DebugTypeList      - a space delimited list of file extensions for
+                          which debugging is enabled (.cgi, .html...)
+                          if absent, defaults to all types
+
+METHODS
+=======
+
+   Apache::DebugInfo provides an object oriented interface to allow you to
+call the various methods from either a module, handler, or an
+Apache::Registry script.
+
+   Constructor:   new($r)        - create a new Apache::DebugInfo object
+                requires a valid Apache request object
+
+   Methods:   The following methods can be called without any arguments,
+in which   case the associated data is output immediately.  Optionally,
+each   can be called with a list (either explicitly or as an array) of
+Perl*Handlers, which will log the data during the appropriate   phase:
+
+     headers_in()   - display incoming HTTP headers
+
+     headers_out()  - display outgoing HTTP headers
+
+     notes()        - display strings set by $r->notes
+
+     pnotes()       - display variables set by $r->pnotes
+
+     pid()          - display the apache child process PID
+
+     get_handlers() - display variables set by PerlSetVar and PerlAddVar
+
+     dir_config()   - display the enabled handlers for this request
+
+     timestamp()    - display the current system time
+
+     mark_phases()  - display the phase before executing any other
+                      handlers. if given the argument 'All',
+                      mark_phases  will display the entry into all
+                      phases after the current phase.  calling with
+                      no arguments outputs the current phase
+                      immediately.
+
+     There are also the following methods available for manipulating
+     the behavior of the above methods:
+
+     file($file)    - get or set the output file
+                      accepts an absolute filename as an argument
+                      returns the output filehandle
+                      defaults to, but overrides DebugFile above
+
+     ip($list)      - get or set the ip list
+                      accepts a space delimited list as an argument
+                      defaults to, but overrides DebugIPList above
+
+     type($list)    - get or set the file type list
+                      accepts a space delimited list as an argument
+                      defaults to, but overrides DebugTypeList above
+
+NOTES
+=====
+
+   Setting DebugInfo to Off has no effect on the ability to make direct
+method calls.
+
+   Verbose debugging is enabled by setting the variable
+$Apache::DebugInfo::DEBUG=1 to or greater.  To turn off all messages set
+LogLevel above info.
+
+   This is alpha software, and as such has not been tested on multiple
+platforms or environments.  It requires PERL_INIT=1, PERL_CLEANUP=1,
+PERL_LOG_API=1, PERL_FILE_API=1, PERL_STACKED_HANDLERS=1, and maybe other
+hooks to function properly.
+
+FEATURES/BUGS
+=============
+
+   Once a debug handler is added to a given request phase, it can no
+longer be controlled by ip() or type(). file(), however, takes affect on
+invocation.  This is because the matching is done when the Perl*Handler is
+added to the stack, while the output file is used when the Perl*Handler is
+actually executed.
+
+   Calling Apache::DebugInfo methods with 'PerlHandler' as an argument has
+been disabled - doing so gets your headers and script printed to the
+browser, so I thought I'd save the unaware from potential pitfalls.
+
+   Phase misspellings, like 'PelrInitHandler' pass through without
+warning, in case you were wondering where your output went...
+
+   The get_handlers and mark_phases methods are incomplete, mainly due to
+oversights in the mod_perl API.  Currently (as of mod_perl 1.2401), they
+cannot function properly on the following callbacks:   PerlInitHandler As
+such, they have been disabled until forthcoming corrections to the API can
+be implemented.  PerlHeaderParserHandlers and PerlPostRequestHandlers
+function normally.
+
+   The output uri is whatever the uri was when new() was called (either on
+the fly or in Apache::DebugInfo::handler).  Thus if the uri has undergone
+translation since the new() call the original, not the new, uri will be
+output.  This feature can be easily remedied, but having a changing uri in
+the output may be confusing when debugging.  Future behavior will be
+influenced by user feedback.
+
+SEE ALSO
+========
+
+   perl(1), mod_perl(1), Apache(3)
+
+AUTHOR
+======
+
+   Geoffrey Young <geoff@cpan.org>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000, Geoffrey Young.  All rights reserved.
+
+   This module is free software.  It may be used, redistributed and/or
+modified under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Apache/Dispatch,  Next: Apache/DumpHeaders,  Prev: Apache/DebugInfo,  Up: Module List
+
+call PerlHandlers with the ease of Registry scripts
+***************************************************
+
+NAME
+====
+
+   Apache::Dispatch - call PerlHandlers with the ease of Registry scripts
+
+SYNOPSIS
+========
+
+   httpd.conf:
+
+     PerlModule Apache::Dispatch
+     PerlModule Bar
+
+     DispatchExtras Pre Post Error
+     DispatchStat On
+     DispatchISA "My::Utils"
+     DispatchAUTOLOAD Off
+
+     <Location /Foo>
+       SetHandler perl-script
+       PerlHandler Apache::Dispatch
+
+     DispatchPrefix Bar
+     DispatchFilter Off
+       </Location>
+
+DESCRIPTION
+===========
+
+   Apache::Dispatch translates $r->uri into a class and method and runs it
+as a PerlHandler.  Basically, this allows you to call PerlHandlers as you
+would Regsitry scripts without having to load your httpd.conf with a
+slurry of <Location> tags.
+
+EXAMPLE
+=======
+
+     in httpd.conf
+
+     PerlModule Apache::Dispatch
+     PerlModule Bar
+
+     <Location /Foo>
+       SetHandler perl-script
+       PerlHandler Apache::Dispatch
+
+     DispatchPrefix Bar
+         </Location>
+
+     in browser:
+       http://localhost/Foo/baz
+
+     the results are the same as if your httpd.conf looked like:
+       <Location /Foo>
+         SetHandler perl-script
+         PerlHandler Bar->dispatch_baz
+       </Location>
+
+   but with the additional security of protecting the class name from the
+browser and keeping the method name from being called directly.  Because
+any class under the Bar:: hierarchy can be called, one <Location>
+directive is able to handle all the methods of Bar, Bar::Baz, etc...
+
+CONFIGURATION DIRECTIVES
+========================
+
+     DispatchPrefix
+       The base class to be substituted for the $r->location part of the
+       uri.
+
+     DispatchLocation
+       Using Apache::Dispatch from a <Directory> directive, either
+       directly or from a .htaccess file, will _require_ the use of
+       DispatchLocation, which defines the starting location from which
+       Apache::Dispatch will start class->method() translation.
+       For example:
+
+     httpd.conf
+       DocumentRoot /usr/local/apache/htdocs
+       <Directory /usr/local/apache/htdocs/>
+         ...
+       <Directory>
+
+     .htaccess (in /usr/local/apache/htdocs/Foo)
+        SetHandler perl-script
+        PerlHandler Apache::Dispatch
+        DispatchPrefix Baz
+        DispatchLocation /Foo
+
+     This allows a request to /Foo/Bar/biff to properly map to
+     Baz::Bar->biff().
+
+     While intended specifically for <Directory> configurations, one
+     could use DispatchLocation to further obscure uri translations
+     within <Location> sections as well by changing the part of
+     the uri that is substitued with your module.
+
+     DispatchExtras
+       An optional list of extra processing to enable per-request.  If
+       the main handler is not a valid method call, the request is
+       declined prior to the execution of any of the extra methods.
+
+     Pre   - eval()s Foo->pre_dispatch($r) prior to dispatching the
+             uri.  The $@ of the eval is not checked in any way.
+
+     Post  - eval()s Foo->post_dispatch($r) after dispatching the
+             uri.  The $@ of the eval is not checked in any way.
+
+     Error - If the main handler returns other than OK then
+             Foo->error_dispatch($r, $@) is called and return status
+             of it is returned instead.  Unlike the pre and post
+             processing routines above, error_dispatch is not wrapped
+             in an eval, so if it dies, the Apache::Dispatch dies,
+             and Apache will process the error using ErrorDocument,
+             custom_response(), etc.
+             With error_dispatch() disabled, the return status of the
+             the main handler is returned to the client.
+
+     DispatchRequire
+       An optional directive that enables require()ing of the module that
+       is the result of the uri to class->method translation.  This allows
+       your configuration to be a bit more dynamic, but also decreases
+       security somewhat.  And don't forget that you really should be
+       pre-loading frequently used modules in the parent process to reduce
+       overhead - DispatchRequire is a directive of conveinence.
+
+     On    - require() the module
+
+     Off   - Do not require() the module (Default)
+
+     DispatchStat
+       An optional directive that enables reloading of the module that is
+       the result of the uri to class->method translation, similar to
+       Apache::Registry, Apache::Reload, or Apache::StatINC.
+
+     On    - Test the called package for modification and reload on
+             change
+
+     Off   - Do not test or reload the package (Default)
+
+     ISA   - Test the called package, and all other packages in the
+             called package's @ISA, and reload on change
+
+     DispatchAUTOLOAD
+       An optional directive that enables unknown methods to use
+       AutoLoader.  It may be applied on a per-server or per-location
+       basis and defaults to Off.  Please see the special section on
+       AUTOLOAD below.
+
+     On    - Allow for methods to be defined in AUTOLOAD method
+
+     Off   - Turn off search for AUTOLOAD method (Default)
+     
+       DispatchISA
+         An optional list of parent classes you want your dispatched class
+         to inherit from.
+
+     DispatchFilter
+       If you have Apache::Filter 1.013 or above installed, you can take
+       advantage of other Apache::Filter aware modules.  Please see the
+       section on FILTERING below.  In keeping with Apache::Filter
+       standards, PerlSetVar Filter has the same effect as DispatchFilter
+       but with lower precedence.
+
+     On    - make the output of your module Apache::Filter aware
+
+     Off   - do not use Apache::Filter (Default)
+
+SPECIAL CODING GUIDELINES
+=========================
+
+   Migrating to Apache::Dispatch is relatively painless - it requires only
+a few minor code changes.  The good news is that once you adapt code to
+work with Dispatch, it can be used as a conventional mod_perl method
+handler, requiring only a few considerations.  Below are a few things that
+require attention.
+
+   In the interests of security, all handler methods must be prefixed with
+'dispatch_', which is added to the uri behind the scenes.  Unlike ordinary
+mod_perl handlers, for Apache::Dispatch there is no default method (with a
+tiny exception - see NOTES below).
+
+   Apache::Dispatch uses object oriented calls behind the scenes.  This
+means that you either need to account for your handler to be called as a
+method handler, such as
+
+     sub dispatch_bar {
+       my $self  = shift;  # your class
+       my $r     = shift;
+     }
+
+   or get the Apache request object directly via
+
+     sub dispatch_bar {
+       my $r     = Apache->request;
+     }
+
+   If you want to use the handler unmodified outside of Apache::Dispatch,
+you must do three things:
+
+     prototype your handler:
+
+     sub dispatch_baz ($$) {
+       my $self  = shift;
+       my $r     = shift;
+     }
+
+     change your httpd.conf entry:
+
+     <Location /Foo>
+       SetHandler perl-script
+       PerlHandler Bar->dispatch_baz
+     </Location>
+
+     pre-load your module:
+       PerlModule Bar
+         or
+       PerlRequire startup.pl
+       # where startup.pl contains
+       # use Bar;
+
+   That's it - now the handler can be swapped in and out of Dispatch
+without further modification.  See the Eagle book on method handlers for
+more details.
+
+FILTERING
+=========
+
+   Apache::Dispatch provides for output filtering using Apache::Filter
+1.013 and above.
+
+     <Location /Foo>
+       SetHandler perl-script
+       PerlHandler Apache::Dispatch Apache::Compress
+
+     DispatchPrefix Bar
+     DispatchFilter On
+       </Location>
+
+   Your handler need do nothing special to make its output the start of
+the chain - Apache::Dispatch registers itself with Apache::Filter and
+hides the task from your handler.  Thus, any dispatched handler is
+automatically Apache::Filter ready without the need for additional code.
+
+   The only caveat is that you must use the request object that is passed
+to the handler and not get it directly using Apache->request.
+
+AUTOLOAD
+========
+
+   Support for AUTOLOAD has been made optional, but requires special care.
+Please take the time to read the camel book on using AUTOLOAD with can()
+and subroutine declarations (3rd ed pp326-329).
+
+   Basically, you declare the methods you want AUTOLOAD to capture by name
+at the top of your script.  This is necessary because can() will return
+true if your class (or any parent class) contains an AUTOLOAD method, but
+$AUTOLOAD will only be populated for declared method calls.  Hence,
+without a declaration you won't be able to get at the name of the method
+you want to AUTOLOAD.
+
+   DispatchISA introduced some convenience, but some headaches as well -
+if you inherit from a class that uses AutoLoader then ALL method calls are
+true.  And as just explained, AUTOLOAD() will not know what the called
+method was.  This may represent a problem if you aren't aware that, say,
+CGI.pm uses AutoLoader and spend a few hours trying to figure out why all
+of a sudden every URL under Dispatch is bombing.
+
+   If you decide to use DispatchISA it is HIGHLY SUGGESTED that you do so
+with DispatchAUTOLOAD Off (which is the default behavior).
+
+NOTES
+=====
+
+   If you define a dispatch_index() method calls to /Foo will default to
+it.  Unfortunately, this implicit translation only happens at the highest
+level - calls to /Foo/Bar will translate to Foo->Bar() (that is, unless
+Foo::Bar is your DispatchPrefix, in which case it will work but
+/Foo/Bar/Baz will not, etc).  Explicit calls to /Foo/index follow the
+normal dispatch rules.
+
+   If the uri can be dispatched but contains anything other than
+[a-zA-Z0-9_/-] Apache::Dispatch declines to handle the request.
+
+   Like everything in perl, the package names are case sensitive.
+
+   Warnings have been left on, so if you set an invalid class with
+DispatchISA you will see a message like:   Can't locate package Foo::Bar
+for @Bar::Baz::ISA at   .../Apache/Dispatch.pm line 277.
+
+   Verbose debugging is enabled by setting $Apache::Dispatch::DEBUG=1.
+Very verbose debugging is enabled at 2.  To turn off all debug information
+set your Apache LogLevel directive above info level.
+
+   This is alpha software, and as such has not been tested on multiple
+platforms or environments for security, stability or other concerns.  It
+requires PERL_DIRECTIVE_HANDLERS=1, PERL_LOG_API=1, PERL_HANDLER=1, and
+maybe other hooks to function properly.
+
+FEATURES/BUGS
+=============
+
+   If a module fails reload under DispatchStat, Apache::Dispatch declines
+the request.  This might change to SERVER_ERROR in the future...
+
+SEE ALSO
+========
+
+   perl(1), mod_perl(1), Apache(3), Apache::Filter(3), Apache::Reload(3),
+Apache::StatINC(3)
+
+AUTHOR
+======
+
+   Geoffrey Young <geoff@cpan.org>
+
+COPYRIGHT
+=========
+
+   Copyright 2001 Geoffrey Young - all rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Apache/DumpHeaders,  Next: Apache/EmbperlChain,  Prev: Apache/Dispatch,  Up: Module List
+
+Watch HTTP transaction via headers
+**********************************
+
+NAME
+====
+
+   Apache::DumpHeaders - Watch HTTP transaction via headers
+
+SYNOPSIS
+========
+
+     #httpd.conf or some such
+     PerlLogHandler  Apache::DumpHeaders
+     PerlSetVar      DumpHeaders_File -
+     PerlSetVar      DumpHeaders_IP "1.2.3.4 1.2.3.5"
+     #PerlSetVar     DumpHeaders_Conditional 1
+     #PerlSetVar     DumpHeaders_Percent 5
+
+DESCRIPTION
+===========
+
+   This module is used to watch an HTTP transaction, looking at the client
+and servers headers.
+
+   With Apache::ProxyPassThru configured, you are able to watch your
+browser talk to any server besides the one with this module living inside.
+
+PARAMETERS
+==========
+
+   This module is configured with PerlSetVar's. All the "only dump if ..."
+options are "AND" conditions. If not all of them matches we won't dump the
+headers.
+
+   If you need some more complicated logic you could use the
+DumpHeaders_Conditional parameter alone and have another module do the
+"dump or dump not" logic with r->notes("DumpHeaders").
+
+DumpHeaders_File
+----------------
+
+   Required parameter to specify which file you want to dump the headers
+to.
+
+DumpHeaders_IP
+--------------
+
+   Optional parameter to specify which one or more IP addresses you want
+to dump traffic from.
+
+DumpHeaders_Conditional
+-----------------------
+
+   If this is set to a true value we'll only dump the headers if another
+module have set r->notes("DumpHeaders") to a true value.
+
+DumpHeaders_Percent
+-------------------
+
+   If this is set, we'll only dump the specified percent of the requests.
+
+SUPPORT
+=======
+
+   The latest version of this module can be found at CPAN and at `http:'
+in this node. Send questions and suggestions to the modperl mailinglist
+(see `http:' in this node for information) or directly to the author (see
+below).
+
+SEE ALSO
+========
+
+   mod_perl(3), Apache(3), Apache::ProxyPassThru(3)
+
+AUTHOR
+======
+
+   Ask Bjoern Hansen <ask@develooper.com>.
+
+   Originally by Doug MacEachern.
+
+
+File: pm.info,  Node: Apache/EmbperlChain,  Next: Apache/ExtUtils,  Prev: Apache/DumpHeaders,  Up: Module List
+
+process embedded perl in HTML in the OutputChain
+************************************************
+
+NAME
+====
+
+   Apache::EmbperlChain - process embedded perl in HTML in the OutputChain
+
+SYNOPSIS
+========
+
+   In the configuration of your apache add something like
+
+     PerlModule Apache::EmbperlChain
+     <Files *.html>
+     SetHandler perl-script
+     PerlHandler Apache::OutputChain Apache::EmbperlChain Apache::PassFile
+     </Files>
+
+   This will cause all html files to be processed by Embperl.
+
+   Now this:
+
+     <Location /foo>
+     SetHandler perl-script
+     PerlHandler Apache::OutputChain Apache::GzipChain Apache::EmbperlChain My::OwnHandler
+     </Location>
+
+   Any request in the /foo subtree will be processed by My::OwnHandler.
+The output of that will then be filtered by EmbperlChain, which will
+process any embedded Perl commands. That output will then be compressed by
+GzipChain, which will deliver compressed content to the client.
+
+STATUS
+======
+
+   This is beta software, and the output chain mechanism itself is also
+beta.
+
+   You currently cannot mix perl's own print statements that print to
+STDOUT and the print or `write_client' methods in Apache.pm. If you do
+that, you will very likely encounter empty documents and probably core
+dumps too. Since Apache::OutputChain uses perl's print statement, you'll
+want to stick to that too.
+
+DESCRIPTION
+===========
+
+   This module calls HTML::Embperl to process any output from another perl
+handler.
+
+   The module seems to work without influencing the other handlers.
+
+   EmbperlChain processes every single buffer content it receives via the
+output chain separately. Therefore care must be taken to print valid
+embedded perl chunks in the content handler. It is recommended that you
+use as few print statements as possible in conjunction with the
+EmbperlChain. The Apache::PassFile module is an example of an efficient
+file reader for this purpose.
+
+   When EmbperlChain is the last handler in the chain, the following
+optimization is performed: all input from the producer is buffered in
+memory, and fed to HTML::Embperl in one call at the end of request. The
+resulting output is sent directly to the browser by HTML::Embperl, for an
+additional performance gain.
+
+   If the 'Last-Modified' HTTP header is set (by an earlier handler in the
+chain), EmbperlChain uses it to enable Embperl's caching mechanism.
+
+PREREQUISITES
+=============
+
+   HTML::Embperl, Apache::OutputChain
+
+AUTHOR
+======
+
+   Eric Cholet, cholet@logilune.com
+
+   Documentation shamelessly copied from Apache::GzipChain by Andreas
+Koenig.
+
+SEE ALSO
+========
+
+   Apache::GzipChain, Apache::SSIChain
+
+
+File: pm.info,  Node: Apache/ExtUtils,  Next: Apache/FakeRequest,  Prev: Apache/EmbperlChain,  Up: Module List
+
+Utils for Apache:C/Perl glue
+****************************
+
+NAME
+====
+
+   Apache::ExtUtils - Utils for Apache:C/Perl glue
+
+SYNOPSIS
+========
+
+     use Apache::ExtUtils ();
+
+DESCRIPTION
+===========
+
+   Under constuction, all here subject to change.
+
+AUTHOR
+======
+
+   Doug MacEachern
+
+
+File: pm.info,  Node: Apache/FakeRequest,  Next: Apache/File,  Prev: Apache/ExtUtils,  Up: Module List
+
+fake request object for debugging
+*********************************
+
+NAME
+====
+
+   Apache::FakeRequest - fake request object for debugging
+
+SYNOPSIS
+========
+
+     use Apache::FakeRequest;
+     my $request = Apache::FakeRequest->new(method_name => 'value', ...);
+
+DESCRIPTION
+===========
+
+   *Apache::FakeRequest* is used to set up an empty Apache request object
+that can be used for debugging.  The *Apache::FakeRequest* methods just
+set internal variables of the same name as the method and return the value
+of the internal variables.  Initial values for methods can be specified
+when the object is created.  The print method prints to STDOUT.
+
+   Subroutines for Apache constants are also defined so that using
+*Apache::Constants* while debugging works, although the values of the
+constants are hard-coded rather than extracted from the Apache source code.
+
+     #!/usr/bin/perl
+
+     use Apache::FakeRequest ();
+     use mymodule ();
+
+     my $request = Apache::FakeRequest->new('get_remote_host'=>'foobar.com');
+     mymodule::handler($request);
+
+AUTHORS
+=======
+
+   Doug MacEachern, with contributions from Andrew Ford
+<A.Ford@ford-mason.co.uk>.
+
+
+File: pm.info,  Node: Apache/File,  Next: Apache/Filter,  Prev: Apache/FakeRequest,  Up: Module List
+
+advanced functions for manipulating files at the server side
+************************************************************
+
+NAME
+====
+
+   Apache::File - advanced functions for manipulating files at the server
+side
+
+SYNOPSIS
+========
+
+     use Apache::File ();
+
+DESCRIPTION
+===========
+
+   Apache::File does two things: it provides an object-oriented interface
+to filehandles similar to Perl's standard IO::File class. While the
+Apache::File module does not provide all the functionality of IO::File,
+its methods are approximately twice as fast as the equivalent IO::File
+methods. Secondly, when you use Apache::File, it adds several new methods
+to the Apache class which provide support for handling files under the
+HTTP/1.1 protocol.
+
+Apache::File methods
+====================
+
+new()
+     This method creates a new filehandle, returning the filehandle object
+     on success, undef on failure. If an additional argument is given, it
+     will be passed to the open() method automatically.
+
+          use Apache::File ();
+          my $fh = Apache::File->new;
+
+          my $fh = Apache::File->new($filename) or die "Can't open $filename $!";
+
+open()
+     Given an Apache::File object previously created with new(), this
+     method opens a file and associates it with the object. The open()
+     method accepts the same types of arguments as the standard Perl open()
+     function, including support for file modes.
+
+          $fh->open($filename);
+
+          $fh->open(">$out_file");
+
+          $fh->open("|$program");
+
+close()
+     The close() method is equivalent to the Perl builtin close function,
+     returns true upon success, false upon failure.
+
+          $fh->close or die "Can't close $filename $!";
+
+tmpfile()
+     The tmpfile() method is responsible for opening up a unique temporary
+     file. It is similar to the tmpnam() function in the POSIX module, but
+     doesn't come with all the memory overhead that loading POSIX does. It
+     will choose a suitable temporary directory (which must be writable by
+     the Web server process). It then generates a series of filenames using
+     the current process ID and the $TMPNAM package global. Once a unique
+     name is found, it is opened for writing, using flags that will cause
+     the file to be created only if it does not already exist. This
+     prevents race conditions in which the function finds what seems to be
+     an unused name, but someone else claims the same name before it can be
+     created.
+
+     As an added bonus, tmpfile() calls the register_cleanup() method
+     behind the scenes to make sure the file is unlinked after the
+     transaction is finished.
+
+     Called in a list context, tmpfile() returns the temporary file name
+     and a filehandle opened for reading and writing. In a scalar context
+     only the filehandle is returned.
+
+          my($tmpnam, $fh) = Apache::File->tmpfile;
+
+          my $fh = Apache::File->tmpfile;
+
+Apache Methods added by Apache::File
+====================================
+
+   When a handler pulls in Apache::File, the module adds a number of new
+methods to the Apache request object. These methods are generally of
+interest to handlers that wish to serve static files from disk or memory
+using the features of the HTTP/1.1 protocol that provide increased
+performance through client-side document caching.
+
+$r->discard_request_body()
+     This method tests for the existence of a request body and if present,
+     simply throws away the data. This discarding is especially important
+     when persistent connections are being used, so that the request body
+     will not be attached to the next request. If the request is malformed,
+     an error code will be returned, which the module handler should
+     propagate back to Apache.
+
+          if ((my $rc = $r->discard_request_body) != OK) {
+             return $rc;
+          }
+
+$r->meets_conditions()
+     In the interest of HTTP/1.1 compliance, the meets_conditions() method
+     is used to implement "conditional GET" rules. These rules include
+     inspection of client headers, including If-Modified-Since,
+     If-Unmodified-Since, If-Match and If-None-Match.
+
+     As far as Apache modules are concerned, they need only check the
+     return value of this method before sending a request body. If the
+     return value is anything other than OK, the module should return from
+     the handler with that value. A common return value other than OK is
+     HTTP_NOT_MODIFIED, which is sent when the document is already cached
+     on the client side, and has not changed since it was cached.
+
+          if((my $rc = $r->meets_conditions) != OK) {
+             return $rc;
+          }
+          #else ... go and send the response body ...
+
+$r->mtime()
+     This method returns the last modified time of the requested file,
+     expressed as seconds since the epoch. The last modified time may also
+     be changed using this method, although update_mtime() method is better
+     suited to this purpose.
+
+          my $date_string = localtime $r->mtime;
+
+$r->set_content_length()
+     This method sets the outgoing Content-length header based on its
+     argument, which should be expressed in byte units. If no argument is
+     specified, the method will use the size returned by $r->filename. This
+     method is a bit faster and more concise than setting Content-length in
+     the headers_out table yourself.
+
+          $r->set_content_length;
+          $r->set_content_length(-s $r->finfo); #same as above
+          $r->set_content_length(-s $filename);
+
+$r->set_etag()
+     This method is used to set the outgoing ETag header corresponding to
+     the requested file. ETag is an opaque string that identifies the
+     currrent version of the file and changes whenever the file is
+     modified. This string is tested by the meets_conditions() method if
+     the client provide an If-Match or If-None-Match header.
+
+          $r->set_etag;
+
+$r->set_last_modified()
+     This method is used to set the outgoing Last-Modified header from the
+     value returned by $r->mtime. The method checks that the specified time
+     is not in the future. In addition, using set_last_modified() is faster
+     and more concise than setting Last-Modified in the headers_out table
+     yourself.
+
+     You may provide an optional time argument, in which case the method
+     will first call the update_mtime() to set the file's last modification
+     date. It will then set the outgoing Last-Modified header as before.
+
+          $r->update_mtime((stat $r->finfo)[9]);
+          $r->set_last_modified;
+          $r->set_last_modified((stat $r->finfo)[9]); #same as the two lines above
+
+$r->update_mtime()
+     Rather than setting the request record mtime field directly, you can
+     use the update_mtime() method to change the value of this field. It
+     will only be updated if the new time is more recent than the current
+     mtime. If no time argument is present, the default is the last
+     modified time of $r->filename.
+
+          $r->update_mtime;
+          $r->update_mtime((stat $r->finfo)[9]); #same as above
+          $r->update_mtime(time);
+
+
+File: pm.info,  Node: Apache/Filter,  Next: Apache/GD/Graph,  Prev: Apache/File,  Up: Module List
+
+Alter the output of previous handlers
+*************************************
+
+NAME
+====
+
+   Apache::Filter - Alter the output of previous handlers
+
+SYNOPSIS
+========
+
+     #### In httpd.conf:
+     PerlModule Apache::Filter
+     # That's it - this isn't a handler.
+     
+     <Files ~ "*\.blah">
+      SetHandler perl-script
+      PerlSetVar Filter On
+      PerlHandler Filter1 Filter2 Filter3
+     </Files>
+     
+     #### In Filter1, Filter2, and Filter3:
+     $r = $r->filter_register();  # Required
+     my $fh = $r->filter_input(); # Optional (you might not need the input FH)
+     while (<$fh>) {
+       s/ something / something else /;
+       print;
+     }
+     
+     #### or, alternatively:
+     $r = $r->filter_register();
+     my ($fh, $status) = $r->filter_input(); # Get status information
+     return $status unless $status == OK;
+     while (<$fh>) {
+       s/ something / something else /;
+       print;
+     }
+
+DESCRIPTION
+===========
+
+   In basic operation, each of the handlers Filter1, Filter2, and Filter3
+will make a call to $r->filter_input(), which will return a filehandle.
+For Filter1, the filehandle points to the requested file.  For Filter2,
+the filehandle contains whatever Filter1 wrote to STDOUT.  For Filter3, it
+contains whatever Filter3 wrote to STDOUT.  The output of Filter3 goes
+directly to the browser.
+
+   Note that the modules Filter1, Filter2, and Filter3 are listed in
+forward order, in contrast to the reverse-order listing of
+Apache::OutputChain.
+
+   When you've got this module, you can use the same handler both as a
+stand-alone handler, and as an element in a chain.  Just make sure that
+whenever you're chaining, all the handlers in the chain are
+"Filter-aware," i.e. they each call $r->filter_register() exactly once,
+before they start printing to STDOUT.  There should be almost no overhead
+for doing this when there's only one element in the chain.
+
+   Currently the following public modules are Filter-aware.  Please tell
+me of others you know about.
+
+     Apache::Registry (using Apache::RegistryFilter, included here)
+     Apache::SSI
+     Apache::ASP
+     HTML::Mason
+     Apache::SimpleReplace
+
+METHODS
+=======
+
+   Apache::Filter is a subclass of Apache, so all Apache methods are
+available.
+
+   This module doesn't create an Apache handler class of its own - rather,
+it adds some methods to the Apache:: class.  Thus, it's really a mix-in
+package that just adds functionality to the $r request object.
+
+   * $r = $r->filter_register()
+
+     Every Filter-aware module must call this method exactly once, so that
+     Apache::filter can properly rotate its filters from previous handlers,
+     and so it can know when the output should eventually go to the
+     browser.
+
+   * $r->filter_input()
+
+     This method will give you a filehandle that contains either the file
+     requested by the user ($r->filename), or the output of a previous
+     filter.  If called in a scalar context, that filehandle is all you'll
+     get back.  If called in a list context, you'll also get an Apache
+     status code (OK, NOT_FOUND, or FORBIDDEN) that tells you whether
+     $r->filename was successfully found and opened.  If it was not, the
+     filehandle returned will be undef.
+
+   * $r->changed_since($time)
+
+     Returns true or false based on whether the current input seems like it
+     has changed since `$time'.  Currently the criteria to figure this out
+     is this: if the file pointed to by `$r->finfo' hasn't changed since
+     the time given, and if all previous filters in the chain are
+     deterministic (see below), then we return false.  Otherwise we return
+     true.
+
+     This method is meant to be useful in implementing caching schemes.
+
+     A caution: always call the `changed_since()' and `deterministic()'
+     methods *AFTER* the `filter_register()' method.  This is because
+     Apache::Filter uses a crude counting method to figure out which
+     handler in the chain is currently executing, and calling these
+     routines out of order messes up the counting.
+
+   * $r->deterministic(1|0);
+
+     As of version 0.07, the concept of a "deterministic" filter is
+     supported.  A deterministic filter is one whose output is entirely
+     determined by the contents of its input file (whether the
+     $r->filename file or the output of another filter), and doesn't
+     depend at all on outside factors.  For example, a filter that
+     translates all its output to upper-case is deterministic, but a
+     filter that adds a date stamp to a page, or looks things up in a
+     database which may vary over time, is not.
+
+     Why is this a big deal?  Let's say you have the following setup:
+
+          <Files ~ "\.boffo$">
+           SetHandler perl-script
+           PerlSetVar Filter On
+           PerlHandler Apache::FormatNumbers Apache::DoBigCalculation
+           # The above are fake modules, you get the idea
+          </Files>
+
+     Suppose the FormatNumbers module is deterministic, and the
+     DoBigCalculation module takes a long time to run.  The
+     DoBigCalculation module can now cache its results, so that when an
+     input file is unchanged on disk, its results will remain known when
+     passed through the FormatNumbers module, and the DoBigCalculation
+     module will be able to used cached results from a previous run.
+
+     The guts of the modules would look something like this:
+
+          sub Apache::FormatNumbers::handler {
+             my $r = shift;
+             $r->content_type("text/html");
+             my ($fh, $status) = $r->filter_input();
+             return $status unless $status == OK;
+             $r->deterministic(1); # Set to true; default is false
+          
+             # ... do some formatting, print to STDOUT
+             return OK;
+          }
+          
+          sub Apache::DoBigCalculation::handler {
+             my $r = shift;
+             $r->content_type("text/html");
+             my ($fh, $status) = $r->filter_input();
+             return $status unless $status == OK;
+          
+             # This module implements a caching scheme by using the
+             # %cache_time and %cache_content hashes.
+             my $time = $cache_time{$r->filename};
+             my $output;
+             if ($r->changed_since($time)) {
+                 # Read from <$fh>, perform a big calculation on it, and print to STDOUT
+             } else {
+                 print $cache_content{$r->filename};
+             }
+          
+             return OK;
+          }
+
+     A caution: always call the `changed_since()' and `deterministic()'
+     methods *AFTER* the `filter_register()' method.  This is because
+     Apache::Filter uses a crude counting method to figure out which
+     handler in the chain is currently executing, and calling these
+     routines out of order messes up the counting.
+
+HEADERS
+=======
+
+   In previous releases of this module, it was dangerous to call
+$r->send_http_header(), because a previous/postvious filter might also try
+to send headers, and then you'd have duplicate headers getting sent.  In
+current releases you can simply send the headers.  If the current filter
+is the last filter, the headers will be sent as usual, and otherwise
+send_http_header() is a no-op.
+
+NOTES
+=====
+
+   You'll notice in the SYNOPSIS that I say `"PerlSetVar Filter On"'.  That
+information isn't actually used by this module, it's used by modules which
+are themselves filters (like Apache::SSI).  I hereby suggest that filtering
+modules use this parameter, using it as the switch to detect whether they
+should call $r->filter_register.  However, it's often not necessary -
+there is very little overhead in simply calling $r->filter_register even
+when you don't need to do any filtering, and $r->filter_input can be a
+handy way of opening the $r->filename file.
+
+   VERY IMPORTANT: if one handler in a stacked handler chain uses
+`Apache::Filter', then THEY ALL MUST USE IT.  This means they all must
+call $r->filter_register exactly once.  Otherwise `Apache::Filter' couldn't
+capture the output of the handlers properly, and it wouldn't know when to
+release the output to the browser.
+
+   The output of each filter (except the last) is accumulated in memory
+before it's passed to the next filter, so memory requirements are large
+for large pages.  Apache::OutputChain only needs to keep one item from
+print()'s argument list in memory at a time, so it doesn't have this
+problem, but there are others (each chunk is filtered independently, so
+content spanning several chunks won't be properly parsed).  In future
+versions I might find a way around this, or cache large pages to disk so
+memory requirements don't get out of hand.  We'll see whether it's a
+problem.
+
+   A couple examples of filters are provided with this distribution in the
+t/ subdirectory: UC.pm converts all its input to upper-case, and Reverse.pm
+prints the lines of its input reversed.
+
+   Finally, a caveat: in version 0.09 I started explicitly setting the
+Content-Length to undef.  This prevents early filters from incorrectly
+setting the content length, which will almost certainly be wrong if there
+are any filters after it.  This means that if you write any filters which
+set the content length, they should do it after the $r->filter_register
+call.
+
+TO DO
+=====
+
+   Add a buffered mode to the final output, so that we can send a proper
+Content-Length header. [gozer@hbesoftware.com (Philippe M. Chiasson)]
+
+BUGS
+====
+
+   This uses some funny stuff to figure out when the currently executing
+handler is the last handler in the chain.  As a result, code that
+manipulates the handler list at runtime (using push_handlers and the like)
+might produce mayhem.  Poke around a bit in the code before you try
+anything.  Let me know if you have a better idea.
+
+   As of 0.07, Apache::Filter will automatically return DECLINED when
+$r->filename points to a directory.  This is just because in most cases
+this is what you want to do (so that mod_dir can take care of the
+request), and because figuring out the "right" way to handle directories
+seems pretty tough - the right way would allow a directory indexing
+handler to be a filter, which isn't possible now.  Also, you can't
+properly pass control to a non-mod_perl indexer like mod_autoindex.
+Suggestions are welcome.
+
+   I haven't considered what will happen if you use this and you haven't
+turned on PERL_STACKED_HANDLERS.  So don't do it.
+
+AUTHOR
+======
+
+   Ken Williams (ken@forum.swarthmore.edu)
+
+COPYRIGHT
+=========
+
+   Copyright 1998,1999,2000 Ken Williams.  All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   perl(1).
+
+

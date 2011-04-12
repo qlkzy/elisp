@@ -1,0 +1,1555 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Unicode/String,  Next: Unix/AliasFile,  Prev: Unicode/MapUTF8,  Up: Module List
+
+String of Unicode characters (UCS2/UTF16)
+*****************************************
+
+NAME
+====
+
+   Unicode::String - String of Unicode characters (UCS2/UTF16)
+
+SYNOPSIS
+========
+
+     use Unicode::String qw(utf8 latin1 utf16);
+     $u = utf8("The Unicode Standard is a fixed-width, uniform ");
+     $u .= utf8("encoding scheme for written characters and text");
+
+     # convert to various external formats
+     print $u->ucs4;      # 4 byte characters
+     print $u->utf16;     # 2 byte characters + surrogates
+     print $u->utf8;      # 1-4 byte characters
+     print $u->utf7;      # 7-bit clean format
+     print $u->latin1;    # lossy
+     print $u->hex;       # a hexadecimal string
+
+     # all these can be used to set string value or as constructor
+     $u->latin1("Å være eller å ikke være");
+     $u = utf16("\0Å\0 \0v\0æ\0r\0e");
+
+     # string operations
+     $u2 = $u->copy;
+     $u->append($u2);
+     $u->repeat(2);
+     $u->chop;
+
+     $u->length;
+     $u->index($other);
+     $u->index($other, $pos);
+
+     $u->substr($offset);
+     $u->substr($offset, $length);
+     $u->substr($offset, $length, $substitute);
+
+     # overloading
+     $u .= "more";
+     $u = $u x 100;
+     print "$u\n";
+
+     # string <--> array of numbers
+     @array = $u->unpack;
+     $u->pack(@array);
+
+     # misc
+     $u->ord;
+     $u = uchr($num);
+
+DESCRIPTION
+===========
+
+   A *Unicode::String* object represents a sequence of Unicode characters.
+The Unicode Standard is a fixed-width, uniform encoding scheme for
+written characters and text.  This encoding treats alphabetic characters,
+ideographic characters, and symbols identically, which means that they can
+be used in any mixture and with equal facility.  Unicode is modeled on the
+ASCII character set, but uses a 16-bit encoding to support full
+multilingual text.
+
+   Internally a *Unicode::String* object is a string of 2 byte values in
+network byte order (big-endian).  The class provide various methods to
+convert from and to various external formats, and all string manipulations
+are made on strings in this the internal 16-bit format.
+
+   The functions utf16(), utf8(), utf7(), ucs2(), ucs4(), latin1(), uchr()
+can be imported from the *Unicode::String* module and will work as
+constructors initializing strings of the corresponding encoding.  The
+ucs2() and utf16() are really aliases for the same function.
+
+   The *Unicode::String* objects overload various operators, so they will
+normally work like plain 8-bit strings in Perl.  This includes conversions
+to strings, numbers and booleans as well as assignment, concatenation and
+repetition.
+
+METHODS
+=======
+
+   The following methods are available:
+
+Unicode::String->stringify_as( [$enc] )
+     This class method specify which encoding will be used when
+     *Unicode::String* objects are implicitly converted to and from plain
+     strings.  It define which encoding to assume for the argument of the
+     *Unicode::String* constructor new().  Without an encoding argument,
+     stringify_as() returns the current encoding ctor function.  The
+     encoding argument ($enc) is a string with one of the following values:
+     "ucs4", "ucs2", "utf16", "utf8", "utf7", "latin1", "hex".  The default
+     is "utf8".
+
+$us = Unicode::String->new( [$initial_value] )
+     This is the customary object constructor.  Without argument, it
+     creates an empty *Unicode::String* object.  If an $initial_value
+     argument is given, it is decoded according to the specified
+     stringify_as() encoding and used to initialize the newly created
+     object.
+
+     Normally you create *Unicode::String* objects by importing some of
+     the encoding methods below as functions into your namespace and
+     calling them with an appropriate encoded argument.
+
+$us->ucs4( [$newval] )
+     The UCS-4 encoding use 32 bits per character.  The main benefit of
+     this encoding is that you don't have to deal with surrogate pairs.
+     Encoded as a Perl string we use 4-bytes in network byte order for each
+     character.
+
+     The ucs4() method always return the old value of $us and if given an
+     argument decodes the UCS-4 string and set this as the new value of
+     $us.  The characters in $newval must be in the range 0x0 .. 0x10FFFF.
+     Characters outside this range is ignored.
+
+$us->ucs2( [$newval] )
+
+$us->utf16( [$newval] )
+     The ucs2() and utf16() are really just different names for the same
+     method.  The UCS-2 encoding use 16 bits per character.  The UTF-16
+     encoding is identical to UCS-2, but includes the use of surrogate
+     pairs.  Surrogates make it possible to encode characters in the range
+     0x010000 .. 0x10FFFF with the use of two consecutive 16-bit chars.
+     Encoded as a Perl string we use 2-bytes in network byte order for each
+     character (or surrogate code).
+
+     The ucs2() method always return the old value of $us and if given an
+     argument set this as the new value of $us.
+
+$us->utf8( [$newval] )
+     The UTF-8 encoding use 8-bit for the encoding of characters in the
+     range 0x0 .. 0x7F, 16-bit for the encoding of characters in the range
+     0x80 .. 0x7FF, 24-bit for the encoding of characters in the range
+     0x800 .. 0xFFFF and 32-bit for characters in the range 0x01000 ..
+     0x10FFFF.  Americans like this encoding, because plain US-ASCII
+     characters are still US-ASCII.  Another benefit is that the character
+     '\0' only occurs as the encoding of 0x0, thus the normal
+     NUL-terminated strings (popular in the C programming language) can
+     still be used.
+
+     The utf8() method always return the old value of $us encoded using
+     UTF-8 and if given an argument decodes the UTF-8 string and set this
+     as the new value of $us.
+
+$us->utf7( [$newval] )
+     The UTF-7 encoding only use plain US-ASCII characters for the
+     encoding.  This makes it safe for transport through 8-bit stripping
+     protocols.  Characters outside the US-ASCII range are base64-encoded
+     and '+' is used as an escape character.  The UTF-7 encoding is
+     described in RFC1642.
+
+     The utf7() method always return the old value of $us encoded using
+     UTF-7 and if given an argument decodes the UTF-7 string and set this
+     as the new value of $us.
+
+     If the (global) variable $Unicode::String::UTF7_OPTIONAL_DIRECT_CHARS
+     is TRUE, then a wider range of characters are encoded as themselves.
+     It is even TRUE by default.  The characters affected by this are:
+
+          ! " # $ % & * ; < = > @ [ ] ^ _ ` { | }
+
+$us->latin1( [$newval] )
+     The first 256 codes of Unicode is identical to the ISO-8859-1 8-bit
+     encoding, also known as Latin-1.  The latin1() method always return
+     the old value of $us and if given an argument set this as the new
+     value of $us.  Characters outside the 0x0 .. 0xFF range are ignored
+     when returning a Latin-1 string.  If you want more control over the
+     mapping from Unicode to Latin-1, use the Unicode::Map8 class.  This
+     is also the way to deal with other 8-bit character sets.
+
+$us->hex( [$newval] )
+     This method() return a plain ASCII string where each Unicode character
+     is represented by the "U+XXXX" string and separated by a single space
+     character.  This format can also be used to set the value of $us (in
+     which case the "U+" is optional).
+
+$us->as_string;
+     Converts a *Unicode::String* to a plain string according to the
+     setting of stringify_as().  The default stringify_as() method is
+     "utf8".
+
+$us->as_num;
+     Converts a *Unicode::String* to a number.  Currently only the digits
+     in the range 0x30 .. 0x39 are recognized.  The plan is to eventually
+     support all Unicode digit characters.
+
+$us->as_bool;
+     Converts a *Unicode::String* to a boolean value.  Only the empty
+     string is FALSE.  A string consisting of only the character U+0030 is
+     considered TRUE, even if Perl consider "0" to be FALSE.
+
+$us->repeat( $count );
+     Returns a new *Unicode::String* where the content of $us is repeated
+     $count times.  This operation is also overloaded as:
+
+          $us x $count
+
+$us->concat( $other_string );
+     Concatenates the string $us and the string $other_string.  If
+     $other_string is not an *Unicode::String* object, then it is first
+     passed to the Unicode::String->new constructor function.  This
+     operation is also overloaded as:
+
+          $us . $other_string
+
+$us->append( $other_string );
+     Appends the string $other_string to the value of $us.  If
+     $other_string is not an *Unicode::String* object, then it is first
+     passed to the Unicode::String->new constructor function.  This
+     operation is also overloaded as:
+
+          $us .= $other_string
+
+$us->copy;
+     Returns a copy of the current *Unicode::String* object.  This
+     operation is overloaded as the assignment operator.
+
+$us->length;
+     Returns the length of the *Unicode::String*.  Surrogate pairs are
+     still counted as 2.
+
+$us->byteswap;
+     This method will swap the bytes in the internal representation of the
+     *Unicode::String* object.
+
+     Unicode reserve the character U+FEFF character as a byte order mark.
+     This works because the swapped character, U+FFFE, is reserved to not
+     be valid.  For strings that have the byte order mark as the first
+     character, we can guaranty to get the byte order right with the
+     following code:
+
+          $ustr->byteswap if $ustr->ord == 0xFFFE;
+
+$us->unpack;
+     Returns a list of integers each representing an UTF-16 character code.
+
+$us->pack( @uchr );
+     Sets the value of $us as a sequence of UTF-16 characters with the
+     characters codes given as parameter.
+
+$us->ord;
+     Returns the character code of the first character in $us.  The ord()
+     method deals with surrogate pairs, which gives us a result-range of
+     0x0 .. 0x10FFFF.  If the $us string is empty, undef is returned.
+
+$us->chr( $code );
+     Sets the value of $us to be a string containing the character assigned
+     code $code.  The argument $code must be an integer in the range 0x0
+     .. 0x10FFFF.  If the code is greater than 0xFFFF then a surrogate pair
+     created.
+
+$us->name
+     In scalar context returns the official Unicode name of the first
+     character in $us.  In array context returns the name of all characters
+     in $us.  Also see *Note Unicode/CharName: Unicode/CharName,.
+
+$us->substr( $offset, [$length, [$subst]] )
+     Returns a sub-string of $us.  Works similar to the builtin substr
+     function, but because we can't make LVALUE subs yet, you have to pass
+     the string you want to assign to the sub-string as the 3rd parameter.
+
+$us->index( $other, [$pos] );
+     Locates the position of $other within $us, possibly starting the
+     search at position $pos.
+
+$us->chop;
+     Chops off the last character of $us and returns it (as a
+     *Unicode::String* object).
+
+FUNCTIONS
+=========
+
+   The following utility functions are provided.  They will be exported on
+request.
+
+byteswap2($str, ...)
+     This function will swap 2 and 2 bytes in the strings passed as
+     arguments.  This can be used to fix up UTF-16 or UCS-2 strings from
+     litle-endian systems.  If this function is called in void context,
+     then it will modify its arguments in-place.  Otherwise, then swapped
+     strings are returned.
+
+byteswap4($str, ...)
+     The byteswap4 function works similar to byteswap2, but will reverse
+     the order of 4 and 4 bytes.  Can be used to fix litle-endian UCS-4
+     strings.
+
+SEE ALSO
+========
+
+   *Note Unicode/CharName: Unicode/CharName,, *Note Unicode/Map8:
+Unicode/Map8,, http://www.unicode.org/
+
+COPYRIGHT
+=========
+
+   Copyright 1997-2000 Gisle Aas.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Unix/AliasFile,  Next: Unix/AutomountFile,  Prev: Unicode/String,  Up: Module List
+
+Perl interface to /etc/aliases format files
+*******************************************
+
+NAME
+====
+
+   Unix::AliasFile - Perl interface to /etc/aliases format files
+
+SYNOPSIS
+========
+
+     use Unix::AliasFile;
+
+     $al = new Unix::AliasFile "/etc/aliases";
+     $al->alias("bozos", @members);
+     $al->delete("deadlist");
+     $al->remove_user("coolmail", "bgates", "badguy");
+     $al->add_user("coolmail", "joecool", "goodguy");
+     $al->remove_user("*", "deadguy");
+     $al->commit();
+     undef $al;
+
+DESCRIPTION
+===========
+
+   The Unix::AliasFile module provides an abstract interface to Unix alias
+files.  It automatically handles file locking, getting colons and commas
+in the right places, and all the other niggling details.
+
+   Unlike some of the other Unix::*File modules, this module will preserve
+the order of your alias file, with a few exceptions.  Comments and aliases
+will appear in the file in the same order that they started in, unless you
+have comment lines interspersed between the beginning of an alias and
+continuation lines for that same alias.  In this case, those comments will
+appear after the alias that contains them.
+
+METHODS
+=======
+
+add_user( ALIAS, @USERS )
+-------------------------
+
+   This method will add the list of users to an existing alias.  Users
+that are already members of the alias are silently ignored.  The special
+alias name * will add the users to every alias.  Returns 1 on success or 0
+on failure.
+
+alias( ALIAS [,@USERS] )
+------------------------
+
+   This method can add, modify, or return information about an alias.
+Supplied with a single alias parameter, it will return a list consisting
+of the members of that alias, or undef if no such alias exists.  If you
+supply more parameters, the named alias will be created or modified if it
+already exists.  The member list is also returned to you in this case.
+
+aliases( )
+----------
+
+   This method returns a list of all existing aliases.  The list will be
+sorted in alphabetical order.  In scalar context, this method returns the
+total number of aliases.
+
+comment( ALIAS, COMMENT )
+-------------------------
+
+   This method inserts a comment line before the specified alias.  You must
+supply your own comment marker (#) but a newline will be automatically
+appended to the comment unless it already has one.  Returns 1 on success
+and 0 on failure.
+
+commit( [BACKUPEXT] )
+---------------------
+
+   See the Unix::ConfigFile documentation for a description of this method.
+
+delempty( )
+-----------
+
+   This method will delete all existing aliases that have no members.  It
+returns a count of how many aliases were deleted.
+
+delete( ALIAS )
+---------------
+
+   This method will delete the named alias.  It has no effect if the
+supplied alias does not exist.
+
+new( FILENAME [,OPTIONS] )
+--------------------------
+
+   See the Unix::ConfigFile documentation for a description of this method.
+
+remove_user( ALIAS, @USERS )
+----------------------------
+
+   This method will remove the list of users from an existing alias.
+Users that are not members of the alias are silently ignored.  The special
+alias name * will remove the users from every alias.  Returns 1 on success
+or 0 on failure.
+
+rename_user( OLDNAME, NEWNAME )
+-------------------------------
+
+   This method will change one username to another in every alias.
+Returns the number of aliases affected.
+
+uncomment( COMMENT )
+--------------------
+
+   Remove the comment from the file that matches the supplied text.  The
+match must be exact.  Returns 1 on success and 0 on failure.
+
+BUGS
+====
+
+   While the Unix::AliasFile module will work with Perl versions prior to
+5.005, it may exhibit a minor bug under those versions.  The bug will
+cause program aliases with embedded comma characters to be broken apart.
+This will not happen under 5.005 and up, due to the use of the
+Text::ParseWords module, which changed significantly with the 5.005
+release.
+
+AUTHOR
+======
+
+   Steve Snodgrass, ssnodgra@fore.com
+
+SEE ALSO
+========
+
+   Unix::AutomountFile, Unix::ConfigFile, Unix::GroupFile, Unix::PasswdFile
+
+
+File: pm.info,  Node: Unix/AutomountFile,  Next: Unix/ConfigFile,  Prev: Unix/AliasFile,  Up: Module List
+
+Perl interface to automounter files
+***********************************
+
+NAME
+====
+
+   Unix::AutomountFile - Perl interface to automounter files
+
+SYNOPSIS
+========
+
+     use Unix::AutomountFile;
+
+     $am = new Unix::AutomountFile "/etc/auto_home";
+     $am->automount("newuser", "fileserver:/export/home/&");
+     $am->options("newuser", "-rw,nosuid");
+     $am->delete("olduser");
+     $am->commit();
+     undef $am;
+
+DESCRIPTION
+===========
+
+   The Unix::AutomountFile module provides an abstract interface to
+automounter files.  It automatically handles file locking, getting colons
+and commas in the right places, and all the other niggling details.
+WARNING: This module is probably Solaris specific at this point.  I have
+only looked at Solaris format automount files thus far.  Also, you cannot
+edit /etc/auto_master with this module, since it is in a different format
+than the other automount files.
+
+METHODS
+=======
+
+add_server( MOUNT, @SERVERS )
+-----------------------------
+
+   This method will add additional servers to an existing automount point.
+It returns 1 on success and 0 on failure.
+
+automount( MOUNT [,@SERVERS] )
+------------------------------
+
+   This method can add, modify, or return information about a mount point.
+Supplied with a single mount parameter, it will return a list of the server
+entries for that mount point, or undef if no such mount exists.  If you
+supply more than one parameter, the mount point will be created or
+modified if it already exists.  The list is also returned to you in this
+case.
+
+automounts( )
+-------------
+
+   This method returns a list of all existing mount points, sorted
+alphabetically.  In scalar context, this method returns the total number of
+mount points.
+
+commit( [BACKUPEXT] )
+---------------------
+
+   See the Unix::ConfigFile documentation for a description of this method.
+
+delete( MOUNT )
+---------------
+
+   This method will delete the named mount point.  It has no effect if the
+supplied mount point does not exist.
+
+new( FILENAME [,OPTIONS] )
+--------------------------
+
+   See the Unix::ConfigFile documentation for a description of this method.
+
+options( MOUNT [,OPTIONS] )
+---------------------------
+
+   Read or modify the mount options associated with a mount point.
+Returns the options in either case.
+
+rename( OLDNAME, NEWNAME )
+--------------------------
+
+   Renames a mount point.  If NEWNAME corresponds to an existing mount
+point, that mount point is overwritten.  Returns 0 on failure and 1 on
+success.
+
+AUTHOR
+======
+
+   Steve Snodgrass, ssnodgra@fore.com
+
+SEE ALSO
+========
+
+   Unix::AliasFile, Unix::ConfigFile, Unix::GroupFile, Unix::PasswdFile
+
+
+File: pm.info,  Node: Unix/ConfigFile,  Next: Unix/GroupFile,  Prev: Unix/AutomountFile,  Up: Module List
+
+Perl interface to various Unix configuration files
+**************************************************
+
+NAME
+====
+
+   Unix::ConfigFile - Perl interface to various Unix configuration files
+
+SYNOPSIS
+========
+
+     use Unix::ConfigFile;
+
+DESCRIPTION
+===========
+
+   The Unix::ConfigFile module provides a base class from which the other
+Unix::*File modules are derived.  It provides some basic facilities like
+file opening, locking, and closing.  You do not need to use this module
+directly unless you are developing a derived module for an unsupported
+configuration file.  However, some of the methods documented here are
+intended for public use by users of Unix::ConfigFile submodules, so you
+may find this documentation useful even if you are not developing your own
+module.
+
+   The ConfigFile object also provides a sequencing API for modules that
+wish to preserve the order of the configuration file they read and write.
+The sequencer maintains a list of arbitrary data that a submodule may
+append, insert, and delete from.  Use of the sequencer is completely
+optional.
+
+   A module that subclasses from Unix::ConfigFile must, at a minimum,
+provide two methods, called "read" and "write".  Both methods will receive
+a filehandle as a parameter (besides the regular object parameter).  The
+read method is called after the file is opened.  It is expected to read in
+the configuration file and initialize the subclass-specific data
+structures associated with the object.  The write method is called when an
+object is committed and is expected to write out the new configuration to
+the supplied filehandle.
+
+USER METHODS
+============
+
+commit( [%OPTIONS] )
+--------------------
+
+   This writes any changes you have made to the object back to disk.  If
+you do not call commit, none of your changes will be reflected in the file
+you are modifying.  Commit may not be called on files opened in read-only
+mode.  There are some optional parameters that may be provided; these are
+passed in the form of key => value pairs.  The "backup" option allows you
+to specify a file extension that will be used to save a backup of the
+original file.  The "writeopts" option passes module-specific options
+through to the write method.  It will accept any scalar for its value;
+typically this will be a list or hash reference.  Commit returns 1 on
+success and 0 on failure.
+
+encpass( PASSWORD )
+-------------------
+
+   This method encrypts the supplied plaintext password using a random
+salt and returns the encrypted password.  Note that this method does not
+actually make any use of the object that it is invoked on, and could be
+called as a class method.
+
+new( FILENAME [,%OPTIONS] )
+---------------------------
+
+   The new method constructs a new ConfigFile (or subclass) object using
+the specified FILENAME.  There are several optional parameters that may be
+specified.  Options must be passed as keyed pairs in the form of option =>
+value.  Valid options are "locking", "lockfile", "mode", and "readopts".
+The locking option determines what style of file locking is used;
+available styles are "dotlock", "flock", and "none".  The default locking
+style is "dotlock".  The "none" locking style causes no locking to be
+done, and all lock and unlock requests will return success.  The lockfile
+option can be used to specify the lock filename used with dotlocking.  The
+default is "FILENAME.lock", where FILENAME is the name of the file being
+opened.  The mode option allows the file open mode to be specified.  The
+default mode is "r+" (read/write), but "r" and "w" are accepted as well.
+Finally, the readopts option allows module-specific options to be passed
+through to the read method.  It will accept any scalar for its value;
+typically this will be a list or hash reference.
+
+DEVELOPER METHODS
+=================
+
+joinwrap( LENGTH, HEAD, INDENT, DELIM, TAIL, @LIST )
+----------------------------------------------------
+
+   This is a utility function that may be called as an object or class
+method.  As the name suggests, this method is basically a version of the
+join function that incorporates line wrapping.  The specified list will be
+joined together, with each list element separated by the specified
+delimiter.  The first line of output will be prefixed with the HEAD
+parameter.  If a line exceeds the length parameter, output is wrapped to
+the next line and the INDENT parameter is used to prefix the line.  In
+addition, the TAIL parameter will be added to the end of every line
+generated except the final one.  There is one case where the resulting
+string can exceed the specified line length - if a single list element,
+plus HEAD or INDENT, exceeds that length.  One final feature is that if
+the HEAD or INDENT parameters contain the text '%n', it will be replaced
+with the current line number, beginning at 0.
+
+sequence( )
+-----------
+
+   Returns the current sequence list associated with the object.  This is
+a list of arbitrary data maintained by a ConfigFile submodule.  The
+ConfigFile module does not care what is contained in the list.
+
+seq_append( @DATA )
+-------------------
+
+   Appends that specified data to the end of the sequence list.
+
+seq_insert( KEY, @DATA )
+------------------------
+
+   Inserts the data into the sequence list before the data that matches the
+specified key.
+
+seq_remove( KEY )
+-----------------
+
+   Removes the data from the sequence list that matches the specified key.
+
+AUTHOR
+======
+
+   Steve Snodgrass, ssnodgra@fore.com
+
+SEE ALSO
+========
+
+   Unix::AliasFile, Unix::AutomountFile, Unix::GroupFile, Unix::PasswdFile
+
+
+File: pm.info,  Node: Unix/GroupFile,  Next: Unix/PasswdFile,  Prev: Unix/ConfigFile,  Up: Module List
+
+Perl interface to /etc/group format files
+*****************************************
+
+NAME
+====
+
+   Unix::GroupFile - Perl interface to /etc/group format files
+
+SYNOPSIS
+========
+
+     use Unix::GroupFile;
+
+     $grp = new Unix::GroupFile "/etc/group";
+     $grp->group("bozos", "*", $grp->maxgid + 1, @members);
+     $grp->remove_user("coolgrp", "bgates", "badguy");
+     $grp->add_user("coolgrp", "joecool", "goodguy");
+     $grp->remove_user("*", "deadguy");
+     $grp->passwd("bozos", $grp->encpass("newpass"));
+     $grp->commit();
+     undef $grp;
+
+DESCRIPTION
+===========
+
+   The Unix::GroupFile module provides an abstract interface to /etc/group
+format files.  It automatically handles file locking, getting colons and
+commas in the right places, and all the other niggling details.
+
+   This module also handles the annoying problem (at least on some
+systems) of trying to create a group line longer than 512 characters.
+Typically this is done by creating multiple lines of groups with the same
+GID.  When a new GroupFile object is created, all members of groups with
+the same GID are merged into a single group with a name corresponding to
+the first name found in the file for that GID.  When the file is
+committed, long groups are written out as multiple lines of no more than
+512 characters, with numbers appended to the group name for the extra
+lines.
+
+METHODS
+=======
+
+add_user( GROUP, @USERS )
+-------------------------
+
+   This method will add the list of users to an existing group.  Users
+that are already members of the group are silently ignored.  The special
+group name * will add the users to every group.  Returns 1 on success or 0
+on failure.
+
+commit( [BACKUPEXT] )
+---------------------
+
+   See the Unix::ConfigFile documentation for a description of this method.
+
+delete( GROUP )
+---------------
+
+   This method will delete the named group.  It has no effect if the
+supplied group does not exist.
+
+encpass( PASSWORD )
+-------------------
+
+   See the Unix::ConfigFile documentation for a description of this method.
+
+gid( GROUP [,GID] )
+-------------------
+
+   Read or modify a group's GID.  Returns the GID in either case.  Note
+that it is illegal to change a group's GID to a GID that is already in use
+by another group.  In this case, the method returns undef.
+
+group( GROUP [,PASSWD, GID, @USERS] )
+-------------------------------------
+
+   This method can add, modify, or return information about a group.
+Supplied with a single group parameter, it will return a list consisting
+of (PASSWORD, GID, @MEMBERS), or undef if no such group exists.  If you
+supply at least three parameters, the named group will be created or
+modified if it already exists.  The list is also returned to you in this
+case.  Note that it is illegal to specify a GID that is already in use by
+another group.  In this case, the method returns undef.
+
+groups( [SORTBY] )
+------------------
+
+   This method returns a list of all existing groups.  By default the list
+will be sorted in order of the GIDs of the groups.  You may also supply
+"name" as a parameter to the method to get the list sorted by group name.
+In scalar context, this method returns the total number of groups.
+
+maxgid( )
+---------
+
+   This method returns the maximum GID in use by all groups.
+
+members( GROUP [,@USERS] )
+--------------------------
+
+   Read or modify the list of members associated with a group.  If you
+specify any users when you call the method, all existing members of the
+group are removed and your list becomes the new set of members.  In scalar
+context, this method returns the total number of members in the group.
+
+new( FILENAME [,OPTIONS] )
+--------------------------
+
+   See the Unix::ConfigFile documentation for a description of this method.
+
+passwd( GROUP [,PASSWD] )
+-------------------------
+
+   Read or modify a group's password.  Returns the encrypted password in
+either case.  If you have a plaintext password, use the encpass method to
+encrypt it before passing it to this method.
+
+remove_user( GROUP, @USERS )
+----------------------------
+
+   This method will remove the list of users from an existing group.
+Users that are not members of the group are silently ignored.  The special
+group name * will remove the users from every group.  Returns 1 on success
+or 0 on failure.
+
+rename_user( OLDNAME, NEWNAME )
+-------------------------------
+
+   This method will change one username to another in every group.
+Returns the number of groups affected.
+
+AUTHOR
+======
+
+   Steve Snodgrass, ssnodgra@fore.com
+
+SEE ALSO
+========
+
+   Unix::AliasFile, Unix::AutomountFile, Unix::ConfigFile, Unix::PasswdFile
+
+
+File: pm.info,  Node: Unix/PasswdFile,  Next: Unix/Processors,  Prev: Unix/GroupFile,  Up: Module List
+
+Perl interface to /etc/passwd format files
+******************************************
+
+NAME
+====
+
+   Unix::PasswdFile - Perl interface to /etc/passwd format files
+
+SYNOPSIS
+========
+
+     use Unix::PasswdFile;
+
+     $pw = new Unix::PasswdFile "/etc/passwd";
+     $pw->user("joeblow", $pw->encpass("secret"), $pw->maxuid + 1, 10,
+     	    "Joe Blow", "/export/home/joeblow", "/bin/ksh");
+     $pw->delete("deadguy");
+     $pw->passwd("johndoe", $pw->encpass("newpass"));
+     foreach $user ($pw->users) {
+         print "Username: $user, Full Name: ", $pw->gecos($user), "\n";
+     }
+     $pw->commit();
+     undef $pw;
+
+DESCRIPTION
+===========
+
+   The Unix::PasswdFile module provides an abstract interface to
+/etc/passwd format files.  It automatically handles file locking, getting
+colons in the right places, and all the other niggling details.
+
+METHODS
+=======
+
+commit( [BACKUPEXT] )
+---------------------
+
+   See the Unix::ConfigFile documentation for a description of this method.
+
+delete( USERNAME )
+------------------
+
+   This method will delete the named user.  It has no effect if the
+supplied user does not exist.
+
+encpass( PASSWORD )
+-------------------
+
+   See the Unix::ConfigFile documentation for a description of this method.
+
+gecos( USERNAME [,GECOS] )
+--------------------------
+
+   Read or modify a user's GECOS string (typically their full name).
+Returns the GECOS string in either case.
+
+gid( USERNAME [,GID] )
+----------------------
+
+   Read or modify a user's GID.  Returns the GID in either case.
+
+home( USERNAME [,HOMEDIR] )
+---------------------------
+
+   Read or modify a user's home directory.  Returns the home directory in
+either case.
+
+maxuid( [IGNORE] )
+------------------
+
+   This method returns the maximum UID in use by all users.  If you pass
+in the optional IGNORE parameter, it will ignore all UIDs greater or equal
+to IGNORE when doing this calculation.  This is useful for excluding
+accounts like nobody.
+
+new( FILENAME [,OPTIONS] )
+--------------------------
+
+   See the Unix::ConfigFile documentation for a description of this method.
+
+passwd( USERNAME [,PASSWD] )
+----------------------------
+
+   Read or modify a user's password.  Returns the encrypted password in
+either case.  If you have a plaintext password, use the encpass method to
+encrypt it before passing it to this method.
+
+rename( OLDNAME, NEWNAME )
+--------------------------
+
+   This method changes the username for a user.  If NEWNAME corresponds to
+an existing user, that user will be overwritten.  It returns 0 on failure
+and 1 on success.
+
+shell( USERNAME [,SHELL] )
+--------------------------
+
+   Read or modify a user's shell.  Returns the shell in either case.
+
+uid( USERNAME [,UID] )
+----------------------
+
+   Read or modify a user's UID.  Returns the UID in either case.
+
+user( USERNAME [,PASSWD, UID, GID, GECOS, HOMEDIR, SHELL] )
+-----------------------------------------------------------
+
+   This method can add, modify, or return information about a user.
+Supplied with a single username parameter, it will return a six element
+list consisting of (PASSWORD, UID, GID, GECOS, HOMEDIR, SHELL), or undef
+if no such user exists.  If you supply all seven parameters, the named
+user will be created or modified if it already exists.  The six element
+list is also returned to you in this case.
+
+users( [SORTBY] )
+-----------------
+
+   This method returns a list of all existing usernames.  By default the
+list will be sorted in order of the UIDs of the users.  You may also
+supply "name" as a parameter to the method to get the list sorted by
+username.  In scalar context, this method returns the total number of
+users.
+
+AUTHOR
+======
+
+   Steve Snodgrass, ssnodgra@fore.com
+
+SEE ALSO
+========
+
+   Unix::AliasFile, Unix::AutomountFile, Unix::ConfigFile, Unix::GroupFile
+
+
+File: pm.info,  Node: Unix/Processors,  Next: Unix/Processors/Info,  Prev: Unix/PasswdFile,  Up: Module List
+
+Interface to processor (CPU) information
+****************************************
+
+NAME
+====
+
+   Unix::Processors - Interface to processor (CPU) information
+
+SYNOPSIS
+========
+
+     use Unix::Processors;
+
+     my $procs = new Unix::Processors;
+     print "There are ", $procs->max_online, " CPUs at ", $procs->max_clock, "\n";
+     (my $FORMAT =   "%2s  %-8s     %4s    \n") =~ s/\s\s+/ /g;
+     printf($FORMAT, "#", "STATE", "CLOCK",  "TYPE", );
+     foreach my $proc (@{$procs->processors}) {
+         printf ($FORMAT, $proc->id, $proc->state, $proc->clock, $proc->type);
+     }
+
+DESCRIPTION
+===========
+
+     This package provides accessors to per-processor (CPU) information.
+     The object is obtained with the Unix::Processors::processors call.
+     the operating system in a OS independent manner.
+
+max_online   Return number of processors currently online.
+max_clock   Return the maximum clock speed across all online processors.    =item processors   Return a array or processor references.  See the Unix::Processors::Info   manual page.  Not all OSes support this call.
+SEE ALSO
+========
+
+   `Unix::Processors::Info', `Sys::Sysconf',
+
+DISTRIBUTION
+============
+
+   The latest version is available from CPAN.
+
+AUTHORS
+=======
+
+   Wilson Snyder <wsnyder@wsnyder.org>
+
+
+File: pm.info,  Node: Unix/Processors/Info,  Next: Unix/Syslog,  Prev: Unix/Processors,  Up: Module List
+
+Interface to processor (CPU) information
+****************************************
+
+NAME
+====
+
+   Unix::Processors::Info - Interface to processor (CPU) information
+
+SYNOPSIS
+========
+
+     use Unix::Processors;
+
+     ...
+     $aproc = $proc->processors[0];
+         print ($aproc->id, $aproc->state, $aproc->clock);
+     }
+
+DESCRIPTION
+===========
+
+     This package provides access to per-processor (CPU) information from
+     the operating system in a OS independent manner.
+
+id   Return the cpu number of this processor.
+clock   Return the clock frequency in MHz.    =item state   Return the cpu state as "online", "offline", or "poweroff".
+type   Return the cpu type.
+SEE ALSO
+========
+
+   `Unix::Processors',
+
+DISTRIBUTION
+============
+
+   The latest version is available from CPAN.
+
+AUTHORS
+=======
+
+   Wilson Snyder <wsnyder@wsnyder.org>
+
+
+File: pm.info,  Node: Unix/Syslog,  Next: Untaint,  Prev: Unix/Processors/Info,  Up: Module List
+
+Perl interface to the UNIX syslog(3) calls
+******************************************
+
+NAME
+====
+
+   Unix::Syslog - Perl interface to the UNIX syslog(3) calls
+
+SYNOPSIS
+========
+
+     use Unix::Syslog qw(:macros);  # Syslog macros
+     use Unix::Syslog qw(:subs);    # Syslog functions
+
+     openlog $ident, $option, $facility;
+     syslog $priority, $format, @formatargs;
+     closelog;
+     $oldmask = setlogmask $mask_priority;
+
+DESCRIPTION
+===========
+
+   This module provides an interface to the system logger *syslogd*(8) via
+Perl's XSUBs. The implementation attempts to resemble the native
+libc-functions of your system, so that anyone being familiar with
+`syslog.h' should be able to use this module right away.
+
+   In contrary to Sys::Syslog(3), this modules does not open a network
+connection to send the messages. This can help you to avoid opening
+security holes in your computer (see `"FAQ"' in this node).
+
+   The subs imported by the tag macros are simply wrappers around the most
+important `#defines' in your system's C header file `syslog.h'. The macros
+return integer values that are used to specify options, facilities and
+priorities in a more or less portable way. They also provide general
+information about your local syslog mechanism. Check syslog(3) and your
+local `syslog.h' for information about the macros, options and facilities
+available on your system.
+
+   The following functions are provided:
+
+openlog $ident, $option, $facility
+     opens a connection to the system logger.  *$ident* is an identifier
+     string that *syslogd*(8) prints into every message. It usually equals
+     the process name. $option is an integer value that is the result of
+     ORed options. *$facility* is an integer value that specifies the part
+     of the system the message should be associated with (e.g. kernel
+     message, mail subsystem).
+
+syslog $priority, $format, @formatargs
+     Generates a log message and passes it to the system logger. If
+     `syslog()' is called without calling `openlog()' first, probably
+     system dependent default values will be used as arguments for an
+     implicit call to `openlog()'.
+
+     *$priority* is an integer value that specifies the priority of the
+     message. Alternatively *$priority* can be the ORed value of a
+     priority and a facility. In that case a previously selected facility
+     will be overridden.
+
+     In the case that `syslog()' is called without calling `openlog()'
+     first and priority does not specify both a priority and a facility, a
+     default facility will be used. This behaviour is most likely system
+     dependent and the user should not rely on any particular value in
+     that case.
+
+     *$format* is a format string in the style of printf(3). Additionally
+     to the usual printf directives `%m' can be specified in the string.
+     It will be replaced implicitly by the contents of the Perl variable
+     $! ($ERRNO). *@formatargs* is a list of values that the format
+     directives will be replaced with subsequently.
+
+closelog
+     closes the connection to the system logger.
+
+setlogmask $mask_priority
+     sets the priority mask and returns the old mask. Logging is enabled
+     for the priorities indicated by the bits in the mask that are set and
+     is disabled where the bits are not set. Macros are provided to specify
+     valid and portable arguments to `setlogmask()'. Usually the default
+     log mask allows all messages to be logged.
+
+   NOTE: The behaviour of this module is system dependent. It is highly
+recommended to consult your system manual for available macros and the
+behaviour of the provided functions.
+
+RETURN VALUES
+=============
+
+   The functions openlog(), syslog() and closelog() return the undefined
+value. The function setlogmask returns the previous mask value.
+
+EXAMPLES
+========
+
+   Open a channel to syslogd specifying an identifier (usually the process
+name) some options and the facility:   `openlog "test.pl", LOG_PID |
+LOG_PERROR, LOG_LOCAL7;'
+
+   Generate log message of specified priority using a printf-type formatted
+string:   `syslog LOG_INFO, "This is message number %d", 42;'
+
+   Set log priority mask to block all messages but those of priority
+`LOG_DEBUG':   `$oldmask = setlogmask(LOG_MASK(LOG_DEBUG))'
+
+   Set log priority mask to block all messages with a higher priority than
+`LOG_ERR':   `$oldmask = setlogmask(LOG_UPTO(LOG_ERR))'
+
+   Close channel to syslogd:   `closelog;'
+
+FAQ
+===
+
+  1. What is the benefit of using this module instead of Sys::Syslog?
+
+     Sys::Syslog always opens a network connection to the syslog service.
+     At least on Linux systems this may lead to some trouble, because
+
+        * Linux syslogd (from package sysklogd) does not listen to the
+          network by default. Most people working on stand-alone machines
+          (including me) didn't see any reason why to enable this option.
+          Others didn't enable it for security reasons.
+
+          OS-independent, some sysadmins may run a firewall on their
+          network that blocks connections to port 514/udp.
+
+        * By default Linux syslogd doesn't forward messages which have
+          already already received from the network to other log hosts.
+          There are reasons not to enable this option unless it is really
+          necessary. Looping messages resulting from a misconfiguration may
+          break down your (log-)system.
+
+     Peter Stamfest <peter.stamfest@eunet.at> pointed out some other
+     advantages of Unix::Syslog, I didn't came across my self.
+
+        * LOG_PERROR works.
+
+        * works with perl -Tw without warnings and problems due to tainted
+          data as it is the case for Sys::Syslog in some special
+          applications. [Especially when running a script as root]
+
+  2. Well, is there any reason to use Sys::Syslog any longer?
+
+     Yes! In contrary to Unix::Syslog, Sys::Syslog works even if you don't
+     have a syslog daemon running on your system as long as you are
+     connected to a log host via a network and have access to the
+     `syslog.h' header file of your log host to generate the initial files
+     for Sys::Syslog (see Sys::Syslog(3) for details). Unix::Syslog only
+     logs to your local syslog daemon which in turn may be configured to
+     distribute the message over the network.
+
+  3. Are calls to the functions provided by Unix::Syslog compatible to
+     those of Sys::Syslog?
+
+     Currently not. Sys::Syslog requires strings to specify many of the
+     arguments to the functions, while Unix::Syslog uses numeric constants
+     accessed via macros as defined in `syslog.h'. Although the strings
+     used by Sys::Syslog are also defined in `syslog.h', it seems that most
+     people got used to the numeric arguments. I will implement the string
+     based calls if there are enough people (*$min_people* > 10**40)
+     complaining about the lack of compatibility.
+
+
+SEE ALSO
+========
+
+   syslog(3), Sys::Syslog(3), syslogd(8), perl(1)
+
+AUTHOR
+======
+
+   Marcus Harnisch <marcus.harnisch@gmx.net>
+
+
+File: pm.info,  Node: Untaint,  Next: User,  Prev: Unix/Syslog,  Up: Module List
+
+Module for laundering tainted data.
+***********************************
+
+NAME
+====
+
+   Untaint - Module for laundering tainted data.
+
+SYNOPSIS
+========
+
+     use Untaint;
+
+     my $pattern = qr(^k\w+);
+
+     my $foo = $ARGV[0];
+
+     # Untaint a scalar
+     if (is_tainted($foo)) {
+            		print "\$foo is tainted. Attempting to launder\n";
+            	$foo = untaint($pattern, $foo);
+     }else{
+            		print "\$foo is not tainted!!\n";
+     }
+
+     # Untaint an array
+     my @foo = @ARGV;
+
+     push @foo, "not tainted";
+
+     if (is_tainted(@foo)) {
+             	print "\@foo is tainted. Attempting to launder\n";
+             my @new = untaint($pattern, @foo);
+     }else{
+             	print "\@foo is not tainted!!\n";
+     }
+
+     # Another way for an list
+     ($a, $b, $c) = untaint(qr(^\d+$), ($a, $b , $c));
+
+     # Untaint a hash
+     my $test = {'name' => $ARGV[0],
+                 'age' => $ARGV[1],
+                 'gender' => $ARGV[2],
+     	    'time' => 'late'
+             	   };
+
+     my $patterns = {'name' => qr(^k\w+),
+            		        'age' => qr(^\d+),
+                     	'gender' => qr(^\w$)
+                            };
+
+     $UNTAINT_ALLOW_HASH++;
+
+     my %new = untaint_hash($patterns, %{$test});
+
+DESCRIPTION
+===========
+
+   This module is used to launder data which has been tainted by using the
+-T switch to be in taint mode. This can be used for CGI scripts as well as
+command line scripts.
+
+   The module will untaint scalars, arrays, and hashes. When laundering an
+array, only array elements which are tainted will be laundered.
+
+FUNCTIONS
+---------
+
+is_tainted(<scalar or array>);
+     You can use this to check the taintedness of data if you wish, but it
+     is also used internally by Untaint.pm to do this when untaint() is
+     called. This method returns 1 if tainted, 0 if not. This is actually
+     a pass-through to Taint.pm's is_tainted method, since that already
+     accomplishes this task.
+
+newvar = untaint(<pattern>, <scalar or array/list>);
+     This method will launder the data (if it can) and return the newly
+     laundered variable. It should be passed either a scalar, or an array
+     reference.  This will return either an array, or a scalar depending
+     on which you want returned.  The pattern should be a regular
+     expression pattern to match the data against.
+
+     If this method can not launder a variable, it will croak().
+
+untaint_hash(<hashref of patterns>, hash)
+     When laundering a hash, a hash of patterns can be passed. This allows
+     you to define a different pattern for each element of the hash. If
+     there is no pattern for an element in the hash, the value itself will
+     be used as the pattern (therefore untainting itself).  This behavior
+     isn't really safe, so you need to specify that you want to do this by
+     setting a special variable to a true value like this:
+
+          $UNTAINT_ALLOW_HASH++;
+
+     That scalar is exported so you need to specifically say it is ok to
+     do this.
+
+     If this is not done, any key/value pair which does not have a pattern
+     will not be laundered and the returned hash will only contain the
+     key/value pairs which had a corresponding pattern.
+
+     It appears that whenever there is one value in a hash that is
+     tainted, ALL values in that hash are tainted. This is a bug in Perl
+     versions which are pre-5.6. This is somewhat of a quagmire since
+     key/value pairs you actually set are now tainted, and need
+     laundering. That's all well and good, but now there is the chance
+     that when you pass the hash ref, you pass something without a pattern
+     unknowingly, and data you don't want untainted is then laundered.
+     Another current bug is that all hash keys are not considered tainted.
+     So, be wary of using hash keys which come from unknown sources in Bad
+     ways. But, if you are trying to use a hash key which you do not know
+     where it's name is from in a dangerous manner, there may be other
+     problems!
+
+$UNTAINT_ALLOW_HASH
+     This variable must be set to a true value of you wish to allow hash
+     values to be untainted based on their own value as a pattern. In
+     other words, the pattern that will be matched to untaint it, will be
+     itself, hence always being untainted.  USE THIS WITH CAUTION.
+
+INSTALLATION
+============
+
+   perl Makefile.PL make make test make install make clean
+
+   Look at the test scripts to see how this can be implemented.
+
+BUGS
+====
+
+   None known at this time. PATCHES WELCOME.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000 Kevin Meltzer. All rights reserved. This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+AUTHOR
+======
+
+   Kevin Meltzer, <`perlguy@perlguy.com'>
+
+CREDITS
+=======
+
+   Tom Phoenix, <`rootbeer@teleport.com'>
+
+SEE ALSO
+========
+
+   *Note Perlsec: (perl.info)perlsec,, *Note Perlrun: (perl.info)perlrun,
+
+
+File: pm.info,  Node: User,  Next: User/Utmp,  Prev: Untaint,  Up: Module List
+
+API for locating user information regardless of OS
+**************************************************
+
+NAME
+====
+
+   User - API for locating user information regardless of OS
+
+SYNOPSIS
+========
+
+     use User;
+
+     my $cfg = Config::IniFiles->new
+           (
+             -file    => sprintf("%s/%s", User->Home, ".ncfg"),
+             -default => 'Default'
+           );
+
+DESCRIPTION
+===========
+
+   This module is allows applications to retrieve per-user
+characteristics. At present, it contains only one method, Home(), which is
+used to return a location that can be expected to be a users "Home"
+directory on either Windows or Unix.
+
+   While one way of writing this would be to check for operating system
+and then check the expected location for an operation system of that type,
+I chose to do the following:
+
+     sub Home {
+
+     return $ENV{HOME}        if $ENV{HOME};
+     return $ENV{USERPROFILE} if $ENV{USERPROFILE};
+     return  "";
+
+     }
+
+   In other words, if $HOME is defined in the user's environment, then
+that is used. Otherwise $USERPROFILE is used. Otherwise "" is returned.
+
+   A contribution for Macintosh (or any other number of OS/arch
+combinations) is greatly solicited.
+
+EXPORT
+------
+
+   None by default.
+
+AUTHOR
+======
+
+   T.M. Brannon, tbone@cpan.org
+
+ACKNOWLEDGEMENTS
+================
+
+   I would like to offer profuse thanks to my fellow perl monk at
+www.perlmonks.org, the_slycer, who told me where HOME could be found on
+Windows machines.
+
+   perl(1).
+
+
+File: pm.info,  Node: User/Utmp,  Next: User/grent,  Prev: User,  Up: Module List
+
+Perl access to utmp- and utmpx-style databases
+**********************************************
+
+NAME
+====
+
+   User::Utmp - Perl access to utmp- and utmpx-style databases
+
+SYNOPSIS
+========
+
+     use User::Utmp qw(utmpname getut putut);
+     utmpname("file");
+     @utmp = getut();
+     putut(\%entry);
+
+   or, on systems supporting utmpx:
+
+     use User::Utmp qw(utmpname getutx putut);
+     utmpname("file");
+     @utmp = getutx();
+     putut(\%entry);
+
+DESCRIPTION
+===========
+
+   The User::Utmp modules provides functions for reading utmp and utmpx
+files, and experimental support for writing utmp files.  The following
+functions are provided:
+
+getut()
+     Reads a utmp-like file and converts it to a Perl array of hashes.
+     Each array element (a reference to a hash) represents one utmp record.
+     The hash keys are the names of the elements of the utmp structure as
+     described in utmp(4).  The hash values are the same as in C.
+
+     Note that even if `ut_addr' (if provided by the utmp implementation)
+     is declared as long, it contains an Internet address (four bytes in
+     network order), not a number.  It is therefore converted to a string
+     suitable as parameter to gethostbyname().  If the record doesn't
+     describe a remote login `ut_addr' is the empty string.
+
+getutx()
+     Reads a utmpx-like file and converts it to a Perl array of hashes.
+     Each array element (a reference to a hash) represents one utmp record.
+     The hash keys are the names of the elements of the utmpx structure as
+     described in utmpx(4) or getutx(3).  The hash values are the same as
+     in C.
+
+     Note that even if `ut_addr' (if provided by the utmpx implementation)
+     is declared as long, it contains an Internet address (four bytes in
+     network order), not a number.  It is therefore converted to a string
+     suitable as parameter to gethostbyname().  If the record doesn't
+     describe a remote login `ut_addr' is the empty string.
+
+putut()
+     Writes out the supplied utmp record into the utmp file.  putut() takes
+     a reference to a hash which has the same structure and contents as the
+     elements of the array returned by getut().  Whether or not putut()
+     creates the utmp file if it doesn't exist is implementation-dependent.
+
+utmpname()
+     Allows the user to change the name of the file being examined from the
+     default file (typically /etc/utmp or, for utmpx, /etc/utmpx) to any
+     other file.  In this case, the name provided to utmpname() will be
+     used for the getut(), getutx(), and putut() functions.
+
+   User::Utmp also provides the following utmp constants as functions:
+
+   BOOT_TIME DEAD_PROCESS EMPTY INIT_PROCESS LOGIN_PROCESS NEW_TIME
+OLD_TIME RUN_LVL USER_PROCESS
+
+   EMPTY is also use on Linux (instead of the non-standard UT_UNKNOWN).
+
+RESTRICTIONS
+============
+
+   Reading the whole file into an array might not be the most efficient
+approach for potentially large files like /etc/wtmp.
+
+   This module is based on the traditional, non-reentrant utmp functions;
+it is therefore not thread-safe.
+
+AUTHOR
+======
+
+   Michael Piotrowski <mxp@dynalabs.de>
+
+SEE ALSO
+========
+
+   utmp(4), getut(3), utmpx(4), getutx(3)
+
+

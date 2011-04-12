@@ -1,0 +1,1738 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Tie/SentientHash,  Next: Tie/ShadowHash,  Prev: Tie/SecureHash,  Up: Module List
+
+Perl module implementing intelligent objects
+********************************************
+
+NAME
+====
+
+   Tie::SentientHash - Perl module implementing intelligent objects
+
+SYNOPSIS
+========
+
+     use Tie::SentientHash;
+
+     tie %hash, 'Tie::SentientHash', $meta_data, $initial_data;
+
+     $hashref    = Tie::SentientHash->new($meta_data, $initial_data);
+     $modified   = $hashref->modified($key [, $bool])
+     $untiedhash = $hashref->export;
+     $metadata   = $hashref->_metadata;
+     $modified   = $hashref->_modified;
+
+     $hashref->{key} = 'value';
+     $hashref->{key1}{key2} = $value;
+     $value2 = $hashref->{key};
+     undef $hashref;
+
+DESCRIPTION
+===========
+
+   The `Tie::SentientHash' package provides intelligent objects.  The
+objects are represented as hashes which:
+
+   * provide read-only elements
+
+   * provide 'special' elements that are handled by user-supplied functions
+
+   * disallow changes to the data as specified by metadata
+
+   * track changes and call a 'commit changes' function when the object is
+     destroyed
+
+   References to scalars, arrays, hashes and objects can be stored in hash
+elements in which case the referenced object is tied to an internal class
+of the appropriate type (Tie::SentientHash::NestedHash, ::NestedArray or
+::NestedScalar), so that changes to the nested data structures can be
+tracked.
+
+   The constructor is invoked with two hash references: the first contains
+metadata and the second the initial data values.  The metadata hash may
+contain the following flags:
+
+READONLY
+     a list of hash entries that are read-only (read-only elements cannot
+     be modified - except by special element handlers - or deleted and are
+     not deleted when the CLEAR method is called)
+
+SPECIAL
+     a hash of name/subroutine-refs pairs that specifies elements that are
+     handled specially (special elements also cannot be deleted).  The user
+     function is called both for STORE (with four arguments) and for FETCH
+     (with three arguments).  The arguments are: a reference to the
+     metadata hash, a reference to the data hash, the element key and if
+     the funtion is being called for a STORE operation, the value to be
+     stored.  SPECIAL elements can be used to implement calculated
+     attributes.
+
+TRACK_CHANGES
+     flag to indicate that the class should keep track of the keys of
+     modified (top-level) hash elements
+
+COMMIT_SUB
+     a reference to a subroutine to commit changes (called with a reference
+     to the data hash and a reference to the metadata hash)
+
+FORBID_INSERTS
+     forbid inserts into hash and sub-hashes/arrays
+
+FORBID_DELETES
+     forbid deletes from hash
+
+FORBID_CHANGES
+     forbid any changes
+
+   Trying to change an object in a way that is forbidden by the metadata
+will cause the module to croak.
+
+   Changes are only tracked at the top level.
+
+   The API is as follows:
+
+tie %hash, 'Tie::SentientHash', $meta_data, $initial_data
+     Functional interface to create a new sentient hash.  $meta_data
+     describes the properties of the sentient hash (as outlined above) and
+     $initial_data is the initial content of the sentient hash.
+
+Tie::SentientHash->new($meta_data, $initial_data)
+     Object oriented constructor for a sentient hash.
+
+$hashref->modified([$key [, $bool]])
+     If called with no arguments in a scalar returns an indication of
+     whether the sentient hash has been modified.  If called with no
+     arguments in an array context returns the list of elements that have
+     been modified.  Otherwise queries or sets the modification status of a
+     specific top level element.
+
+$untiedhash = $hashref->export
+     Creates an "untied" copy of the sentient hash.
+
+   If a commit function is specified when the sentient hash is created it
+will be called when the destructor is called (normall when it is
+garbage-collected).
+
+EXAMPLE
+=======
+
+   I use Tie::SentientHash as the basis for implementing persistent
+objects in my CGI/mod_perl scripts.  The details of reading and writing
+the objects from and to the database is handled by a class, but neither
+the class nor the high level code needs to keep track of whether the
+object has been changed in any way.
+
+   For example if you had a pay per view system of some kind you could
+have a script that contained the following fragment:
+
+     sub pay_per_view ($$) {
+       my($cust_id, $cost) = @_;
+
+     my $cust = load Customer $cust_id;
+     $cust->{CREDIT} -= $cost;
+        }
+
+   The customer object would be implemented in a module sketched out
+below.  A commit function is specified on the call to create a new
+sentient object, and that function will be called when $cust goes out of
+scope at the end of the pay_per_view function and can write the modified
+object back to the database.  If none of the attributes had been modified
+then the commit function would not be invoked.
+
+     package Customer;
+
+     sub load ($$) {
+       my ($class, $cust_id) = @_;
+       my $data = {};
+
+     # read customer data from a database into $data
+
+     my $meta = { COMMIT_SUB     => \&_commit,
+                  READONLY       => [ qw( CUST_ID ) ],
+                  FORBID_INSERTS => 1 };
+
+     return bless Tie::SentientHash->new($meta, $data), $class;
+        }
+
+     sub _commit ($$) {
+       my ($meta, $data) = @_;
+
+     # As we have been called, something has changed.  The names of
+     # the modified fields are the keys of $meta->{MODIFIED}.  We had
+     # better write the data back out to the database.
+     
+        }
+
+RESTRICTIONS
+============
+
+   Full array semantics are only supported for Perl version 5.005.
+
+   Starting with version 0.54 blessed objects may be stored in the
+*sentient hash*, however this functionality is experimental, has not been
+exhaustively tested, may not work, and may be subject to change.  Use at
+your own peril!
+
+   Tie::SentientHash ties nested elements to internal subclasses so it can
+track changes.  If you keep references to such elements and modify them
+directly then Tie::SentientHash may not be aware of the changes.
+
+   Objects of classes that use the tie mechanism may not work when stored
+in a sentient hash.
+
+   If you use an object as the data for a new sentient hash, then the hash
+will not be re-blessed, i.e. if $object is an object then after
+
+     $href = Tie::SentientHash->new($meta, $object);
+
+   $href will be blessed in the same class as $object.  This means you
+cannot use the modified or export methods on $href.  However you can use
+them on the tied array, e.g.:
+
+     @keys    = (tied %$href)->modified;
+     $newhash = (tied %$href)->export;
+
+   As Tie::Sentient recursively ties nested elements to internal
+subclasses it may not be very efficent on large, deeply nested data
+structures.  (If I find the time I may provide a C implementation that
+would be faster in this regard).
+
+AUTHOR
+======
+
+   Andrew Ford <A.Ford@ford-mason.co.uk>
+
+   Please let me know if you use this module.
+
+SEE ALSO
+========
+
+   perl(1).
+
+COPYRIGHT
+=========
+
+   Copyright 1999-2001 Andrew Ford and Ford & Mason Ltd. All rights
+reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Tie/ShadowHash,  Next: Tie/SortHash,  Prev: Tie/SentientHash,  Up: Module List
+
+Merge multiple data sources into a hash
+***************************************
+
+NAME
+====
+
+   Tie::ShadowHash - Merge multiple data sources into a hash
+
+SYNOPSIS
+========
+
+     use Tie::ShadowHash;
+     use DB_File;
+     tie (%db, 'DB_File', 'file.db');
+     $obj = tie (%hash, 'Tie::ShadowHash', \%db, "otherdata.txt");
+
+     # Accesses search %db first, then the hashed "otherdata.txt".
+     print "$hash{key}\n";
+
+     # Changes override data sources, but don't change them.
+     $hash{key} = 'foo';
+     delete $hash{bar};
+
+     # Add more data sources on the fly.
+     %extra = (fee => 'fi', foe => 'fum');
+     $obj->add (\%extra);
+
+     # Add a text file as a data source, taking the first "word" up
+     # to whitespace on each line as the key and the rest of the line
+     # as the value.
+     $split = sub { split (' ', $_[0], 2) };
+     $obj->add ([text => "pairs.txt", $split]);
+
+     # Add a text file as a data source, splitting each line on
+     # whitespace and taking the first "word" to be the key and an
+     # anonymous array consisting of the remaining words to be the
+     # data.
+     $split = sub { split (' ', $_[0]) };
+     $obj->add ([text => "triples.txt", $split]);
+
+DESCRIPTION
+===========
+
+   This module merges together multiple sets of data in the form of hashes
+into a data structure that looks to Perl like a single simple hash.  When
+that hash is accessed, the data structures managed by that shadow hash are
+searched in order they were added for that key.  This allows the rest of a
+program simple and convenient access to a disparate set of data sources.
+
+   Tie::ShadowHash can handle anything that looks like a hash; just give
+it a reference as one of the additional arguments to tie().  This includes
+other tied hashes, so you can include DB and DBM files as data sources for
+a shadow hash.  If given a plain file name instead of a reference, it will
+build a hash to use internally, with each chomped line of the file being
+the key and the number of times that line is seen in the file being the
+value.
+
+   Tie::Shadowhash also supports special tagged data sources that can take
+options specifying their behavior.  The only tagged data source currently
+supported is "text", which takes a filename of a text file and a reference
+to a sub.  The sub is called for every line of the file, with that line as
+an argument, and is expected to return a list.  The first element of the
+list will be the key, and the second and subsequent elements will be the
+value or values.  If there is more than one value, the value stored in the
+hash and associated with that key is an anonymous array containing all of
+them.
+
+   Tagged data sources are distinguished from normal data sources by
+passing them to tie() (or to add() - see below) as an anonymous array.
+The first element is the data source tag and the remaining elements are
+arguments for that data source.  For a text data source, see the usage
+summary above for examples.
+
+   The shadow hash can be modified, and the modifications override the data
+sources, but modifications aren't propagated back to the data sources.  In
+other words, the shadow hash treats all data sources as read-only and saves
+your modifications only in internal memory.  This lets you make changes to
+the shadow hash for the rest of your program without affecting the
+underlying data in any way (and this behavior is the main reason why this
+is called a shadow hash).
+
+   If the shadow hash is cleared, by assigning the empty list to it, by
+explicitly calling CLEAR(), or by some other method, all data sources are
+dropped from the shadow hash.  There is no other way of removing a data
+source from a shadow hash after it's been added (you can, of course, always
+untie the shadow hash and dispose of the underlying object if you saved it
+to destroy the shadow hash completely).
+
+   You can call the add() method of the underlying object to add data
+sources to the shadow hash.  It takes the same arguments as the initial
+tie() does and interprets them in the same way.
+
+DIAGNOSTICS
+===========
+
+Can't open file %s: %s
+     Tie::ShadowHash was given a file name to use as a source, but when it
+     tried to open that file, the open failed with that system error
+     message.
+
+Invalid source type %s
+     Tie::Shadowhash was given a tagged data source of an unknown type.
+     The only currently supported tagged data source is "text".
+
+CAVEATS
+=======
+
+   It's worth paying *very* careful attention to `"The untie Gotcha"',
+*Note Perltie: (perl.info)perltie, when using this module.  It's also
+important to be careful about what you do with tied hashes that are
+included in a shadow hash.  Tie::ShadowHash stores a reference to such
+arrays; if you untie them out from under a shadow hash, you may not get
+the results you expect.  Remember that if you put something in a shadow
+hash, you'll need to clean out the shadow hash as well as everything else
+that references a variable if you want to free it completely.
+
+   Not all tied hashes implement EXISTS; in particular, ODBM, NDBM, some
+old versions of GDBM, and versions of SDBM in Perl 5.005_56 or earlier
+don't.  Calling exists on a shadow hash that includes one of those tied
+hashes as a data source may therefore result in a runtime error.
+Tie::ShadowHash doesn't use exists except to implement the EXISTS method
+because of this.
+
+   Because it can't use EXISTS due to the above problem, Tie::ShadowHash
+cannot correctly distinguish between a non-existent key and an existing key
+associated with an undefined value.  This isn't a large problem, since many
+tied hashes can't store undefined values anyway, but it means that if one
+of your data sources contains a given key associated with an undefined
+value and one of your later data sources contains the same key but with a
+defined value, when the shadow hash is accessed using that key, it will
+return the first defined value it finds.  This is an exception to the
+normal rule that all data sources are searched in order and the value
+returned by an access is the first value found.  (Tie::ShadowHash does
+correctly handle undefined values stored directly in the shadow hash.)
+
+AUTHOR
+======
+
+   Russ Allbery <rra@stanford.edu>.
+
+
+File: pm.info,  Node: Tie/SortHash,  Next: Tie/SubstrHash,  Prev: Tie/ShadowHash,  Up: Module List
+
+Perl module to keep hashes in a sorted order
+********************************************
+
+NAME
+====
+
+   Tie::SortHash - Perl module to keep hashes in a sorted order
+
+SYNOPSIS
+========
+
+     use Tie::SortHash;
+
+     my %people = (
+                   'John Doe'  => 33,
+                   'Jane Doe'  => 29,
+                   'Jim Smith' => 15,
+                  );
+
+     my $sortblock = q(
+                       my $c = (split /\s+/, $a)[1];
+                       my $d = (split /\s+/, $b)[1];
+
+     $c cmp $d
+        ||
+                         $hash{$a} <=> $hash{$b}
+                        );
+
+     tie %people, 'Tie::SortHash', \%people, $sortblock;
+
+     foreach my $name ( keys %people ) {
+       print $name . " is " . $people{$name} . " years old.\n";
+     }
+
+     # This output will always be
+     Jane Doe is 29 years old.
+     John Doe is 33 years old.
+     Jim Smith is 15 years old.
+
+DESCRIPTION
+===========
+
+   This module is a designed to be a light weight hash sorting mechanism.
+It is often frustrating to have a hash return elements in a random order,
+such as when using the `keys()', `values()' and `each()' functions, or
+simply when iterating over them.
+
+METHODS
+=======
+
+Tie
+---
+
+   In order to tie() your hash to `Tie::SortHash', you can use any of
+these methods:
+
+     tie HASH, 'Tie::SortHash', HASHREF, SORTBLOCK;
+
+     tie HASH, 'Tie::SortHash', HASHREF;
+
+     tie HASH, 'Tie::SortHash';
+
+   It is important to remember that if you have elements in your HASH
+already, you must supply a reference to that hash in `HASHREF'.
+
+   For example:
+
+     tie %people, 'Tie::SortHash', \%people;
+
+   If you don't, ` %people' will be set to an empty hash.  You probably
+don't want that.
+
+Standard Tied Hash Methods
+--------------------------
+
+   `Tie::SortHash' implements all the methods that a tied hash class
+should.  These are: TIEHASH, CLEAR, DELETE, DESTROY, EXISTS, FETCH,
+FIRSTKEY, NEXTKEY and STORE.  With the exception of a few, these all work
+as they would on a normal hash.  Those exceptions include:
+
+FIRSTKEY
+     This will produce the first key according to the `"sortblock"' in
+     this node.
+
+NEXTKEY
+     This will produce each key according to the `"sortblock"' in this
+     node, excluding the first which is hanled by FIRSTKEY.
+
+     It is a *really* bad idea to change the `"sortblock"' in this node in
+     the middle of an iteration, unless you actually want to.  ( I'd be
+     interested in why, though. )
+
+sortblock
+---------
+
+   After you have tied your hash, you can change the sort block at any
+time.  Some examples include:
+
+     (tied %people)->sortblock( q( $hash{$b} <=> $hash{$a} ) );
+
+   or:
+
+     my $tied_ref = tie my %people, 'Tie::SortHash', \%people;
+
+     $tied_ref->sortblock( q(
+                             $hash{$a} <=> $hash{$b}
+                                       ||
+                                    $b cmp $a
+                         )  );
+
+   It is important to remember a few things about the sort block.
+
+Always pass the sort block in a non-interpolated scalar
+     This allows you to have greater control over the sorting that you
+     would like to do.  With out it, you couldn't sort by value because
+     your program would complain that ` %hash' hasn't been declared.  And
+     `$a' and <$b> would need to be represented more like
+     `$Tie::SortHash::a'.
+
+` %hash' is generic within your sort block.
+     This is because the internal representation of the tie hash is most
+     likley not representative of the hash you're tieing.  And it allows
+     the ability to manipulate and sort accoring to value.
+
+     In other words, within your `"sortblock"' in this node, ` %hash' is
+     the `Tie::SortHash's' representation of your hash.
+
+What happens when you have a syntax error in your `"sortblock"' in this node?
+     The program dies, just like it would with any other syntax error.  You
+     will recieve a nice message ( `$@' ) when this occurs.  It will die
+     when you try to assign to the `"sortblock"' in this node.
+
+AUTHOR
+======
+
+   Casey Tweten, crt@kiski.net
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000 Casey Tweten. All rights reserved.  This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+VERSION
+=======
+
+   Version 1.00 Aug 19, 2000
+
+SEE ALSO
+========
+
+   *Note Perl: (perl.info)perl,(1), *Note Perltie: (perl.info)perltie,,
+*Note Perlfaq4: (perl.info)perlfaq4,.
+
+
+File: pm.info,  Node: Tie/SubstrHash,  Next: Tie/Syslog,  Prev: Tie/SortHash,  Up: Module List
+
+Fixed-table-size, fixed-key-length hashing
+******************************************
+
+NAME
+====
+
+   Tie::SubstrHash - Fixed-table-size, fixed-key-length hashing
+
+SYNOPSIS
+========
+
+     require Tie::SubstrHash;
+
+     tie %myhash, 'Tie::SubstrHash', $key_len, $value_len, $table_size;
+
+DESCRIPTION
+===========
+
+   The Tie::SubstrHash package provides a hash-table-like interface to an
+array of determinate size, with constant key size and record size.
+
+   Upon tying a new hash to this package, the developer must specify the
+size of the keys that will be used, the size of the value fields that the
+keys will index, and the size of the overall table (in terms of key-value
+pairs, not size in hard memory). *These values will not change for the
+duration of the tied hash*. The newly-allocated hash table may now have
+data stored and retrieved. Efforts to store more than `$table_size'
+elements will result in a fatal error, as will efforts to store a value
+not exactly `$value_len' characters in length, or reference through a key
+not exactly `$key_len' characters in length. While these constraints may
+seem excessive, the result is a hash table using much less internal memory
+than an equivalent freely-allocated hash table.
+
+CAVEATS
+=======
+
+   Because the current implementation uses the table and key sizes for the
+hashing algorithm, there is no means by which to dynamically change the
+value of any of the initialization parameters.
+
+
+File: pm.info,  Node: Tie/Syslog,  Next: Tie/TextDir,  Prev: Tie/SubstrHash,  Up: Module List
+
+Perl extension for tie'ing a filehandle to Syslog
+*************************************************
+
+NAME
+====
+
+   Tie::Syslog - Perl extension for tie'ing a filehandle to Syslog
+
+SYNOPSIS
+========
+
+     use Tie::Syslog;
+
+     ###
+     ##  Pass up to four args:
+     ##    facility.priority   ('local0.error')
+     ##    identity            ('my_program')
+     ##    log options         ('pid')
+     ##    setlogsock          ('inet'|'unix')
+     ###
+     tie *MYLOG, 'Tie::Syslog','local0.error','my_program','pid','inet';
+
+     print MYLOG "I made an error."; ## this will be syslogged
+     printf MYLOG "Error %d", 42;    ## syslog as "Error 42"
+
+     untie *MYLOG;
+
+DESCRIPTION
+===========
+
+   This module allows you to tie a filehandle (output only) to syslog. This
+becomes useful in general when you want to capture any activity that
+happens on STDERR and see that it is syslogged for later perusal. You can
+also create an arbitrary filehandle, say LOG, and send stuff to syslog by
+printing to this filehandle. This module depends on the Sys::Syslog module
+to actually get info to syslog.
+
+   Tie your filehandle to syslog using a glob to the filehandle. When it is
+tied to the 'Tie::Syslog' class, you may optionally pass four arguments
+that determine the behavior of the output bound to syslog.
+
+   You first specify a facility and priority to direct your filehandle
+traffic to the proper channels in syslog. I suggest reviewing a manpage
+for syslog on your local system to identify what the facilities and
+priorities actually are. Nonetheless, this first argument is specified as
+a string consisting of the facility followed by a dot, followed by the
+priority. For example, the default setting is 'local0.error'. If you do
+not specify a first arg, this default is used.
+
+   The second argument is an identifier string. This is the string that
+shows up in evey line of output that syslog writes. You may use this
+identifier to help sort out syslog lines produced by different
+applications (with different id's.) If you do not specify a value for this
+argument, it will default to the name of the running program. (This is
+derived from the special $0 variable, stripping off everything up to the
+final appearing forward slash character.)
+
+   The third argument is a string of comma separated log options specific
+to syslog. Current documentation supports 'pid,cons,ndelay,nowait'. Check
+your local listings, as you may pass values that are only part of your
+local system. I suggest checking your man pages for syslog, and perhaps
+looking inside your site_perl/$archname/sys/syslog.ph for other such
+values.  If you do not pass this third argument, it defaults to the string
+'pid', which makes syslog put a [12345] pid value on each line of output.
+
+   The fourth argument is either the string 'inet' or 'unix'. This is
+passed to the Sys::Syslog::setlogsock() call to specify the socket type to
+be used when opening the connection to syslog. If this argument is not
+specified, then the default used is 'inet'. Many perl installations still
+have original Sys::Syslog which does not have the setlogsock() routine.
+There is also no $VERSION constant to test in Sys::Syslog, so we'll test
+the symbol table to see if the routine exists. If the routine does not
+exist, then the fourth argument is silently ignored. I did not want to
+require people to have "the latest" version of perl just to use this
+module.
+
+   An aside on using 'STDERR':
+
+   The blessed object that is returned from tie also has one additional
+member function. In the case that you tie the filehandle 'STDERR' (or a
+dup'ed copy of STDERR) then you may want to capture information going to
+the warn() and die() functions. You may call ExtendedSTDERR() to setup the
+proper handler function to deal with the special signals for __DIE__ and
+__WARN__. Because this module really has no knowledge of what filehandle
+is being tied, I contemplated trying to make this automatic for when the
+STDERR filehandle is used. But, alas, one may have a different name for
+what is really STDERR, plus the TIEHANDLE function has no way of knowing
+what the filehandle symbol is anyway.  I also decided to put the logic of
+how to handle the two signal cases into this module, when perhaps they
+might be more suited to be at the level of whoever is calling this module.
+Well, you don't have to call the routine ExtendedSTDERR() if you don't
+like what it does. I felt obligated to provide a proper solution to the
+signal handling since a common use of this module would be to capture
+STDERR for syslogging.
+
+     my $x = tie *STDERR, 'Tie::Syslog', 'local0.debug';
+     $x->ExtendedSTDERR();            ## set __DIE__,__WARN__ handler
+
+     print STDERR "I made an error."; ## this will be syslogged
+     printf STDERR "Error %d", 42;    ## syslog as "Error 42"
+     warn "Another error was made.";  ## this will also be syslogged
+     eval {
+         die "exception thrown";      ## this is *NOT* syslogged
+     };
+     die "Killing me softly?!";       ## syslogged, then script ends
+
+     undef $x;                        ## be sure to do this, else warns!
+     untie *STDERR;
+
+   When used with STDERR, combined with the good habit of using the perl -w
+switch, this module happens to be useful in catching unexpected errors in
+any of your code, or team's code. Tie::Syslog is pretty brain-dead.
+However, it can become quite flexible if you investigate your options with
+the actual syslog daemon. Syslog has a variety of options available,
+including notifying console, logging to other machines running syslog, or
+email support in the event of Bad Things. Consult your syslog documentation
+to get /etc/syslog.conf setup by your sysadmin and use Tie::Syslog to get
+information into those channels.
+
+BUGS
+====
+
+   If you do not specify an identity (2nd arg) to tie() it defaults to the
+name of the executable via special var $0. It is split by the character
+'/', so non-unix systems will end up with a "full name" for its identity,
+if left unspecified.
+
+AUTHOR
+======
+
+   Copyright (C) 1999 Broc Seib. All rights reserved. This program is free
+software; you can redistribute it and/or modify it under the same terms as
+Perl itself.
+
+REVISION
+========
+
+   $Id: Syslog.pm,v 1.5 1999/09/02 05:36:38 bseib Exp $
+
+SEE ALSO
+========
+
+   Read perldoc perltie for info on how to tie a filehandle.  Read perldoc
+Sys::Syslog.  Read man syslog to learn more about syslog.
+
+
+File: pm.info,  Node: Tie/TextDir,  Next: Tie/TieDict,  Prev: Tie/Syslog,  Up: Module List
+
+interface to directory of files
+*******************************
+
+NAME
+====
+
+   Tie::TextDir - interface to directory of files
+
+SYNOPSIS
+========
+
+     use Tie::TextDir;
+     tie (%hash, 'Tie::TextDir', '/some_directory', 'rw');  # Open in read/write mode
+     $hash{'one'} = "some text";         # Creates file /some_directory/one
+                                         # with contents "some text"
+     untie %hash;
+     
+     tie (%hash, 'Tie::TextDir', '/etc');    # Defaults to read-only mode
+     print $hash{'passwd'};  # Prints contents of /etc/passwd
+
+DESCRIPTION
+===========
+
+   This is the Tie::TextDir module.  It is a TIEHASH interface which lets
+you tie a Perl hash to a directory of textfiles.
+
+   To use it, tie a hash to a directory:
+
+     tie (%hash, "/some_directory", 'rw');  # Open in read/write mode
+
+   If you pass 'rw' as the third parameter, you'll be in read/write mode,
+and any changes you make to the hash will create or modify files in the
+given directory.  If you don't open in read/write mode you'll be in
+read-only mode, and any changes you make to the hash won't have any effect
+in the given directory.
+
+LIMITATIONS
+===========
+
+   You may not use the empty string, '.', or '..' as a key in a hash,
+because they would all cause integrity problems in the directory.
+
+   This has only been tested on the UNIX platform, and some of the shadier
+techniques probably won't work right on MacOS or DOS.
+
+CAUTIONS
+========
+
+   Strange characters can cause problems when used as the keys in a hash.
+For instance, if you accidentally store '../../f' as a key, you'll
+probably mess something up.  If you knew what you were doing, you're
+probably okay.  I'd like to add an optional (by default on) "safe" mode
+that URL-encodes keys (I've lost the name of the person who suggested
+this, but thanks!).
+
+AUTHOR
+======
+
+   Ken Williams (ken@forum.swarthmore.edu)
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1998 Ken Williams/Swarthmore College.  All rights
+reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: Tie/TieDict,  Next: Tie/Toggle,  Prev: Tie/TextDir,  Up: Module List
+
+A Perl tie to a dictionary file
+*******************************
+
+NAME
+====
+
+   `Tie::TieDict' - A Perl tie to a dictionary file
+
+SYNOPSIS
+========
+
+     tie %MyDict, 'Tie::TieDict', *FILEHANDLE, $Dict, $fold
+
+     tie %MyDict, 'Tie::TieDict', $FileName, $Dict, $fold
+
+   *dict* is optional; defaults to true.  If *dict* is true, search the
+file in dictionary order  - ignore anything but whitespace and word
+characters.
+
+   fold is optional; defaults to true.  If fold is true, ignore case.
+
+DESCRIPTION
+===========
+
+Methods
+-------
+
+   `Data_scan' - this scans the passed string and returns the working
+structure for whatever the string is.  Defaults to just returning the
+string; override this method if you want something better.
+
+   `Data_fmt' - this formats the passed structure into a string.  This
+structure was (most likely) generated by `Data_scan' and should able to be
+read by it later.
+
+Format of file
+--------------
+
+     KEY - DATA
+
+   The KEY begins with any non space character, may otherwise contain any
+character, but must end with a character other than a dash or a space.
+The DATA part is scanned by the `Data_scan' method.
+
+AUTHOR
+======
+
+   Randall Maas (`randym@acm.org' in this node, `http:' in this node)
+
+
+File: pm.info,  Node: Tie/Toggle,  Next: Tie/TransactHash,  Prev: Tie/TieDict,  Up: Module List
+
+False and true, alternately, ad infinitum.
+******************************************
+
+NAME
+====
+
+   Tie::Toggle - False and true, alternately, ad infinitum.
+
+SYNOPSIS
+========
+
+     use Tie::Toggle;
+
+     tie my $toggle, 'Tie::Toggle';
+
+     foreach my $number ( 0 .. 10 )
+     	{
+     	next unless $toggle;
+     
+     	print $number, "\n";
+     	}
+     
+     =head1 DESCRIPTION
+
+   You use `Tie::Toggle' to go back and forth between false and true over
+and over again. You don't have to worry about any of this since the magic
+of tie does that for you by using `Tie::Cycle'.
+
+   You can also use `Tie::FlipFlop' by Abigail to do the same thing, but
+with any two values.
+
+AUTHOR
+======
+
+   brian d foy <brian+cpan@smithrenaud.com>.
+
+COPYRIGHT and LICENSE
+=====================
+
+   Copyright 2000 by brian d foy.
+
+   This software is available under the same terms as perl.
+
+
+File: pm.info,  Node: Tie/TransactHash,  Next: Tie/TwoLevelHash,  Prev: Tie/Toggle,  Up: Module List
+
+Edit hash in transactions not changing order during trans.
+**********************************************************
+
+NAME
+====
+
+   Tie::TransactHash - Edit hash in transactions not changing order during
+trans.
+
+SYNOPSIS
+========
+
+     use Tie::TransactHash;
+     $::edit_db = tie %::edit_me, TransactHash, \%::db_as_hash, $::db;
+     while (($key, $value)=each %edit_me)) {
+       $::edit_me{$key} ++ if $key =~ m/counters/ ;
+     }
+
+DESCRIPTION
+===========
+
+   Tie::TransactHash is a package which provides facilities for editing
+any other hash in transactions.  A transaction is a group of changes which
+go together and are either all applied or none.  When working on a
+standard perl hash or a hash indexed DBM file, one advantage is that the
+original hash remains untouched during the transaction, so its order (the
+order the each(), keys() or values functions give out) is maintained -
+changes can be made to the transact hash whilst iterating over it.
+
+OVERVIEW
+========
+
+   Editing a hash causes problems because it rearranges the hash.  If the
+editing is to be done in sequence then this makes life difficult.  The
+TransactHash class uses a fixed sequence hash class which overlays the
+normal hash and allows editing in place.  It stores all of the changes to
+the original hash in memory until it is told to apply them.
+
+   As a side effect of this design, the class also provides a
+commit/rollback system.  When a commit is called, the order of the hidden
+hash will be changed.
+
+   A commit will normally be done as the TransactHash object is being
+destroyed.  This could be undesirable if your program exits when it
+discovers a failure.  You can change the.
+
+   If you can accept the re-ordering, then you can do partial edits and
+commit half way through.
+
+   When working on a DBM file, if a crash occurs during the editing and no
+commit has been called then the original hash will be left intact.  If
+however the crash occurs during the commit, bad things could happen.
+
+     use DB_File;
+     use Tie::TransactHash;
+     use Fcntl;
+
+     $::db = tie %::db_as_hash, DB_File, $::dbname, O_RDWR|O_CREAT, 0640, $db_type
+       or die $!;
+
+     $::edit_db = tie %::edit_me, TransactHash, \%::db_as_hash, $::db;
+     #the $::db doesn't really do any good right now, but in future it might
+
+     my $count = 0;
+     my ($key,$value)
+     while(($key,$_)=each %edit_me) {
+       s/bouncy/bouncy, very very bouncy./;
+       m/Fred/ && do {
+     	 $count++;
+     	 $edit_me{ Fred . $count } = $key;
+       }
+     }
+     print "Found Fred in the values $count times\n";
+
+   Generally, this package should be used if you want to occasionally do
+small numbers of changes across the values of a large hash.  If you are
+using it overly (often or for large numbers of changes on the database),
+then you should probably switch to btree indexed hashes (Berkley DBM)
+which give you the same ordering effect but don't use a large chunk of
+memory.  Alternately you could consider some kind of multi-pass algorithm
+(scan through the database putting planned changes to a file then apply
+them afterwards all in one go).
+
+METHODS
+=======
+
+new( \%hidehash [,$hideobj] )
+-----------------------------
+
+   This creates a new TransactHash, hiding the hash \%hidehash.
+
+TIEHASH (and other hash methods)
+--------------------------------
+
+   This is simply a call to new.  See above.  The other hash methods are
+just as for a standard hash (see perltie) and act just like one.
+
+Iterator functions (FIRSTKEY & NEXTKEY)
+---------------------------------------
+
+   The iterators first iterate over the hidden hash as normal (giving out
+changed values) then iterate over the storehash skipping values in the
+original hash.
+
+commit() and reset()
+--------------------
+
+   These functions are not normally visible in the hash interface, but can
+be used as object methods.  commit() updates the original hidden hash
+(which changes its order) and reset() loses all of the changes that we
+have made.
+
+   In the hash interface commit is called as the variable is destroyed.
+This should happen at exit time, but didn't seem to to me.  Assigning
+undef to the variable you stored the object in and untie()ing the hash
+will force it to happen.
+
+$transhash->autostore()
+-----------------------
+
+   This method stores a true or false value in the object telling it
+whether it should automatically commit if it is destroyed.  If this is set
+to false, then the object method $transhash->commit() must be called to
+store any changes, otherwise they will be lost.
+
+   If this is set to true, then be aware that exiting your program from
+some kind of error condition of your program (that is, not one perl knows
+about) would commit the changes.
+
+$transhash->verify_write()
+--------------------------
+
+   This function checks that a write has committed to the hash correctly.
+It does this by checking that all of the values in the old temporary
+stores match those in the new ones.
+
+   This function is untested since I don't have a sensible test case for
+it yet and don't need it myself.  should work though.
+
+COPYING
+-------
+
+     Copyright (c) 1997 Michael De La Rue
+
+   This is free software and may be distributed under the same terms as
+perl.  There is no warantee.  See the file COPYING which should have been
+included with the distribution for one set of terms under which it may be
+distributed.  The artistic license, distributed with perl gives the other
+one.
+
+
+File: pm.info,  Node: Tie/TwoLevelHash,  Next: Tie/VecArray,  Prev: Tie/TransactHash,  Up: Module List
+
+Tied interface to multi-dimensional (Two-Level) hash files
+**********************************************************
+
+NAME
+====
+
+   Tie::TwoLevelHash - Tied interface to multi-dimensional (Two-Level)
+hash files
+
+SYNOPSIS
+========
+
+     # Tie to Hash-o-hashes
+     use Tie::TwoLevelHash;
+     tie (%hash, 'Tie::TwoLevelHash', $file, 'rw');  # Open in read/write mode
+
+     $hash{PEOPLE} = {YOU => "me"}; # Set value YOU in hash PEOPLE withing hash %hash to "me"
+     
+     # Tie to hash within a Hash-o-hashes
+     use Tie::TwoLevelHash:
+     tie (%hash, 'Tie::TwoLevelHash', "$file, <SingHash>" 'rw');  # Open in read/write mode
+
+     $hash{YOU} = "me"; # Set key YOU in hash <SingHash> (within HoH's) to "me"
+
+     untie %hash;
+     
+     tie (%hash, 'Tie::TwoLevelHash', $file);    # Defaults to read-only mode
+
+     ...
+
+     untie %hash;
+
+DESCRIPTION
+===========
+
+   This is the Tie::TwoLevelHash module.  It is a TIEHASH interface which
+lets you tie to a text file which is a multi-dimensional (two level) hash.
+
+   To use it, tie a hash to a directory:
+
+     tie(%hash, 'Tie::TwoLevelHash', $file, 'rw');  # Open in read/write mode
+
+   If you pass 'rw' as the third parameter, you'll be in read/write mode,
+and any changes you make to the hash will create or modify the file.  If
+you don't open in read/write mode you'll be in read-only mode, and any
+changes you make to the hash won't have any effect in the given file. It's
+actually useless to tie to the file in read mode and make write calls to
+it, or the hash you are tying to it. If you do, it may croak, depending on
+what you are trying. If you want to grab values and play with them, do
+that in your script, and get the values out of the hash name you are tying
+with, so you can write to a local hash, and not affect, or try to affect
+the hash you are tying with.
+
+Two Level Hash Files
+====================
+
+   A two level hash file (I use a .tlh extension) is a file after the same
+format as the defunct(?) Windows .ini files. A simple example of a small
+TLH file is as follows:
+
+     # This is a TLH file
+     # Comments on top of this file are allowed
+
+     COLORS
+     	Red: #ff0000
+     	Black: #000000
+     	White: #ffffff
+
+     PEOPLE
+     	Dog: Zeke
+     	Cat: Tigger
+     	PerlHacker: Randal
+     	Author: Kevin Meltzer
+
+     EXTRA
+     	Key: Val
+     	Test: Vest
+
+   This file is a textual representation of a two-level hash, also known
+as a Hash of hashes. The file itself is the main hash, and each section
+contains another hash. So, this file contains the hash COLORS the hash
+PEOPLE and the hash EXTRA.  *Tie::TwoLevelHash* allows for you to tie to
+the entire hash of hashes, or directly to one of the hashes within that
+hash of hashes. When you make a change in your script to the tied hash, it
+makes that change in your file.
+
+EXAMPLES
+========
+
+Tying to hash of hashes
+-----------------------
+
+     $file = "foo.tlh";
+     tie(%hash, 'Tie::TwoLevelHash', $file, 'rw');
+
+     # Set %foo to equal %hash
+     %foo = %hash;
+
+     # Grab value of BAR in hash FOO into $bar
+     $bar = $hash{FOO}->{BAR};
+
+     # Set existing value
+     $hash{PEOPLE} = {You => "me"};
+
+     # Set new value
+     $hash{COLORS} = {YELLOW => "flowery"};
+
+     # Set new record
+     $hash{HATS} = {BLACK => "Cowboy", RED => "Baseball", WHITE => "Beanie"};
+
+     # Add new record with predefined hash
+     %new = (ONE => "1",
+     	TWO => "2",
+     	THREE => "3",
+     	FOUR => "4",
+     	);
+
+     $hash{NUM} = {%new}; # Works, or can use \%new instead of {%new}
+
+     # Clear, set then delete entry
+     $hash{PEOPLE} = {FOO => ""};
+     $hash{PEOPLE} = {FOO => "Bar"};
+     $hash{PEOPLE} = {FOO => undef};
+
+     # Added new element to existing record
+     $hash{PEOPLE} = {'FOO' => "FOObar"};
+
+     $hash{EXTRA} = undef;
+
+     untie %hash;
+
+     The resulting TLH file would be (assuming you began with the TLH example above):
+
+     # This is a TLH file
+     # Comments on top of this file are allowed
+
+     COLORS
+     	Black: #000000
+     	Red: #ff0000
+     	White: #ffffff
+     	Yellow: flowery
+
+     HATS
+     	BLACK: Cowboy
+     	RED: Baseball
+     	WHITE: Pope hat
+
+     NUM
+     	FOUR: 4
+     	ONE: 1
+     	THREE: 3
+     	TWO: 2
+
+     PEOPLE
+     	Author: Kevin Meltzer
+     	Cat: Tigger
+     	Dog: Zeke
+     	FOO: FOObar
+     	PerlHacker: Randal
+
+Tying to a hash within a hash of hashes
+---------------------------------------
+
+     tie(%hash, 'Tie::TwoLevelHash', "$file, PEOPLE", 'rw');
+     
+     # Set %foo to equal %hash
+     %foo = %hash;
+
+     # Grab value of FOO into $bar
+     $bar = $hash{FOO};
+
+     # Set existing value
+     $hash{Cat} = "Gizmo";
+
+     # Set new value
+     $hash{Someone} = "Larry";
+
+     # Clear, set then delete entry
+     $hash{FOO} = "";
+     $hash{FOO} = "bar";
+     $hash{FOO} = undef;
+
+     untie %hash;
+
+   The resulting TLH file would be:
+
+     # This is a TLH file
+     # Comments on top of this file are allowed
+
+     COLORS
+     	Red: #ff0000
+     	Black: #000000
+     	White: #ffffff
+
+     PEOPLE
+     	Author: Kevin Meltzer
+     	Cat: Gizmo
+     	Dog: Zeke
+     	PerlHacker: Randal
+     	Someone: Larry
+
+     EXTRA
+     	Key: Val
+     	Test: Vest
+
+Getting the value of your tied hash to your local script
+--------------------------------------------------------
+
+   When you are tied to the hash, tie doesn't actually export the values
+in that hash (or HoH) by default. So, *Tie::TwoLevelHash* exports a method
+that allows you to muck around with the hash's actual values within your
+script. This can also be useful if, for whatever reason, you don't want to
+write out the hash file whenever you make a change, and wish to do it at a
+later time, while still working with the new values.
+
+With a hash-o-hashes
+....................
+
+     # Tie your hash, but use a scaler to be object-like
+     tie(%hash, "Tie::TwoLevelHash" , $file, 'rw');
+     
+     # Make untied copy of your tied HoH
+     %bar = %hash;
+
+   Now, you can generally use %bar as you would any other hash-o-hashes.
+Above we tied to the entire hash-o-hashes, so %bar will be filled with hash
+references. You could do something like the following to list all the hash
+names, and values:
+
+     foreach $key (keys %bar) {
+     print "$key\n";
+     	$foo = $bar{$key};
+     	%foo = %$foo; # Deref the lower hash
+     	foreach $fookey (keys %foo) {
+     		print "\t$fookey\: $foo{$fookey}\n";
+     	}
+     }
+
+   Now, say you wanted to change one of the values, but not change it in
+your TLH file just yet. You can do this like:
+
+     # This line changes the value in %bar
+     $bar{PEOPLE}->{Comedian} = "Sienfeld";
+     
+     # This line writes the new value to your tied hash (and TLH)
+     $hash{PEOPLE} = $bar{PEOPLE};
+
+With a hash in a hash-o-hashes
+..............................
+
+   This way is slightly different. Right now, trying to make a copy of your
+hash the same way you do above, does not copy the hash correctly. So,
+there is a method, *GetHash* , which will export it correctly.
+
+     # Tie your hash, but use a scaler to be object-like
+     $foo = tie(%hash, "Tie::TwoLevelHash" , "$file, PEOPLE", 'rw');
+
+     # Now, we will call the method that exports the hash
+     # We will import it into the hash %bar
+     %bar = $foo->GetHash;
+
+   Now, you can generally use %bar as you would any other hash. Above we
+tied only to one hash in the hash-o-hashes, so %bar will be one hash.  You
+could do something like the following to list all the hash names, and
+values:
+
+     foreach $key (keys %goo) {
+     	print "$key\: $goo{$key}\n";
+     }
+
+   Now, if you wanted to change values before writting the new TLH file
+out via your tie:
+
+     # This line will set key Comedian to Sienfeld locally
+     $bar{Comedian} = "Sienfeld";
+
+     # Now, we write out the new hash
+     %hash = %bar;
+
+CHANGING VALUES
+===============
+
+   I won't go into how to change value in a hash. When you are tying to a
+hash in the hash of hashes, you make your calls as usual. You make your
+calls as usual when you are tied to the entire HoH's, except when you are
+setting new values (anything that would call STORE).
+
+   Due to tie() not being very friendly while tying to HoH's, you can not
+make a call such as
+
+   $hash{FOO}->{BAR} = "zog";
+
+   when tied to a HoH's. So, you must make this call like:
+
+   $hash{FOO} = {BAR => "zog"};
+
+   You can see how/when to do this in the EXAMPLE section.  When you want
+to delete a key in a hash, use undef like:
+
+   $hash{FOO} = {BAR => undef};
+
+   or, when tying to single hash:
+
+   $hash{BAR} = undef;
+
+   %hash = ();
+
+   This will CLEAR the hash, as well as remove ALL data from the file you
+are tied to.  Be *sure* you want to do this when you call it.
+
+INSTALLATION
+============
+
+   You install Tie::TwoLevelHash, as you would install any perl module
+library, by running these commands:
+
+     perl Makefile.PL
+     make
+     make test
+     make install
+     make clean
+
+AUTHOR
+======
+
+   Copyright 1998, Kevin Meltzer.  All rights reserved.  It may be used
+and modified freely, but I do request that this copyright notice remain
+attached to the file.  You may modify this module as you wish, but if you
+redistribute a modified version, please attach a note listing the
+modifications you have made.
+
+   Address bug reports and comments to: kmeltz@cris.com
+
+   The author makes no warranties, promises, or gaurentees of this
+software. As with all software, use at your own risk.
+
+VERSION
+=======
+
+   Version $Revision: 1.2 $  $Date: 1998/10/30 13:52:04 $
+
+CHANGES
+=======
+
+   $Log: TwoLevelHash.pm,v $ Revision 1.2  1998/10/30 13:52:04  kmeltz
+Fixed FETCH so it will return correctly when doing %foo = %bar; when using
+a tie to a HoH's. Still not working right for hash in the HoH's, so the
+GetHash method stays.
+
+   Revision 1.1  1998/10/27 15:43:47  kmeltz Changed croaks to carps for
+Hash Invalid warning. May need to continue script, so let script die and
+module return undef.  Changed CLEAR to not erase TLH file when clearing
+hash in HoH's, or resetting it.  Added exported method GetHash. This
+allows for user to import hash values into their script, and change values
+before setting them to TLH file.  Changed a bunch in the POD.
+
+AVAILABILITY
+============
+
+   The latest version of Tie::TwoLevelHash should always be available from:
+
+     $CPAN/modules/by-authors/id/K/KM/KMELTZ/
+
+   Visit http://www.perl.com/CPAN/ to find a CPAN site near you.
+
+SEE ALSO
+========
+
+   `perl(1)' in this node, `perlfunc(1)' in this node, `perltie(1)' in
+this node
+
+
+File: pm.info,  Node: Tie/VecArray,  Next: Tie/Watch,  Prev: Tie/TwoLevelHash,  Up: Module List
+
+An array interface to a bit vector.
+***********************************
+
+NAME
+====
+
+     Tie::VecArray - An array interface to a bit vector.
+
+SYNOPSIS
+========
+
+     require Tie::VecArray;
+     
+     $vector = '';
+     vec($vector, 0, 32) = 33488897;
+
+     # Tie the vector to an array as 8 bits.
+     $obj = tie @array, 'Tie::VecArray', 8, $vector;
+
+     @array[0..3] = qw(1 255 256 -1);
+
+     # SURPRISE!  Its 1, 255, 0, 255!
+     print @array[0..3];
+
+     # Look at the same vector as a 32 bit vector.
+     $obj->bits(32);
+
+     # Back to 33488897
+     print $array[0];
+
+DESCRIPTION
+===========
+
+   This module implements an array interface to a bit vector.
+
+Method
+------
+
+tie
+          $vec_obj = tie(@array, 'Tie::VecArray', $bits);
+          $vec_obj = tie(@array, 'Tie::VecArray', $bits, $vec);
+
+     Creates a new @array tied to a bit vector.  $bits is the number of
+     bits which will be passed to vec() to interpret the vector.
+
+     If $vec is given that will be used as the bit vector, otherwise the
+     vector will start out empty.
+
+bits
+          $bits = $vec_obj->bits;
+          $vec_obj->bits($bits);
+
+     Get/set the bit size we'll use to interpret the vector.
+
+     When setting the bit size the length of the array might be ambiguous.
+     (For instance, going from a one bit vector with five entries to a two
+     bit vector... do you have two or three entries?)  The length of the
+     array will always round up.  This can cause odd things to happen.
+     Consider:
+
+          $vec_obj = tie @vec, 'Tie::VecArray', 1;
+
+          # A one bit vector with 5 entries.
+          @vec[0..4] = (1) x 5;
+
+          # prints a size of 5, as expected.
+          print scalar @vec;
+
+          # Switch to two bit interpretation.
+          $vec_obj->bits(2);
+
+          # This returns 3 since it will round up.
+          print scalar @vec;
+
+          # Switch back to one bit.
+          $vec_obj->bits(1);
+
+          # Whoops, 6!
+          print scalar @vec;
+
+AUTHOR
+======
+
+   Michael G Schwern <schwern@pobox.com>
+
+SEE ALSO
+========
+
+   `vec', *Note Perlfunc: (perl.info)perlfunc,, `vec', *Note Tie/Array:
+Tie/Array,
+
+
+File: pm.info,  Node: Tie/Watch,  Next: Tiger,  Prev: Tie/VecArray,  Up: Module List
+
+place watchpoints on Perl variables.
+************************************
+
+NAME
+====
+
+     Tie::Watch - place watchpoints on Perl variables.
+
+SYNOPSIS
+========
+
+     use Tie::Watch;
+
+     $watch = Tie::Watch->new(
+         -variable => \$frog,
+         -debug    => 1,
+         -shadow   => 0,
+         -fetch    => [\&fetch, 'arg1', 'arg2', ..., 'argn'],
+         -store    => \&store,
+         -destroy  => sub {print "Final value=$frog.\n"},
+     }
+     %vinfo = $watch->Info;
+     $args  = $watch->Args(-fetch);
+     $val   = $watch->Fetch;
+     print "val=", $watch->Say($val), ".\n";
+     $watch->Store('Hello');
+     $watch->Unwatch;
+
+DESCRIPTION
+===========
+
+   This class module binds one or more subroutines of your devising to a
+Perl variable.  All variables can have FETCH, STORE and DESTROY callbacks.
+Additionally, arrays can define CLEAR, EXTEND, FETCHSIZE, POP, PUSH,
+SHIFT, SPLICE, STORESIZE and UNSHIFT callbacks, and hashes can define
+CLEAR, DELETE, EXISTS, FIRSTKEY and NEXTKEY callbacks.  If these term are
+unfamiliar to you, I *really* suggest you read *Note Perltie:
+(perl.info)perltie,.
+
+   With Tie::Watch you can:
+
+     . alter a variable's value
+     . prevent a variable's value from being changed
+     . invoke a Perl/Tk callback when a variable changes
+     . trace references to a variable
+
+   Callback format is patterned after the Perl/Tk scheme: supply either a
+code reference, or, supply an array reference and pass the callback code
+reference in the first element of the array, followed by callback
+arguments.  (See examples in the Synopsis, above.)
+
+   Tie::Watch provides default callbacks for any that you fail to specify.
+Other than negatively impacting performance, they perform the standard
+action that you'd expect, so the variable behaves "normally".  Once you
+override a default callback, perhaps to insert debug code like print
+statements, your callback normally finishes by calling the underlying
+(overridden) method.  But you don't have to!
+
+   To map a tied method name to a default callback name simply lowercase
+the tied method name and uppercase its first character.  So FETCH becomes
+Fetch, NEXTKEY becomes Nextkey, etcetera.
+
+   Here are two callbacks for a scalar. The FETCH (read) callback does
+nothing other than illustrate the fact that it returns the value to assign
+the variable.  The STORE (write) callback uppercases the variable and
+returns it.  In all cases the callback must return the correct read or
+write value - typically, it does this by invoking the underlying method.
+
+     my $fetch_scalar = sub {
+         my($self) = @_;
+         $self->Fetch;
+     };
+
+     my $store_scalar = sub {
+         my($self, $new_val) = @_;
+         $self->Store(uc $new_val);
+     };
+
+   Here are FETCH and STORE callbacks for either an array or hash.  They
+do essentially the same thing as the scalar callbacks, but provide a
+little more information.
+
+     my $fetch = sub {
+         my($self, $key) = @_;
+         my $val = $self->Fetch($key);
+         print "In fetch callback, key=$key, val=", $self->Say($val);
+         my $args = $self->Args(-fetch);
+         print ", args=('", join("', '",  @$args), "')" if $args;
+         print ".\n";
+         $val;
+     };
+
+     my $store = sub {
+         my($self, $key, $new_val) = @_;
+         my $val = $self->Fetch($key);
+         $new_val = uc $new_val;
+         $self->Store($key, $new_val);
+         print "In store callback, key=$key, val=", $self->Say($val),
+           ", new_val=", $self->Say($new_val);
+         my $args = $self->Args(-store);
+         print ", args=('", join("', '",  @$args), "')" if $args;
+         print ".\n";
+         $new_val;
+     };
+
+   In all cases, the first parameter is a reference to the Watch object,
+used to invoke the following class methods.
+
+METHODS
+=======
+
+$watch = Tie::Watch->new(-options => values);
+     The watchpoint constructor method that accepts option/value pairs to
+     create and configure the Watch object.  The only required option is
+     *-variable*.
+
+     *-variable* is a reference to a scalar, array or hash variable.
+
+     *-debug* (default 0) is 1 to activate debug print statements internal
+     to Tie::Watch.
+
+     *-shadow* (default 1) is 0 to disable array and hash shadowing.  To
+     prevent infinite recursion Tie::Watch maintains parallel variables for
+     arrays and hashes.  When the watchpoint is created the parallel shadow
+     variable is initialized with the watched variable's contents, and when
+     the watchpoint is deleted the shadow variable is copied to the
+     original variable.  Thus, changes made during the watch process are
+     not lost.  Shadowing is on my default.  If you disable shadowing any
+     changes made to an array or hash are lost when the watchpoint is
+     deleted.
+
+     Specify any of the following relevant callback parameters, in the
+     format described above: *-fetch*, *-store*, *-destroy*.  Additionally
+     for arrays: *-clear*, *-extend*, *-fetchsize*, *-pop*, *-push*,
+     *-shift*, *-splice*, *-storesize* and *-unshift*.  Additionally for
+     hashes: *-clear*, *-delete*, *-exists*, *-firstkey* and *-nextkey*.
+
+$args = $watch->Args(-fetch);
+     Returns a reference to a list of arguments for the specified callback,
+     or undefined if none.
+
+$watch->Fetch();  $watch->Fetch($key);
+     Returns a variable's current value.  $key is required for an array or
+     hash.
+
+%vinfo = $watch->Info();
+     Returns a hash detailing the internals of the Watch object, with these
+     keys:
+
+          %vinfo = {
+              -variable =>  SCALAR(0x200737f8)
+              -debug    =>  '0'
+              -shadow   =>  '1'
+              -value    =>  'HELLO SCALAR'
+              -destroy  =>  ARRAY(0x200f86cc)
+              -fetch    =>  ARRAY(0x200f8558)
+              -store    =>  ARRAY(0x200f85a0)
+              -legible  =>  above data formatted as a list of string, for printing
+          }
+
+     For array and hash Watch objects, the *-value* key is replaced with a
+     *-ptr* key which is a reference to the parallel array or hash.
+     Additionally, for an array or hash, there are key/value pairs for all
+     the variable specific callbacks.
+
+$watch->Say($val);
+     Used mainly for debugging, it returns $val in quotes if required, or
+     the string "undefined" for undefined values.
+
+$watch->Store($new_val);  $watch->Store($key, $new_val);
+     Store a variable's new value.  $key is required for an array or hash.
+
+$watch->Unwatch();
+     Stop watching the variable.
+
+EFFICIENCY CONSIDERATIONS
+=========================
+
+   If you can live using the class methods provided, please do so.  You
+can meddle with the object hash directly and improved watch performance,
+at the risk of your code breaking in the future.
+
+AUTHOR
+======
+
+   Stephen.O.Lidie@Lehigh.EDU
+
+HISTORY
+=======
+
+     lusol@Lehigh.EDU, LUCC, 96/05/30
+     . Original version 0.92 release, based on the Trace module from Hans Mulder,
+       and ideas from Tim Bunce.
+
+     lusol@Lehigh.EDU, LUCC, 96/12/25
+     . Version 0.96, release two inner references detected by Perl 5.004.
+
+     lusol@Lehigh.EDU, LUCC, 97/01/11
+     . Version 0.97, fix Makefile.PL and MANIFEST (thanks Andreas Koenig).
+       Make sure test.pl doesn't fail if Tk isn't installed.
+
+     Stephen.O.Lidie@Lehigh.EDU, Lehigh University Computing Center, 97/10/03
+     . Version 0.98, implement -shadow option for arrays and hashes.
+
+     Stephen.O.Lidie@Lehigh.EDU, Lehigh University Computing Center, 98/02/11
+     . Version 0.99, finally, with Perl 5.004_57, we can completely watch arrays.
+       With tied array support this module is essentially complete, so its been
+       optimized for speed at the expense of clarity - sorry about that. The
+       Delete() method has been renamed Unwatch() because it conflicts with the
+       builtin delete().
+
+     Stephen.O.Lidie@Lehigh.EDU, Lehigh University Computing Center, 99/04/04
+     . Version 1.0, for Perl 5.005_03, update Makefile.PL for ActiveState, and
+       add two examples (one for Perl/Tk).
+
+COPYRIGHT
+=========
+
+   Copyright (C) 1996 - 1999 Stephen O. Lidie. All rights reserved.
+
+   This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+

@@ -1,0 +1,1656 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Devel/SawAmpersand,  Next: Devel/SelfStubber,  Prev: Devel/PreProcessor,  Up: Module List
+
+Perl extension querying sawampersand variable
+*********************************************
+
+NAME
+====
+
+   Devel::SawAmpersand - Perl extension querying sawampersand variable
+
+SYNOPSIS
+========
+
+     use Devel::SawAmpersand qw(sawampersand);
+
+     sawampersand();
+
+DESCRIPTION
+===========
+
+   There's a global variable in the perl source, called sawampersand. It
+gets set to true in that moment in which the parser sees one of $`, $',
+and $&. It never can be set to false again. Trying to set it to false
+breaks the handling of the $`, $&, and $' completely.
+
+   If the global variable `sawampersand' is set to true, all subsequent RE
+operations will be accompanied by massive in-memory copying, because there
+is nobody in the perl source who could predict, *when* the (necessary)
+copy for the ampersand family will be needed. So all subsequent REs are
+considerable slower than necessary.
+
+   There are at least three impacts for developers:
+
+   * never use $& and friends in a library.
+
+   * Never "use English" in a library, because it contains the three bad
+     fellows.
+
+   * before you release a module or program, check if sawampersand is set
+     by any of the modules you use or require.
+
+Workaround
+----------
+
+   Fortunately perl offers easy to use alternatives, that is
+
+     instead of this              you can use this
+
+     $`   of   /pattern/          $1   of  /(.*?)pattern/s
+     $&   of   /pattern/          $1   of  /(pattern)/
+     $'   of   /pattern/          $+   of  /pattern(.*)/s
+
+   In general, apply `/^(.*)(pattern)(.*)$/s' and use $1 for $`, $2 for $&
+and $+ for $' ($+ is not dependent on the number of parens in the original
+pattern). Note that the `/s' switch can alter the meaning of . in your
+pattern.
+
+Future Directions
+-----------------
+
+     From: jmm@elegant.com (John Macdonald)
+     Date: Wed, 24 Dec 1997 10:49:56 -0500
+
+   How about adding an option to matches/substitutes that explicitly sets
+$`, $&, and $'?  When this new option is seen, sawampersand will be set
+for the duration of the match and then turned off.  That causes the
+expense for unflagged matches to go back to normal and only flagged
+matches incur the extra expense and they would be the ones that actually
+need it.  (Or does sawampersand need to affect the compilation of the RE's
+too?)
+
+AUTHOR
+======
+
+   Andreas Koenig, special thanks to Johan Vromans and John Macdonald for
+parts of the manpage and to Doug MacEachern for the FindAmpersand.
+
+SEE ALSO
+========
+
+   Devel::FindAmpersand, B::FindAmpersand
+
+
+File: pm.info,  Node: Devel/SelfStubber,  Next: Devel/SmallProf,  Prev: Devel/SawAmpersand,  Up: Module List
+
+generate stubs for a SelfLoading module
+***************************************
+
+NAME
+====
+
+   Devel::SelfStubber - generate stubs for a SelfLoading module
+
+SYNOPSIS
+========
+
+   To generate just the stubs:
+
+     use Devel::SelfStubber;
+     Devel::SelfStubber->stub('MODULENAME','MY_LIB_DIR');
+
+   or to generate the whole module with stubs inserted correctly
+
+     use Devel::SelfStubber;
+     $Devel::SelfStubber::JUST_STUBS=0;
+     Devel::SelfStubber->stub('MODULENAME','MY_LIB_DIR');
+
+   MODULENAME is the Perl module name, e.g. Devel::SelfStubber, NOT
+'Devel/SelfStubber' or 'Devel/SelfStubber.pm'.
+
+   MY_LIB_DIR defaults to '.' if not present.
+
+DESCRIPTION
+===========
+
+   Devel::SelfStubber prints the stubs you need to put in the module
+before the __DATA__ token (or you can get it to print the entire module
+with stubs correctly placed). The stubs ensure that if a method is called,
+it will get loaded. They are needed specifically for inherited autoloaded
+methods.
+
+   This is best explained using the following example:
+
+   Assume four classes, A,B,C & D.
+
+   A is the root class, B is a subclass of A, C is a subclass of B, and D
+is another subclass of A.
+
+     A
+                            / \
+                           B   D
+                          /
+                         C
+
+   If D calls an autoloaded method 'foo' which is defined in class A, then
+the method is loaded into class A, then executed. If C then calls method
+'foo', and that method was reimplemented in class B, but set to be
+autoloaded, then the lookup mechanism never gets to the AUTOLOAD mechanism
+in B because it first finds the method already loaded in A, and so
+erroneously uses that. If the method foo had been stubbed in B, then the
+lookup mechanism would have found the stub, and correctly loaded and used
+the sub from B.
+
+   So, for classes and subclasses to have inheritance correctly work with
+autoloading, you need to ensure stubs are loaded.
+
+   The SelfLoader can load stubs automatically at module initialization
+with the statement 'SelfLoader->load_stubs()';, but you may wish to avoid
+having the stub loading overhead associated with your initialization
+(though note that the SelfLoader::load_stubs method will be called sooner
+or later - at latest when the first sub is being autoloaded). In this
+case, you can put the sub stubs before the __DATA__ token. This can be
+done manually, but this module allows automatic generation of the stubs.
+
+   By default it just prints the stubs, but you can set the global
+$Devel::SelfStubber::JUST_STUBS to 0 and it will print out the entire
+module with the stubs positioned correctly.
+
+   At the very least, this is useful to see what the SelfLoader thinks are
+stubs - in order to ensure future versions of the SelfStubber remain in
+step with the SelfLoader, the SelfStubber actually uses the SelfLoader to
+determine which stubs are needed.
+
+
+File: pm.info,  Node: Devel/SmallProf,  Next: Devel/StackTrace,  Prev: Devel/SelfStubber,  Up: Module List
+
+per-line Perl profiler
+**********************
+
+NAME
+====
+
+   Devel::SmallProf - per-line Perl profiler
+
+SYNOPSIS
+========
+
+     perl5 -d:SmallProf test.pl
+
+DESCRIPTION
+===========
+
+   The Devel::SmallProf profiler is focused on the time taken for a
+program run on a line-by-line basis.  It is intended to be as "small" in
+terms of impact on the speed and memory usage of the profiled program as
+possible and also in terms of being simple to use.  Those statistics are
+placed in the file `smallprof.out' in the following format:
+
+     <num> <time> <ctime> <line>:<text>
+
+   where <num> is the number of times that the line was executed, <time>
+is the amount of "wall time" (time according the the clock on the wall vs.
+cpu time) spent executing it, <ctime> is the amount of cpu time expended
+on it and <line> and <text> are the line number and the actual text of the
+executed line (read from the file).
+
+   The package uses the debugging hooks in Perl and thus needs the -d
+switch, so to profile test.pl, use the command:
+
+     perl5 -d:SmallProf test.pl
+
+   Once the script is done, the statistics in `smallprof.out' can be
+sorted to show which lines took the most time.  The output can be sorted
+to find which lines take the longest, either with the sort command:
+
+     sort -k 2nr,2 smallprof.out | less
+
+   or a perl script:
+
+     open(PROF,"smallprof.out");
+     @sorted = sort {(split(/\s+/,$b))[2] <=>
+                             (split(/\s+/,$a))[2]} <PROF>;
+             close PROF;
+     print join('',@sorted);
+
+NOTES
+=====
+
+   * The "wall time" readings come from Time::HiRes and are reasonably
+     useful, at least on my system.  The cpu times come from the 'times'
+     built-in and the granularity is not necessarily as small as with the
+     wall time.  On some systems this column may be useful.  On others it
+     may not.
+
+   * SmallProf does attempt to make up for its shortcomings by subtracting
+     a small amount from each timing (null time compensation).  This
+     should help somewhat with the accuracy.
+
+   * SmallProf depends on the Time::HiRes package to do its timings.  It
+     claims to require version 1.20, but may work with earlier versions,
+     depending on your platform.
+
+OPTIONS
+=======
+
+   SmallProf has 3 variables which can be used during your script to
+affect what gets profiled.
+
+   * If you do not wish to see lines which were never called, set the
+     variable `$DB::drop_zeros = 1'.  With `drop_zeros' set, SmallProf can
+     be used for basic coverage analysis.
+
+   * To turn off profiling for a time, insert a `$DB::profile = 0' into
+     your code (profiling may be turned back on with `$DB::profile = 1').
+     All of the time between profiling being turned off and back on again
+     will be lumped together and reported on the `$DB::profile = 0' line.
+     This can be used to summarize a subroutine call or a chunk of code.
+
+   * To only profile code in a certain package, set the `%DB::packages'
+     array.  For example, to see only the code in packages main and
+     `Test1', do this:
+
+          %DB::packages = ( 'main' => 1, 'Test1' => 1 );
+
+   * These variables can be put in a file called `.smallprof' in the
+     current directory.  For example, a `.smallprof' containing
+
+          $DB::drop_zeros = 1;
+          $DB::profile = 0;
+
+     will set SmallProf to not report lines which are never touched for
+     any file profiled in that directory and will set profiling off
+     initially (presumably to be turned on only for a small portion of
+     code).
+
+INSTALLATION
+============
+
+   Just the usual
+
+     perl Makefile.PL
+     make
+     make test
+     make install
+
+   and should install fine via the CPAN module.
+
+BUGS
+====
+
+   Subroutine calls are currently not under the control of %DB::packages.
+This should not be a great inconvenience in general.
+
+   The handling of evals is bad news.  This is due to Perl's handling of
+evals under the -d flag.  For certain evals, caller() returns '(eval n)'
+for the filename and for others it doesn't.  For some of those which it
+does, the array `@{'_<filename'}' contains the code of the eval.  For
+others it doesn't.  Sometime, when I've an extra tuit or two, I'll figure
+out why and how I can compensate for this.  (Note: 5.6.0 made some
+debugging changes.  This may now be fixed, I'm not sure).
+
+   SmallProf must be invoked from the command line.  If it is included on
+the shebang line, the file in which it is included will not be visible in
+the symbol table.  Profiling will continue as expected, but the contents
+of the source lines will not be listed.  This is new as of 5.6.0.
+
+   Comments, advice and questions are welcome.  If you see inefficent
+stuff in this module and have a better way, please let me know.
+
+AUTHOR   Ted Ashton <ashted@southern.edu>   SmallProf was developed from code originally posted to usenet by Philippe Verdret <philippe.verdret@sonovision-itep.fr>.  Special thanks to Geoffrey Broadwell <habusan2@sprynet.com> for his assistance on the Win32 platform and to Philippe for his patient assistance in testing and  debugging.   Copyright (c) 1997 Ted Ashton   This module is free software and can be redistributed and/or modified under the same terms as Perl itself.
+=============================================================================================================================================================================================================================================================================================================================================================================================================================================================================================
+
+SEE ALSO
+========
+
+   *Note Devel/DProf: Devel/DProf,, *Note Time/HiRes: Time/HiRes,.
+
+
+File: pm.info,  Node: Devel/StackTrace,  Next: Devel/Symdump,  Prev: Devel/SmallProf,  Up: Module List
+
+Stack trace and stack trace frame objects
+*****************************************
+
+NAME
+====
+
+   Devel::StackTrace - Stack trace and stack trace frame objects
+
+SYNOPSIS
+========
+
+     use Devel::StackTrace;
+
+     my $trace = Devel::StackTrace->new;
+
+     print $trace->as_string; # like carp
+
+     # from top (most recent) of stack to bottom.
+     while (my $frame = $trace->next_frame)
+     {
+         print "Has args\n" if $f->hasargs;
+     }
+
+     # from bottom (least recent) of stack to top.
+     while (my $frame = $trace->prev_frame)
+     {
+         print "Sub: ", $f->subroutine, "\n";
+     }
+
+DESCRIPTION
+===========
+
+   The Devel::StackTrace module contains two classes, Devel::StackTrace
+and Devel::StackTraceFrame.  The goal of this object is to encapsulate the
+information that can found through using the caller() function, as well as
+providing a simple interface to this data.
+
+   The Devel::StackTrace object contains a set of Devel::StackTraceFrame
+objects, one for each level of the stack.  The frames contain all the data
+available from caller() as of Perl 5.00503.  There are changes in Perl
+5.6.0 that have yet to be incorporated.
+
+   This code was created to support my `Exception::Class::Base' in this
+node class (part of Exception::Class) but may be useful in other contexts.
+
+'TOP' AND 'BOTTOM' OF THE STACK
+===============================
+
+   When describing the methods of the trace object, I use the words 'top'
+and 'bottom'.  In this context, the 'top' frame on the stack is the most
+recent frame and the 'bottom' is the least recent.
+
+   Here's an example:
+
+     foo();  # bottom frame is here
+
+     sub foo
+     {
+        bar();
+     }
+
+     sub bar
+     {
+        Devel::StackTrace->new;  # top frame is here.
+     }
+
+Devel::StackTrace METHODS
+=========================
+
+   * new(%named_params)
+
+     Returns a new Devel::StackTrace object.
+
+     Takes the following parameters:
+
+   * - ignore_package => $package_name OR \@package_names Any frames where
+     the package is one of these packages will not be on the stack.
+
+   * - ignore_class => $package_name OR \@package_names Any frames where
+     the package is a subclass of one of these packages (or is the same
+     package) will not be on the stack.
+
+     Devel::StackTrace internally adds itself to the 'ignore_package'
+     parameter, meaning that the Devel::StackTrace package is *ALWAYS*
+     ignored.  However, if you create a subclass of Devel::StackTrace it
+     will not be ignored.
+
+   * next_frame
+
+     Returns the next Devel::StackTraceFrame object down on the stack.  If
+     it hasn't been called before it returns the first frame.  It returns
+     undef when it reaches the bottom of the stack and then resets its
+     pointer so the next call to `next_frame' or `prev_frame' will work
+     properly.
+
+   * prev_frame
+
+     Returns the next Devel::StackTraceFrame object up on the stack.  If it
+     hasn't been called before it returns the last frame.  It returns undef
+     when it reaches the top of the stack and then resets its pointer so
+     pointer so the next call to `next_frame' or `prev_frame' will work
+     properly.
+
+   * reset_pointer
+
+     Resets the pointer so that the next call `next_frame' or `prev_frame'
+     will start at the top or bottom of the stack, as appropriate.
+
+   * frames
+
+     Returns a list of Devel::StackTraceFrame objects.  The order they are
+     returned is from top (most
+
+   * frame ($index)
+
+     Given an index, returns the relevant frame or undef if there is not
+     frame at that index.  The index is exactly like a Perl array.  The
+     first frame is 0 and negative indexes are allowed.
+
+   * frame_count
+
+     Returns the number of frames in the trace object.
+
+   * as_string
+
+     Calls as_string on each frame from top to bottom, producing output
+     quite similar to the Carp module's cluck/confess methods.
+
+Devel::StackTraceFrame METHODS
+==============================
+
+   See the `caller' in this node documentation for more information on
+what these methods return.
+
+   * package
+
+   * filename
+
+   * line
+
+   * subroutine
+
+   * hasargs
+
+   * wantarray
+
+   * evaltext
+
+     Returns undef if the frame was not part of an eval.
+
+   * is_require
+
+     Returns undef if the frame was not part of a require.
+
+   * args
+
+     Returns the arguments passed to the frame.  Note that any arguments
+     that are references are returned as references, not copies.
+
+Perl 5.6.0 and greater _ONLY_
+-----------------------------
+
+   * hints
+
+   * bitmask
+
+AUTHOR
+======
+
+   Dave Rolsky, <autarch@urth.org>
+
+SEE ALSO
+========
+
+   Exception::Class
+
+
+File: pm.info,  Node: Devel/Symdump,  Next: Devel/Timer,  Prev: Devel/StackTrace,  Up: Module List
+
+dump symbol names or the symbol table
+*************************************
+
+NAME
+====
+
+   Devel::Symdump - dump symbol names or the symbol table
+
+SYNOPSIS
+========
+
+     # Constructor
+     require Devel::Symdump;
+     @packs = qw(some_package another_package);
+     $obj = Devel::Symdump->new(@packs);        # no recursion
+     $obj = Devel::Symdump->rnew(@packs);       # with recursion
+
+     # Methods
+     @array = $obj->packages;
+     @array = $obj->scalars;
+     @array = $obj->arrays;
+     @array = $obj->hashs;
+     @array = $obj->functions;
+     @array = $obj->filehandles;  # deprecated, use ios instead
+     @array = $obj->dirhandles;   # deprecated, use ios instead
+     @array = $obj->ios;
+     @array = $obj->unknowns;
+
+     $string = $obj->as_string;
+     $string = $obj->as_HTML;
+     $string = $obj1->diff($obj2);
+
+     $string = Devel::Symdump->isa_tree;    # or $obj->isa_tree
+     $string = Devel::Symdump->inh_tree;    # or $obj->inh_tree
+
+     # Methods with autogenerated objects
+     # all of those call new(@packs) internally
+     @array = Devel::Symdump->packages(@packs);
+     @array = Devel::Symdump->scalars(@packs);
+     @array = Devel::Symdump->arrays(@packs);
+     @array = Devel::Symdump->hashes(@packs);
+     @array = Devel::Symdump->functions(@packs);
+     @array = Devel::Symdump->ios(@packs);
+     @array = Devel::Symdump->unknowns(@packs);
+
+Incompatibility with versions before 2.00
+-----------------------------------------
+
+   Perl 5.003 already offered the opportunity to test for the individual
+slots of a GLOB with the *GLOB{XXX} notation. Devel::Symdump version 2.00
+uses this method internally which means that the type of undefined values
+is recognized in general. Previous versions couldn't determine the type of
+undefined values, so the slot unknowns was invented. From version 2.00
+this slot is still present but will usually not contain any elements.
+
+   The interface has changed slightly between the perl versions 5.003 and
+5.004. To be precise, from perl5.003_11 the names of the members of a GLOB
+have changed. IO is the internal name for all kinds of input-output
+handles while `FILEHANDLE' and `DIRHANDLE' are deprecated.
+
+   `Devel::Symdump' accordingly introduces the new method ios() which
+returns filehandles and directory handles. The old methods filehandles()
+and dirhandles() are still supported for a transitional period.  They will
+probably have to go in future versions.
+
+DESCRIPTION
+===========
+
+   This little package serves to access the symbol table of perl.
+
+`Devel::Symdump->rnew(@packages)'
+---------------------------------
+
+   returns a symbol table object for all subtrees below @packages.  Nested
+Modules are analyzed recursively. If no package is given as argument, it
+defaults to main. That means to get the whole symbol table, just do a
+`rnew' without arguments.
+
+`Devel::Symdump->new(@packages)'
+--------------------------------
+
+   does not go into recursion and only analyzes the packages that are
+given as arguments.
+
+   The methods packages(), scalars(), arrays(), hashes(), functions(),
+ios(), and unknowns() each return an array of fully qualified symbols of
+the specified type in all packages that are held within a Devel::Symdump
+object, but without the leading `$', `@' or %.  In a scalar context, they
+will return the number of such symbols.  Unknown symbols are usually
+either formats or variables that haven't yet got a defined value.
+
+   As_string() and as_HTML() return a simple string/HTML representations
+of the object.
+
+   Diff() prints the difference between two Devel::Symdump objects in
+human readable form. The format is similar to the one used by the
+as_string method.
+
+   Isa_tree() and inh_tree() both return a simple string representation of
+the current inheritance tree. The difference between the two methods is
+the direction from which the tree is viewed: top-down or bottom-up. As I'm
+sure, many users will have different expectation about what is top and
+what is bottom, I'll provide an example what happens when the Socket
+module is loaded:
+
+% print Devel::Symdump->inh_tree
+          AutoLoader
+                  DynaLoader
+                          Socket
+          DynaLoader
+                  Socket
+          Exporter
+                  Carp
+                  Config
+                  Socket
+
+     The inh_tree method shows on the left hand side a package name and
+     indented to the right the packages that use the former.
+
+% print Devel::Symdump->isa_tree
+          Carp
+                  Exporter
+          Config
+                  Exporter
+          DynaLoader
+                  AutoLoader
+          Socket
+                  Exporter
+                  DynaLoader
+                          AutoLoader
+
+     The isa_tree method displays from left to right ISA relationships, so
+     Socket IS A DynaLoader and DynaLoader IS A AutoLoader. (Actually, they
+     were at the time this manpage was written)
+
+   You may call both methods, isa_tree() and inh_tree(), with an object.
+If you do that, the object will store the output and retrieve it when you
+call the same method again later. The typical usage would be to use them
+as class methods directly though.
+
+SUBCLASSING
+===========
+
+   The design of this package is intentionally primitive and allows it to
+be subclassed easily. An example of a (maybe) useful subclass is
+Devel::Symdump::Export, a package which exports all methods of the
+Devel::Symdump package and turns them into functions.
+
+AUTHORS
+=======
+
+   Andreas Koenig `<andk@cpan.org>' and Tom Christiansen
+`<tchrist@perl.com>'. Based on the old `dumpvar.pl' by Larry Wall.
+
+
+File: pm.info,  Node: Devel/Timer,  Next: Devel/WeakRef,  Prev: Devel/Symdump,  Up: Module List
+
+Track and report execution time for parts of code
+*************************************************
+
+NAME
+====
+
+   Devel::Timer - Track and report execution time for parts of code
+
+SYNOPSIS
+========
+
+     use Devel::Timer;
+
+     my $t = new Devel::Timer();
+
+     $t->mark("first db query");
+
+     ## do some work
+
+     $t->mark("second db query");
+
+     ## do some more work
+
+     $t->mark("end of second db query");
+
+     $t->report();
+
+DESCRIPTION
+===========
+
+   Devel::Timer allows developers to accurately time how long a specific
+piece of code takes to execute.  This can be helpful in locating the
+slowest parts of an existing application.
+
+   First, the Devel::Timer module is used and instantiated.
+
+     use Devel::Timer;
+
+     my $t = new Devel::Timer();
+
+   Second, markers are placed before and after pieces of code that need to
+be timed.  For this example, we are profiling the methods get_user_score()
+and get_average_user_score().
+
+     $t->mark("first db query");
+     &get_user_score($user);
+
+     $t->mark("second db query");
+     &get_average_user_score();
+
+   Finally, at the end of the code that you want to profile, and end marker
+is place, and a report is generated on stderr.
+
+     $t->mark("END");
+     $t->report();
+
+   Sample report:
+
+     Devel::Timer Report -- Total time: 0.3464 secs
+     Interval  Time    Percent
+     ----------------------------------------------
+     02 -> 03  0.3001  86.63%  second db query -> END
+     01 -> 02  0.0461  13.30%  first db query -> second db query
+     00 -> 01  0.0002   0.07%  INIT -> first db query
+
+   The report is output using the method Devel::Timer::print() which
+currently just prints to stderr.  If you want to send the output to a
+custom location you can override the print() method.  The initialize() and
+shutdown() methods can also overridden if you want to open and close log
+files or database connections.
+
+   e.g.
+
+   package MyTimer;
+
+   use strict; use Devel::Timer; use vars qw(@ISA);
+
+   @ISA = ("Devel::Timer");
+
+   sub initialize {     my $log = "/tmp/timer.log";     open(LOG,
+">>$log") or die("Unable to open [$log] for writing."); }
+
+   sub print {     my($self, $msg) = @_;     print LOG $msg . "\n"; }
+
+   sub shutdown {     close LOG; }
+
+   You would then use the new module MyTimer exactly as you would use
+Devel::Timer.
+
+     use MyTimer;
+     my $t = new MyTimer();
+     $t->mark("about to do x");
+     $t->mark("about to do y");
+     $t->mark("done y");
+     $t->report();
+
+SEE ALSO
+========
+
+   Time::HiRes
+
+AUTHOR
+======
+
+     Jason Moore - jmoore@sober.com
+
+
+File: pm.info,  Node: Devel/WeakRef,  Next: Devel/ptkdb,  Prev: Devel/Timer,  Up: Module List
+
+weak references (not reference-counted)
+***************************************
+
+NAME
+====
+
+   *Devel::WeakRef* - weak references (not reference-counted)
+
+SYNOPSIS
+========
+
+     my $foo={a => 1, b => 2};	# Some sort of reference scalar.
+     my $foo_=new Devel::WeakRef $foo;
+     my $bar=$foo_->deref;		# Hard ref through dereference
+     $foo_->deref->{c}=3;		# Dereference
+     $foo=$bar=77;			# OK, hash collected
+     $foo_->deref;			# Yields undef now
+     $foo_->empty;			# True now.
+
+   Currently this also works:
+
+     $$foo_->{a};
+
+   But this dies with a stern message:
+
+     $$foo_=$new_thingy;		# Nope! Weak ref must never change referents.
+
+   This hash table has weak references as values:
+
+     tie my %table, Devel::WeakRef::Table;
+     $table{key1}=$some_object;
+     $table{key2}=$some_other_object;
+     $table{key1}=$yet_another_object; # OK to replace keys like this
+
+DESCRIPTION
+===========
+
+   A weak reference maintains a "pointer" to an object (specified by a
+reference to it, just like bless) that does not contribute to the object's
+reference count; thus, the object's storage will be freed (and its
+destructor invoked) when only weak references remain to it. (It is fine to
+have multiple weak references to a single object.) The deref method
+derefences the weak reference. Dereferencing a weak reference whose target
+has already been destroyed results in undef.
+
+   empty tests if the reference is invalid; `$ref->empty' is equivalent to
+`!defined $ref->deref'. *For now*, you can just use Perl's normal scalar
+dereference to the same effect; but be sure to use this for reading only.
+This interface may change.
+
+   The package *Devel::WeakRef::Table* may be used to tie hashes so as to
+make their values all weak references. This is useful for caches in
+particular, where it would be more annoying to have to explicitly
+dereference the value each time.
+
+   The most likely applications of this module are:
+
+Cyclic Structures
+     Various structures, like arbitrarily-traversable trees, or
+     doubly-linked lists, or some queues, naturally have cyclic pointer
+     structures in them. If you are not very careful, removing external
+     references without breaking up the internal links will give you a
+     memory leak. With weak references, you need only be sure that there
+     is no cyclic structure of *hard* (normal) references; back-links and
+     other convenient links can easily be made weak.
+
+Caches
+     For some applications it is desirable to maintain a cache of lookups
+     (search results) keyed off (say) search string. The values might be
+     some objects. To have these entries removed when an object is
+     destroyed, you want to leave each object's reference count untouched
+     (so it will be collected as it would have otherwise), and make sure
+     its destructor removes the appropriate keys from the caching table.
+
+AUTHORS
+=======
+
+   Jesse Glick, *jglick@sig.bsh.com*.
+
+BUGS
+====
+
+   If you mess with the internal structure of a weak ref you will probably
+dump core.
+
+   The module attempts to catch attempts to directly set the target of a
+weak reference in a scalar dereference operation as an lvalue, and dies
+abruptly. It tries to do so as nicely as possible, but it is not feasible
+to 100% protect the environment in this case. In other words, if you plan
+on having this error occur, do not plan on `eval-BLOCK'ing it and
+expecting everything to be dandy later.
+
+   Tied weak tables have not been tested as well as the bare references.
+There may be unforeseen memory leaks (presumably, not in the referred-to
+objects themselves, but in supporting data areas-this would affect raw
+memory usage, not collection of the reference targets).
+
+   Putting a weak ref on a reference object places extension-magic (`~',
+see `perlguts(1P)' in this node) on that object. This could conflict with
+other user extensions using custom magic. To avoid this, *Devel::WeakRef*
+specifically looks for its own magic and only its own magic; however,
+another extension might not do so for itself and become extremely
+confused, if it was specifically looking for its own magic (probably not so
+common).
+
+REVISION
+========
+
+   X<$Format: "`$Source$' last modified $Date$, release
+$DevelWeakRefRelease$. $Copyright$"$> `Devel-WeakRef/lib/Devel/WeakRef.pm'
+last modified Thu, 25 Sep 1997 20:32:00 -0400, release 0.003. Copyright
+(c) 1997 Strategic Interactive Group. All rights reserved. This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+
+File: pm.info,  Node: Devel/ptkdb,  Next: Device/ISDN/OCLM,  Prev: Devel/WeakRef,  Up: Module List
+
+Perl debugger using a Tk GUI
+****************************
+
+NAME
+====
+
+   Devel::ptkdb - Perl debugger using a Tk GUI
+
+DESCRIPTION
+===========
+
+     ptkdb is a debugger for perl that uses perlTk for a user interface.
+     Features include:
+
+     Hot Variable Inspection
+     Breakpoint Control Panel
+     Expression List
+     Subroutine Tree
+
+     <body bgcolor=white>
+
+SYNOPSIS
+========
+
+     To debug a script using ptkdb invoke perl like this:
+
+     perl -d:ptkdb myscript.pl
+
+Usage
+=====
+
+     perl -d:ptkdb myscript.pl
+
+Code Pane
+---------
+
+Line Numbers
+          Line numbers are presented on the left side of the window.	Lines that
+          have lines through them are not breakable.	Lines that are plain text
+          are breakable.	Clicking on these line numbers will insert a
+          breakpoint on that line and change the line number color to
+          $ENV{'PTKDB_BRKPT_COLOR'} (Defaults to Red).	Clicking on the number
+          again will remove the breakpoint.	 If you disable the breakpoint with
+          the controls on the BrkPt notebook page the color will change to
+          $ENV{'PTKDB_DISABLEDBRKPT_COLOR'}(Defaults to Green).
+
+Cursor Motion
+          If you place the cursor over a variable (i.e. $myVar, @myVar, or
+          																				 %myVar) and pause for a second the debugger will evaluate the current
+          value of the variable and pop a balloon up with the evaluated
+          result. I<This feature is not available with Tk400.>
+
+          If Data::Dumper(standard with perl5.00502)is available it will be used
+          to format the result.	 If there is an active selection, the text of
+          that selection will be evaluated.
+
+Notebook Pane
+-------------
+
+Exprs
+          This is a list of expressions that are evaluated each time the debugger stops.	The results
+          of the expresssion are presented heirarchically for expression that result in hashes or lists.
+          Double clicking on such an expression will cause it to collapse; double clicking again
+          will cause the expression to expand.	Expressions are entered through B<Enter Expr> entry,
+          or by Alt-E when text is selected in the code pane.
+
+          The B<Quick Expr> entry, will take an expression, evaluate it, and replace the entries
+          contents with the result.	 The result is also transfered to the 'clipboard' for pasting.
+
+Subs
+          Displays a list of all the packages invoked with the script heirarchially.	At the bottom
+          of the heirarchy are the subroutines within the packages.	 Double click on a package to
+          expand it.	Subroutines are listed by their full package names.
+
+BrkPts
+          Presents a list of the breakpoints current in use.	The pushbutton allows a breakpoint to
+          be 'disabled' without removing it.	Expressions can be applied to the breakpoint.	 If the
+          expression evaluates to be 'true'(results in a defined value that is not 0) the debugger
+          will stop the script.	 Pressing the 'Goto' button will set the text pane to that file and
+          line where the breakpoint is set.	 Pressing the 'Delete' button will delete the breakpoint.
+
+Menus
+=====
+
+File Menu
+---------
+
+About...
+          Presents a dialog box telling you about the version of ptkdb.	 It recovers
+          your OS name, version of perl, version of Tk, and some other information
+
+Open
+          Presents a list of files that are part of the invoked perl script.	Selecting
+          a file from this list will present this file in the text window.
+
+Save Config...
+          Requires Data::Dumper.	Prompts for a filename to save the configuration to.	Saves
+          the breakpoints, expressions, eval text and window geometry.	If the name given as
+          the default is used and the script is reinvoked, this configuration will be reloaded
+          automatically.
+
+          B<NOTE:>	You may find this preferable to using
+
+Restore Config...
+          Requires Data::Dumper.	Prompts for a filename to restore a configuration saved with
+          the "Save Config..." menu item.
+
+Goto Line...
+          Prompts for a line number.	Pressing the "Okay" button sends the window to the line number entered.
+
+Find Text...
+          Prompts for text to search for.	 Options include forward search, backwards search, and regular expression
+          searching.
+
+Quit
+          Causes the debugger and the target script to exit.
+
+Control Menu
+------------
+
+Run
+          The debugger allows the script to run to the next breakpoint or until the script exits.
+
+Run To Here
+          Runs the debugger until it comes to wherever the insertion cursor in text window
+          is placed.
+
+Set Breakpoint
+          Sets a breakpoint on the line at the insertion cursor.
+
+Clear Breakpoint
+          Remove a breakpoint on the at the insertion cursor.
+
+Clear All Breakpoints
+          Removes all current breakpoints
+
+Step Over
+          Causes the debugger to step over the next line.	 If the line
+          is a subroutine call it steps over the call, stopping when
+          the subroutine returns.
+
+Step In
+          Causes the debugger to step into the next line.	 If the line
+          is a subroutine call it steps into the subroutine, stopping
+          at the first executable line within the subroutine.
+
+Return
+          Runs the script until it returns from the currently executing
+          subroutine.
+
+Restart
+          Saves the breakpoints and expressions in a temporary file and
+          	restarts the script from the beginning.  CAUTION: This feature will
+          	not work properly with debugging of CGI Scripts.
+
+Stop On Warning
+     When -w is enabled the debugger will stop when warnings such as, "Use
+     of uninitialized value at undef_warn.pl line N" are encountered.  The
+     debugger will stop on the NEXT line of execution since the error
+     can't be detected until the current line has executed.
+
+     This feature can be turned on at startup by adding:
+
+     $DB::ptkdb::stop_on_warning = 1 ;
+
+     to a .ptkdbrc file
+
+Data Menu
+---------
+
+Enter Expression
+          When an expression is entered in the "Enter Expression:" text box, selecting
+          this item will enter the expression into the expression list.	 Each time the
+          debugger stops this expression will be evaluated and its result updated in
+          the list window.
+
+Delete Expression
+          Deletes the highlighted expression in the expression window.
+
+Delete All Expressions
+          Delete all expressions in the expression window.
+
+Expression Eval Window
+          Pops up a two pane window.	Expressions of virtually unlimitted length
+          can be entered in the top pane.	 Pressing the 'Eval' button will cause
+          the expression to be evaluated and its placed in the lower pane.	If
+          Data::Dumper is available it will be used to format the resulting
+          text.	 Undo is enabled for the text in the upper pane.
+
+     HINT:	 You can enter multiple expressions by separating them
+     with commas.
+
+Use Data::Dumper for Eval Window
+          Enables or disables the use of Data::Dumper for formatting the results
+          of expressions in the Eval window.
+
+Stack Menu
+----------
+
+     Maintains a list of the current subroutine stack each time the debugger
+     stops.	Selecting an item from this menu will set the text in the code
+     window to that particular subourtine entry point.
+
+Bookmarks Menu
+--------------
+
+     Maintains a list of bookmarks.	The booksmarks are saved in ~/.ptkdb_bookmarks
+
+Add Bookmark
+          Adds a bookmark to the bookmark list.
+
+Options
+=======
+
+     Here is a list of the current active XResources options.	Several
+     of these can be overridden with environmental variables.	Resources
+     can be added to .Xresources or .Xdefaults depending on your X configuration.
+     To enable these resources you must either restart your X server or
+     use the xrdb -override resFile command.	 xfontsel can be used to select
+     fonts.
+
+     /*
+     * Perl Tk Debugger XResources.
+     * Note... These resources are subject to change.
+     *
+     * Use 'xfontsel' to select different fonts.
+     *
+     * Append these resource to ~/.Xdefaults | ~/.Xresources
+     * and use xrdb -override ~/.Xdefaults | ~/.Xresources
+     * to activate them.
+     */
+     /* Set Value to se to place scrollbars on the right side of windows
+     	CAUTION:	extra whitespace at the end of the line is causing
+     failures with Tk800.011.
+     
+     sw -> puts scrollbars on left, se puts scrollars on the right
+     
+     */
+     ptkdb*scrollbars: sw
+     /* controls where the code pane is oriented, down the left side, or across the top */
+     /* values can be set to left, right, top, bottom */
+     ptkdb*codeside: left
+     
+     /*
+     * Background color for the balloon
+     * CAUTION:	For certain versions of Tk trailing
+     * characters after the color produces an error
+     */
+     ptkdb.frame2.frame1.rotext.balloon.background: green
+     ptkdb.frame2.frame1.rotext.balloon.font: fixed											 /* Hot Variable Balloon Font */
+     
+     
+     ptkdb.frame*font: fixed														/* Menu Bar */
+     ptkdb.frame.menubutton.font: fixed								/* File menu */
+     ptkdb.frame2.frame1.rotext.font: fixed						/* Code Pane */
+     ptkdb.notebook.datapage.frame1.hlist.font: fixed	/* Expression Notebook Page */
+     
+     ptkdb.notebook.subspage*font: fixed								/* Subroutine Notebook Page */
+     ptkdb.notebook.brkptspage*entry.font: fixed				/* Delete Breakpoint Buttons */
+     ptkdb.notebook.brkptspage*button.font: fixed			/* Breakpoint Expression Entries */
+     ptkdb.notebook.brkptspage*button1.font: fixed			/* Breakpoint Expression Entries */
+     ptkdb.notebook.brkptspage*checkbutton.font: fixed /* Breakpoint Checkbuttons */
+     ptkdb.notebook.brkptspage*label.font: fixed				/* Breakpoint Checkbuttons */
+     
+     ptkdb.toplevel.frame.textundo.font: fixed					/* Eval Expression Entry Window */
+     ptkdb.toplevel.frame1.text.font: fixed						/* Eval Expression Results Window */
+     ptkdb.toplevel.button.font:	 fixed								/* "Eval..." Button */
+     ptkdb.toplevel.button1.font: fixed								/* "Clear Eval" Button */
+     ptkdb.toplevel.button2.font: fixed								/* "Clear Results" Button */
+     ptkdb.toplevel.button3.font: fixed								/* "Clear Dismiss" Button */
+     
+     /*
+     * Background color for where the debugger has stopped
+     */
+     ptkdb*stopcolor: blue
+     
+     /*
+     * Background color for set breakpoints
+     */
+     ptkdb*breaktagcolor*background: yellow
+     ptkdb*disabledbreaktagcolor*background: white
+     /*
+     * Font for where the debugger has stopped
+     */
+     ptkdb*stopfont: -*-fixed-bold-*-*-*-*-*-*-*-*-*-*-*
+     
+     /*
+     * Background color for the search tag
+     */
+     ptkdb*searchtagcolor: green
+
+Environmental Variables
+=======================
+
+PTKDB_BRKPT_COLOR
+          Sets the background color of a set breakpoint
+
+PTKDB_DISABLEDBRKPT_COLOR
+          Sets the background color of a disabled breakpoint
+
+PTKDB_CODE_FONT
+          Sets the font of the Text in the code pane.
+
+PTKDB_CODE_SIDE
+          Sets which side the code pane is packed onto.	 Defaults to 'left'.
+          Can be set to 'left', 'right', 'top', 'bottom'.
+
+          Overrides the Xresource ptkdb*codeside: I<side>.
+
+PTKDB_EXPRESSION_FONT
+          Sets the font used in the expression notebook page.
+
+PTKDB_EVAL_FONT
+          Sets the font used in the Expression Eval Window
+
+PTKDB_EVAL_DUMP_INDENT
+          Sets the value used for Data::Dumper 'indent' setting.	See man Data::Dumper
+
+PTKDB_SCROLLBARS_ONRIGHT
+          A non-zero value Sets the scrollbars of all windows to be on the right side of the window.	Useful
+          for Windows users using ptkdb in an XWindows environment.
+
+PTKDB_LINENUMBER_FORMAT
+          Sets the format of line numbers on the left side of the window.	 Default value is %05d.	 useful
+          if you have a script that contains more than 99999 lines.
+
+PTKDB_DISPLAY
+          Sets the X display that the ptkdb window will appear on when invoked.	 Useful for debugging CGI
+          scripts on remote systems.
+
+PTKDB_BOOKMARKS_PATH
+          Sets the path of the bookmarks file.	Default is $ENV{'HOME'}/.ptkdb_bookmarks
+
+PTKDB_STOP_TAG_COLOR
+          Sets the color that highlights the line where the debugger is stopped
+
+FILES
+=====
+
+.ptkdbrc
+--------
+
+     If this file is present in ~/ or in the directory where perl is invoked the file will
+     be read and executed as a perl script before the debugger makes its initial stop at startup.
+     There	 are several 'api' calls that can be used with such scripts.	There is an internal
+     variable $DB::no_stop_at_start that may be set to non-zero to prevent the debugger from
+     stopping at the first line of the script.	 This is useful for debugging CGI scripts.
+
+     There is a system ptkdbrc file in $PREFIX/lib/perl5/$VERS/Devel/ptkdbrc
+
+brkpt($fname, @lines)
+          Sets breakspoints on the list of lines in $fname.	 A warning message is generated
+          if a line is not breakable.
+
+condbrkpt($fname, @($line, $expr) )
+          Sets conditional breakpoints in $fname on pairs of $line and $expr.	A warning message is generated
+          if a line is not breakable.	 NOTE:	the validity of the expression will not be determined until execution
+          of that particular line.
+
+brkonsub(@names)
+          Sets a breakpoint on each subroutine name listed.	A warning message is generated
+          if a subroutine does not exist.	 NOTE:	for a script with no other packages the default
+          package is "main::" and the subroutines would be "main::mySubs".
+
+brkonsub_regex(@regExprs)
+          Uses the list of @regExprs as a list of regular expressions to set breakpoints.	 Sets breakpoints
+          on every subroutine that matches any of the listed regular expressions.
+
+textTagConfigure(tag, ?option?, ?value?)
+          Allows the user to format the text in the code window.	The option
+          value pairs are the same values as the option for the tagConfigure
+          method documented in Tk::Text.	Currently the following tags are
+          in effect:
+
+          'code'							 Format for code in the text pane
+          		'stoppt'						 Format applied to the line where the debugger is currently stopped
+          		'breakableLine'			 Format applied to line numbers where the code is 'breakable'
+          		'nonbreakableLine'	 Format applied to line numbers where the code is no breakable
+          		'breaksetLine'			 Format applied to line numbers were a breakpoint is set
+          		'breakdisabledLine'	 Format applied to line numbers were a disabled breakpoint is set
+          		'search_tag'				 Format applied to text when located by a search.
+
+     Example:
+
+     # # Turns off the overstrike on lines that you can't set a breakpoint
+     on # and makes the text color yellow.  #
+     textTagConfigure('nonbreakableLine', -overstrike => 0, -foreground =>
+     "yellow") ;
+
+add_exprs(@exprList)
+          Add a list of expressions to the 'Exprs' window.	NOTE: use the single
+          quote character \' to prevent the expression from being "evaluated" in
+          the string context.
+
+          Example:
+
+          #
+          # Adds the $_ and @_ expressions to the active list
+          #
+
+          add_exprs('$_', '@_') ;
+
+NOTES
+=====
+
+Debugging Other perlTk Applications
+-----------------------------------
+
+     ptkdb can be used to debug other perlTk applications if some
+     cautions are observed.	Basically, do not click the mouse in the
+     application's window(s) when you've entered the debugger and do not
+     click in the debugger's window(s) while the application is running.
+     	Doing either one is not necessarily fatal, but it can confuse things
+     	that are going on and produce unexpected results.
+
+     Be aware that most perlTk applications have a central event loop.
+     	User actions, such as mouse clicks, key presses, window exposures,
+     	etc will generate 'events' that the script will process.	When
+     	a perlTk application is running, its 'MainLoop' call will accept these
+     	events and then dispatch them to appropriate callbacks associated
+     	with the appropriate widgets.
+
+     Ptkdb has its own event loop that runs whenever you've stopped at a
+     	breakpoint and entered the debugger.	However, it can accept events
+     	that are generated by other perlTk windows and dispatch their callbacks.
+     	The problem here is that the application is supposed to be 'stopped',
+     	and logically the application should not be able to process events.
+
+     A future version of ptkdb will have an extension that will 'filter'
+     events so that application events are not processed while the
+     debugger is active, and debugger events will not be processed while
+     the target script is active.
+
+Debugging CGI Scripts
+---------------------
+
+     One advantage of ptkdb over the builtin debugger(-d) is that it can
+     be used to debug CGI perl scripts as they run on a web server.	Be
+     sure that that your web server's perl instalation includes Tk.
+
+   Change your
+
+     #! /usr/local/bin/perl
+
+   to
+
+     #! /usr/local/bin/perl -d:ptkdb
+
+   TIP: You can debug scripts remotely if you're using a unix based
+Xserver and where you are authoring the script has an Xserver.	 The
+Xserver can be another unix workstation, a Macintosh or Win32 platform
+with an appropriate XWindows package.	 In your script insert the 		following
+BEGIN subroutine:
+
+     sub BEGIN {
+     	$ENV{'DISPLAY'} = "myHostname:0.0" ;
+     }
+
+   Be sure that your web server has permission to open windows on your
+Xserver (see the xhost manpage).
+
+     Access your web page with your browswer and 'submit' the script as
+     normal.	 The ptkdb window should appear on myHostname's monitor.	At
+     this point you can start debugging your script.	 Be aware that your
+     browser may timeout waiting for the script to run.
+
+   To expedite debugging you may want to setup your breakpoints in advance
+with a .ptkdbrc file and use the $DB::no_stop_at_start variable.	 NOTE: for
+debugging web scripts you may have to have the .ptkdbrc file installed in
+the server account's home directory (~www) or whatever username your
+webserver is running under.	 Also try installing a .ptkdbrc file in
+the same directory as the target script.
+
+KNOWN PROBLEMS
+==============
+
+Breakpoint Controls
+     If the size of the right hand pane is too small the breakpoint
+     controls are not visible.	The breakpoints are still there, the
+     window may have to be enlarged in order for them to be visible.
+
+Balloons and Tk400
+     The Balloons in Tk400 will not work with ptkdb.	 All other functions
+     are supported, but the Balloons require Tk800 or higher.
+
+AUTHOR
+======
+
+   Andrew E. Page, aep@world.std.com
+
+ACKNOWLEDGEMENTS
+================
+
+   Matthew Persico		 For suggestions, and beta testing.
+
+
+File: pm.info,  Node: Device/ISDN/OCLM,  Next: Device/ISDN/OCLM/CurrentStatistics,  Prev: Devel/ptkdb,  Up: Module List
+
+A perl module to control the 3com OfficeConnect LanModem
+********************************************************
+
+NAME
+====
+
+   Device::ISDN::OCLM - A perl module to control the 3com OfficeConnect
+LanModem
+
+SYNOPSIS
+========
+
+     $sp = 1;
+     $pw = 'secret;
+     $lanmodem = Device::ISDN::OCLM->new ();
+     $lanmodem->password ($pw);
+     $command = 'manualConnect';
+     $status = $lanmodem->$command ($sp);
+     while (($status eq 'CLOCK') || ($status eq 'PASSWORD') ||
+            ($status eq 'CONNECTING') || ($status eq 'LOGGING IN')) {
+       if ($status eq 'CLOCK') {
+         sleep (1);
+         $status = $lanmodem->setClock ();
+       } elsif ($status eq 'PASSWORD') {
+         sleep (1);
+         $status = $lanmodem->enterPasword ();
+       } elsif (($status eq 'CONNECTING') || ($status eq 'LOGGING IN')) {
+         $command = 'connectStatus';
+         $status = 'OK';
+       }
+       if ($status eq 'OK') {
+         sleep (1);
+         $status = $lanmodem->$command ($sp);
+       }
+     }
+     print "$status\n";
+
+DESCRIPTION
+===========
+
+   This module can be used to control the 3com OfficeConnect LanModem, an
+ISDN TA/router. Device statistics can be queried and manual connections
+can be brought up and taken down. Support is provided for setting the
+clock if the device is power-cycled, and for automatically entering the
+password if the device is password-protected.
+
+   All operations that access the device return a status code indicating
+whether the operation was successful or not; and, if not, why. For
+example, if you attempt to query device statistics and the device is
+locked then the status code will indicate this fact, allowing you to enter
+the password and retry the operation. Hence the loop in the above synopsis.
+
+   This module does not perform these loops internally in an effort to
+allow it to be embedded within a controlling application such as the *oclm*
+Perl command-line application, and a GNOME/GTK graphical user interface
+that is available separately.
+
+   This module has a few warts; some are mandated by the device itself and
+some are the fault of the author.
+
+CONSTRUCTORS
+============
+
+   The following constructor is provided:
+
+$lanmodem = Device::ISDN::OCLM->new ()
+     This class method constructs a new LanModem object. A default HTTP
+     user agent is created with no proxy information.
+
+METHODS
+=======
+
+   The following methods are provided:
+
+$copy = $lanmodem->clone ()
+     This method returns a clone of this object.
+
+$oldHostname = $lanmodem->lanmodem ( [$newHostname] )
+     This method gets, and optionally sets, the hostname (and optionally
+     port) of the device being controlled. The default value is
+     *3com.oc.lanmodem*.
+
+$oldPassword = $lanmodem->password ( [$newPassword] )
+     This method gets, and optionally sets, the password needed to access
+     the device. This is only needed if your device is password-protected.
+
+$userAgent = $lanmodem->userAgent ()
+     This method gets the *LWP::UserAgent* that is used by this object to
+     access the device. Use this if you want to configure HTTP proxy
+     settings, etc.
+
+$defHostname = $lanmodem->defaultLanModem ()
+     This method gets the default device hostname, *3com.oc.lanmodem*.
+
+$status = $lanmodem->manualConnect ($providerIndex)
+     This method attempts to manually connect to the specified service
+     provider (identified by index, starting from 1). The result will be
+     one of the standard status codes, *'CONNECTING'* if the ISDN
+     connection attempt is in progress (most likely), *'LOGGING IN'* if
+     the device is attempting to log in to the service provider, *'ISDN
+     FAILED'* if there was an error placing the ISDN call or *'LOGON
+     FAILED'* if there was an error logging on. Currently, further details
+     of the error are not available.
+
+     Once you have called this and the response is *'CONNECTING'* or
+     *'LOGGING IN'* then you should poll the *connectStatus()* method to
+     determine the updated connection attempt status.
+
+     If you call this method while the device is already connecting to, or
+     logging into the service provider, then the results are not clearly
+     defined; the connection attempt may be aborted. If you call this
+     after the device has connected to the service provider, then again it
+     is not clearly defined; it may return success.
+
+$status = $lanmodem->connectStatus ($providerIndex)
+     This method returns the connection status of the call currently in
+     progress to the specified provider.
+
+$status = $lanmodem->manualDisconnect ($lineIndex)
+     This method attempts to manually disconnect the specified ISDN line
+     (identified by index, starting from 1). The result will be one of the
+     standard status codes.
+
+$status = $lanmodem->manualAbort ($lineIndex)
+     This method attempts to abort the current connection attempt on the
+     specified ISDN line (identified by index, starting from 1). The result
+     will be one of the standard status codes.
+
+$status = $lanmodem->enterPassword ()
+     This method enters the password on the device to unlock it. You should
+     first configure a password through the password() method. This method
+     should generally be called when a query returns the status code
+     'PASSWORD'. The result will be one of the standard status codes or
+     *'BAD PASSWORD'* if the password you configured is incorrect.
+
+$status = $lanmodem->setClock ()
+     This method sets the time on the device to the current time on your
+     system. This should generally be called when a query returns the
+     status code 'CLOCK'. The result will be one of the standard status
+     codes.
+
+$status = $lanmodem->getManualStatistics ()
+     This method queries manual calling statistics from the device. This
+     includes all configured service providers and whether they are
+     currently connected or not. The result will be one of the standard
+     status codes.
+
+$info = $lanmodem->manualStatistics ()
+     This method returns the result of the previous manual calling
+     statistics query; the result is of type
+     Device::ISDN::OCLM::ManualStatistics. If the previous request failed,
+     then the result is indeterminate.
+
+$status = $lanmodem->getSystemStatistics ()
+     This method queries system statistics from the device. This includes
+     the device serial number, firmware revision etc. The result will be
+     one of the standard status codes.
+
+$info = $lanmodem->systemStatistics ()
+     This method returns the result of the previous system statistics
+     query; the result is of type Device::ISDN::OCLM::SystemStatistics. If
+     the previous request failed, then the result is indeterminate.
+
+$status = $lanmodem->getISDNStatistics ()
+     This method queries ISDN statistics from the device. This includes the
+     status of the different ISDN layers, etc. The result will be one of
+     the standard status codes.
+
+$info = $lanmodem->isdnStatistics ()
+     This method returns the result of the previous ISDN statistics query;
+     the result is of type Device::ISDN::OCLM::ISDNStatistics. If the
+     previous request failed, then the result is indeterminate.
+
+$status = $lanmodem->getCurrentStatistics ()
+     This method queries current call statistics from the device. This
+     includes details about the current connection on each ISDN line,
+     including its up time, to whom it is connected, etc. The result will
+     be one of the standard status codes.
+
+$info = $lanmodem->currentStatistics ()
+     This method returns the result of the previous current call statistics
+     query; the result is of type Device::ISDN::OCLM::CurrentStatistics.
+     If the previous request failed, then the result is indeterminate.
+
+$status = $lanmodem->getLastStatistics ()
+     This method queries last call statistics from the device. This
+     includes details about the previous connection on each ISDN line,
+     including its up time, the reason for it going down, etc. The result
+     will be one of the standard status codes.
+
+$info = $lanmodem->lastStatistics ()
+     This method returns the result of the previous last call statistics
+     query; the result is of type Device::ISDN::OCLM::LastStatistics. If
+     the previous request failed, then the result is indeterminate.
+
+$status = $lanmodem->getLast10Statistics ()
+     This method queries last 10 call statistics from the device. This
+     includes details of the last 10 calls, including their durations, the
+     reason for going up, etc. The result will be one of the standard
+     status codes.
+
+$info = $lanmodem->last10Statistics ()
+     This method returns the result of the previous last 10 call statistics
+     query; the result is of type Device::ISDN::OCLM::Last10Statistics. If
+     the previous request failed, then the result is indeterminate.
+
+$status = $lanmodem->getSPStatistics ()
+     This method queries service provider statistics from the device. This
+     includes the name of each configured service provider as well as how
+     much time you have spent connected to that provider, etc. The result
+     will be one of the standard status codes.
+
+$info = $lanmodem->spStatistics ()
+     This method returns the result of the previous service provider
+     statistics query; the result is of type
+     Device::ISDN::OCLM::SPStatistics. If the previous request failed,
+     then the result is indeterminate.
+
+STANDARD STATUS CODES
+=====================
+
+   The following are the status codes that you should expect from any
+command that you perform against the device:
+
+'OK'
+     The command succeeded.
+
+'CLOCK'
+     The device clock is unset (probably because of a power cycle). You
+     should call *setClock()* to set the clock and then repeat your
+     original command.
+
+'PASSWORD'
+     The device is password locked. You should call *enterPassword()* to
+     enter the password and then repeat your original command.
+
+'BAD HTML'
+     The device returned and unexpected HTML page. This is either because
+     of a bug in this module or because your firmware is different from
+     mine.  Probably best to contact me and we can work out the problem.
+
+'BAD HTTP'
+     There was a problem performing an HTTP request of the device. Either
+     you got the hostname wrong, it is not reachable from your machine,
+     there was a network error, or something bizarre of that nature
+     happened.
+
+BUGS
+====
+
+   Specifying your password in any manner is, of course, insecure. Doesn't
+support multiple concurrent connection attemps. Others unknown.
+
+SEE ALSO
+========
+
+   `oclm' in this node, *Note Device/ISDN/OCLM/ManualStatistics:
+Device/ISDN/OCLM/ManualStatistics,, *Note
+Device/ISDN/OCLM/SystemStatistics: Device/ISDN/OCLM/SystemStatistics,,
+*Note Device/ISDN/OCLM/ISDNStatistics: Device/ISDN/OCLM/ISDNStatistics,,
+*Note Device/ISDN/OCLM/CurrentStatistics:
+Device/ISDN/OCLM/CurrentStatistics,, *Note
+Device/ISDN/OCLM/LastStatistics: Device/ISDN/OCLM/LastStatistics,, *Note
+Device/ISDN/OCLM/Last10Statistics: Device/ISDN/OCLM/Last10Statistics,,
+*Note Device/ISDN/OCLM/SPStatistics: Device/ISDN/OCLM/SPStatistics,, *Note
+Device/ISDN/OCLM/Statistics: Device/ISDN/OCLM/Statistics,
+
+COPYRIGHT
+=========
+
+   Copyright 1999-2000 Merlin Hughes.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+AUTHOR
+======
+
+   Merlin Hughes <merlin@merlin.org>
+
+

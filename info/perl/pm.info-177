@@ -1,0 +1,1851 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: HTML/PageIndex,  Next: HTML/Pager,  Prev: HTML/Navigation,  Up: Module List
+
+Class to create HTML page index objects.
+****************************************
+
+NAME
+====
+
+   HTML::PageIndex - Class to create HTML page index objects.
+
+SYNOPSIS
+========
+
+     use HTML::PageIndex;
+
+     $foo = new HTML::PageIndex;
+
+     $zog = $foo->makeindex([total pages],[current page],[base url],[url arguement],[show prev/next]);
+
+     print $zog;
+
+DESCRIPTION
+===========
+
+   Will return an object which will display a dynamic index of html pages.
+It would look like:
+
+     [Prev] 1 2 3 4 5 6 [Next]
+
+makeindex([total pages],[current page],[base url],[url arguement],[show prev/next]);
+     This is currently the only public method. The args are as follows:
+
+          [total pages] - How many total pages are there.
+
+          [current page] - What the current page is. It is expected that the using script
+          		 would generate this.
+
+          [base url] - The base url to link to.
+
+          [url arguement] - May be "", but if it isn't it will build a
+          		  URL with ?[URL arguement]=[page number]
+
+          [show prev/next] - Default is 0. If 0 it will not show [Prev] if you are on the
+          		first page, or [Next] if you are on the last page. If 1, it will
+          		show [Prev] and [Next] as text.
+
+INSTALLATION
+============
+
+   You install HTML::PageIndex, as you would install any perl module
+library, by running these commands:
+
+     perl Makefile.PL
+     make
+     make install
+     make clean
+
+BUGS
+====
+
+   None knows at time of writing.
+
+AVAILABILITY
+============
+
+   The latest version of HTML::PageIndex should always be available from:
+
+     $CPAN/modules/by-authors/id/K/KM/KMELTZ/
+
+   Visit <URL:http://www.perl.com/CPAN/> to find a CPAN site near you.
+
+   Or, from <URL:http://www.perlguy.com/perl>.
+
+VERSION
+=======
+
+   $Revision: 0.2 $ $Date: 1998/12/23 18:47:22 $
+
+CHANGES
+=======
+
+   $Log: PageIndex.pm,v $ Revision 0.2  1998/12/23 18:47:22  meltzek Added
+POD.
+
+AUTHOR INFORMATION
+==================
+
+   Copyright 1998-99, Kevin Meltzer.  All rights reserved.  It may be used
+and modified freely, but I do request that this copyright notice remain
+attached to the file.  You may modify this module as you wish, but if you
+redistribute a modified version, please attach a note listing the
+modifications you have made.
+
+   Address bug reports and comments to: perlguy@perlguy.com
+
+   The author makes no warranties, promises, or gaurentees of this
+software. As with all software, use at your own risk.
+
+
+File: pm.info,  Node: HTML/Pager,  Next: HTML/Parse,  Prev: HTML/PageIndex,  Up: Module List
+
+Perl module to handle CGI HTML paging of arbitary data
+******************************************************
+
+NAME
+====
+
+   HTML::Pager - Perl module to handle CGI HTML paging of arbitary data
+
+SYNOPSIS
+========
+
+     use HTML::Pager;
+     use CGI;
+
+     # get CGI query object
+     my $query = CGI->new();
+
+     # create a callback subroutine to generate the data to be paged
+     my $get_data_sub = sub {
+        my ($offset, $rows) = @_;
+        my @return_array;
+
+     for (my $x = 0; $x < $rows; $x++) {
+        push(@return_array, [ time() ]);
+     }
+     return \@return_array;
+       }
+
+     # create a Pager object
+     my $pager = HTML::Pager->new(
+                                  # required parameters
+                                  query => $query,
+                                  get_data_callback => $get_data_sub,
+                                  rows => 100,
+                                  page_size => 10,
+
+     # some optional parameters
+     persist_vars => ['myformvar1',
+                      'myformvar2',
+                      'myformvar3'],
+     cell_space_color => '#000000',
+     cell_background_color => '#ffffff',
+     nav_background_color => '#dddddd',
+     javascript_presubmit => 'last_minute_javascript()',
+     debug => 1,
+                                   );
+
+     # make it go - send the results to the browser.
+     print $pager->output;
+
+DESCRIPTION
+===========
+
+   This module handles the paging of data coming from an arbitrary source
+and being displayed using HTML::Template and CGI.pm.  It provides an
+interface to pages of data similar to many well-known sites, like
+altavista.digital.com or www.google.com.
+
+   This module uses HTML::Template to do all its HTML generation.  While
+it is possible to use this module without directly using HTML::Template,
+it's not very useful.  Modification of the look-and-feel as well as the
+functionality of the resulting HTML should all be done through
+HTML::Template objects.  Take a look at *Note HTML/Template:
+HTML/Template, for more info.
+
+METHODS
+=======
+
+new()
+-----
+
+   The new() method creates a new Pager object and prepares the data for
+output().
+
+   new() requires several options, see above for syntax:
+
+   * query - this is the CGI.pm query object for this run.  Pager will
+     remove it's state-maintaining parameters from the query.  They all
+     begin with PAGER_, so just be careful not to use that prefix.
+
+   * rows - this is the total number of rows in your dataset.  This is
+     needed to provide the next-button, prev-button and page-jump
+     functionality.
+
+   * page_size - the number of rows to display at one time.
+
+   * get_data_callback - this is a callback that you provide to get the
+     pages of data.  It is passed two arguements - the offset and the
+     number of rows in the page.  You return an array ref containing array
+     refs of row data.  For you DBI-heads, this is very similar to
+     selectall_arrayref() - so similar that for very simple cases you can
+     just pass the result through.  Example - this is a sub that returns
+     data from an in-memory array of hash refs.
+
+          my @data = (
+                       { name => sam, age => 10 },
+                       { name => saa, age => 11 },
+                       { name => sad, age => 12 },
+                       { name => sac, age => 13 },
+                       { name => sab, age => 14 },
+                       # ...
+                     );
+
+          my $get_data_sub = sub {
+             my ($offset, $rows) = @_;
+             my @return_array;
+
+          for (my $x = 0; $x < $rows; $x++) {
+             push(@return_array, [ $data[$offset + $x]{name},
+                                   $data[$offset + $x]{age}
+                                 ]
+                 );
+          }
+          return \@return_array;
+            }
+          
+            my $pager = HTML::Pager->new(query => $query,
+                                    get_data_callback => $get_data_sub,
+                                    rows => 100,
+                                    page_size => 10
+                                   );
+
+     You can also specify arguements to be passed to your callback
+     function.  To do this, call new like:
+
+          HTML::Pager->new(query => $query,
+                           get_data_callback => [$get_data_sub, $arg, $arg],
+                           rows => 100,
+                           page_size => 10
+                          );
+
+     If you want to use named, rather than numeric TMPL_VARs in your Pager
+     template you can return a ref to an array of hashes rather than
+     arrays.  This array of hashes will be passed directly to
+     HTML::Template to fill in the loop data for your paging area.
+
+   new() supports several optional arguements:
+
+   * debug - if set to 1, debugging information is warn()'d during the
+     program run.  Defaults to 0.
+
+   * template - this is an HTML::Template object to use instead of the
+     auto-generated HTML::Template used in Pager output.  It must define
+     the following TMPL_LOOPs and TMPL_VARs.  Here's what the default
+     template looks like, to give you an idea of how to change it to suite
+     your purposes:
+
+          <TMPL_VAR NAME="PAGER_JAVASCRIPT">
+          <FORM>
+          <TABLE BORDER=0 BGCOLOR=#000000 WIDTH=100%>
+          <TR><TD><TABLE BORDER=0 WIDTH=100%>
+          <TMPL_LOOP NAME="PAGER_DATA_LIST">
+            <TR>
+              <TD BGCOLOR=#ffffff><TMPL_VAR NAME="PAGER_DATA_COL_0"></TD>
+              <TD BGCOLOR=#ffffff><TMPL_VAR NAME="PAGER_DATA_COL_1"></TD>
+              <TD BGCOLOR=#ffffff><TMPL_VAR NAME="PAGER_DATA_COL_2"></TD>
+              <!--- depends on number of rows in data - so should your replacement! -->
+            </TR>
+          </TMPL_LOOP>
+          <TR><TD BGCOLOR=#DDDDDD COLSPAN=3 ALIGN=CENTER>
+            <TMPL_VAR NAME="PAGER_PREV">
+            <TMPL_VAR NAME="PAGER_JUMP">
+            <TMPL_VAR NAME="PAGER_NEXT">
+          </TD></TR>
+          </TABLE>
+          </TABLE>
+          <TMPL_VAR NAME="PAGER_HIDDEN">
+          </FORM>
+
+     Make sure you include all the TMPL_LOOPs and TMPL_VARs included above.
+     If you get HTML::Template errors about trying to set bad param
+     'PAGER_BLAH', that probably means you didn't put the 'PAGER_BLAH'
+     variable in your template.  You can put extra state-maintaining
+     <INPUT> fields in the paging form - in fact, I think that this is
+     probably required for most real-world uses.
+
+     Optionally you can use named parameters inside PAGER_DATA_LIST, and
+     return an array of hashes to fill them in from get_data_callback.  If
+     you did that your template might look like:
+
+          ...
+          <TMPL_LOOP NAME="PAGER_DATA_LIST">
+            <TR>
+              <TD BGCOLOR=#ffffff><TMPL_VAR NAME="NUMBER"></TD>
+              <TD BGCOLOR=#ffffff><TMPL_VAR NAME="FIRST_NAME"></TD>
+              <TD BGCOLOR=#ffffff><TMPL_VAR NAME="LAST_NAME"></TD>
+            </TR>
+          </TMPL_LOOP>
+          ...
+
+   * persist_vars - Pass a ref to an array of the names of the CGI form
+     parameters you want to store into this fuction, and they will be
+     included in the hidden form data of the pager form.
+
+     This method allows you to have hidden form variables which persist
+     from page to page.  This is useful when connecting your pager to some
+     other function (such as a search form) which needs to keep some data
+     around for later use.
+
+     The old $pager->persist_vars() syntax still works but is deprecated.
+
+   * column_names - should be set to an array ref containing the names of
+     the columns - this will be used to create column headers.  Without
+     this arguement, the columns will have no headers.  This option is only
+     useful in very simple cases where all the data is actually in use as
+     columns.  Example:
+
+          my $pager = HTML::Pager->new( column_names => [ 'one', 'two' ]);
+
+   * cell_space_color - this specifies the color of the lines separating
+     the cells.  If the default template is mostly OK, except for the color
+     scheme, this will provide a middle ground between the necessity of
+     creating your own Pager template and suffering with bad colors.
+     Example:
+
+          my $pager = HTML::Pager->new( cell_space_color => '#222244' );
+
+   * cell_background_color - this specifies the background color of each
+     data cell.  If the default template is mostly OK, except for the color
+     scheme, this will provide a middle ground between the necessity of
+     creating your own Pager template and suffering with bad colors.
+     Example:
+
+          my $pager = HTML::Pager->new( cell_background_color => '#000000' );
+
+   * nav_background_color - this specifies the background color of the
+     bottom navigation bar.  If the default template is mostly OK, except
+     for the color scheme, this will provide a middle ground between the
+     necessity of creating your own Pager template and suffering with bad
+     colors.  Example:
+
+          my $pager = HTML::Pager->new( nav_background_color => '#222244' );
+
+   * javascript_presubmit - this optional parameter allows you to specify a
+     Javascript function which will be called when a user clicks on one of
+     the Pager navigation buttons, prior to submitting the form.  Only if
+     this function returns 'true' will the form be submitted.
+
+     The Pager navigation calls its 'PAGER_set_offset_and_submit()'
+     javascript function when a user clicks the "Next", "Previous" or other
+     page buttons.  This normally precludes calling your own javascript
+     submit functions to perform some task.
+
+     Through this hook, you can perform client-side functions, such as form
+     validation, which can modify the form or actually prevent the user
+     from going to the next page.  This is particularly useful for enabling
+     some kind of work-flow involving form validation.
+
+          Constructor Example:
+
+          my $pager = HTML::Pager->new(
+                         javascript_presubmit => 'last_minute_javascript()'
+                      );
+
+          HTML Example:
+
+          <script language=Javascript>
+              function last_minute_javascript() {
+                  return confirm("Are you sure you want to leave this page?");
+              }
+          </script>
+
+output()
+--------
+
+   This method returns the HTML <FORM> and <TABLE> to create the paging
+list-view.  If you used the template option to new() this will output the
+entire template.
+
+MAINTAINING PAGING STATE
+========================
+
+   Sometimes you'll want to be able to allow the user to leave your paging
+list and be able to come back to where they were without requiring that
+they use the Back button.  To do this all you have to do is arrange to
+save the state of the PAGER_offset parameter, and pass it back to the
+paging-list CGI.
+
+CREDITS
+=======
+
+   This module was created for Vanguard Media and I'd like to thank my
+boss, Jesse Erlbaum, for allowing me to release it to the public.  He also
+added the persist_vars functionality, the background colors option and the
+javascript_presubmit option.
+
+AUTHOR
+======
+
+   Sam Tregar, sam@tregar.com
+
+LICENSE
+=======
+
+   HTML::Template : A Perl module to handle CGI HTML paging of arbitary
+data Copyright (C) 1999 Sam Tregar (sam@tregar.com)
+
+   This program is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2 of the License, or (at your option)
+any later version.
+
+   This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
+
+   You should have received a copy of the GNU General Public License along
+with this program; if not, write to the Free Software Foundation, Inc., 59
+Temple Place, Suite 330, Boston, MA 02111-1307 USA
+
+SEE ALSO
+========
+
+   *Note HTML/Template: HTML/Template,, *Note CGI: CGI,
+
+
+File: pm.info,  Node: HTML/Parse,  Next: HTML/Parser,  Prev: HTML/Pager,  Up: Module List
+
+Deprecated, a wrapper around HTML::TreeBuilder
+**********************************************
+
+NAME
+====
+
+   HTML::Parse - Deprecated, a wrapper around HTML::TreeBuilder
+
+SYNOPSIS
+========
+
+     See the documentation for HTML::TreeBuilder
+
+DESCRIPTION
+===========
+
+   Disclaimer: This module is provided only for backwards compatibility
+with earlier versions of this library.  New code should not use this
+module, and should really use the HTML::Parser and HTML::TreeBuilder
+modules directly, instead.
+
+   The `HTML::Parse' module provides functions to parse HTML documents.
+There are two functions exported by this module:
+
+parse_html($html) or parse_html($html, $obj)
+     This function is really just a synonym for $obj->parse($html) and $obj
+     is assumed to be a subclass of HTML::Parser.  Refer to *Note
+     HTML/Parser: HTML/Parser, for more documentation.
+
+     If $obj is not specified, the $obj will default to an internally
+     created new HTML::TreeBuilder object configured with strict_comment()
+     turned on.  That class implements a parser that builds (and is) a HTML
+     syntax tree with HTML::Element objects as nodes.
+
+     The return value from parse_html() is $obj.
+
+parse_htmlfile($file, [$obj])
+     Same as parse_html(), but pulls the HTML to parse, from the named
+     file.
+
+     Returns undef if the file could not be opened, or $obj otherwise.
+
+   When a HTML::TreeBuilder object is created, the following variables
+control how parsing takes place:
+
+$HTML::Parse::IMPLICIT_TAGS
+     Setting this variable to true will instruct the parser to try to
+     deduce implicit elements and implicit end tags.  If this variable is
+     false you get a parse tree that just reflects the text as it stands.
+     Might be useful for quick & dirty parsing.  Default is true.
+
+     Implicit elements have the implicit() attribute set.
+
+$HTML::Parse::IGNORE_UNKNOWN
+     This variable contols whether unknow tags should be represented as
+     elements in the parse tree.  Default is true.
+
+$HTML::Parse::IGNORE_TEXT
+     Do not represent the text content of elements.  This saves space if
+     all you want is to examine the structure of the document.  Default is
+     false.
+
+$HTML::Parse::WARN
+     Call warn() with an apropriate message for syntax errors.  Default is
+     false.
+
+REMEMBER!
+=========
+
+   HTML::TreeBuilder objects should be explicitly destroyed when you're
+finished with them.  See *Note HTML/TreeBuilder: HTML/TreeBuilder,.
+
+SEE ALSO
+========
+
+   *Note HTML/Parser: HTML/Parser,, *Note HTML/TreeBuilder:
+HTML/TreeBuilder,, *Note HTML/Element: HTML/Element,
+
+COPYRIGHT
+=========
+
+   Copyright 1995-1998 Gisle Aas. All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+AUTHOR
+======
+
+   Gisle Aas <gisle@aas.no>.  Current maintainer Sean M. Burke
+<sburke@cpan.org>
+
+
+File: pm.info,  Node: HTML/Parser,  Next: HTML/PrettyPrinter,  Prev: HTML/Parse,  Up: Module List
+
+HTML parser class
+*****************
+
+NAME
+====
+
+   HTML::Parser - HTML parser class
+
+SYNOPSIS
+========
+
+     use HTML::Parser ();
+
+     # Create parser object
+     $p = HTML::Parser->new( api_version => 3,
+                             start_h => [\&start, "tagname, attr"],
+                             end_h   => [\&end,   "tagname"],
+                             marked_sections => 1,
+                           );
+
+     # Parse document text chunk by chunk
+     $p->parse($chunk1);
+     $p->parse($chunk2);
+     #...
+     $p->eof;                 # signal end of document
+
+     # Parse directly from file
+     $p->parse_file("foo.html");
+     # or
+     open(F, "foo.html") || die;
+     $p->parse_file(*F);
+
+   HTML::Parser version 2 style subclassing and method callbacks:
+
+     {
+        package MyParser;
+        use base 'HTML::Parser';
+
+     sub start {
+        my($self, $tagname, $attr, $attrseq, $origtext) = @_;
+        #...
+     }
+
+     sub end {
+     	my($self, $tagname, $origtext) = @_;
+     	#...
+     }
+
+     sub text {
+     	my($self, $origtext, $is_cdata) = @_;
+     	#...
+     }
+      }
+
+     my $p = MyParser->new;
+     $p->parse_file("foo.html");
+
+DESCRIPTION
+===========
+
+   Objects of the HTML::Parser class will recognize markup and separate it
+from plain text (alias data content) in HTML documents.  As different
+kinds of markup and text are recognized, the corresponding event handlers
+are invoked.
+
+   HTML::Parser in not a generic SGML parser.  We have tried to make it
+able to deal with the HTML that is actually "out there", and it normally
+parses as closely as possible to the way the popular web browsers do it
+instead of strictly following one of the many HTML specifications from
+W3C.  Where there is disagreement there is often an option that you can
+enable to get the official behaviour.
+
+   The document to be parsed may be supplied in arbitrary chunks.  This
+makes on-the-fly parsing as documents are received from the network
+possible.
+
+   If event driven parsing does not feel right for your application, you
+might want to use `HTML::TokeParser'.  It is a HTML::Parser subclass that
+allows a more conventional program structure.
+
+METHODS
+=======
+
+   The following method is used to construct a new HTML::Parser object:
+
+$p = HTML::Parser->new( %options_and_handlers )
+     This class method creates a new HTML::Parser object and returns it.
+     Key/value pair arguments may be provided to assign event handlers or
+     initialize parser options.  The handlers and parser options can also
+     be set or modified later by method calls described below.
+
+     If a top level key is in the form "<event>_h" (e.g., "text_h"} then it
+     assigns a handler to that event, otherwise it initializes a parser
+     option. The event handler specification value must be an array
+     reference.  Multiple handlers may also be assigned with the 'handlers
+     => [%handlers]' option.  See examples below.
+
+     If new() is called without any arguments, it will create a parser that
+     uses callback methods compatible with version 2 of HTML::Parser.  See
+     the section on "version 2 compatibility" below for details.
+
+     Special constructor option 'api_version => 2' can be used to
+     initialize version 2 callbacks while still setting other options and
+     handlers.  The 'api_version => 3' option can be used if you don't want
+     to set any options and don't want to fall back to v2 compatible mode.
+
+     Examples:
+
+          $p = HTML::Parser->new(api_version => 3,
+                                 text_h => [ sub {...}, "dtext" ]);
+
+     This creates a new parser object with a text event handler subroutine
+     that receives the original text with general entities decoded.
+
+          $p = HTML::Parser->new(api_version => 3,
+          			start_h => [ 'my_start', "self,tokens" ]);
+
+     This creates a new parser object with a start event handler method
+     that receives the $p and the tokens array.
+
+          $p = HTML::Parser->new(api_version => 3,
+          		        handlers => { text => [\@array, "event,text"],
+                                               comment => [\@array, "event,text"],
+                                             });
+
+     This creates a new parser object that stores the event type and the
+     original text in @array for text and comment events.
+
+   The following methods feed the HTML document to the HTML::Parser object:
+
+$p->parse( $string )
+     Parse $string as the next chunk of the HTML document.  The return
+     value is normally a reference to the parser object (i.e. $p).
+     Handlers invoked should not attempt modify the $string in-place until
+     $p->parse returns.
+
+     If an invoked event handler aborts parsing by calling $p->eof, then
+     $p->parse() will return a FALSE value.
+
+$p->parse_file( $file )
+     Parse text directly from a file.  The $file argument can be a
+     filename, an open file handle, or a reference to a an open file
+     handle.
+
+     If $file contains a filename and the file can't be opened, then the
+     method returns an undefined value and $! tells why it failed.
+     Otherwise the return value is a reference to the parser object.
+
+     If a file handle is passed as the $file argument, then the file will
+     normally be read until EOF, but not closed.
+
+     If an invoked event handler aborts parsing by calling $p->eof, then
+     $p->parse_file() may not have read the entire file.
+
+     On systems with multi-byte line terminators, the values passed for the
+     offset and length argspecs may be too low if parse_file is called with
+     a file handle that is not in binary mode.
+
+$p->eof
+     Signals the end of the HTML document.  Calling the $p->eof method
+     outside a handler callback will flush any remaining buffered text
+     (which triggers the text event if there is any remaining text).
+
+     Calling $p->eof inside a handler will terminate parsing at that point
+     and cause $p->parse to return a FALSE value.  This also terminates
+     parsing by $p->parse_file().
+
+     The return value is a reference to the parser object.
+
+   Most parser options are controlled by boolean attributes.  Each boolean
+attribute is enabled by calling the corresponding method with a TRUE
+argument and disabled with a FALSE argument.  The attribute value is left
+unchanged if no argument is given.  The return value from each method is
+the old attribute value.
+
+   Methods that can be used to get and/or set parser options are:
+
+$p->strict_comment( [$bool] )
+     By default, comments are terminated by the first occurrence of "->".
+     This is the behaviour of most popular browsers (like Netscape and
+     MSIE), but it is not correct according to the official HTML standard.
+     Officially, you need an even number of "-" tokens before the closing
+     ">" is recognized and there may not be anything but whitespace
+     between an even and an odd "-".
+
+     The official behaviour is enabled by enabling this attribute.
+
+$p->strict_names( [$bool] )
+     By default, almost anything is allowed in tag and attribute names.
+     This is the behaviour of most popular browsers and allows us to parse
+     some broken tags with invalid attr values like:
+
+          <IMG SRC=newprevlstGr.gif ALT=[PREV LIST] BORDER=0>
+
+     By default, "LIST]" is parsed as a boolean attribute, not as part of
+     the ALT value as was clearly intended.  This is also what Netscape
+     sees.
+
+     The official behaviour is enabled by enabling this attribute.  If
+     enabled, it will cause the tag above to be reported as text since
+     "LIST]" is not a legal attribute name.
+
+$p->boolean_attribute_value( $val )
+     This method sets the value reported for boolean attributes inside HTML
+     start tags.  By default, the name of the attribute is also used as its
+     value.  This affects the values reported for tokens and attr argspecs.
+
+$p->xml_mode( [$bool] )
+     Enabling this attribute changes the parser to allow some XML
+     constructs such as *empty element tags* and *XML processing
+     instructions*.  It disables forcing tag and attribute names to lower
+     case when they are reported by the `tagname' and attr argspecs, and
+     suppress special treatment of elements that are parsed as CDATA for
+     HTML.
+
+     *Empty element tags* look like start tags, but end with the character
+     sequence "/>".  When recognized by HTML::Parser they cause an
+     artificial end event in addition to the start event.  The text for
+     the artificial end event will be empty and the `tokenpos' array will
+     be undefined even though the only element in the token array will have
+     the correct tag name.
+
+     *XML processing instructions* are terminated by "?>" instead of a
+     simple ">" as is the case for HTML.
+
+$p->unbroken_text( [$bool] )
+     By default, blocks of text are given to the text handler as soon as
+     possible (but the parser makes sure to always break text at the
+     boundary between whitespace and non-whitespace so single words and
+     entities always can be decoded safely).  This might create breaks that
+     make it hard to do transformations on the text. When this attribute is
+     enabled, blocks of text are always reported in one piece.  This will
+     delay the text event until the following (non-text) event has been
+     recognized by the parser.
+
+$p->marked_sections( [$bool] )
+     By default, section markings like <![CDATA[...]]> are treated like
+     ordinary text.  When this attribute is enabled section markings are
+     honoured.
+
+     There are currently no events associated with marked section elements.
+
+   As markup and text is recognized, handlers are invoked.  The following
+method is used to set up handlers for different events:
+
+$p->handler( event => \&subroutine, argspec )
+$p->handler( event => method_name, argspec )
+$p->handler( event => \@accum, argspec )
+$p->handler( event => "" );
+$p->handler( event => undef );
+$p->handler( event );
+     This method assigns a subroutine, method, or array to handle an event.
+
+     Event is one of text, start, end, `declaration', comment, process or
+     default.
+
+     Subroutine is a reference to a subroutine which is called to handle
+     the event.
+
+     *Method_name* is the name of a method of $p which is called to handle
+     the event.
+
+     *Accum* is a array that will hold the event information as sub-arrays.
+
+     If the second argument is "", the event is ignored.  If it is undef,
+     the default handler is invoked for the event.
+
+     Argspec is a string that describes the information to be reported for
+     the event.  Any requested information that does not apply to a
+     specific event is passed as undef.  If argspec is omitted, then it is
+     left unchanged since last update.
+
+     The return value from $p->handle is the old callback routine or a
+     reference to the accumulator array.
+
+     Return values from handler callback routines/methods are always
+     ignored.  A handler callback can request parsing to be aborted by
+     invoking the $p->eof method.  A handler callback is not allowed to
+     invoke $p->parse() or $p->parse_file().
+
+     Examples:
+
+          $p->handler(start =>  "start", 'self, attr, attrseq, text' );
+
+     This causes the "start" method of object $p to be called for 'start'
+     events.  The callback signature is $p->start(\%attr, \@attr_seq,
+     $text).
+
+          $p->handler(start =>  \&start, 'attr, attrseq, text' );
+
+     This causes subroutine start() to be called for 'start' events.  The
+     callback signature is start(\%attr, \@attr_seq, $text).
+
+          $p->handler(start =>  \@accum, '"S", attr, attrseq, text' );
+
+     This causes 'start' event information to be saved in @accum.  The
+     array elements will be ['S', \%attr, \@attr_seq, $text].
+
+          $p->handler(start => "");
+
+     This causes 'start' events to be ignored.  It also supresses
+     invokations of any default handler for start events.  It is equivalent
+     to $p->handler(start => sub {}), but is more efficient.
+
+          $p->handler(start => undef);
+
+     This causes no handler to be assosiated with start events.  If there
+     is a default handler it will be invoked.
+
+Argspec
+-------
+
+   Argspec is a string containing a comma separated list that describes
+the information reported by the event.  The following argspec identifier
+names can be used:
+
+`self'
+     Self causes the current object to be passed to the handler.  If the
+     handler is a method, this must be the first element in the argspec.
+
+tokens
+     Tokens causes a reference to an array of token strings to be passed.
+     The strings are exactly as they were found in the original text, no
+     decoding or case changes are applied.
+
+     For `declaration' events, the array contains each word, comment, and
+     delimited string starting with the declaration type.
+
+     For comment events, this contains each sub-comment.  If
+     $p->strict_comments is disabled, there will be only one sub-comment.
+
+     For start events, this contains the original tag name followed by the
+     attribute name/value pairs.  The value of boolean attributes will be
+     either the value set by $p->boolean_attribute_value or the attribute
+     name if no value has been set by $p->boolean_attribute_value.
+
+     For end events, this contains the original tag name (one token only).
+
+     For process events, this contains the process instructions (one token
+     only).
+
+     This passes undef for text events.
+
+`tokenpos'
+     Tokenpos causes a reference to an array of token positions to be
+     passed.  For each string that appears in tokens, this array contains
+     two numbers.  The first number is the offset of the start of the
+     token in the original text and the second number is the length of the
+     token.
+
+     Boolean attributes in a start event will have (0,0) for the attribute
+     value offset and length.
+
+     This passes undef if there are no tokens in the event (e.g., text)
+     and for artifical end events triggered by empty element tags.
+
+     If you are using these offsets and lengths to modify text, you should
+     either work from right to left, or be very careful to calculate the
+     changes to the offsets.
+
+`token0'
+     Token0 causes the original text of the first token string to be
+     passed.  This should always be the same as $tokens->[0].
+
+     For `declaration' events, this is the declaration type.
+
+     For start and end events, this is the tag name.
+
+     For process and non-strict comment events, this is everything inside
+     the tag.
+
+     This passes undef if there are no tokens in the event.
+
+`tagname'
+     This is the element name (or *generic identifier* in SGML jargon) for
+     start and end tags.  Since HTML is case insensitive this name is
+     forced to lower case to ease string matching.
+
+     Since XML is case sensitive, the tagname case is not changed when
+     `xml_mode' is enabled.
+
+     The declaration type of declaration elements is also passed as a
+     tagname, even if that is a bit strange.  In fact, in the current
+     implementation tagname is identical to `token0' except that the name
+     may be forced to lower case.
+
+attr
+     Attr causes a reference to a hash of attribute name/value pairs to be
+     passed.
+
+     Boolean attributes' values are either the value set by
+     $p->boolean_attribute_value or the attribute name if no value has been
+     set by $p->boolean_attribute_value.
+
+     This passes undef except for start events.
+
+     Unless `xml_mode' is enabled, the attribute names are forced to lower
+     case.
+
+     General entities are decoded in the attribute values and one layer of
+     matching quotes enclosing the attribute values are removed.
+
+`attrseq'
+     Attrseq causes a reference to an array of attribute names to be
+     passed.  This can be useful if you want to walk the attr hash in the
+     original sequence.
+
+     This passes undef except for start events.
+
+     Unless `xml_mode' is enabled, the attribute names are forced to lower
+     case.
+
+text
+     Text causes the source text (including markup element delimiters) to
+     be passed.
+
+`dtext'
+     Dtext causes the decoded text to be passed.  General entities are
+     automatically decoded unless the event was inside a CDATA section or
+     was between literal start and end tags (`script', style, `xmp', and
+     plaintext).
+
+     The ISO 8859-1 character set (aka Latin1) is assumed for entity
+     decoding.
+
+     It is planned that HTML::Parser will get an utf8 option at some point
+     that will affect the byte sequence that characters with codes greater
+     than 127 will decode into.
+
+     This passes undef except for text events.
+
+is_cdata
+     Is_cdata causes a TRUE value to be passed if the event is inside a
+     CDATA section or is between literal start and end tags (`script',
+     style, `xmp', and plaintext).
+
+     When the flag is FALSE for a text event, then you should normally
+     either use `dtext' or decode the entities yourself before the text is
+     processed further.
+
+offset
+     Offset causes the byte position in the HTML document of the start of
+     the event to be passed.  The first byte in the document is 0.
+
+length
+     Length causes the number of bytes of the source text of the event to
+     be passed.
+
+event
+     Event causes the event name to be passed.
+
+     The event name is one of text, start, end, `declaration', comment,
+     process or default.
+
+line
+     *Note: This is not supported yet!*
+
+     Line causes the line number of the start of the event to be passed.
+     The first line in the document is 1.  Line counting doesn't start
+     until at least one handler requests this value.
+
+`'...''
+     A literal string of 0 to 255 characters enclosed in single (') or
+     double (") quotes is passed as entered.
+
+undef
+     Pass an undefined value.  Useful as padding.
+
+Events
+------
+
+   Handlers for the following events can be registered:
+
+text
+     This event is triggered when plain text is recognized.  The text may
+     contain multiple lines.  A sequence of text may be broken between
+     several text events unless $p->unbroken_text is enabled.
+
+     The parser will make sure that it does not break a word or a sequence
+     of whitespace between two text events.
+
+start
+     This event is triggered when a start tag is recognized.
+
+     Example:
+
+          <A HREF="http://www.perl.com/">
+
+end
+     This event is triggered when an end tag is recognized.
+
+     Example:
+
+          </A>
+
+`declaration'
+     This event is triggered when a *markup declaration* is recognized.
+
+     For typical HTML documents, the only declaration you are likely to
+     find is <!DOCTYPE ...>.
+
+     Example:
+
+          <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+          "http://www.w3.org/TR/html40/strict.dtd">
+
+     DTDs inside <!DOCTYPE ...> will confuse HTML::Parser.
+
+comment
+     This event is triggered when a markup comment is recognized.
+
+     Example:
+
+          <!-- This is a comment -- -- So is this -->
+
+process
+     This event is triggered when a processing instructions markup is
+     recognized.
+
+     The format and content of processing instructions is system and
+     application dependent.
+
+     Examples:
+
+          <? HTML processing instructions >
+          <? XML processing instructions ?>
+
+default
+     This event is triggered for events that do not have a specific
+     handler.  You can set up a handler for this event to catch stuff you
+     did not want to catch explicitly.
+
+VERSION 2 COMPATIBILITY
+=======================
+
+   When an HTML::Parser object is constructed with no arguments, a set of
+handlers is automatically provided that is compatible with the old
+HTML::Parser version 2 callback methods.
+
+   This is equivalent to the following method calls:
+
+     $p->handler(start   => "start",   "self, tagname, attr, attrseq, text");
+     $p->handler(end     => "end",     "self, tagname, text");
+     $p->handler(text    => "text",    "self, text, is_cdata");
+     $p->handler(process => "process", "self, token0, text");
+     $p->handler(comment =>
+               sub {
+     		 my($self, $tokens) = @_;
+     		 for (@$tokens) {$self->comment($_);}},
+               "self, tokens");
+     $p->handler(declaration =>
+               sub {
+     		 my $self = shift;
+     		 $self->declaration(substr($_[0], 2, -1));},
+               "self, text");
+
+   Setup of these handlers can also be requested with the "api_version =>
+2" constructor option.
+
+SUBCLASSING
+===========
+
+   The HTML::Parser class is subclassable.  Parser objects are plain
+hashes and HTML::Parser reserves only hash keys that start with
+"_hparser".  The parser state can be set up by invoking the init() method
+which takes the same arguments as new().
+
+EXAMPLES
+========
+
+   The first simple example shows how you might strip out comments from an
+HTML document.  We achieve this by setting up a comment handler that does
+nothing and a default handler that will print out anything else:
+
+     use HTML::Parser;
+     HTML::Parser->new(default_h => [sub { print shift }, 'text'],
+                       comment_h => [""],
+                      )->parse_file(shift || die) || die $!;
+
+   The next example prints out the text that is inside the <title> element
+of an HTML document.  Here we start by setting up a start handler.  When
+it sees the title start tag it enables a text handler that prints any text
+found and an end handler that will terminate parsing as soon as the title
+end tag is seen:
+
+     use HTML::Parser ();
+
+     sub start_handler
+     {
+       return if shift ne "title";
+       my $self = shift;
+       $self->handler(text => sub { print shift }, "dtext");
+       $self->handler(end  => sub { shift->eof if shift eq "title"; },
+     		           "tagname,self");
+     }
+
+     my $p = HTML::Parser->new(api_version => 3);
+     $p->handler( start => \&start_handler, "tagname,self");
+     $p->parse_file(shift || die) || die $!;
+     print "\n";
+
+   More examples are found in the "eg/" directory of the `HTML-Parser'
+distribution; the program `hrefsub' shows how you can edit all links found
+in a document and `htextsub' how to edid the text only; the program
+`hstrip' shows how you can strip out certain tags/elements and/or
+attributes; and the program `htext' show how to obtain the plain text, but
+not any script/style content.
+
+BUGS
+====
+
+   HTML::Parser will leave <plaintext> mode when it sees </plaintext>.
+Plaintext mode should not really be escapeable.
+
+   The <style> and <script> sections do not end with the first "</", but
+need the complete corresponding end tag.
+
+   When the *strict_comment* option is enabled, we still recognize
+comments where there is something other than whitespace between even and
+odd "-" markers.
+
+   Once $p->boolean_attribute_value has been set, there is no way to
+restore the default behaviour.
+
+   There is currently no way to get both quote characters into the same
+literal argspec.
+
+   Empty tags, e.g. "<>" and "</>", are not recognized.  SGML allows them
+to repeat the previous start tag or close the previous start tag
+respecitvely.
+
+   NET tags, e.g. "code/.../" are not recognized.  This is an SGML
+shorthand for "<code>...</code>".
+
+   Unclosed start or end tags, e.g. "<tt<b>...</b</tt>" are not recognized.
+
+DIAGNOSTICS
+===========
+
+   The following messages may be produced by HTML::Parser.  The notation
+in this listing is the same as used in *Note Perldiag:
+(perl.info)perldiag,:
+
+Not a reference to a hash
+     (F) The object blessed into or subclassed from HTML::Parser is not a
+     hash as required by the HTML::Parser methods.
+
+Bad signature in parser state object at %p
+     (F) The _hparser_xs_state element does not refer to a valid state
+     structure.  Something must have changed the internal value stored in
+     this hash element, or the memory has been overwritten.
+
+_hparser_xs_state element is not a reference
+     (F) The _hparser_xs_state element has been destroyed.
+
+Can't find '_hparser_xs_state' element in HTML::Parser hash
+     (F) The _hparser_xs_state element is missing from the parser hash.
+     It was either deleted, or not created when the object was created.
+
+API version %s not supported by HTML::Parser %s
+     (F) The constructor option 'api_version' with an argument greater than
+     or equal to 4 is reserved for future extentions.
+
+Bad constructor option '%s'
+     (F) An unknown constructor option key was passed to the new() or
+     init() methods.
+
+Parse loop not allowed
+     (F) A handler invoked the parse() or parse_file() method.  This is
+     not permitted.
+
+marked sections not supported
+     (F) The $p->marked_sections() method was invoked in a HTML::Parser
+     module that was compiled without support for marked sections.
+
+Unknown boolean attribute (%d)
+     (F) Something is wrong with the internal logic that set up aliases for
+     boolean attributes.
+
+Only code or array references allowed as handler
+     (F) The second argument for $p->handler must be either a subroutine
+     reference, then name of a subroutine or method, or a reference to an
+     array.
+
+No handler for %s events
+     (F) The first argument to $p->handler must be a valid event name;
+     i.e. one of "start", "end", "text", "process", "declaration" or
+     "comment".
+
+Unrecognized identifier %s in argspec
+     (F) The identifier is not a known argspec name.  Use one of the names
+     mentioned in the argspec section above.
+
+Literal string is longer than 255 chars in argspec
+     (F) The current implementation limits the length of literals in an
+     argspec to 255 characters.  Make the literal shorter.
+
+Backslash reserved for literal string in argspec
+     (F) The backslash character "\" is not allowed in argspec literals.
+     It is reserved to permit quoting inside a literal in a later version.
+
+Unterminated literal string in argspec
+     (F) The terminating quote character for a literal was not found.
+
+Bad argspec (%s)
+     (F) Only identifier names, literals, spaces and commas are allowed in
+     argspecs.
+
+Missing comma separator in argspec
+     (F) Identifiers in an argspec must be separated with ",".
+
+SEE ALSO
+========
+
+   *Note HTML/Entities: HTML/Entities,, *Note HTML/TokeParser:
+HTML/TokeParser,, *Note HTML/HeadParser: HTML/HeadParser,, *Note
+HTML/LinkExtor: HTML/LinkExtor,, *Note HTML/Form: HTML/Form,
+
+   *Note HTML/TreeBuilder: HTML/TreeBuilder, (part of the *HTML-Tree*
+distribution)
+
+   http://www.w3.org/TR/REC-html40
+
+   More information about marked sections and processing instructions may
+be found at `http://www.sgml.u-net.com/book/sgml-8.htm'.
+
+COPYRIGHT
+=========
+
+     Copyright 1996-2001 Gisle Aas. All rights reserved.
+     Copyright 1999-2000 Michael A. Chase.  All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: HTML/PrettyPrinter,  Next: HTML/QuickCheck,  Prev: HTML/Parser,  Up: Module List
+
+generate nice HTML files from HTML syntax trees
+***********************************************
+
+NAME
+====
+
+     HTML::PrettyPrinter - generate nice HTML files from HTML syntax trees
+
+SYNOPSIS
+========
+
+     use HTML::TreeBuilder;
+     # generate a HTML syntax tree
+     my $tree = new HTML::TreeBuilder;
+     $tree->parse_file($file_name);
+     # modify the tree if you want
+
+     use HTML::PrettyPrinter;
+     my $hpp = new HTML::PrettyPrinter ('linelength' => 130,
+                                        'quote_attr' => 1);
+     # configure
+     $tree->address("0.1.0")->attr(_hpp_indent,0);    # for an individual element
+     $hpp->set_force_nl(1,qw(body head));             # for tags
+     $hpp->set_force_nl(1,qw(@SECTIONS));             # as above
+     $hpp->set_nl_inside(0,'default!');               # for all tags
+
+     # format the source
+     my $linearray_ref = $hpp->format($tree);
+     print @$linearray_ref;
+
+     # alternative: print directly to filehandle
+     use FileHandle;
+     my $fh = new FileHandel ">$filenaem2";
+     if (defined $fh) {
+       $hpp->select($fh);
+       $hpp->format();
+       undef $fh;
+       $hpp->select(undef),
+     }
+
+DESCRIPTION
+===========
+
+   HTML::PrettyPrinter produces nicely formatted HTML code from a HTML
+syntax tree. It is especially usefull if the produced HTML file shall be
+read or edited manually afterwards. Various parameters let you adapt the
+output to different styles and requirements.
+
+   If you don't care how the HTML source looks like as long as it is valid
+and readable by browsers, you should use the as_HTML() method of
+HTML::Element instead of the pretty printer. It is about five times faster.
+
+   The pretty printer will handle line wrapping, indention and structuring
+by the way the whitespace in the tree is represented in the output.
+Furthermore upper/lowercase markup and markup minimization, quoting of
+attribute values, the encoding of entities and the presence of optional
+end tags are configurable.
+
+   There are two types of parameters to influence the output, individual
+parameters that are set on a per element and per tag basis and common
+parameters that are set only once for each instance of a pretty printer.
+
+   In order to faciliate the configuration a mechanism to handle tag groups
+is provided. Thus, it is possible to modify a parameter for a group of tags
+(e.g. all known block elements) without writing each tag name explicitly.
+Perhaps the code for tag groups will move to an other Perl module in the
+future.
+
+   For HTML::Elements that require a special treatment like <PRE>, <XMP>,
+<SCRIPT>, comments and declarations, pretty printer will fall back to the
+method as_HTML() of the HTML elements.
+
+INDIVIDUAL PARAMETERS
+=====================
+
+   Following individual paramters exist
+
+indent n
+     The indent of new lines inside the element is increased by n
+     coloumns. Default is 2 for all tags.
+
+skip *bool*
+     If *true*, the element and its content is skipped from output.
+     Default is false.
+
+nl_before n
+     Number of newlines before the start tag. Default is 0 for inline
+     elements and 1 for other elements.
+
+nl_inside n
+     Number of newlines between the tags and the contents of an element.
+     Default is 0.
+
+nl_after n
+     Number of newlines after an element. Default is 0 for inline elements
+     and 1 for other elements.
+
+force_nl *bool*
+     Force linebreaks before and after an element even if the HTML tree
+     does not contain whitespace at this place. Default is false for inline
+     elements and true for all other elements. This parameter is superseded
+     if the common parameter allow_forced_nl is set to false.
+
+endtag *bool*
+     Print an optional endtag. Default is *true*.
+
+Access Methods
+--------------
+
+   Following access methods exist for each individual paramenter.  Replace
+parameter by the respective name.
+
+$hpp->parameter($element)
+     Takes a reference to an HTML element as argument. Returns the value
+     of the parameter for that element. The priority to retrieve the value
+     is:
+
+       1. The value of the element's internal attribute `_hpp_*parameter*'.
+
+       2. The value specified inside the pretty printer for the tag of the
+          element.
+
+       3. The value specified inside the pretty printer for `'default!''.
+
+
+$hpp->parameter('tag')
+     Like `*parameter*($element)', except that only priorities 2 and 3 are
+     evaluated.
+
+$hpp->set_parameter($value,'tag1','tag2',...)
+     Sets the parameter for each tag in the list to $value.
+
+     If $value is undefined, the entries for the tags are deleted.
+
+     Beside individual tags the list may include tag groups like
+     '`@BLOCK'' (see below) and '`default!''. Individual tag names are
+     written in lower case, the names of tag groups start with an '@' and
+     are written in upper case letters. Tag groups are expanded during the
+     call of `set_*parameter*()'.  '`default!'' sets the default value,
+     which is retrived if no value is defined for the individual element
+     or tag.
+
+$hpp->set_parameter($value,'all!')
+     Deletes all existing settings for parameter inside the pretty printer
+     and sets the default to $value..
+
+COMMON PARAMETERS
+=================
+
+tabify n
+     If non zero, each n spaces at the beginnig of a line are converted
+     into one TAB. Default is 8.
+
+linelength n
+     The maximum number of character a line should have. Default is 80.
+
+     The linelength may be exceeded if there is no proper way to break a
+     line without modifying the content, e.g. inside <PRE> and other
+     special elements or if there is no whitespace.
+
+min_bool_attr *bool*
+     Minimize boolean attributes, e.g. print <UL COMPACT> instead of <UL
+     COMPACT=COMPACT>. Default is true.
+
+quote_attr *bool*
+     Always quote attribute values. If false, attribute values consisting
+     entirely of letters, digits, periods and hyphens only are not put into
+     quotes. Default is false.
+
+entities string
+     The string contains all characters that are escaped to their entity
+     names.  Default is the bare minimum of "&<>" plus the non breaking
+     space 'nbsp' (because otherwise it is difficult for the human eye to
+     distiguish it from a normal space in most editors).
+
+wrap_at_tagend NEVER|AFTER_ATTR|ALWAYS
+     May pretty printer wrap lines before the closing ankle of a start tag?
+     Supported values are the predifined constants NEVER (allow line wraps
+     at white space only ), AFTER_ATTR (allow line wraps at the end of
+     tags that contain attributes only) and ALWAYS (allow line wraps at
+     the end of every start tag). Default is AFTER_ATTR.
+
+allow_forced_nl *bool*
+     Allow the addition of white space, that is not in the HTML tree.  If
+     set to false (the default) the force_nl parameter is ignored.  It is
+     recomended to set this parameter to true if the HTML tree was
+     generated with ignore_ignorable_whitespace set to true.
+
+uppercase *bool*
+     Use uppercase letters for markup. Default is the value of
+     $HTML::Element::html_uc at the time the constructor is called.
+
+Access Method
+-------------
+
+$hpp->*paramter*([value])
+     Retrieves and optionaly sets the parameter.
+
+OTHER METHODS
+=============
+
+$hpp = HTML::PrettyPrinter->new(%common_paremeters)
+     This class method creates a new HTML::PrettyPrinter and returns it.
+     Key/value pair arguments may be provided to overwrite the default
+     settings of common parameters. There is currently no mechanism to
+     overwrite the default values for individual parameters at
+     construction. Use the `$hpp-'set_parameter()> methods instead.
+
+$hpp->select($fh)
+     Select a FileHandle object for output.
+
+     If a FileHandle is selected the generated HTML is printed directly to
+     that file. With $hpp->select(undef) you can switch back to the
+     default behaviour.
+
+$line_array_ref = $hpp->format($tree,[$indent],[$line_array_ref])
+     Format the HTML syntax (sub-) tree.
+
+     $tree is not restricted to the root of the HTML syntax tree. A
+     reference to any HTML::Element will do.
+
+     The optional `$indent' indents the first element by n characters
+
+     Return value is the reference to an array with the generated lines.
+     If such a reference is provided as third argument, the lines will be
+     appended to that array. Otherwise a new array will be created.
+
+     If a FileHandle is selected by a previous call of the
+     `$hpp-'select($fh)> method, the lines are printed to the FileHandle
+     object directly.  The array of lines is not changed in this case.
+
+TAG GROUPS
+==========
+
+   Tag groups are lists that contain the names of tags and other tag groups
+which are considered as subsets. This reflects the way allowed content is
+specified in HTML DTDs, where e.g. %flow consists of all %block and
+%inline elements and %inline covers several subsets like %phrase.
+
+   If you add a tag name to a group A, it will be seen in any group that
+contains group A. Thus, it is easy to maintain groups of tags with similar
+properties. (and configure HTML pretty printer for these tags).
+
+   The names of tag groups are written in upper case letters with a leading
+'@' (e.g. '@BLOCK'). The names of simple tags are written all lower case.
+
+Functions
+---------
+
+   All the functions to handle and modify tag groups are included in the
+@EXPORT_OK list of `HTML::PrettyPrinter'.
+
+@tag_groups = list_groups()
+     Returns a list with the names of all defined tag groups
+
+@tags = group_expand('tag_or_tag_group0',['tag_or_tag_group1',...])
+     Returns a list of every tag in the tag groups and their subgroups
+     Each tag is listed once only. The order of the list is not specified.
+
+@tag_groups = sub_group('tag_group0',['tag_group1',...])
+     Returns a list of every tag group and sub group in the list.  Each
+     group is listed once only. The order of the list is not specified.
+
+group_get('@NAME')
+     Return the (unexpanded) contents of a tag group.
+
+`group_set('@NAME',['tag_or_tag_group0',...])'
+     Set a tag group.
+
+`group_add('@NAME','tag_or_tag_group0',['tag_or_tag_group1',...])'
+     Add tags and tag groups to a group.
+
+`group_remove('@NAME','tag_or_tag_group0',['tag_or_tag_group1',...])'
+     Remove tags or tag groups from a group. Subgroups are not expanded.
+     Thus, `group_remove('@A','@B')' will remove '@B' from '@A' if it is
+     included directly. Tags included in '@B' will not be removed from
+     '@A'.  Nor will '@A' be changed if '@B' is included in a aubgroup of
+     '@A' but not in '@A' directly.
+
+Predefined Tag Groups
+---------------------
+
+   There are a couple of predefined tag groups. Use `  foreach my $tg
+(list_groups()) {     print "'$tg' => qw(".join(',',group_get($tg)).")\n";
+ } ' to get a list.
+
+Examples for tag groups
+-----------------------
+
+  1. create some groups `   group_set('@A',qw(a1 a2 a3));
+     group_set('@B',qw(b1 b2));   group_set('@C',qw(@A @B c1 @D));   # @D
+     needs to be defined when @C is expannded   group_set('@D',qw(d1 @B));
+      group_set('@E',qw(e1 @D));   group_set('@F',qw(f1 @A)); '
+
+  2. add tags `   group_add('@A',qw(a4 a5)); # @A contains (a1 a2 a3 a4 a5)
+      group_add('@D',qw(d1));    # @D contains (d1 @B d1)
+     group_add('@F',group_exapand('@B'),'@F');   # @F contains (f1 @A b1
+     b2 f1 @F) '
+
+  3. evaluate `   group_exapand('@E');    # returns e1, d1, b1, b2
+     sub_groups('@E');       # returns @B, @D   sub_groups(qw(@E @F));  #
+     returns @A, @B, @D   group_get('@F'));       # returns f1, @A, b1,
+     b2, f1, @F '
+
+  4. remove tags `   group_remove('@E','@C');  # @E not changed, because
+     it doesn't contain @C   group_remove('@E','@D');  # @D removed from @E
+      group_remove('@D','d1');  # all d1's are removed. Now @D contains
+     @B only   group_remove('@C','@B');  # @C now contains (@a c1 @D), Thus
+      sub_groups('@C');         # still returns @A, @B, @D,
+                  # because @B is included in @D, too '
+
+  5. application `   # set the indent for tags b1, b2, e1, g1 to 0
+     $hpp->set_indent(0,qw(@D @E g1)); '
+
+     If the groups @D or @E are modified afterwards, the configuration of
+     the pretty printer is not affected, because `set_indent()' will
+     expand the tag groups.
+
+
+EXAMPLE
+=======
+
+   Consider the following HTML tree
+
+     <html> @0
+       <head> @0.0
+     	<title> @0.0.0
+     	  "Demonstrate HTML::PrettyPrinter"
+       <body> @0.1
+     	<h1> @0.1.0
+     	  "Headline"
+     	<p align="JUSTIFY"> @0.1.1
+     	  "Some text in "
+     	  <b> @0.1.1.1
+     	    "bold"
+     	  " and "
+     	  <i> @0.1.1.3
+     	    "italics"
+     	  " and with 'ä' & 'ü'."
+     	<table align="LEFT" border=0> @0.1.2
+     	  <tr> @0.1.2.0
+     	    <td align="RIGHT"> @0.1.2.0.0
+     	      "top right"
+     	  <tr> @0.1.2.1
+     	    <td align="LEFT"> @0.1.2.1.0
+     	      "bottom left"
+     	<hr noshade="NOSHADE" size=5> @0.1.3
+     	<address> @0.1.4
+     	  <a href="mailto:schotten@gmx.de"> @0.1.4.0
+     	    "Claus Schotten"
+
+   and `   $hpp = HTML::PrettyPrinter-'new('uppercase' => 1);   print
+@{$hpp->format($tree)}; >
+
+   will print
+
+     <HTML><HEAD><TITLE>Demonstrate
+     	HTML::PrettyPrinter</TITLE></HEAD><BODY><H1>Headline</H1><P
+     	ALIGN=JUSTIFY>Some text in <B>bold</B> and
+     	<I>italics</I> and with 'ä' &amp; 'ü'.</P><TABLE
+     	ALIGN=LEFT BORDER=0><TR><TD ALIGN=RIGHT>top
+     	    right</TD></TR><TR><TD ALIGN=LEFT>bottom
+     	    left</TD></TR></TABLE><HR NOSHADE SIZE=5
+     	><ADDRESS><A HREF="mailto:schotten@gmx.de"
+     	  >Claus&nbsp;Schotten</A></ADDRESS></BODY></HTML>
+
+   That doesn't look very nice. What went wrong? By default
+HTML::PrettyPrinter takes a conservative approach on whitespace. It will
+enlarge existing whitespace, but it will not introduce new whitespace
+outside of tags, because that might change the way a browser renders the
+HTML document. However the HTML tree was constructed with
+ignore_ignorable_whitespace> turned on.  Thus, there is no whitespace
+between block elements that the pretty printer could format. So pretty
+printer does line wrapping and indention only.  E.g. the title is in the
+third level of the tree. Thus, the second line is indented six characters.
+The table cells in the fifth level are indented by ten characters.
+Furthermore, you see that there is a whitespace inserted after the last
+attribute of the <A> tag.
+
+   Let's set $hpp->allow_forced_nl(1);. Now the *forced_nl* parameters are
+enabled. By default, they are set for all non-inline tags. That creates
+
+     <HTML>
+       <HEAD>
+         <TITLE>Demonstrate HTML::PrettyPrinter</TITLE>
+       </HEAD>
+       <BODY>
+         <H1>Headline</H1>
+         <P ALIGN=JUSTIFY>Some text in <B>bold</B> and
+           <I>italics</I> and with 'ä' &amp; 'ü'.</P>
+         <TABLE ALIGN=LEFT BORDER=0>
+           <TR>
+     	 <TD ALIGN=RIGHT>top right</TD>
+           </TR>
+           <TR>
+     	 <TD ALIGN=LEFT>bottom left</TD>
+           </TR>
+         </TABLE>
+         <HR NOSHADE SIZE=5>
+         <ADDRESS><A HREF="mailto:schotten@gmx.de"
+     	 >Claus&nbsp;Schotten</A></ADDRESS>
+       </BODY>
+     </HTML>
+     
+     Much better, isn't it? Now let's improve the structuring.
+      $hpp->set_nl_before(2,qw(body table));
+      $hpp->set_nl_after(2,qw(table));
+     will require two new lines in front of <body> and <table> tags and after
+     <table> tags.
+
+     <HTML>
+       <HEAD>
+         <TITLE>Demonstrate HTML::PrettyPrinter</TITLE>
+       </HEAD>
+     
+       <BODY>
+         <H1>Headline</H1>
+         <P ALIGN=JUSTIFY>Some text in <B>bold</B> and
+           <I>italics</I> and with 'ä' &amp; 'ü'.</P>
+     
+         <TABLE ALIGN=LEFT BORDER=0>
+           <TR>
+     	 <TD ALIGN=RIGHT>top right</TD>
+           </TR>
+           <TR>
+     	 <TD ALIGN=LEFT>bottom left</TD>
+           </TR>
+         </TABLE>
+     
+         <HR NOSHADE SIZE=5>
+         <ADDRESS><A HREF="mailto:schotten@gmx.de"
+     	 >Claus&nbsp;Schotten</A></ADDRESS>
+       </BODY>
+     </HTML>
+
+   Currently the mail address is the only attribute value which is quoted.
+Here the quotes are required by the '@' character. For all other attribute
+values quotes are optional and thus ommited by default.
+$hpp->quote_attr(1); will turn the quotes on.
+
+   $hpp->set_endtag(0,'all!') turns all optional endtags off.  This
+affects the </p> (and should affect </tr> and </td>, see below).
+Alternatively, we could use $hpp->set_endtag(0,'default!'). That would
+turn the default off, too. But it wouldn't delete settings for individual
+tags that supersede the default.
+
+   $hpp->set_nl_after(3,'head') requires three new lines after the <head>
+element. Because there are already two new lines required by the start of
+<body> only one additional line is added.
+
+   $hpp->set_force_nl(0,'td') will inhibit the introduction of whitespace
+alround <td>. Thus, the table cells are now on the same line as the table
+rows.
+
+     <HTML>
+       <HEAD>
+         <TITLE>Demonstrate HTML::PrettyPrinter</TITLE>
+       </HEAD>
+     
+     
+       <BODY>
+         <H1>Headline</H1>
+         <P ALIGN="JUSTIFY">Some text in <B>bold</B> and
+     	<I>italics</I> and with 'ä' &amp; 'ü'.
+     
+         <TABLE ALIGN="LEFT" BORDER="0">
+     	<TR><TD ALIGN="RIGHT">top right</TD></TR>
+     	<TR><TD ALIGN="LEFT">bottom left</TD></TR>
+         </TABLE>
+     
+         <HR NOSHADE SIZE="5">
+         <ADDRESS><A HREF="mailto:schotten@gmx.de"
+     	  >Claus&nbsp;Schotten</A></ADDRESS>
+       </BODY>
+     </HTML>
+
+   The end tags </td> and </tr> are printed because HTML:Tagset says they
+are mandatory.    map {$HTML::Tagset::optionalEndTag{$_}=1} qw(td tr th);
+will fix that.
+
+   The additional new line after </head> doesn't look nice. With
+$hpp->set_nl_after(undef,'head') we will reset the parameter for the <head>
+tag.
+
+   $hpp->entities($hpp->entities().'ä'); will enforce the entity encoding
+of 'ä'.
+
+   $hpp->min_bool_attr(0); will inhibt the minimizyation of the NOSHADE
+attribute to <hr>.
+
+   Let's fiddle with the indention:   $hpp->set_indent(8,'@TEXTBLOCK');
+$hpp->set_indent(0,'html');
+
+   New lines inside text blocks (here inside <h1>, <p> and <address>) will
+be indented by 8 characters instead of two, whereas the code directly
+under <html> will not be indented.
+
+     <HTML>
+     <HEAD>
+       <TITLE>Demonstrate HTML::PrettyPrinter</TITLE>
+     </HEAD>
+     
+     <BODY>
+       <H1>Headline</H1>
+       <P ALIGN="JUSTIFY">Some text in <B>bold</B> and
+     	   <I>italics</I> and with '&auml;' &amp; 'ü'.
+     
+       <TABLE ALIGN="LEFT" BORDER="0">
+         <TR><TD ALIGN="RIGHT">top right
+         <TR><TD ALIGN="LEFT">bottom left
+       </TABLE>
+     
+       <HR NOSHADE="NOSHADE" SIZE="5">
+       <ADDRESS><A HREF="mailto:schotten@gmx.de"
+     	     >Claus&nbsp;Schotten</A></ADDRESS>
+     </BODY>
+     </HTML>
+
+   $hpp->wrap_at_tagend(HTML::PrettyPrinter::NEVER); will disable the line
+wrap between the attribute and the '>' of the <a> tag. The resulting line
+excedes the target line length by far, but the is no point left, where the
+pretty printer could legaly break this line.
+
+   $hpp->set_endtag(1,'tr') will overwrite the default. Thus, the </tr>
+appears in the code whereas the other optional endtags are still omitted.
+
+   Finally, we customize some individual elements:
+
+`$tree-'address('0.1.1')->attr('_hpp_skip',1)>
+     will skip the <p> and its content from the output
+
+`$tree-'address('0.1.2.1.0')->attr('_hpp_force_nl',1)>
+     will force new lines arround the second <td>, but will not affect the
+     first.  <td>.
+
+     <HTML>
+     <HEAD>
+       <TITLE>Demonstrate HTML::PrettyPrinter</TITLE>
+     </HEAD>
+     
+     <BODY>
+       <H1>Headline</H1>
+     
+       <TABLE ALIGN="LEFT" BORDER="0">
+         <TR><TD ALIGN="RIGHT">top right</TR>
+         <TR>
+           <TD ALIGN="LEFT">bottom left
+         </TR>
+       </TABLE>
+     
+       <HR NOSHADE="NOSHADE" SIZE="5">
+       <ADDRESS><A
+     	     HREF="mailto:schotten@gmx.de">Claus&nbsp;Schotten</A></ADDRESS>
+     </BODY>
+     </HTML>
+
+KNOWN BUGS
+==========
+
+   * This is early alpha code. The interfaces are subject to changes.
+
+   * The module is tested with perl 5.005_03 only. It should work with
+     perl 5.004 though.
+
+   * The predefined tag groups are incomplete. Several tags need to be
+     added.
+
+   * Attribute values from a fixed set given in the DTD (e.g.
+     ALIGN=LEFT|RIGHT etc.) should be converted to upper or lower case
+     depending on the value of the uppercase parameter. Currently, they
+     are printed as given in the HTML tree.
+
+   * No optimization for performance was done.
+
+SEE ALSO
+========
+
+   *Note HTML/TreeBuilder: HTML/TreeBuilder,, *Note HTML/Element:
+HTML/Element,, *Note HTML/Tagset: HTML/Tagset,
+
+COPYRIGHT
+=========
+
+   Copyright 2000 Claus Schotten  schotten@gmx.de
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+AUTHOR
+======
+
+   Claus Schotten <schotten@gmx.de>
+
+

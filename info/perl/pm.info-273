@@ -1,0 +1,1930 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Net/netent,  Next: Net/protoent,  Prev: Net/libnetFAQ,  Up: Module List
+
+by-name interface to Perl's built-in getnet*() functions
+********************************************************
+
+NAME
+====
+
+   Net::netent - by-name interface to Perl's built-in getnet*() functions
+
+SYNOPSIS
+========
+
+     use Net::netent qw(:FIELDS);
+     getnetbyname("loopback") 		or die "bad net";
+     printf "%s is %08X\n", $n_name, $n_net;
+
+     use Net::netent;
+
+     $n = getnetbyname("loopback") 		or die "bad net";
+     { # there's gotta be a better way, eh?
+         @bytes = unpack("C4", pack("N", $n->net));
+         shift @bytes while @bytes && $bytes[0] == 0;
+     }
+     printf "%s is %08X [%d.%d.%d.%d]\n", $n->name, $n->net, @bytes;
+
+DESCRIPTION
+===========
+
+   This module's default exports override the core getnetbyname() and
+getnetbyaddr() functions, replacing them with versions that return
+"Net::netent" objects.  This object has methods that return the similarly
+named structure field name from the C's netent structure from `netdb.h';
+namely name, aliases, addrtype, and net.  The aliases method returns an
+array reference, the rest scalars.
+
+   You may also import all the structure fields directly into your
+namespace as regular variables using the :FIELDS import tag.  (Note that
+this still overrides your core functions.)  Access these fields as
+variables named with a preceding `n_'.  Thus, `$net_obj->name()'
+corresponds to $n_name if you import the fields.  Array references are
+available as regular array variables, so for example `@{
+$net_obj->aliases() }' would be simply @n_aliases.
+
+   The getnet() function is a simple front-end that forwards a numeric
+argument to getnetbyaddr(), and the rest to getnetbyname().
+
+   To access this functionality without the core overrides, pass the use
+an empty import list, and then access function functions with their full
+qualified names.  On the other hand, the built-ins are still available via
+the `CORE::' pseudo-package.
+
+EXAMPLES
+========
+
+   The getnet() functions do this in the Perl core:
+
+     sv_setiv(sv, (I32)nent->n_net);
+
+   The gethost() functions do this in the Perl core:
+
+     sv_setpvn(sv, hent->h_addr, len);
+
+   That means that the address comes back in binary for the host
+functions, and as a regular perl integer for the net ones.  This seems a
+bug, but here's how to deal with it:
+
+     use strict;
+     use Socket;
+     use Net::netent;
+
+     @ARGV = ('loopback') unless @ARGV;
+
+     my($n, $net);
+
+     for $net ( @ARGV ) {
+
+     unless ($n = getnetbyname($net)) {
+      	warn "$0: no such net: $net\n";
+      	next;
+     }
+
+     printf "\n%s is %s%s\n",
+      	    $net,
+      	    lc($n->name) eq lc($net) ? "" : "*really* ",
+      	    $n->name;
+
+     print "\taliases are ", join(", ", @{$n->aliases}), "\n"
+      		if @{$n->aliases};
+
+     # this is stupid; first, why is this not in binary?
+     # second, why am i going through these convolutions
+     # to make it looks right
+     {
+      	my @a = unpack("C4", pack("N", $n->net));
+      	shift @a while @a && $a[0] == 0;
+      	printf "\taddr is %s [%d.%d.%d.%d]\n", $n->net, @a;
+     }
+
+     if ($n = getnetbyaddr($n->net)) {
+      	if (lc($n->name) ne lc($net)) {
+      	    printf "\tThat addr reverses to net %s!\n", $n->name;
+      	    $net = $n->name;
+      	    redo;
+      	}
+     }
+      }
+
+NOTE
+====
+
+   While this class is currently implemented using the Class::Struct
+module to build a struct-like class, you shouldn't rely upon this.
+
+AUTHOR
+======
+
+   Tom Christiansen
+
+
+File: pm.info,  Node: Net/protoent,  Next: Net/servent,  Prev: Net/netent,  Up: Module List
+
+by-name interface to Perl's built-in getproto*() functions
+**********************************************************
+
+NAME
+====
+
+   Net::protoent - by-name interface to Perl's built-in getproto*()
+functions
+
+SYNOPSIS
+========
+
+     use Net::protoent;
+     $p = getprotobyname(shift || 'tcp') || die "no proto";
+     printf "proto for %s is %d, aliases are %s\n",
+        $p->name, $p->proto, "@{$p->aliases}";
+
+     use Net::protoent qw(:FIELDS);
+     getprotobyname(shift || 'tcp') || die "no proto";
+     print "proto for $p_name is $p_proto, aliases are @p_aliases\n";
+
+DESCRIPTION
+===========
+
+   This module's default exports override the core getprotoent(),
+getprotobyname(), and getnetbyport() functions, replacing them with
+versions that return "Net::protoent" objects.  They take default second
+arguments of "tcp".  This object has methods that return the similarly
+named structure field name from the C's protoent structure from `netdb.h';
+namely name, aliases, and proto.  The aliases method returns an array
+reference, the rest scalars.
+
+   You may also import all the structure fields directly into your
+namespace as regular variables using the :FIELDS import tag.  (Note that
+this still overrides your core functions.)  Access these fields as
+variables named with a preceding `p_'.  Thus, `$proto_obj->name()'
+corresponds to $p_name if you import the fields.  Array references are
+available as regular array variables, so for example `@{
+$proto_obj->aliases() }' would be simply @p_aliases.
+
+   The getproto() function is a simple front-end that forwards a numeric
+argument to getprotobyport(), and the rest to getprotobyname().
+
+   To access this functionality without the core overrides, pass the use
+an empty import list, and then access function functions with their full
+qualified names.  On the other hand, the built-ins are still available via
+the `CORE::' pseudo-package.
+
+NOTE
+====
+
+   While this class is currently implemented using the Class::Struct
+module to build a struct-like class, you shouldn't rely upon this.
+
+AUTHOR
+======
+
+   Tom Christiansen
+
+
+File: pm.info,  Node: Net/servent,  Next: Net/xAP,  Prev: Net/protoent,  Up: Module List
+
+by-name interface to Perl's built-in getserv*() functions
+*********************************************************
+
+NAME
+====
+
+   Net::servent - by-name interface to Perl's built-in getserv*() functions
+
+SYNOPSIS
+========
+
+     use Net::servent;
+     $s = getservbyname(shift || 'ftp') || die "no service";
+     printf "port for %s is %s, aliases are %s\n",
+        $s->name, $s->port, "@{$s->aliases}";
+
+     use Net::servent qw(:FIELDS);
+     getservbyname(shift || 'ftp') || die "no service";
+     print "port for $s_name is $s_port, aliases are @s_aliases\n";
+
+DESCRIPTION
+===========
+
+   This module's default exports override the core getservent(),
+getservbyname(), and getnetbyport() functions, replacing them with
+versions that return "Net::servent" objects.  They take default second
+arguments of "tcp".  This object has methods that return the similarly
+named structure field name from the C's servent structure from `netdb.h';
+namely name, aliases, port, and proto.  The aliases method returns an
+array reference, the rest scalars.
+
+   You may also import all the structure fields directly into your
+namespace as regular variables using the :FIELDS import tag.  (Note that
+this still overrides your core functions.)  Access these fields as
+variables named with a preceding `n_'.  Thus, `$serv_obj->name()'
+corresponds to $s_name if you import the fields.  Array references are
+available as regular array variables, so for example `@{
+$serv_obj->aliases() }' would be simply @s_aliases.
+
+   The getserv() function is a simple front-end that forwards a numeric
+argument to getservbyport(), and the rest to getservbyname().
+
+   To access this functionality without the core overrides, pass the use
+an empty import list, and then access function functions with their full
+qualified names.  On the other hand, the built-ins are still available via
+the `CORE::' pseudo-package.
+
+EXAMPLES
+========
+
+     use Net::servent qw(:FIELDS);
+
+     while (@ARGV) {
+         my ($service, $proto) = ((split m!/!, shift), 'tcp');
+         my $valet = getserv($service, $proto);
+         unless ($valet) {
+             warn "$0: No service: $service/$proto\n"
+             next;
+         }
+         printf "service $service/$proto is port %d\n", $valet->port;
+         print "alias are @s_aliases\n" if @s_aliases;
+     }
+
+NOTE
+====
+
+   While this class is currently implemented using the Class::Struct
+module to build a struct-like class, you shouldn't rely upon this.
+
+AUTHOR
+======
+
+   Tom Christiansen
+
+
+File: pm.info,  Node: Net/xAP,  Next: NetAddr/IP,  Prev: Net/servent,  Up: Module List
+
+A base class for protocols such as IMAP, ACAP, IMSP, and ICAP.
+**************************************************************
+
+NAME
+====
+
+   Net::xAP - A base class for protocols such as IMAP, ACAP, IMSP, and
+ICAP.
+
+SYNOPSIS
+========
+
+   `use Net::xAP;'
+
+   *WARNING: This code is in alpha release.  Expect the interface to
+change from release to release.*
+
+DESCRIPTION
+===========
+
+   This base class implements the substrate common across the IMAP, ACAP,
+IMSP, and ICAP protocols.  It provides the interface to the network calls
+and implements a small amount of glue to assist in implementing interfaces
+to this protocol family.
+
+END-PROGRAMMER METHODS
+======================
+
+   The following methods are potentially useful for end-programmers.
+
+last_command_time
+-----------------
+
+   Return what time the most recent command was sent to the server.  The
+return value is a time integer.
+
+connection
+----------
+
+   Returns the connection object being used by the object.
+
+PROTOCOL-DEVELOPER METHODS
+==========================
+
+   The following methods are probably only useful to protocol developers.
+
+new $host, $peerport [, %options]
+---------------------------------
+
+   Create a new instance of Net::xAP, connects to $host, and returns a
+reference to the object.
+
+   The $host parameter is the name of the host to contact.  If $host
+starts with a / character, the parameter is assumed to contain the name of
+a program and the given program is spawned as a child process.  This is
+useful for driving programs that can be operated interactively from the
+command-line, such as UW-imapd.
+
+   The `$peerport' parameter specifies the TCP port used for the network
+connection. The parameter should be in the syntax understood by
+`IO::Socket::INET->new'.  This parameter is ignored if a child process is
+spawned.
+
+   The %options parameter specifies any options to use.  The following
+list enumerates the options, and their default values, currently
+understood by `Net::xAP':
+
+`Synchronous => 1'
+     Setting this option causes `Net::xAP' to issue a response method
+     immediately after sending the command to the server.  Currently, this
+     option should always be left on.  Non-synchronous command/response
+     processing has not been tested.
+
+     One down-side to Synchronous mode is that commands cannot be sent to
+     the server from within a callback.  Instead, the results should be
+     saved, and the commands should be sent after the current command has
+     completed.
+
+`NonSyncLits => 0'
+     Setting this option causes `Net::xAP' to use non-synchronizing
+     literals.  This should only be enabled if the protocol and server this
+     feature.
+
+`Debug => 0'
+     Setting this option causes debug output to be written to stderr.  See
+     the debug_print method for a description of the output format.
+
+`InternetDraft => 0'
+     Setting this option adds support for various extensions that are still
+     in Internet Draft.  This option is only intended to be used by
+     protocol developers.  Most bug reports related to this feature will be
+     ignored.
+
+   All options are also passed to the internal call to
+`IO::Socket::INET->new', unless a child IMAP process is spawned.
+
+command $callback, $command [, @args]
+-------------------------------------
+
+   The command is used to send commands to the server.
+
+   The `$callback' parameter should be a reference to a subroutine. It
+will be called when a response is received from the server.
+
+   `@args' is a list of $type-$value pairs.  The $type indicates what type
+of data type to use for $value.  This is used to control the encoding
+necessary to pass the command arguments to the server.
+
+   The following $types are understood:
+
+`ATOM'
+     The data will sent raw to the server.
+
+`ASTRING'
+     The data will be sent to the server as an atom, a quoted string, or a
+     literal depending on the content of $value.
+
+`PARENS'
+     The data in $value will be interpreted as an array reference and be
+     sent inside a pair of parentheses.
+
+STRING
+     The data will be sent to the server as either a quoted string or
+     literal depending on the content of $value.
+
+`QSTRING'
+     The data will be sent to the server as a quoted string.
+
+   If the `Synchronous' option is set this method will return a response
+object, otherwise it will return the sequence number associated with the
+command just sent to the server.
+
+parse_fields $str
+-----------------
+
+   Splits the specified $str into fields.  A list reference is returned
+contain the individual fields.  Parenthetical clauses are represented as
+nested list references of arbitrary depth.  Quoted strings are stripped of
+their surrounding quotes and escaped \\ and `\"' characters are unescaped.
+
+response
+--------
+
+   Reads response lines from the server until one of the lines is a
+completion response.  For each response, the appropriate callbacks are
+triggered.  This is automatically called if the `Synchronous' option is on.
+
+getline
+-------
+
+   Get one 'line' of data from the server, including any literal payloads.
+
+close_connection
+----------------
+
+   Closes the connection to the server, returning the results of the
+operation.
+
+sequence
+--------
+
+   Returns the sequence number of the last command issued to the server.
+
+next_sequence
+-------------
+
+   Returns the sequence number that will be assigned to the next command
+issued.
+
+pending
+-------
+
+   Returns a list of sequence numbers for the commands that are still
+awaiting a complete response from the server.
+
+   The list is sorted numerically.
+
+debug [$boolean]
+----------------
+
+   Returns the value of the debug option for the object.
+
+   If $boolean is specified, the debug state is set to the given value.
+
+debug_print $direction, $text
+-----------------------------
+
+   Prints $text to `STDERR', preceded by an indication of traffic
+direction, the object reference, and a timestamp. The parameter $direction
+is used to indicate the direction of the traffic related to the debug
+call.  Use 0 for data being sent to the server, or 1 for data coming from
+the server.
+
+debug_text $text
+----------------
+
+   A stub method intended to be overridden by subclasses.  It provides
+subclasses with the ability to make alterations to $text before being
+output by debug_print method.  The base class version does no alteration
+of $text.
+
+RESPONSE OBJECTS
+================
+
+   A response object is the data type returned by the response method.  A
+few convenience routines are provided at the Net::xAP level that are
+likely to be common across several protocols.
+
+new
+---
+
+   Creates a new response object.
+
+tag
+---
+
+   Returns the tag associated with the response object.
+
+status
+------
+
+   Returns the command status associated with the response object.  This
+will be OK, `NO', or BAD.
+
+text
+----
+
+   Returns the human readable text assocated with the status of the
+response object.
+
+   This will typically be overridden by a subclass of the `xAP' class to
+handle things like status codes.
+
+status_code
+-----------
+
+   Returns a list reference containing the response code portion of the
+server response.
+
+CAVEATS
+=======
+
+   With only a few exceptions, the methods provided in this class are
+intended for use by developers adding support for additional protocols.
+Don't muck with this level, unless you know what you're doing.
+
+AUTHOR
+======
+
+   Kevin Johnson <`kjj@pobox.com'>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997-1999 Kevin Johnson <kjj@pobox.com>.
+
+   All rights reserved. This program is free software; you can
+redistribute it and/or modify it under the same terms as Perl itself.
+
+
+File: pm.info,  Node: NetAddr/IP,  Next: NetAddr/IP/Count,  Prev: Net/xAP,  Up: Module List
+
+Manipulate IP Addresses easily
+******************************
+
+NAME
+====
+
+   NetAddr::IP - Manipulate IP Addresses easily
+
+SYNOPSIS
+========
+
+     use NetAddr::IP qw($Use_CIDR_Notation $Always_Display_Mask);
+
+     # Initialization of NetAddr::IP objects
+     my $ip = new NetAddr::IP "10.0.0.1";
+     my $subnet = new NetAddr::IP("10.0.0.0", "255.255.255.0");
+     my $othersubnet = new NetAddr::IP("10.0.0.0", "24");
+     my $yetanothersubnet = new NetAddr::IP "10.0.0.0/24";
+     my $serialsubnet = new NetAddr::IP($min, $max, $bits);
+
+     # A proper subnet (or undef if any host but is set)
+     my $subnet_ok = new_subnet NetAddr::IP("10.0.0.0", "24");
+     my $subnet_undef = new_subnet NetAddr::IP("10.0.0.1", "24");
+
+     # A numeric representation of a subnet/host address
+     my $address = $ip->to_numeric();
+     my ($min, $max, $bits) = $ip->to_numeric();
+
+     # A string representation of an address or subnet
+     print "My ip address is ", $ip->to_string, "\n";
+
+     # Just the string or the mask part...
+     print "My ip address alone is ", $ip->addr_to_string, "\n";
+     print "and my netmask is ", $ip->mask_to_string, "\n";
+
+     # Enumeration of all the addresses within a given subnet, keeping
+     # the original mask
+     my @hosts = $subnet->enum;
+     for $i (@hosts) {
+         print "address ", $i->to_string,
+         " belongs to subnet ", $subnet->to_string, "\n";
+     }
+
+     # You can also produce the list of host addresses in a given subnet
+     my @hosts = $subnet->host_enum;
+     for $i (@hosts) {
+         print "Host ", $i->to_string,
+         " is in subnet ", $subnet->to_string, "\n";
+     }
+
+     # This calculates network and broadcast addresses for a subnet
+     my $network = $subnet->network;
+     my $broadcast = $subnet->broadcast;
+     print "Subnet ", $subnet->to_string, " has broadcast address ",
+       $broadcast->to_string, " and network number ", $network->to_string,
+       "\n";
+
+     # Checks to see if a host address or subnet is contained within another
+     # subnet
+     if ($subnet->contains $ip) {
+         print "Host ", $ip->to_string, " is contained in ",
+         $subnet->to_string, "\n";
+     }
+
+     # Masks and address components can be copied from object to object
+     $ip1->set_addr($ip2);
+     $ip1->set_mask($subnet);
+
+     # Ammount of hosts in a subnet can also be easily calculated
+     $max_hosts_in_subnet = $subnet->how_many - 2;
+
+     # A range of IP Addresses
+     @range = $ip->range($final_ip); # From $ip to $final_ip
+     @range = $ip->range(@dont_know_which_is_larger);
+     				# From the smallest on the list + $ip to
+     				# the largest
+
+     # Usable addresses in a subnet
+     $first_address = $subnet->first;
+     $last_address = $subnet->last;
+
+     # Compact subnets or addresses into the largest possible CIDR block
+     @compact_block = NetAddr::IP::compact(@many_small_ip_address_blocks);
+
+     # Split a set of blocks into smaller subnets
+     @small_subnets = NetAddr::IP::expand(@ip_address_blocks);
+
+     # Obtain a numeric representation of an IP address
+     my $number = $ip->addr_number;
+
+     # How many bits are there in the mask?
+     my $masklen = $ip->mask_bits;
+
+DESCRIPTION
+===========
+
+   This module provides a simple interface to the tedious bit manipulation
+involved when handling IP address calculations. It also helps by performing
+range comparisons between subnets as well as other frequently used
+functions.
+
+   Most of the primitive functions return a NetAddr::IP object.
+
+   The variables *$Use_CIDR_Notation*  and *$Always_Display_Mask*  affect
+how the ->to_string function will present its result. The names are
+hopefully intuitive enough. Note that IP addresses are not properly
+compacted (ie, 200.44.0/18 is written as 200.44.0.0/18) because this
+adapts to the widely adopted but incorrect notation. Perhaps a later
+version will include a variable to change this.
+
+   This code has not been widely tested yet. Endianness problems might very
+well exist. Please email the author if such problems are found.
+
+   This software is (c) Luis E. Munoz. It can be used under the terms of
+the perl artistic license provided that proper credit is preserved and that
+the original documentation is not removed.
+
+   This software comes with the same warranty as perl itself (ie, none), so
+by using it you accept any and all the liability.
+
+AUTHOR
+======
+
+   Luis E. Munoz <lem@cantv.net>
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: NetAddr/IP/Count,  Next: NetPacket,  Prev: NetAddr/IP,  Up: Module List
+
+Count hosts in named subnets
+****************************
+
+NAME
+====
+
+   NetAddr::IP::Count - Count hosts in named subnets
+
+SYNOPSIS
+========
+
+     use NetAddr::IP::Count;
+     use NetAddr::IP;
+
+     my $counter = new NetAddr::IP::Count;
+
+     $counter->add('subnet-00', new NetAddr::IP("10.0.0.0/24"));
+     $counter->add('other', @array_of_ip_addresses);
+     $counter->add('other', @another_array_of_ip_addresses);
+
+     $counter->cache(10);
+
+     $counter->count(new NetAddr::IP("10.0.3.17"));
+     $counter->count(@array_of_ip_addresses);
+
+     $counter->valcount(new NetAddr::IP("10.0.3.17"), 23);
+     @array_of_ipaddr_and_values = (new NetAddr::IP("10.0.3.17"), 23,
+     				new NetAddr::IP("101.0.23.107"), 2);
+     $counter->valcount(@array_of_ipaddr_and_values);
+
+     my $r_count = $counter->result;
+
+     foreach my $subnet (keys %{$r_count}) {
+         print "Subnet $subnet had ", $r_count->{$subnet}, " visits.\n";
+     }
+
+DESCRIPTION
+===========
+
+   This module implements a symplistic way to match individual IP
+Addresses to subnets. It can be used to, among other things, help analyze
+HTTPD logs.
+
+   The following methods are implemented.
+
+`->new'
+     Creates a new counter. This method can be called passing as argument a
+     hash where the keys are the name of the subnet group and the values
+     are references to arrays of `NetAddr::IP' objects referencing each
+     specific subnet. This is probably ok for static initializations.
+
+`->add'
+     Adds a subnet group. The first parameter is the name of the group
+     being added. If it's a new name, a new entry will be created. Else the
+     given subnets are added to the existing ones, like in the example
+     above.
+
+`->count'
+     Verifies if the `NetAddr::IP'es are contained in any of the given
+     subnets. If this is the case, the corresponding totals are updated.
+
+`->valcount'
+     The same as `->count' but the argument is an array consisting of
+     `NetAddr::IP'es and value pairs.
+
+`->result'
+     Returns a reference to a hash containing the respective totals for
+     each subnet group. The key to the hash is the subnet name given with
+     `->add', the value is how many `NetAddr::IP' objects have been found
+     to match that subnet group.
+
+`->cache'
+     Since in usual applications `NetAddr::IPes' from the same subnet will
+     tend to be grouped in clusters like in the case of HTTPD logs some
+     caching is attempted to speed things up. The caching consists in
+     storing the last few entries matched in an LRU list which is checked
+     before going through all the stored subnets.
+
+     This can improve response times if tuned sensibly, however consider
+     that every miss will cause every entry in the cache to be checked
+     twice, one in the cache and one in the normal process so it's
+     important to tune the cache.
+
+     The default cache size is 5, which can be changed by calling the
+     `->cache' method as in the example. The old value of the cache size
+     is returned.
+
+AUTHOR
+======
+
+   Luis E. Munoz <lem@cantv.net>. Alvaro Carvajal <alvaro@cantv.net>
+contributed the valcount method.
+
+SEE ALSO
+========
+
+   perl(1), NetAddr::IP(1).
+
+
+File: pm.info,  Node: NetPacket,  Next: NetPacket/ARP,  Prev: NetAddr/IP/Count,  Up: Module List
+
+modules to assemble/disassemble network packets at the protocol level.
+**********************************************************************
+
+NAME
+====
+
+   `NetPacket' - modules to assemble/disassemble network packets at the
+protocol level.
+
+SYNOPSIS
+========
+
+     # NetPacket is a base class only
+
+DESCRIPTION
+===========
+
+   `NetPacket' provides a base class for a cluster of modules related to
+decoding and encoding of network protocols.  Each `NetPacket' descendent
+module knows how to encode and decode packets for the network protocol it
+implements.  Consult the documentation for the module in question for
+protocol-specific implementation.
+
+   Note that there is no inheritance in the `NetPacket::' cluster of
+modules other than each protocol module being a `NetPacket'.  This was
+seen to be too restrictive as imposing inheritance relationships (for
+example between the IP, UDP and TCP protocols) would make things like
+tunneling or other unusual situations difficult.
+
+WRITING YOUR OWN `NetPacket::' MODULE
+=====================================
+
+   You are encouraged to write additional `NetPacket::' modules as well as
+improve existing ones.  Contact the maintainer of the module in question
+with your suggestions or changes.
+
+   The following sections are a list of suggestions and conventions for
+writing a `NetPacket::' module.
+
+Naming Conventions
+------------------
+
+   When creating a module in the `NetPacket::' namespace, it is suggested
+that you stick to a couple of conventions when naming packet contents.
+This will hopefully lead to a consistent namespace making the
+`NetPacket::' easier to use.
+
+   Content names are all lowercase, with underscores separating multiple
+words.  The following abbreviations are recommended:
+
+     Word		Abbreviation
+     --------------------------------
+     source		src
+     destination		dest
+     checksum		cksum
+     identifier		id
+     version		ver
+     protocol		proto
+
+Required Methods
+----------------
+
+   encode(), decode(), strip()
+
+Required Fields
+---------------
+
+   Every NetPacket:: object should have the following fields.
+
+_parent
+     A link to the parent `NetPacket::' object in which this `NetPacket::'
+     object is encaulated.  This field is undefined if there is no parent
+     object.
+
+_frame
+     A copy of the raw data of the packet.
+
+data
+     This field should contain the data encapsulated in the packet (i.e any
+     headers or trailers stripped off) or undef if the packet contains no
+     data.  Note that in this sense, "data" is taken to mean information
+     not relevant to the particular protocol being decoded.  For example,
+     an ARP packet contains many header fields but no data.  A UDP
+     datagram, however contains header fields and a payload.
+
+Tags
+----
+
+COPYRIGHT
+=========
+
+     Copyright (c) 1995,1996,1997,1998,1999 ANU and CSIRO on behalf of
+     the participants in the CRC for Advanced Computational Systems
+     ('ACSys').
+
+     ACSys makes this software and all associated data and documentation
+     ('Software') available free of charge.  You may make copies of the
+     Software but you must include all of this notice on any copy.
+
+     The Software was developed for research purposes and ACSys does not
+     warrant that it is error free or fit for any purpose.  ACSys
+     disclaims any liability for all claims, expenses, losses, damages
+     and costs any user may incur as a result of using, copying or
+     modifying the Software.
+
+AUTHOR
+======
+
+   Tim Potter <tpot@acsys.anu.edu.au>
+
+
+File: pm.info,  Node: NetPacket/ARP,  Next: NetPacket/Ethernet,  Prev: NetPacket,  Up: Module List
+
+Assemble and disassemble ARP (Address Resolution Protocol) packets.
+*******************************************************************
+
+NAME
+====
+
+   `NetPacket::ARP' - Assemble and disassemble ARP (Address Resolution
+Protocol) packets.
+
+SYNOPSIS
+========
+
+     use NetPacket::ARP;
+
+     $tcp_obj = NetPacket::ARP->decode($raw_pkt);
+     $tcp_pkt = NetPacket::ARP->encode(params...);   # Not implemented
+
+DESCRIPTION
+===========
+
+   `NetPacket::ARP' provides a set of routines for assembling and
+disassembling packets using ARP (Address Resolution Protocol).
+
+Methods
+-------
+
+`NetPacket::ARP->decode([RAW PACKET])'
+     Decode the raw packet data given and return an object containing
+     instance data.  This method will quite happily decode garbage input.
+     It is the responsibility of the programmer to ensure valid packet data
+     is passed to this method.
+
+`NetPacket::ARP->encode(param => value)'
+     Return a ARP packet encoded with the instance data specified.  Not
+     implemented.
+
+Functions
+---------
+
+`NetPacket::ARP::strip([RAW PACKET])'
+     Return the encapsulated data (or payload) contained in the TCP packet.
+     Since no payload data is encapulated in an ARP packet (only instance
+     data), this function returns undef.
+
+Instance data
+-------------
+
+   The instance data for the `NetPacket::ARP' object consists of the
+following fields.
+
+htype
+     Hardware type.
+
+proto
+     Protocol type.
+
+hlen
+     Header length.
+
+plen
+     Protocol length.
+
+opcode
+     One of the following constants:
+
+        * ARP_OPCODE_REQUEST
+
+        * ARP_OPCODE_REPLY
+
+        * RARP_OPCODE_REQUEST
+
+        * RARP_OPCODE_REPLY
+
+sha
+     Source hardware address.
+
+spa
+     Source protocol address.
+
+tha
+     Target hardware address.
+
+tpa
+     Target protocol address.
+
+Exports
+-------
+
+default
+     none
+
+exportable
+     none
+
+tags
+     The following tags group together related exportable items.
+
+    :ALL
+          All the above exportable items.
+
+EXAMPLE
+=======
+
+   Print out arp requests on the local network.
+
+   #!/usr/bin/perl
+
+   use Net::PcapUtils; use NetPacket::Ethernet qw(:types); use
+NetPacket::ARP;
+
+   sub process_pkt {     my ($arg, $hdr, $pkt) = @_;
+
+     my $eth_obj = NetPacket::Ethernet->decode($pkt);
+
+     if ($eth_obj->{type} == ETH_TYPE_ARP) {
+     	my $arp_obj = NetPacket::ARP->decode($eth_obj->{data}, $eth_obj);
+     	print("source hw addr=$arp_obj->{sha}, " .
+     	      "dest hw addr=$arp_obj->{tha}\n");
+     }
+     }
+
+   Net::PcapUtils::loop(\&process_pkt);
+
+TODO
+====
+
+Implement encode() function
+Does this work for protocols other than IP?  Need to read RFC.
+Example is a bit silly
+COPYRIGHT
+=========
+
+     Copyright (c) 1995,1996,1997,1998,1999 ANU and CSIRO on behalf of
+     the participants in the CRC for Advanced Computational Systems
+     ('ACSys').
+
+     ACSys makes this software and all associated data and documentation
+     ('Software') available free of charge.  You may make copies of the
+     Software but you must include all of this notice on any copy.
+
+     The Software was developed for research purposes and ACSys does not
+     warrant that it is error free or fit for any purpose.  ACSys
+     disclaims any liability for all claims, expenses, losses, damages
+     and costs any user may incur as a result of using, copying or
+     modifying the Software.
+
+AUTHOR
+======
+
+   Tim Potter <tpot@acsys.anu.edu.au>
+
+
+File: pm.info,  Node: NetPacket/Ethernet,  Next: NetPacket/ICMP,  Prev: NetPacket/ARP,  Up: Module List
+
+Assemble and disassemble ethernet packets.
+******************************************
+
+NAME
+====
+
+   `NetPacket::Ethernet' - Assemble and disassemble ethernet packets.
+
+SYNOPSIS
+========
+
+     use NetPacket::Ethernet;
+
+     $eth_obj = NetPacket::Ethernet->decode($raw_pkt);
+     $eth_pkt = NetPacket::Ethernet->encode(params...);   # Not implemented
+     $eth_data = NetPacket::Ethernet::strip($raw_pkt);
+
+DESCRIPTION
+===========
+
+   `NetPacket::Ethernet' provides a set of routines for assembling and
+disassembling packets using the Ethernet protocol.
+
+Methods
+-------
+
+`NetPacket::Ethernet->decode([RAW PACKET])'
+     Decode the raw packet data given and return an object containing
+     instance data.  This method will quite happily decode garbage input.
+     It is the responsibility of the programmer to ensure valid packet data
+     is passed to this method.
+
+`NetPacket::Ethernet->encode(param => value)'
+     Return an ethernet packet encoded with the instance data specified.
+     Not implemented.
+
+Functions
+---------
+
+`NetPacket::Ethernet::strip([RAW PACKET])'
+     Return the encapsulated data (or payload) contained in the ethernet
+     packet.  This data is suitable to be used as input for other
+     `NetPacket::*' modules.
+
+     This function is equivalent to creating an object using the
+     `decode()' constructor and returning the data field of that object.
+
+Instance data
+-------------
+
+   The instance data for the `NetPacket::Ethernet' object consists of the
+following fields.
+
+src_mac
+     The source MAC address for the ethernet packet as a hex string.
+
+dest_mac
+     The destination MAC address for the ethernet packet as a hex string.
+
+type
+     The protocol type for the ethernet packet.
+
+data
+     The payload for the ethernet packet.
+
+Exports
+-------
+
+default
+     none
+
+exportable
+     ETH_TYPE_IP ETH_TYPE_ARP ETH_TYPE_APPLETALK ETH_TYPE_SNMP
+     ETH_TYPE_IPv6 ETH_TYPE_PPP
+
+tags
+     The following tags group together related exportable items.
+
+    `:types'
+          ETH_TYPE_IP ETH_TYPE_ARP ETH_TYPE_APPLETALK ETH_TYPE_SNMP
+          ETH_TYPE_IPv6 ETH_TYPE_PPP
+
+    `:strip'
+          Import the strip function `eth_strip' which is an alias for
+          `NetPacket::Ethernet::strip'
+
+    :ALL
+          All the above exportable items.
+
+EXAMPLE
+=======
+
+   The following script dumps ethernet frames by mac address and protocol
+to standard output.
+
+     #!/usr/bin/perl
+
+     use strict;
+     use Net::PcapUtils;
+     use NetPacket::Ethernet;
+
+     sub process_pkt {
+         my($arg, $hdr, $pkt) = @_;
+
+     my $eth_obj = NetPacket::Ethernet->decode($pkt);
+     print("$eth_obj->{src_mac}:$eth_obj->{dest_mac} $eth_obj->{type}\n");
+       }
+
+     Net::PcapUtils::loop(\&process_pkt);
+
+TODO
+====
+
+Implement encode() function
+COPYRIGHT
+=========
+
+     Copyright (c) 1995,1996,1997,1998,1999 ANU and CSIRO on behalf of
+     the participants in the CRC for Advanced Computational Systems
+     ('ACSys').
+
+     ACSys makes this software and all associated data and documentation
+     ('Software') available free of charge.  You may make copies of the
+     Software but you must include all of this notice on any copy.
+
+     The Software was developed for research purposes and ACSys does not
+     warrant that it is error free or fit for any purpose.  ACSys
+     disclaims any liability for all claims, expenses, losses, damages
+     and costs any user may incur as a result of using, copying or
+     modifying the Software.
+
+AUTHOR
+======
+
+   Tim Potter <tpot@acsys.anu.edu.au>
+
+
+File: pm.info,  Node: NetPacket/ICMP,  Next: NetPacket/IGMP,  Prev: NetPacket/Ethernet,  Up: Module List
+
+Assemble and disassemble ICMP (Internet Control Message Protocol) packets.
+**************************************************************************
+
+NAME
+====
+
+   `NetPacket::ICMP' - Assemble and disassemble ICMP (Internet Control
+Message Protocol) packets.
+
+SYNOPSIS
+========
+
+     use NetPacket::ICMP;
+
+     $icmp_obj = NetPacket::ICMP->decode($raw_pkt);
+     $icmp_pkt = NetPacket::ICMP->encode(params...);   # Not implemented
+     $icmp_data = NetPacket::ICMP::strip($raw_pkt);
+
+DESCRIPTION
+===========
+
+   `NetPacket::ICMP' provides a set of routines for assembling and
+disassembling packets using ICMP (Internet Control Message Protocol).
+
+Methods
+-------
+
+`NetPacket::ICMP->decode([RAW PACKET])'
+     Decode the raw packet data given and return an object containing
+     instance data.  This method will quite happily decode garbage input.
+     It is the responsibility of the programmer to ensure valid packet data
+     is passed to this method.
+
+`NetPacket::IGMP->encode(param => value)'
+     Return an IGMP packet encoded with the instance data specified.  Not
+     implemented.
+
+Functions
+---------
+
+`NetPacket::IGMP::strip([RAW PACKET])'
+     Return the encapsulated data (or payload) contained in the ICMP
+     packet.
+
+Instance data
+-------------
+
+   The instance data for the `NetPacket::ICMP' object consists of the
+following fields.
+
+type
+     The ICMP message type of this packet.
+
+code
+     The ICMP message code of this packet.
+
+cksum
+     The checksum for this packet.
+
+data
+     The encapsulated data (payload) for this packet.
+
+Exports
+-------
+
+default
+     none
+
+exportable
+     none
+
+tags
+     The following tags group together related exportable items.
+
+    `:strip'
+          Import the strip function `icmp_strip'.
+
+    :ALL
+          All the above exportable items.
+
+EXAMPLE
+=======
+
+TODO
+====
+
+Implement encode() function
+Create constants
+Write example
+COPYRIGHT
+=========
+
+     Copyright (c) 1995,1996,1997,1998,1999 ANU and CSIRO on behalf of
+     the participants in the CRC for Advanced Computational Systems
+     ('ACSys').
+
+     ACSys makes this software and all associated data and documentation
+     ('Software') available free of charge.  You may make copies of the
+     Software but you must include all of this notice on any copy.
+
+     The Software was developed for research purposes and ACSys does not
+     warrant that it is error free or fit for any purpose.  ACSys
+     disclaims any liability for all claims, expenses, losses, damages
+     and costs any user may incur as a result of using, copying or
+     modifying the Software.
+
+AUTHOR
+======
+
+   Tim Potter <tpot@acsys.anu.edu.au>
+
+
+File: pm.info,  Node: NetPacket/IGMP,  Next: NetPacket/IP,  Prev: NetPacket/ICMP,  Up: Module List
+
+Assemble and disassemble IGMP (Internet Group Mangement Protocol) packets.
+**************************************************************************
+
+NAME
+====
+
+   `NetPacket::IGMP' - Assemble and disassemble IGMP (Internet Group
+Mangement Protocol) packets.
+
+SYNOPSIS
+========
+
+     use NetPacket::IGMP;
+
+     $igmp_obj = NetPacket::IGMP->decode($raw_pkt);
+     $igmp_pkt = NetPacket::IGMP->encode(params...);   # Not implemented
+     $igmp_data = NetPacket::IGMP::strip($raw_pkt);
+
+DESCRIPTION
+===========
+
+   `NetPacket::IGMP' provides a set of routines for assembling and
+disassembling packets using IGMP (Internet Group Mangement Protocol).
+
+Methods
+-------
+
+`NetPacket::IGMP->decode([RAW PACKET])'
+     Decode the raw packet data given and return an object containing
+     instance data.  This method will quite happily decode garbage input.
+     It is the responsibility of the programmer to ensure valid packet data
+     is passed to this method.
+
+`NetPacket::IGMP->encode(param => value)'
+     Return an IGMP packet encoded with the instance data specified.  Not
+     implemented.
+
+Functions
+---------
+
+`NetPacket::IGMP::strip([RAW PACKET])'
+     Return the encapsulated data (or payload) contained in the IGMP
+     packet.  This function returns undef as there is no encapsulated data
+     in an IGMP packet.
+
+Instance data
+-------------
+
+   The instance data for the `NetPacket::IGMP' object consists of the
+following fields.
+
+version
+     The IGMP version of this packet.
+
+type
+     The message type for this packet.
+
+len
+     The length (including length of header) in bytes for this packet.
+
+subtype
+     The message subtype for this packet.
+
+cksum
+     The checksum for this packet.
+
+group_addr
+     The group address specified in this packet.
+
+data
+     The encapsulated data (payload) for this packet.
+
+Exports
+-------
+
+default
+     none
+
+exportable
+     IGMP_VERSION_RFC998 IGMP_VERSION_RFC1112 IGMP_HOST_MQUERY
+     IGMP_HOST_MREPORT IGMP_IP_NO_HOSTS IGMP_IP_ALL_HOSTS
+     IGMP_IP_ALL_ROUTERS
+
+tags
+     The following tags group together related exportable items.
+
+    `:strip'
+          Import the strip function `igmp_strip'.
+
+    `:versions'
+          IGMP_VERSION_RFC998 IGMP_VERSION_RFC1112
+
+    `:msgtypes'
+          IGMP_HOST_MQUERY IGMP_HOST_MREPORT
+
+    `:group_addrs'
+          IGMP_IP_NO_HOSTS IGMP_IP_ALL_HOSTS IGMP_IP_ALL_ROUTERS
+
+    :ALL
+          All the above exportable items.
+
+EXAMPLE
+=======
+
+   The following script dumps UDP frames by IP address and UDP port to
+standard output.
+
+     #!/usr/bin/perl
+
+     use strict;
+     use Net::PcapUtils;
+     use NetPacket::Ethernet qw(:strip);
+     use NetPacket::IP;
+     use NetPacket::IGMP;
+
+     sub process_pkt {
+         my($arg, $hdr, $pkt) = @_;
+
+     my $ip_obj = NetPacket::IP->decode(eth_strip($pkt));
+     my $igmp_obj = NetPacket::IGMP->decode($ip_obj->{data});
+
+     print("$ip_obj->{src_ip} -> $ip_obj->{dest_ip} ",
+     	    "$igmp_obj->{type}/$igmp_obj->{subtype} ",
+     	    "$igmp_obj->{group_addr}\n");
+       }
+
+     Net::PcapUtils::loop(\&process_pkt, FILTER => 'igmp');
+
+TODO
+====
+
+Implement encode() function
+COPYRIGHT
+=========
+
+     Copyright (c) 1995,1996,1997,1998,1999 ANU and CSIRO on behalf of
+     the participants in the CRC for Advanced Computational Systems
+     ('ACSys').
+
+     ACSys makes this software and all associated data and documentation
+     ('Software') available free of charge.  You may make copies of the
+     Software but you must include all of this notice on any copy.
+
+     The Software was developed for research purposes and ACSys does not
+     warrant that it is error free or fit for any purpose.  ACSys
+     disclaims any liability for all claims, expenses, losses, damages
+     and costs any user may incur as a result of using, copying or
+     modifying the Software.
+
+AUTHOR
+======
+
+   Tim Potter <tpot@acsys.anu.edu.au>
+
+
+File: pm.info,  Node: NetPacket/IP,  Next: NetPacket/TCP,  Prev: NetPacket/IGMP,  Up: Module List
+
+Assemble and disassemble IP (Internet Protocol) packets.
+********************************************************
+
+NAME
+====
+
+   `NetPacket::IP' - Assemble and disassemble IP (Internet Protocol)
+packets.
+
+SYNOPSIS
+========
+
+     use NetPacket::IP;
+
+     $ip_obj = NetPacket::IP->decode($raw_pkt);
+     $ip_pkt = NetPacket::IP->encode(params...);   # Not implemented
+     $ip_data = NetPacket::IP::strip($raw_pkt);
+
+DESCRIPTION
+===========
+
+   `NetPacket::IP' provides a set of routines for assembling and
+disassembling packets using IP (Internet Protocol).
+
+Methods
+-------
+
+`NetPacket::IP->decode([RAW PACKET])'
+     Decode the raw packet data given and return an object containing
+     instance data.  This method will quite happily decode garbage input.
+     It is the responsibility of the programmer to ensure valid packet data
+     is passed to this method.
+
+`NetPacket::IP->encode(param => value)'
+     Return an IP packet encoded with the instance data specified.  Not
+     implemented.
+
+Functions
+---------
+
+`NetPacket::IP::strip([RAW PACKET])'
+     Return the encapsulated data (or payload) contained in the IP packet.
+     This data is suitable to be used as input for other `NetPacket::*'
+     modules.
+
+     This function is equivalent to creating an object using the
+     `decode()' constructor and returning the data field of that object.
+
+Instance data
+-------------
+
+   The instance data for the `NetPacket::IP' object consists of the
+following fields.
+
+ver
+     The IP version number of this packet.
+
+hlen
+     The IP header length of this packet.
+
+flags
+     The IP header flags for this packet.
+
+foffset
+     The IP fragment offset for this packet.
+
+tos
+     The type-of-service for this IP packet.
+
+len
+     The length (including length of header) in bytes for this packet.
+
+id
+     The identification (sequence) number for this IP packet.
+
+ttl
+     The time-to-live value for this packet.
+
+proto
+     The IP protocol number for this packet.
+
+cksum
+     The IP checksum value for this packet.
+
+src_ip
+     The source IP address for this packet in dotted-quad notation.
+
+dest_ip
+     The destination IP address for this packet in dotted-quad notation.
+
+options
+     Any IP options for this packet.
+
+data
+     The encapsulated data (payload) for this IP packet.
+
+Exports
+-------
+
+default
+     none
+
+exportable
+     IP_PROTO_IP IP_PROTO_ICMP IP_PROTO_IGMP IP_PROTO_IPIP IP_PROTO_TCP
+     IP_PROTO_UDP IP_VERSION_IPv4
+
+tags
+     The following tags group together related exportable items.
+
+    `:protos'
+          IP_PROTO_IP IP_PROTO_ICMP IP_PROTO_IGMP IP_PROTO_IPIP
+          IP_PROTO_TCP IP_PROTO_UDP
+
+    `:versions'
+          IP_VERSION_IPv4
+
+    `:strip'
+          Import the strip function `ip_strip'.
+
+    :ALL
+          All the above exportable items.
+
+EXAMPLE
+=======
+
+   The following script dumps IP frames by IP address and protocol to
+standard output.
+
+     #!/usr/bin/perl
+
+     use strict;
+     use Net::PcapUtils;
+     use NetPacket::Ethernet qw(:strip);
+     use NetPacket::IP;
+
+     sub process_pkt {
+         my ($user, $hdr, $pkt) = @_;
+
+     my $ip_obj = NetPacket::IP->decode(eth_strip($pkt));
+     print("$ip_obj->{src_ip}:$ip_obj->{dest_ip} $ip_obj->{proto}\n");
+       }
+
+     Net::PcapUtils::loop(\&process_pkt, FILTER => 'ip');
+
+TODO
+====
+
+Implement encode() function
+IP option decoding - currently stored in binary form.
+Assembly of received fragments
+COPYRIGHT
+=========
+
+     Copyright (c) 1995,1996,1997,1998,1999 ANU and CSIRO on behalf of
+     the participants in the CRC for Advanced Computational Systems
+     ('ACSys').
+
+     ACSys makes this software and all associated data and documentation
+     ('Software') available free of charge.  You may make copies of the
+     Software but you must include all of this notice on any copy.
+
+     The Software was developed for research purposes and ACSys does not
+     warrant that it is error free or fit for any purpose.  ACSys
+     disclaims any liability for all claims, expenses, losses, damages
+     and costs any user may incur as a result of using, copying or
+     modifying the Software.
+
+AUTHOR
+======
+
+   Tim Potter <tpot@acsys.anu.edu.au>
+
+
+File: pm.info,  Node: NetPacket/TCP,  Next: NetPacket/UDP,  Prev: NetPacket/IP,  Up: Module List
+
+Assemble and disassemble TCP (Transmission Control Protocol) packets.
+*********************************************************************
+
+NAME
+====
+
+   `NetPacket::TCP' - Assemble and disassemble TCP (Transmission Control
+Protocol) packets.
+
+SYNOPSIS
+========
+
+     use NetPacket::TCP;
+
+     $tcp_obj = NetPacket::TCP->decode($raw_pkt);
+     $tcp_pkt = NetPacket::TCP->encode(params...);   # Not implemented
+     $tcp_data = NetPacket::TCP::strip($raw_pkt);
+
+DESCRIPTION
+===========
+
+   `NetPacket::TCP' provides a set of routines for assembling and
+disassembling packets using TCP (Transmission Control Protocol).
+
+Methods
+-------
+
+`NetPacket::TCP->decode([RAW PACKET])'
+     Decode the raw packet data given and return an object containing
+     instance data.  This method will quite happily decode garbage input.
+     It is the responsibility of the programmer to ensure valid packet data
+     is passed to this method.
+
+`NetPacket::TCP->encode(param => value)'
+     Return a TCP packet encoded with the instance data specified.  Not
+     implemented.
+
+Functions
+---------
+
+`NetPacket::TCP::strip([RAW PACKET])'
+     Return the encapsulated data (or payload) contained in the TCP
+     packet.  This data is suitable to be used as input for other
+     `NetPacket::*' modules.
+
+     This function is equivalent to creating an object using the
+     `decode()' constructor and returning the data field of that object.
+
+Instance data
+-------------
+
+   The instance data for the `NetPacket::TCP' object consists of the
+following fields.
+
+src_port
+     The source TCP port for the packet.
+
+dest_port
+     The destination TCP port for the packet.
+
+seqnum
+     The TCP sequence number for this packet.
+
+acknum
+     The TCP acknowledgement number for this packet.
+
+hlen
+     The header length for this packet.
+
+reserved
+     The 6-bit "reserved" space in the TCP header.
+
+flags
+     Contains the urg, ack, psh, rst, syn and fin flags for this packet.
+
+winsize
+     The TCP window size for this packet.
+
+cksum
+     The TCP checksum.
+
+urg
+     The TCP urgent pointer.
+
+options
+     Any TCP options for this packet in binary form.
+
+data
+     The encapsulated data (payload) for this packet.
+
+Exports
+-------
+
+default
+     none
+
+exportable
+     tcp_strip
+
+tags
+     The following tags group together related exportable items.
+
+    `:strip'
+          Import the strip function `tcp_strip'.
+
+    :ALL
+          All the above exportable items.
+
+EXAMPLE
+=======
+
+   The following script is a primitive pop3 sniffer.
+
+     #!/usr/bin/perl
+
+     use strict;
+     use Net::PcapUtils;
+     use NetPacket::Ethernet qw(:strip);
+     use NetPacket::IP qw(:strip);
+     use NetPacket::TCP;
+
+     sub process_pkt {
+         my($arg, $hdr, $pkt) = @_;
+
+     my $tcp_obj = NetPacket::TCP->decode(ip_strip(eth_strip($pkt)));
+
+     if (($tcp_obj->{src_port} == 110) or ($tcp_obj->{dest_port} == 110)) {
+     	  print($tcp_obj->{data});
+     }
+       }
+
+     Net::PcapUtils::loop(\&process_pkt, FILTER => 'tcp');
+
+TODO
+====
+
+Implement encode() function
+Assembly of TCP fragments into a data stream
+Option processing
+Nicer processing of TCP flags
+COPYRIGHT
+=========
+
+     Copyright (c) 1995,1996,1997,1998,1999 ANU and CSIRO on behalf of
+     the participants in the CRC for Advanced Computational Systems
+     ('ACSys').
+
+     ACSys makes this software and all associated data and documentation
+     ('Software') available free of charge.  You may make copies of the
+     Software but you must include all of this notice on any copy.
+
+     The Software was developed for research purposes and ACSys does not
+     warrant that it is error free or fit for any purpose.  ACSys
+     disclaims any liability for all claims, expenses, losses, damages
+     and costs any user may incur as a result of using, copying or
+     modifying the Software.
+
+AUTHOR
+======
+
+   Tim Potter <tpot@acsys.anu.edu.au>
+
+
+File: pm.info,  Node: NetPacket/UDP,  Next: NetServer/Generic,  Prev: NetPacket/TCP,  Up: Module List
+
+Assemble and disassemble UDP (User Datagram Protocol) packets.
+**************************************************************
+
+NAME
+====
+
+   `NetPacket::UDP' - Assemble and disassemble UDP (User Datagram
+Protocol) packets.
+
+SYNOPSIS
+========
+
+     use NetPacket::UDP;
+
+     $udp_obj = NetPacket::UDP->decode($raw_pkt);
+     $udp_pkt = NetPacket::UDP->encode(params...);   # Not implemented
+     $udp_data = NetPacket::UDP::strip($raw_pkt);
+
+DESCRIPTION
+===========
+
+   `NetPacket::UDP' provides a set of routines for assembling and
+disassembling packets using UDP (User Datagram Protocol).
+
+Methods
+-------
+
+`NetPacket::UDP->decode([RAW PACKET])'
+     Decode the raw packet data given and return an object containing
+     instance data.  This method will quite happily decode garbage input.
+     It is the responsibility of the programmer to ensure valid packet data
+     is passed to this method.
+
+`NetPacket::UDP->encode(param => value)'
+     Return a UDP packet encoded with the instance data specified.  Not
+     implemented.
+
+Functions
+---------
+
+`NetPacket::UDP::strip([RAW PACKET])'
+     Return the encapsulated data (or payload) contained in the UDP
+     packet.  This data is suitable to be used as input for other
+     `NetPacket::*' modules.
+
+     This function is equivalent to creating an object using the
+     `decode()' constructor and returning the data field of that object.
+
+Instance data
+-------------
+
+   The instance data for the `NetPacket::UDP' object consists of the
+following fields.
+
+src_port
+     The source UDP port for the datagram.
+
+dest_port
+     The destination UDP port for the datagram.
+
+len
+     The length (including length of header) in bytes for this packet.
+
+cksum
+     The checksum value for this packet.
+
+data
+     The encapsulated data (payload) for this packet.
+
+Exports
+-------
+
+default
+     none
+
+exportable
+     igmp_strip IGMP_VERSION_RFC998 IGMP_VERSION_RFC1112
+     IGMP_MSG_HOST_MQUERY IGMP_MSG_HOST_MREPORT IGMP_IP_NO_HOSTS
+     IGMP_IP_ALL_HOSTS IGMP_IP_ALL_ROUTERS
+
+tags
+     The following tags group together related exportable items.
+
+    `:strip'
+          Import the strip function `igmp_strip'.
+
+    `:versions'
+          IGMP_VERSION_RFC998 IGMP_VERSION_RFC1112
+
+    `:msgtypes'
+          IGMP_HOST_MQUERY IGMP_HOST_MREPORT
+
+    `:group_addrs'
+          IGMP_IP_NO_HOSTS IGMP_IP_ALL_HOSTS IGMP_IP_ALL_ROUTERS
+
+    :ALL
+          All the above exportable items.
+
+EXAMPLE
+=======
+
+   The following script dumps IGMP the contents of IGMP frames to standard
+output.
+
+     #!/usr/bin/perl
+
+     use strict;
+     use Net::PcapUtils;
+     use NetPacket::Ethernet qw(:strip);
+     use NetPacket::IP;
+     use NetPacket::UDP;
+
+     sub process_pkt {
+         my($arg, $hdr, $pkt) = @_;
+
+     my $ip_obj = NetPacket::IP->decode(eth_strip($pkt));
+     my $udp_obj = NetPacket::UDP->decode($ip_obj->{data});
+
+     print("$ip_obj->{src_ip}:$udp_obj->{src_port} -> ",
+     	    "$ip_obj->{dest_ip}:$udp_obj->{dest_port} ",
+     	    "$udp_obj->{len}\n");
+       }
+
+     Net::PcapUtils::loop(\&process_pkt, FILTER => 'udp');
+
+TODO
+====
+
+Implement encode() function
+COPYRIGHT
+=========
+
+     Copyright (c) 1995,1996,1997,1998,1999 ANU and CSIRO on behalf of
+     the participants in the CRC for Advanced Computational Systems
+     ('ACSys').
+
+     ACSys makes this software and all associated data and documentation
+     ('Software') available free of charge.  You may make copies of the
+     Software but you must include all of this notice on any copy.
+
+     The Software was developed for research purposes and ACSys does not
+     warrant that it is error free or fit for any purpose.  ACSys
+     disclaims any liability for all claims, expenses, losses, damages
+     and costs any user may incur as a result of using, copying or
+     modifying the Software.
+
+AUTHOR
+======
+
+   Tim Potter <tpot@acsys.anu.edu.au>
+
+

@@ -1,0 +1,2126 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Net/Daemon/Log,  Next: Net/Daemon/SSL,  Prev: Net/Daemon,  Up: Module List
+
+Utility functions for logging
+*****************************
+
+NAME
+====
+
+   Net::Daemon::Log - Utility functions for logging
+
+SYNOPSIS
+========
+
+     # Choose logging method: syslog or Win32::EventLog
+     $self->{'facility'} = 'mail'; # Default: Daemon
+     $self->{'logfile'} = undef;   # Default
+
+     # Choose logging method: stderr
+     $self->{'logfile'} = 1;
+
+     # Choose logging method: IO handle
+     my $file = IO::File->new("my.log", "a");
+     $self->{'logfile'} = $file;
+
+     # Debugging messages (equivalent):
+     $self->Log('debug', "This is a debugging message");
+     $self->Debug("This is a debugging message");
+
+     # Error messages (equivalent):
+     $self->Log('err', "This is an error message");
+     $self->Error("This is an error message");
+
+     # Fatal error messages (implies 'die')
+     $self->Fatal("This is a fatal error message");
+
+WARNING
+=======
+
+   THIS IS ALPHA SOFTWARE. It is *only* 'Alpha' because the interface (API)
+is not finalised. The Alpha status does not reflect code quality or
+stability.
+
+DESCRIPTION
+===========
+
+   Net::Daemon::Log is a utility class for portable logging messages.  By
+default it uses syslog (Unix) or Win32::EventLog (Windows), but logging
+messages can also be redirected to stderr or a log file.
+
+Generic Logging
+---------------
+
+     $self->Log($level, $msg, @args);
+
+   This is the generic interface. The logging level is in syslog style,
+thus one of the words 'debug', 'info', 'notice', 'err' or 'crit'.  You'll
+rarely need info and notice and I can hardly imagine a reason for crit
+(critical). In 95% of all cases debug and err will be sufficient.
+
+   The logging string $msg is a format string similar to printf.
+
+Utility methods
+---------------
+
+     $self->Debug($msg, @args);
+     $self->Error($msg, @args);
+     $self->Fatal($msg, @args);
+
+   These are replacements for logging with levels debug and err. The
+difference between the latter two is that Fatal includes throwing a Perl
+exception.
+
+Chossing a logging target
+-------------------------
+
+   By default logging will happen to syslog (Unix) or EventLog (Windows).
+However you may choose logging to stderr by setting
+
+     $self->{'logfile'} = 1;
+
+   This is required if neither of syslog and EventLog is available. An
+alternative option is setting
+
+     $self->{'logfile'} = $handle;
+
+   where $handle is any object supporting a print method, for example an
+IO::Handle object. Usually the logging target is choosen as soon as you
+call $self->Log() the first time. However, you may force choosing the
+target by doing a
+
+     $self->OpenLog();
+
+   before calling Log the first time.
+
+MULTITHREADING
+==============
+
+   The Multithreading capabitities of this class are depending heavily on
+the underlying classes Sys::Syslog, Win32::EventLog or IO::Handle.  If
+they are thread safe, you can well assume that this package is too. (The
+exception being that you should better call $self->OpenLog() before
+threading.)
+
+AUTHOR AND COPYRIGHT
+====================
+
+     Net::Daemon is Copyright (C) 1998, Jochen Wiedmann
+                                        Am Eisteich 9
+                                        72555 Metzingen
+                                        Germany
+
+     Phone: +49 7123 14887
+     Email: joe@ispsoft.de
+
+     All rights reserved.
+
+     You may distribute this package under the terms of either the GNU
+     General Public License or the Artistic License, as specified in the
+     Perl README file.
+
+SEE ALSO
+========
+
+   `Net::Daemon(3)' in this node, `Sys::Syslog(3)' in this node,
+`Win32::EventLog(3)' in this node, `IO::Handle(3)' in this node
+
+
+File: pm.info,  Node: Net/Daemon/SSL,  Next: Net/Daemon/Test,  Prev: Net/Daemon/Log,  Up: Module List
+
+perl extensions for portable ssl daemons
+****************************************
+
+NAME
+====
+
+   Net::Daemon::SSL - perl extensions for portable ssl daemons
+
+SYNOPSIS
+========
+
+     use Net::Daemon::SSL;
+     package MyDaemon;
+     @MyDaemon::ISA = qw (Net::Daemon::SSL);
+     sub Run
+     {
+         my $this = shift;
+         my $buffer;
+         $this->{socket}->print ( "vasja was here\n" );
+         $this->{socket}->sysread ( $buffer, 100 ); # Attention! getline() method
+                                                    # do not work with IO::Socket::SSL
+                                                    # version 0.73
+                                                    # see perldoc IO::Socket::SSL
+                                                    # for more details
+     }
+     package main;
+     my $daemon = new MyDaemon ( {}, \ @ARGV ); # you can use --help command line key
+     $daemon || die "error create daemon instance: $!\n";
+     $daemon->Bind();
+
+DESCRIPTION
+===========
+
+   This class implements an IO::Socket::SSL functionality for Net::Daemon
+class. See perldoc Net::Daemon for more information about Net::Daemon
+usage.
+
+Options
+-------
+
+   This method add IO::Socket::SSL specific options ( SSL_use_cert,
+SSL_verify_mode, SSL_key_file, SSL_cert_file, SSL_ca_path, SSL_ca_file ) to
+generic Net::Daemon options. See perldoc IO::Socket::SSL for description of
+this options
+
+Bind
+----
+
+   This method creates an IO::Socket::SSL::SafeAccept socket, stores this
+socket into $this->{socket} and passes control to parent
+Net::Daemon::Bind. The IO::Socket::SSL::SafeAccept is a class inherited
+from IO::Socket::SSL with the only difference from parent class - the
+accept() method of this class returns EINTR on *any* error. This trick is
+needed to "hack" Net::Daemon::Bind functionality: if this method gets an
+error from accept() ( Net::Daemon::SSL auth error, for example ) it will
+call Fatal() method and die unless this is a EINTR error.
+
+AUTHOR AND COPYRIGHT
+====================
+
+     Net::Daemon::SSL (C) Michael Kulakov, Zenon N.S.P. 2000
+                          125124, 19, 1-st Jamskogo polja st,
+                          Moscow, Russian Federation
+
+     mkul@cpan.org
+
+     All rights reserved.
+
+     You may distribute this package under the terms of either the GNU
+     General Public License or the Artistic License, as specified in the
+     Perl README file.
+
+SEE ALSO
+========
+
+   `Net::Daemon(3)' in this node, `IO::Socket::SSL(3)' in this node
+
+
+File: pm.info,  Node: Net/Daemon/Test,  Next: Net/Dict,  Prev: Net/Daemon/SSL,  Up: Module List
+
+support functions for testing Net::Daemon servers
+*************************************************
+
+NAME
+====
+
+   Net::Daemon::Test - support functions for testing Net::Daemon servers
+
+SYNOPSIS
+========
+
+     # This is the server, stored in the file "servertask".
+     #
+     # Create a subclass of Net::Daemon::Test, which in turn is
+     # a subclass of Net::Daemon
+     use Net::Daemon::Test ();
+     package MyDaemon;
+     @MyDaemon::ISA = qw(Net::Daemon::Test);
+
+     sub Run {
+     	# Overwrite this and other methods, as you like.
+     }
+
+     my $self = Net::Daemon->new(\%attr, \@options);
+     eval { $self->Bind() };
+     if ($@) {
+     	die "Server cannot bind: $!";
+     }
+     eval { $self->Run() };
+     if ($@) {
+     	die "Unexpected server termination: $@";
+     }
+
+     # This is the client, the real test script, note we call the
+     # "servertask" file below:
+     #
+     # Call the Child method to spawn a child. Don't forget to use
+     # the timeout option.
+     use Net::Daemon::Test ();
+
+     my($handle, $port) = eval {
+         Net::Daemon::Test->Child(5, # Number of subtests
+     				 'servertask', '--timeout', '20')
+     };
+     if ($@) {
+     	print "not ok 1 $@\n";
+     	exit 0;
+     }
+     print "ok 1\n";
+
+     # Real tests following here
+     ...
+
+     # Terminate the server
+     $handle->Terminate();
+
+DESCRIPTION
+===========
+
+   This module is a frame for creating test scripts of Net::Daemon based
+server packages, preferrably using Test::Harness, but that's your choice.
+
+   A test consists of two parts: The client part and the server part.  The
+test is executed by the child part which invokes the server part, by
+spawning a child process and invoking an external Perl script.  (Of course
+we woultn't need this external file with fork(), but that's the best
+possibility to make the test scripts portable to Windows without requiring
+threads in the test script.)
+
+   The server part is a usual Net::Daemon application, for example a script
+like dbiproxy. The only difference is that it derives from
+Net::Daemon::Test and not from Net::Daemon, the main difference is that
+the Bind method attempts to allocate a port automatically. Once a port is
+allocated, the number is stored in the file "ndtest.prt".
+
+   After spawning the server process, the child will wait ten seconds
+(hopefully sufficient) for the creation of ndtest.prt.
+
+AVAILABLE METHODS
+=================
+
+Server part
+-----------
+
+Options
+     Adds an option *-timeout* to Net::Daemon: The server's Run method
+     will die after at most 20 seconds.
+
+Bind
+     (Instance method) This is mainly the default Bind method, but it
+     attempts to find and allocate a free port in two ways: First of all,
+     it tries to call Bind with port 0, most systems will automatically
+     choose a port in that case. If that seems to fail, ports 30000-30049
+     are tried. We hope, one of these will succeed. :-)
+
+Run
+     (Instance method) Overwrites the Net::Daemon's method by adding a
+     timeout.
+
+   sub Run ($) {     my $self = shift;     $self->Run(); }
+
+Client part
+-----------
+
+Child
+     (Class method) Attempts to spawn a server process. The server process
+     is expected to create the file 'ndtest.prt' with the port number.
+
+     The method returns a process handle and a port number. The process
+     handle offers a method *Terminate* that may later be used to stop the
+     server process.
+
+AUTHOR AND COPYRIGHT
+====================
+
+     Net::Daemon is Copyright (C) 1998, Jochen Wiedmann
+                                        Am Eisteich 9
+                                        72555 Metzingen
+                                        Germany
+
+     Phone: +49 7123 14887
+     Email: joe@ispsoft.de
+
+     All rights reserved.
+
+   You may distribute under the terms of either the GNU General Public
+License or the Artistic License, as specified in the Perl README file.
+
+SEE ALSO
+========
+
+   `Net::Daemon(3)' in this node, `Test::Harness(3)' in this node
+
+
+File: pm.info,  Node: Net/Dict,  Next: Net/Domain,  Prev: Net/Daemon/Test,  Up: Module List
+
+client API for accessing dictionary servers (RFC 2229)
+******************************************************
+
+NAME
+====
+
+   Net::Dict - client API for accessing dictionary servers (RFC 2229)
+
+SYNOPSIS
+========
+
+     use Net::Dict;
+     
+     $dict = Net::Dict->new("some.host.name");
+     $h = $dict->define("word");
+     foreach $i (@{$h}) {
+         ($db, $def) = @{$i};
+     	. . .
+     }
+
+DESCRIPTION
+===========
+
+   `Net::Dict' is a class implementing a simple Dict client in Perl as
+described in RFC2229.  It provides wrappers for a subset of the RFC2229
+commands.
+
+OVERVIEW
+========
+
+   Quotation from RFC2229:
+
+     The Dictionary Server Protocol (DICT) is a TCP transaction based
+     query/response protocol that allows a client to access dictionary
+     definitions from a set of natural language dictionary databases.
+
+CONSTRUCTOR
+===========
+
+     $dict = Net::Dict->new (HOST [,OPTIONS]);
+
+   This is the constructor for a new Net::Dict object. `HOST' is the name
+of the remote host on which a Dict server is running.
+
+   If the `HOST' value is an empty string, the default behavior is to try
+dict.org, alt0.dict.org, alt1.dict.org, and alt2.dict.org, in that order.
+
+   OPTIONS are passed in a hash like fashion, using key and value pairs.
+Possible options are:
+
+ConfigFile
+     The path to the configuration file (see dict(1) for details on the
+     format of the config. file). The config file entries override the
+     default definitions (e.g. server name and port), but are overriden by
+     an explicit definitions in the constructor.
+
+HTML
+     Give an output of 'match' and 'define' in HTML.
+
+Port
+     The port number to connect to on the remote machine for the Dict
+     connection (a default port number is 2628, according to RFC2229).
+
+Client
+     The string to send as the CLIENT identifier.  If not set, then a
+     default identifier for Net::Dict is sent.
+
+Timeout
+     Set a timeout value (defaults to 120)
+
+Debug
+     debug level (see the debug method in *Note Net/Cmd: Net/Cmd,)
+
+METHODS
+=======
+
+   Unless otherwise stated all methods return either a *true* or false
+value, with *true* meaning that the operation was a success. When a method
+states that it returns a value, failure will be returned as undef or an
+empty list.
+
+serverInfo()
+     returns a string, containing the information about the server.
+
+dbs()
+     returns a hash, containing an ID of the dictionary as a key and
+     description as the value.
+
+dbInfo($dbname)
+     returns a string, containing description of the dictionary $dbname.
+
+setDicts(@dicts)
+     sets the set of dictionaries, that will be searched during the
+     successive define() calls. Defaults to '*'. No existance checks are
+     performed by this interface, so you'd better make sure the
+     dictionaries you specify are on the server (e.g. by calling dbs()).
+
+strats()
+     returns an array, containing an ID of a matching strategy as a key
+     and a verbose description as a value.
+
+define($word [, @dbs])
+     returns a reference to an array, whose members are lists, consisting
+     of two elements: the dictionary name and the definition.  If no
+     dictionaries are specified, those set by setDicts() are used.
+
+match($word, $strategy [, @dbs])
+     same as define(), but a matching using the specified strategies is
+     performed. Return array of lists, consisting of dictionary - match
+     pairs.
+
+dbTitle($dbname)
+     Returns the title string for the specified dictionary.  This is the
+     same string returned by the dbs() method for all databases.
+
+UNIMPLEMENTED
+=============
+
+   The following RFC2229 commands have not been implemented:
+
+authentication
+     The authentication protocol isn't currently implemented.
+
+REPORTING BUGS
+==============
+
+   When reporting bugs/problems please include as much information as
+possible.  It may be difficult for me to reproduce the problem as almost
+every setup is different.
+
+   A small script which yields the problem will probably be of help. It
+would also be useful if this script was run with the extra options `Debug
+=> 1' passed to the constructor, and the output sent with the bug report.
+If you cannot include a small script then please include a Debug trace
+from a run of your program which does yield the problem.
+
+EXAMPLES
+========
+
+   The examples directory of the Net-Dict distribution includes simple.pl,
+which illustrates basic use of the module.
+
+AUTHOR
+======
+
+   Net::Dict was written by Dmitry Rubinstein
+<dimrub@wisdom.weizmann.ac.il>, using Net::FTP and Net::SMTP as a pattern
+and a model for imitation.
+
+   The module is now maintained by Neil Bowers <neilb@cre.canon.co.uk>
+
+SEE ALSO
+========
+
+   *Note Net/Netrc: Net/Netrc, *Note Net/Cmd: Net/Cmd,
+
+   dict(1), dictd(8), RFC 2229
+http://www.cis.ohio-state.edu/htbin/rfc/rfc2229.html http://www.dict.org/
+
+COPYRIGHT
+=========
+
+   Copyright (C) 2001 Canon Research Centre Europe, Ltd.
+
+   Copyright (c) 1998 Dmitry Rubinstein. All rights reserved.
+
+   This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Domain,  Next: Net/DummyInetd,  Prev: Net/Dict,  Up: Module List
+
+Attempt to evaluate the current host's internet name and domain
+***************************************************************
+
+NAME
+====
+
+   Net::Domain - Attempt to evaluate the current host's internet name and
+domain
+
+SYNOPSIS
+========
+
+     use Net::Domain qw(hostname hostfqdn hostdomain);
+
+DESCRIPTION
+===========
+
+   Using various methods *attempt* to find the Fully Qualified Domain Name
+(FQDN) of the current host. From this determine the host-name and the
+host-domain.
+
+   Each of the functions will return undef if the FQDN cannot be
+determined.
+
+hostfqdn ()
+     Identify and return the FQDN of the current host.
+
+hostname ()
+     Returns the smallest part of the FQDN which can be used to identify
+     the host.
+
+hostdomain ()
+     Returns the remainder of the FQDN after the hostname has been removed.
+
+AUTHOR
+======
+
+   Graham Barr <gbarr@pobox.com>.  Adapted from Sys::Hostname by David
+Sundstrom <sunds@asictest.sc.ti.com>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1995-1998 Graham Barr. All rights reserved.  This program
+is free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+
+File: pm.info,  Node: Net/DummyInetd,  Next: Net/FTP,  Prev: Net/Domain,  Up: Module List
+
+A dummy Inetd server
+********************
+
+NAME
+====
+
+   Net::DummyInetd - A dummy Inetd server
+
+SYNOPSIS
+========
+
+     use Net::DummyInetd;
+     use Net::SMTP;
+     
+     $inetd = new Net::DummyInetd qw(/usr/lib/sendmail -ba -bs);
+     
+     $smtp  = Net::SMTP->new('localhost', Port => $inetd->port);
+
+DESCRIPTION
+===========
+
+   `Net::DummyInetd' is just what it's name says, it is a dummy inetd
+server.  Creation of a `Net::DummyInetd' will cause a child process to be
+spawned off which will listen to a socket. When a connection arrives on
+this socket the specified command is fork'd and exec'd with STDIN and
+STDOUT file descriptors duplicated to the new socket.
+
+   This package was added as an example of how to use `Net::SMTP' to
+connect to a sendmail process, which is not the default, via SIDIN and
+STDOUT.  A `Net::Inetd' package will be available in the next release of
+`libnet'
+
+CONSTRUCTOR
+===========
+
+new ( CMD )
+     Creates a new object and spawns a child process which listens to a
+     socket.  `CMD' is a list, which will be passed to exec when a new
+     process needs to be created.
+
+METHODS
+=======
+
+port
+     Returns the port number on which the *DummyInetd* object is listening
+
+AUTHOR
+======
+
+   Graham Barr <gbarr@pobox.com>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1995-1997 Graham Barr. All rights reserved.  This program
+is free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+
+File: pm.info,  Node: Net/FTP,  Next: Net/FTP/Common,  Prev: Net/DummyInetd,  Up: Module List
+
+FTP Client class
+****************
+
+NAME
+====
+
+   Net::FTP - FTP Client class
+
+SYNOPSIS
+========
+
+     use Net::FTP;
+     
+     $ftp = Net::FTP->new("some.host.name", Debug => 0);
+     $ftp->login("anonymous",'me@here.there');
+     $ftp->cwd("/pub");
+     $ftp->get("that.file");
+     $ftp->quit;
+
+DESCRIPTION
+===========
+
+   `Net::FTP' is a class implementing a simple FTP client in Perl as
+described in RFC959.  It provides wrappers for a subset of the RFC959
+commands.
+
+OVERVIEW
+========
+
+   FTP stands for File Transfer Protocol.  It is a way of transferring
+files between networked machines.  The protocol defines a client (whose
+commands are provided by this module) and a server (not implemented in
+this module).  Communication is always initiated by the client, and the
+server responds with a message and a status code (and sometimes with data).
+
+   The FTP protocol allows files to be sent to or fetched from the server.
+Each transfer involves a *local file* (on the client) and a *remote file*
+(on the server).  In this module, the same file name will be used for both
+local and remote if only one is specified.  This means that transferring
+remote file `/path/to/file' will try to put that file in `/path/to/file'
+locally, unless you specify a local file name.
+
+   The protocol also defines several standard *translations* which the
+file can undergo during transfer.  These are ASCII, EBCDIC, binary, and
+byte.  ASCII is the default type, and indicates that the sender of files
+will translate the ends of lines to a standard representation which the
+receiver will then translate back into their local representation.  EBCDIC
+indicates the file being transferred is in EBCDIC format.  Binary (also
+known as image) format sends the data as a contiguous bit stream.  Byte
+format transfers the data as bytes, the values of which remain the same
+regardless of differences in byte size between the two machines (in theory
+- in practice you should only use this if you really know what you're
+doing).
+
+CONSTRUCTOR
+===========
+
+new (HOST [,OPTIONS])
+     This is the constructor for a new Net::FTP object. `HOST' is the name
+     of the remote host to which a FTP connection is required.
+
+     OPTIONS are passed in a hash like fashion, using key and value pairs.
+     Possible options are:
+
+     *Firewall* - The name of a machine which acts as a FTP firewall. This
+     can be overridden by an environment variable `FTP_FIREWALL'. If
+     specified, and the given host cannot be directly connected to, then
+     the connection is made to the firewall machine and the string
+     `@hostname' is appended to the login identifier. This kind of setup
+     is also refered to as a ftp proxy.
+
+     *BlockSize* - This is the block size that Net::FTP will use when doing
+     transfers. (defaults to 10240)
+
+     Port - The port number to connect to on the remote machine for the
+     FTP connection
+
+     Timeout - Set a timeout value (defaults to 120)
+
+     Debug - debug level (see the debug method in *Note Net/Cmd: Net/Cmd,)
+
+     Passive - If set to a non-zero value then all data transfers will be
+     done using passive mode. This is not usually required except for some
+     dumb servers, and some firewall configurations. This can also be set
+     by the environment variable `FTP_PASSIVE'.
+
+     Hash - If TRUE, print hash marks (#) on STDERR every 1024 bytes.  This
+     simply invokes the `hash()' method for you, so that hash marks are
+     displayed for all transfers.  You can, of course, call `hash()'
+     explicitly whenever you'd like.
+
+     If the constructor fails undef will be returned and an error message
+     will be in $@
+
+METHODS
+=======
+
+   Unless otherwise stated all methods return either a *true* or false
+value, with *true* meaning that the operation was a success. When a method
+states that it returns a value, failure will be returned as undef or an
+empty list.
+
+login ([LOGIN [,PASSWORD [, ACCOUNT] ] ])
+     Log into the remote FTP server with the given login information. If
+     no arguments are given then the `Net::FTP' uses the `Net::Netrc'
+     package to lookup the login information for the connected host.  If
+     no information is found then a login of anonymous is used.  If no
+     password is given and the login is anonymous then the users Email
+     address will be used for a password.
+
+     If the connection is via a firewall then the authorize method will be
+     called with no arguments.
+
+authorize ( [AUTH [, RESP]])
+     This is a protocol used by some firewall ftp proxies. It is used to
+     authorise the user to send data out.  If both arguments are not
+     specified then authorize uses `Net::Netrc' to do a lookup.
+
+site (ARGS)
+     Send a SITE command to the remote server and wait for a response.
+
+     Returns most significant digit of the response code.
+
+type (TYPE [, ARGS])
+     This method will send the TYPE command to the remote FTP server to
+     change the type of data transfer. The return value is the previous
+     value.
+
+ascii ([ARGS]) binary([ARGS]) ebcdic([ARGS]) byte([ARGS])
+     Synonyms for type with the first arguments set correctly
+
+     NOTE ebcdic and byte are not fully supported.
+
+rename ( OLDNAME, NEWNAME )
+     Rename a file on the remote FTP server from `OLDNAME' to `NEWNAME'.
+     This is done by sending the RNFR and RNTO commands.
+
+delete ( FILENAME )
+     Send a request to the server to delete FILENAME.
+
+cwd ( [ DIR ] )
+     Attempt to change directory to the directory given in $dir.  If $dir
+     is `".."', the FTP `CDUP' command is used to attempt to move up one
+     directory. If no directory is given then an attempt is made to change
+     the directory to the root directory.
+
+cdup ()
+     Change directory to the parent of the current directory.
+
+pwd ()
+     Returns the full pathname of the current directory.
+
+rmdir ( DIR )
+     Remove the directory with the name DIR.
+
+mkdir ( DIR [, RECURSE ])
+     Create a new directory with the name DIR. If `RECURSE' is *true* then
+     mkdir will attempt to create all the directories in the given path.
+
+     Returns the full pathname to the new directory.
+
+ls ( [ DIR ] )
+     Get a directory listing of DIR, or the current directory.
+
+     In an array context, returns a list of lines returned from the
+     server. In a scalar context, returns a reference to a list.
+
+dir ( [ DIR ] )
+     Get a directory listing of DIR, or the current directory in long
+     format.
+
+     In an array context, returns a list of lines returned from the
+     server. In a scalar context, returns a reference to a list.
+
+get ( REMOTE_FILE [, LOCAL_FILE [, WHERE]] )
+     Get `REMOTE_FILE' from the server and store locally. `LOCAL_FILE' may
+     be a filename or a filehandle. If not specified the the file will be
+     stored in the current directory with the same leafname as the remote
+     file.
+
+     If WHERE is given then the first WHERE bytes of the file will not be
+     transfered, and the remaining bytes will be appended to the local
+     file if it already exists.
+
+     Returns `LOCAL_FILE', or the generated local file name if `LOCAL_FILE'
+     is not given.
+
+put ( LOCAL_FILE [, REMOTE_FILE ] )
+     Put a file on the remote server. `LOCAL_FILE' may be a name or a
+     filehandle.  If `LOCAL_FILE' is a filehandle then `REMOTE_FILE' must
+     be specified. If `REMOTE_FILE' is not specified then the file will be
+     stored in the current directory with the same leafname as
+     `LOCAL_FILE'.
+
+     Returns `REMOTE_FILE', or the generated remote filename if
+     `REMOTE_FILE' is not given.
+
+     NOTE: If for some reason the transfer does not complete and an error
+     is returned then the contents that had been transfered will not be
+     remove automatically.
+
+put_unique ( LOCAL_FILE [, REMOTE_FILE ] )
+     Same as put but uses the `STOU' command.
+
+     Returns the name of the file on the server.
+
+append ( LOCAL_FILE [, REMOTE_FILE ] )
+     Same as put but appends to the file on the remote server.
+
+     Returns `REMOTE_FILE', or the generated remote filename if
+     `REMOTE_FILE' is not given.
+
+unique_name ()
+     Returns the name of the last file stored on the server using the
+     `STOU' command.
+
+mdtm ( FILE )
+     Returns the *modification time* of the given file
+
+size ( FILE )
+     Returns the size in bytes for the given file as stored on the remote
+     server.
+
+     NOTE: The size reported is the size of the stored file on the remote
+     server.  If the file is subsequently transfered from the server in
+     ASCII mode and the remote server and local machine have different
+     ideas about "End Of Line" then the size of file on the local machine
+     after transfer may be different.
+
+supported ( CMD )
+     Returns TRUE if the remote server supports the given command.
+
+hash ( [FILEHANDLE_GLOB_REF],[ BYTES_PER_HASH_MARK] )
+     Called without parameters, or with the first argument false, hash
+     marks are suppressed.  If the first argument is true but not a
+     reference to a file handle glob, then \*STDERR is used.  The second
+     argument is the number of bytes per hash mark printed, and defaults
+     to 1024.  In all cases the return value is a reference to an array of
+     two:  the filehandle glob reference and the bytes per hash mark.
+
+   The following methods can return different results depending on how
+they are called. If the user explicitly calls either of the pasv or port
+methods then these methods will return a *true* or false value. If the
+user does not call either of these methods then the result will be a
+reference to a `Net::FTP::dataconn' based object.
+
+nlst ( [ DIR ] )
+     Send a `NLST' command to the server, with an optional parameter.
+
+list ( [ DIR ] )
+     Same as nlst but using the LIST command
+
+retr ( FILE )
+     Begin the retrieval of a file called FILE from the remote server.
+
+stor ( FILE )
+     Tell the server that you wish to store a file. FILE is the name of
+     the new file that should be created.
+
+stou ( FILE )
+     Same as stor but using the `STOU' command. The name of the unique
+     file which was created on the server will be available via the
+     unique_name method after the data connection has been closed.
+
+appe ( FILE )
+     Tell the server that we want to append some data to the end of a file
+     called FILE. If this file does not exist then create it.
+
+   If for some reason you want to have complete control over the data
+connection, this includes generating it and calling the response method
+when required, then the user can use these methods to do so.
+
+   However calling these methods only affects the use of the methods above
+that can return a data connection. They have no effect on methods get, put,
+put_unique and those that do not require data connections.
+
+port ( [ PORT ] )
+     Send a `PORT' command to the server. If `PORT' is specified then it
+     is sent to the server. If not the a listen socket is created and the
+     correct information sent to the server.
+
+pasv ()
+     Tell the server to go into passive mode. Returns the text that
+     represents the port on which the server is listening, this text is in
+     a suitable form to sent to another ftp server using the port method.
+
+   The following methods can be used to transfer files between two remote
+servers, providing that these two servers can connect directly to each
+other.
+
+pasv_xfer ( SRC_FILE, DEST_SERVER [, DEST_FILE ] )
+     This method will do a file transfer between two remote ftp servers. If
+     `DEST_FILE' is omitted then the leaf name of `SRC_FILE' will be used.
+
+pasv_xfer_unique ( SRC_FILE, DEST_SERVER [, DEST_FILE ] )
+     Like pasv_xfer but the file is stored on the remote server using the
+     STOU command.
+
+pasv_wait ( NON_PASV_SERVER )
+     This method can be used to wait for a transfer to complete between a
+     passive server and a non-passive server. The method should be called
+     on the passive server with the `Net::FTP' object for the non-passive
+     server passed as an argument.
+
+abort ()
+     Abort the current data transfer.
+
+quit ()
+     Send the QUIT command to the remote FTP server and close the socket
+     connection.
+
+Methods for the adventurous
+---------------------------
+
+   `Net::FTP' inherits from `Net::Cmd' so methods defined in `Net::Cmd' may
+be used to send commands to the remote FTP server.
+
+quot (CMD [,ARGS])
+     Send a command, that Net::FTP does not directly support, to the remote
+     server and wait for a response.
+
+     Returns most significant digit of the response code.
+
+     WARNING This call should only be used on commands that do not require
+     data connections. Misuse of this method can hang the connection.
+
+THE dataconn CLASS
+==================
+
+   Some of the methods defined in `Net::FTP' return an object which will
+be derived from this class.The dataconn class itself is derived from the
+IO::Socket::INET class, so any normal IO operations can be performed.
+However the following methods are defined in the dataconn class and IO
+should be performed using these.
+
+read ( BUFFER, SIZE [, TIMEOUT ] )
+     Read `SIZE' bytes of data from the server and place it into `BUFFER',
+     also performing any <CRLF> translation necessary. TIMEOUT is
+     optional, if not given the the timeout value from the command
+     connection will be used.
+
+     Returns the number of bytes read before any <CRLF> translation.
+
+write ( BUFFER, SIZE [, TIMEOUT ] )
+     Write `SIZE' bytes of data from `BUFFER' to the server, also
+     performing any <CRLF> translation necessary. TIMEOUT is optional, if
+     not given the the timeout value from the command connection will be
+     used.
+
+     Returns the number of bytes written before any <CRLF> translation.
+
+abort ()
+     Abort the current data transfer.
+
+close ()
+     Close the data connection and get a response from the FTP server.
+     Returns *true* if the connection was closed successfully and the
+     first digit of the response from the server was a '2'.
+
+UNIMPLEMENTED
+=============
+
+   The following RFC959 commands have not been implemented:
+
+ALLO
+     Allocates storage for the file to be transferred.
+
+SMNT
+     Mount a different file system structure without changing login or
+     accounting information.
+
+HELP
+     Ask the server for "helpful information" (that's what the RFC says) on
+     the commands it accepts.
+
+MODE
+     Specifies transfer mode (stream, block or compressed) for file to be
+     transferred.
+
+SYST
+     Request remote server system identification.
+
+STAT
+     Request remote server status.
+
+STRU
+     Specifies file structure for file to be transferred.
+
+REIN
+     Reinitialize the connection, flushing all I/O and account information.
+
+REPORTING BUGS
+==============
+
+   When reporting bugs/problems please include as much information as
+possible.  It may be difficult for me to reproduce the problem as almost
+every setup is different.
+
+   A small script which yields the problem will probably be of help. It
+would also be useful if this script was run with the extra options `Debug
+=' 1> passed to the constructor, and the output sent with the bug report.
+If you cannot include a small script then please include a Debug trace
+from a run of your program which does yield the problem.
+
+AUTHOR
+======
+
+   Graham Barr <gbarr@pobox.com>
+
+SEE ALSO
+========
+
+   *Note Net/Netrc: Net/Netrc, *Note Net/Cmd: Net/Cmd,
+
+   ftp(1), ftpd(8), RFC 959
+http://www.cis.ohio-state.edu/htbin/rfc/rfc959.html
+
+CREDITS
+=======
+
+   Henry Gabryjelski <henryg@WPI.EDU> - for the suggestion of creating
+directories recursively.
+
+   Nathan Torkington <gnat@frii.com> - for some input on the documentation.
+
+   Roderick Schertler <roderick@gate.net> - for various inputs
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1995-1998 Graham Barr. All rights reserved.  This program
+is free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+
+File: pm.info,  Node: Net/FTP/Common,  Next: Net/FTP/Shell,  Prev: Net/FTP,  Up: Module List
+
+Perl extension for simplifying common usages of Net::FTP.
+*********************************************************
+
+NAME
+====
+
+   Net::FTP::Common - Perl extension for simplifying common usages of
+Net::FTP.
+
+SYNOPSIS
+========
+
+     use Net::FTP::Common;
+     %net_ftp_config = ( Debug   => 1, Timeout => 120 );
+
+     %common_cfg     =
+       (
+         User => 'username',          # overwrite anonymous user default
+         Pass => 'password',          # overwrite list@rebol.com pass default
+         Dir  => 'pub',               # overwrite slash default
+         Type => 'A'                  # overwrite I (binary) default
+        );
+
+     $ez = Net::FTP::Common->new(\%net_ftp_config, \%common_cfg);
+
+     $host = 'ftp.rebol.com';
+
+     # Get a listing of a remote directory:
+     @listing =	$ez->dir($host);
+
+     # Make a directory on the remote machine
+     $ez->mkdir($host, Dir => '/pub/newdir/1/2/3', Recurse => 1);
+
+     # Get a file from the remote machine
+     $ez->get($host, File => 'codex.txt', LocalFile => '/tmp/crypto.txt');
+
+     # Send a file to the remote machine
+     $ez->send($host, File => 'codex.txt');
+
+     # test for a file's existence on the remote machine (using =~)
+     @file = $ez->grep($host, File => '[A-M]*[.]txt');
+     # a synonym for grep is glob (no difference, just another name)
+     @file = $ez->glob($host, File => 'n.*-file.t?t');
+
+     # test for a file on the remote machine (using eq)
+     $ez->check($host, File => 'needed-file.txt');
+     # note this is no more than you manually calling:
+     # (scalar grep { $_ = 'needed-file.txt' } $ez->dir($host)) > 0;
+     # or manually calling
+     # (scalar $ez->grep($host, File => 'needed-file.txt')) > 0
+
+     # can we login to the machine?
+     $ez->login($host) || die "cant login: $@";
+
+DESCRIPTION
+===========
+
+   This module is intended to make the common uses of Net::FTP a one-line
+affair. Also, it made the development of Net::FTP::Shell straightfoward.
+
+   Note well: though Net::FTP works in the stateful way that the FTP
+protocol does, Net::FTP::Common works in a stateless "one-hit" fashion.
+That is, for each separate call to the API, a connection is established,
+the particular Net::FTP::Common functionality is performed and the
+connection is dropped.  The disadvantage of this approach is the (usually
+irrelevant and insignificant) over head of connection and disconnection.
+The advantage is that there is much less chance of incurring failure due
+to timeout.
+
+TRAPS FOR THE UNWARY
+--------------------
+
+   *      @file = $ez->grep($host, File => '[A-M]*[.]txt');
+          
+          is correct
+
+          @file = $ez->grep($host, '[A-M]*[.]txt');
+
+     looks correct but is not because you did not name the argument as you
+     are supposed to.
+
+   * In the current dain-bramaged interface, you can catch the bozak when
+     you accidentally forget to specify the $host argument to
+     Net::FTP::Common's API functions.
+
+     Since no one seems to be using this, I may in fact rework the API to
+     allow the host to be a default instead of requiring it's
+     specification.
+
+EXPORT
+------
+
+   None by default.
+
+AUTHOR
+======
+
+   T. M. Brannon <tbone@cpan.org>
+
+SEE ALSO
+========
+
+   REBOL (www.rebol.com) is a language which supports 1-line internet
+processing for the schemes of mailto:, http:, daytime:, and ftp:.
+
+   A Perl implementation of REBOL is in the works at www.metaperl.com.
+
+
+File: pm.info,  Node: Net/FTP/Shell,  Next: Net/FTPServer,  Prev: Net/FTP/Common,  Up: Module List
+
+Perl extension for shell use of Net::FTP::Common
+************************************************
+
+NAME
+====
+
+   Net::FTP::Shell - Perl extension for shell use of Net::FTP::Common
+
+SYNOPSIS
+========
+
+     # from the DOS/Unix shell...
+     shell> please.pl get  gnu emacs.tgz        # ... will ftp a file to gnu acct
+     shell> please.pl send gnu vi-sucks.truth   # ... will ftp a file to gnu acct
+     shell> please.pl dir  gnu                  # ... will list directory of gnu acct
+     shell> please.pl mkdir gnu /new/wares      # ... must use absolute path
+     shell> please.pl check gnu 'emacs-30.tar.gz'
+     shell> please.pl glob  gnu '.*.tar.gz'     # ... not a glob, but a regexp
+     shell> please.pl describe gnu
+     ----- account named "gnu" --------
+     username:  wareboy
+     password:  gnupass
+     host:      ftp.gnu.org
+     directory: /users/wareboy
+     xfer_type: I (binary transfers... ascii is A)
+     Debug    : 1
+     Timeout  : 240
+
+DESCRIPTION
+===========
+
+   This is a module which was designed when point-to-point FTP
+communication between two people is not possible (ie, for firewall
+reasons) but they need to exchange files and they have a common FTP
+account somewhere.
+
+PREREQUISITES
+=============
+
+   * Net::FTP::Common (CPAN id: TBONE)
+
+   * User (CPAN id: TBONE)
+
+   * Config::IniFiles
+
+     note that IniFiles 1.6 has a small problem with the regular
+     expression on line 399:
+
+          elsif (($parm, $val) = /\s*([\S\s]+?)\s*=\s*(.*)/) {	# new parameter
+
+     should be
+
+          elsif (($parm, $val) = /\s*([\S\s]+?)\s*=\s*(\S*)/) {	# new parameter
+
+     I have sent in a bug report. Until then, patch your Config::IniFiles
+     to the above before sending any problem reports with this module.
+
+INSTALLATION (Important)
+========================
+
+   Installing the module is easy:
+
+     perl Makefile.PL
+     make install
+
+   Then, you can either type
+
+     perl install.pl
+
+   and have a default .ncfg placed in your home directory or you can do the
+manual process described below:
+
+Manual Process
+--------------
+
+   You must create a file named ".ncfg" and place in your home directory.
+On Unix, you can find your home directory by typing
+
+     echo $HOME
+
+   On Windows, open a command shell and type
+
+   set USERPROFILE
+
+   The .ncfg file is written in Windows INI-file syntax. Here is a sample
+one:
+
+     [Default]
+     User = heave
+     Pass = ho
+     Host = 229.117.122.180
+     Dir  = /download
+
+     [Instinet]
+     Dir = /download/instinet
+
+     [Rydex]
+     Dir = /download/rydex
+
+     [Socgen]
+     Dir = /download/socgen
+
+     [Linda]
+     Dir = /download/linda
+
+     [Terrence]
+     Dir = /download/terrence
+     
+     Then you can simply use the please.pl Perl script to send things:
+
+     perl please.pl send Linda love-letter.txt
+     perl please.pl send Terrence resume.doc
+
+AUTHOR
+======
+
+   T. M. Brannon, tbone@cpan.org
+
+SEE ALSO
+========
+
+   www.metaperl.com, www.rebol.com, Net::FTP::Common, Net::FTP
+
+
+File: pm.info,  Node: Net/FTPServer,  Next: Net/FTPServer/DBeg1/DirHandle,  Prev: Net/FTP/Shell,  Up: Module List
+
+A secure, extensible and configurable Perl FTP server
+*****************************************************
+
+NAME
+====
+
+   Net::FTPServer - A secure, extensible and configurable Perl FTP server
+
+SYNOPSIS
+========
+
+     ftpd [--help] [-d] [-v] [-p port] [-s] [-S] [-V] [-C conf_file] [-P pidfile]
+
+DESCRIPTION
+===========
+
+   `Net::FTPServer' is a secure, extensible and configurable FTP server
+written in Perl.
+
+   Current features include:
+
+     * Authenticated FTP access.
+     * Anonymous FTP access.
+     * Complete implementation of current RFCs.
+     * ASCII or binary type file transfers.
+     * Active or passive mode file transfers.
+     * Run standalone or from inetd(8).
+     * Security features: chroot, resource limits, tainting,
+       protection against buffer overflows.
+     * IP-based and/or IP-less virtual hosts.
+     * Complete access control system.
+     * Anonymous read-only FTP personality.
+     * Virtual filesystem allows files to be served
+       from a database.
+     * Directory aliases and CDPATH support.
+     * Extensible command set.
+
+INSTALLING AND RUNNING THE SERVER
+=================================
+
+   A standard `ftpd.conf' file is supplied with the server.  You should
+study the comments in the file and edit it to your satisfaction, and then
+copy it to `/etc/ftpd.conf'.
+
+     cp ftpd.conf /etc/
+     chown root.root /etc/ftpd.conf
+     chmod 0755 /etc/ftpd.conf
+
+   Two start-up scripts are supplied with the ftp server, to run it in two
+common configurations: either as a full FTP server or as an anonymous-only
+read-only FTP server. The scripts are `ftpd' and `ro-ftpd'. You may need to
+edit these scripts if Perl is not stored in the standard place on your
+system (the default path is `/usr/bin/perl').
+
+   You should copy the appropriate script, either `ftpd' or `ro-ftpd' to a
+suitable place (for example: `/usr/sbin/in.ftpd').
+
+     cp ftpd /usr/sbin/in.ftpd
+     chown root.root /usr/sbin/in.ftpd
+     chmod 0755 /usr/sbin/in.ftpd
+
+STANDALONE SERVER
+-----------------
+
+   If you have a high load site, you will want to run `Net::FTPServer' as
+a standalone server. To start `Net::FTPServer' as a standalone server, do:
+
+     /usr/sbin/in.ftpd -S
+
+   You may want to add this to your local start-up files so that the
+server starts automatically when you boot the machine.
+
+   To stop the server, do:
+
+     killall in.ftpd
+
+RUNNING FROM INETD
+------------------
+
+   Add the following line to `/etc/inetd.conf':
+
+     ftp stream tcp nowait root /usr/sbin/tcpd in.ftpd
+
+   (This assumes that you have the `tcpd' package installed to provide
+basic access control through `/etc/hosts.allow' and `/etc/hosts.deny'.
+This access control is in addition to any access control which you may
+configure through `/etc/ftpd.conf'.)
+
+   After editing this file you will need to inform `inetd':
+
+     killall -HUP inetd
+
+COMMAND LINE FLAGS
+==================
+
+     --help       Display help and exit
+     -d, -v       Enable debugging
+     -p PORT      Listen on port PORT instead of the default port
+     -s           Run in daemon mode (default: run from inetd)
+     -S           Run in background and in daemon mode
+     -V           Show version information and exit
+     -C CONF      Use CONF as configuration file (default: /etc/ftpd.conf)
+     -P PIDFILE   Save pid into PIDFILE (daemon mode only)
+     --test       Test mode (used only in automatic testing scripts)
+
+CONFIGURING AND EXTENDING THE SERVER
+====================================
+
+   `Net::FTPServer' can be configured and extended in a number of
+different ways.
+
+   Firstly, almost all common server configuration can be carried out by
+editing the configuration file `/etc/ftpd.conf'.
+
+   Secondly, commands can be loaded into the server at run-time to provide
+custom extensions to the common FTP command set.  These custom commands
+are written in Perl.
+
+   Thirdly, one of several different supplied *personalities* can be
+chosen. Personalities can be used to make deep changes to the FTP server:
+for example, there is a supplied personality which allows the FTP server
+to serve files from a relational database. By subclassing
+`Net::FTPServer', `Net::FTPServer::DirHandle' and
+`Net::FTPServer::FileHandle' you may also write your own personalities.
+
+   The next sections talk about each of these possibilities in turn.
+
+EDITING /etc/ftpd.conf
+----------------------
+
+   A standard `/etc/ftpd.conf' file is supplied with `Net::FTPServer' in
+the distribution. This contains all possible configurable options,
+information about them and defaults. You should consult the comments in
+this file for authoritative information.
+
+LOADING CUSTOMIZED SITE COMMANDS
+--------------------------------
+
+   It is very simple to write custom SITE commands. These commands are
+available to users when they type "SITE XYZ" in a command line FTP client
+or when they define a custom SITE command in their graphical FTP client.
+
+   SITE commands are unregulated by RFCs. You may define any commands and
+give them any names and any function you wish. However, over time various
+standard SITE commands have been recognized and implemented in many FTP
+servers. `Net::FTPServer' also implements these. They are:
+
+     SITE VERSION      Display the server software version.
+     SITE EXEC         Execute a shell command on the server (in
+                       C<Net::FTPServer> this is disabled by default!)
+     SITE ALIAS        Display chdir aliases.
+     SITE CDPATH       Display chdir paths.
+     SITE CHECKMETHOD  Implement checksums.
+     SITE CHECKSUM
+     SITE IDLE         Get or set the idle timeout.
+
+   The following commands are found in `wu-ftpd', but not currently
+implemented by `Net::FTPServer': SITE CHMOD, SITE GPASS, SITE GROUP, SITE
+GROUPS, SITE INDEX, SITE MINFO, SITE NEWER, SITE UMASK.
+
+   So when you are choosing a name for a SITE command, it is probably best
+not to choose one of the above names, unless you are specifically
+implementing or overriding that command.
+
+   Custom SITE commands have to be written in Perl. However, there is very
+little you need to understand in order to write these commands - you will
+only need a basic knowledge of Perl scripting.
+
+   As our first example, we will implement a `SITE README' command.  This
+command just prints out some standard information.
+
+   Firstly create a file called `/usr/local/lib/site_readme.pl' (you may
+choose a different path if you want). The file should contain:
+
+     sub {
+       my $self = shift;
+       my $cmd = shift;
+       my $rest = shift;
+
+     $self->reply (200,
+                   "This is the README file for mysite.example.com.",
+                   "Mirrors are contained in /pub/mirrors directory.",
+                   "       :       :       :       :       :",
+                   "End of the README file.");
+       }
+
+   Edit `/etc/ftpd.conf' and add the following command:
+
+   site command: readme /usr/local/lib/site_readme.pl
+
+   and restart the FTP server (check your system log [/var/log/messages]
+for any syntax errors or other problems). Here is an example of a user
+running the SITE README command:
+
+     ftp> quote help site
+     214-The following commands are recognized:
+     214-    ALIAS   CHECKMETHOD     EXEC    README
+     214-    CDPATH  CHECKSUM        IDLE    VERSION
+     214 You can also use HELP to list general commands.
+     ftp> site readme
+     200-This is the README file for mysite.example.com.
+     200-Mirrors are contained in /pub/mirrors directory.
+     200-       :       :       :       :       :
+     200 End of the README file.
+
+   Our second example demonstrates how to use parameters (the `$rest'
+argument). This is the `SITE ECHO' command.
+
+     sub {
+       my $self = shift;
+       my $cmd = shift;
+       my $rest = shift;
+
+     # Split the parameters up.
+     my @params = split /\s+/, $rest;
+
+     # Quote each parameter.
+     my $reply = join ", ", map { "'$_'" } @params;
+
+     $self->reply (200, "You said: $reply");
+       }
+
+   Here is the `SITE ECHO' command in use:
+
+     ftp> quote help site
+     214-The following commands are recognized:
+     214-    ALIAS   CHECKMETHOD     ECHO    IDLE
+     214-    CDPATH  CHECKSUM        EXEC    VERSION
+     214 You can also use HELP to list general commands.
+     ftp> site echo hello how are you?
+     200 You said: 'hello', 'how', 'are', 'you?'
+
+   Our third example is more complex and shows how to interact with the
+virtual filesystem (VFS). The `SITE SHOW' command will be used to list
+text files directly (the user normally has to download the file and view
+it locally). Hence `SITE SHOW readme.txt' should print the contents of the
+`readme.txt' file in the local directory (if it exists).
+
+   All file accesses must be done through the VFS, not by directly
+accessing the disk. If you follow this convention then your commands will
+be secure and will work correctly with different back-end personalities
+(in particular when "files" are really blobs in a relational database).
+
+     sub {
+       my $self = shift;
+       my $cmd = shift;
+       my $rest = shift;
+
+     # Get the file handle.
+     my ($dirh, $fileh, $filename) = $self->_get ($rest);
+
+     # File doesn't exist or not accessible. Return an error.
+     unless ($fileh)
+       {
+     	$self->reply (550, "File or directory not found.");
+     	return;
+       }
+
+     # Check it's a simple file.
+     my ($mode) = $fileh->status;
+
+     unless ($mode eq "f")
+       {
+     	$self->reply (550,
+     		      "SITE SHOW command is only supported on plain files.");
+     	return;
+       }
+
+     # Try to open the file.
+     my $file = $fileh->open ("r");
+
+     unless ($file)
+       {
+     	$self->reply (550, "File or directory not found.");
+     	return;
+       }
+
+     # Copy data into memory.
+     my @lines = ();
+
+     while ($_ = $file->getline)
+       {
+     	# Remove any native line endings.
+     	s/[\n\r]+$//;
+
+     push @lines, $_;
+           }
+
+     # Close the file handle.
+     $file->close;
+
+     # Send the file back to the user.
+     $self->reply (200, "File $filename:", @lines, "End of file.");
+       }
+
+   This code is not quite complete. A better implementation would also
+check the "retrieve rule" (so that people couldnE<39>t use `SITE SHOW' in
+order to get around access control limitations which the server
+administrator has put in place). It would also check the file more closely
+to make sure it was a text file and would refuse to list very large files.
+
+   Here is an example (abbreviated) of a user using the `SITE SHOW'
+command:
+
+     ftp> site show README
+     200-File README:
+     200-$Id: FTPServer.pm,v 1.33 2001/02/22 15:46:12 rich Exp $
+     200-
+     200-Net::FTPServer - A secure, extensible and configurable Perl FTP server.
+     [...]
+     200-To contact the author, please email: Richard Jones <rich@annexia.org>
+     200 End of file.
+
+STANDARD PERSONALITIES
+----------------------
+
+   Currently `Net::FTPServer' is supplied with three standard
+personalities. These are:
+
+     Full    The complete read/write anonymous/authenticated FTP
+             server which serves files from a standard Unix filesystem.
+
+     RO      A small read-only anonymous-only FTP server similar
+             in functionality to Dan Bernstein's publicfile
+             program.
+
+     DBeg1   An example FTP server which serves files to a PostgreSQL
+             database. This supports files and hierarchical
+             directories, multiple users (but not file permissions)
+             and file upload.
+
+   The standard Full personality will not be explained here.
+
+   The *RO* personality is the Full personality with all code related to
+writing files, creating directories, deleting, etc.  removed. The RO
+personality also only permits anonymous logins and does not contain any
+code to do ordinary authentication. It is therefore safe to use the RO
+personality where you are only interested in serving files to anonymous
+users and do not want to worry about crackers discovering a way to trick
+the FTP server into writing over a file.
+
+   The *DBeg1* personality is a complete read/write FTP server which
+stores files as BLOBs (Binary Large OBjects) in a PostgreSQL relational
+database. The personality supports file download and upload and contains
+code to authenticate users against a users table in the database (database
+"users" are thus completely unrelated to real Unix users). The *DBeg1* is
+intended only as an example. It does not support advanced features such as
+file permissions and quotas. As part of the schoolmaster.net project
+Bibliotech Ltd. have developed an even more advanced database personality
+which supports users, groups, access control lists, quotas, recursive
+moves and copies and many other features. However this database
+personality is not available as source.
+
+   To use the DBeg1 personality you must first run a PostgreSQL server
+(version 6.4 or above) and ensure that you have access to it from your
+local user account.  Use the `initdb', `createdb' and `createuser'
+commands to create the appropriate user account and database (please
+consult the PostgreSQL administrators manual for further information about
+this - I do not answer questions about basic PostgreSQL knowledge).
+
+   Here is my correctly set up PostgreSQL server, accessed from my local
+user account "rich":
+
+     cruiser:~$ psql
+     Welcome to the POSTGRESQL interactive sql monitor:
+       Please read the file COPYRIGHT for copyright terms of POSTGRESQL
+
+     type \? for help on slash commands
+     type \q to quit
+     type \g or terminate with semicolon to execute query
+        You are currently connected to the database: rich
+
+     rich=> \d
+     Couldn't find any tables, sequences or indices!
+
+   You will also need the following Perl modules installed: DBI, DBD::Pg.
+
+   Now you will need to create a database called "ftp" and populate it
+with data. This is how to do this:
+
+     createdb ftp
+     psql ftp < doc/eg1.sql
+
+   Check that no ERRORs are reported by PostgreSQL.
+
+   You should now be able to start the FTP server by running the following
+command (not as root):
+
+     ./dbeg1-ftpd -S -p 2000 -C ftpd.conf
+
+   If the FTP server doesnE<39>t start correctly, you should check the
+system log file [/var/log/messages].
+
+   Connect to the FTP server as follows:
+
+     ftp localhost 2000
+
+   Log in as either rich/123456 or dan/123456 and then try to move around,
+upload and download files, create and delete directories, etc.
+
+SUBCLASSING THE Net::FTPServer CLASSES
+--------------------------------------
+
+   By subclassing `Net::FTPServer', `Net::FTPServer::DirHandle' and/or
+`Net::FTPServer::FileHandle' you can create custom personalities for the
+FTP server.
+
+   Typically by overriding the hooks in the `Net::FTPServer' class you can
+change the basic behaviour of the FTP server - turning it into an
+anonymous read-only server, for example.
+
+   By overriding the hooks in `Net::FTPServer::DirHandle' and
+`Net::FTPServer::FileHandle' you can create virtual filesystems: serving
+files into and out of a database, for example.
+
+   The current manual page contains information about the hooks in
+`Net::FTPServer' which may be overridden.
+
+   See `Net::FTPServer::DirHandle(3)' in this node for information about
+the methods in `Net::FTPServer::DirHandle' which may be overridden.
+
+   See `Net::FTPServer::FileHandle(3)' in this node for information about
+the methods in `Net::FTPServer::FileHandle' which may be overridden.
+
+   The most reasonable way to create your own personality is to extend one
+of the existing personalities. Choose the one which most closely matches
+the personality that you want to create. For example, suppose that you
+want to create another database personality. A good place to start would
+be by copying `lib/Net/FTPServer/DBeg1/*.pm' to a new directory
+`lib/Net/FTPServer/MyDB/' (for example). Now edit these files and
+substitute "MyDB" for "DBeg1". Then examine each subroutine in these files
+and modify them, consulting the appropriate manual page if you need to.
+
+VIRTUAL HOSTS
+-------------
+
+   `Net:FTPServer' is capable of hosting multiple FTP sites on a single
+machine. Because of the nature of the FTP protocol, virtual hosting is
+almost always done by allocating a single separate IP address per FTP
+site. However, `Net::FTPServer' also supports an experimental IP-less
+virtual hosting system, although this requires modifications to the client.
+
+   Normal (IP-based) virtual hosting is carried out as follows:
+
+     * For each FTP site, allocate a separate IP address.
+     * Configure IP aliasing on your normal interface so that
+       the single physical interface responds to multiple
+       virtual IP addresses.
+     * Add entries (A records) in DNS mapping each site's
+       name to a separate IP address.
+     * Add reverse entries (PTR records) in DNS mapping each
+       IP address back to the site hostname. It is important
+       that both forward and reverse DNS is set up correctly,
+       else virtual hosting may not work.
+     * In /etc/ftpd.conf you will need to add a virtual host
+       section for each site like this:
+
+     <Host sitename>
+
+     ip: 1.2.3.4
+     ... any specific configuration options for this site ...
+
+     </Host>
+
+     You don't in fact need the "ip:" part assuming that
+     your forward and reverse DNS are set up correctly.
+      * If you want to specify a lot of external sites, or
+     generate the configuration file automatically from a
+     database or a script, you may find the <Include filename>
+     syntax useful.
+
+   There are examples in `/etc/ftpd.conf'. Here is how IP-based virtual
+hosting works:
+
+     * The server starts by listening on all interfaces.
+     * A connection arrives at one of the IP addresses and a
+       process is forked off.
+     * The child process finds out which interface the
+       client connected to and reverses the name.
+     * If:
+         the IP address matches one of the "ip:" declarations
+         in any of the "Host" sections,
+       or:
+         there is a reversal for the name, and the name
+         matches one of the "Host" sections in the configuration
+         file,
+       then:
+         configuration options are read from that
+         section of the file and override any global configuration
+         options specified elsewhere in the file.
+     * Otherwise, the global configuration options only
+       are used.
+
+   IP-less virtual hosting is an experimental feature. It requires the
+client to send a `HOST' command very early on in the command stream -
+before USER and PASS. The `HOST' command explicitly gives the hostname
+that the FTP client is attempting to connect to, and so allows many FTP
+sites to be multiplexed onto a single IP address. At the present time, I
+am not aware of any FTP clients which implement the `HOST' command,
+although they will undoubtedly become more common in future.
+
+   This is how to set up IP-less virtual hosting:
+
+     * Add entries (A or CNAME records) in DNS mapping the
+       name of each site to a single IP address.
+     * In /etc/ftpd.conf you will need to list the same single
+       IP address to which all your sites map:
+
+     virtual host multiplex: 1.2.3.4
+
+     * In /etc/ftpd.conf you will need to add a virtual host
+       section for each site like this:
+
+     <Host sitename>
+
+     ... any specific configuration options for this site ...
+
+     </Host>
+
+   Here is how IP-less virtual hosting works:
+
+     * The server starts by listening on one interface.
+     * A connection arrives at the IP address and a
+       process is forked off.
+     * The IP address matches "virtual host multiplex"
+       and so no IP-based virtual host processing is done.
+     * One of the first commands that the client sends is
+       "HOST" followed by the hostname of the site.
+     * If there is a matching "Host" section in the
+       configuration file, then configuration options are
+       read from that section of the file and override any
+       global configuration options specified elsewhere in
+       the file.
+     * If there is no matching "Host" section then the
+       global configuration options alone are used.
+
+   The client is not permitted to issue the `HOST' command more than once,
+and is not permitted to issue it after login.
+
+VIRTUAL HOSTING AND SECURITY
+----------------------------
+
+   Only certain configuration options are available inside the <Host>
+sections of the configuration file.  Generally speaking, the only
+configuration options you can put here are ones which take effect after the
+site name has been determined - hence "allow anonymous" is OK (since
+itE<39>s an option which is parsed after determining the site name and
+during log in), but "port" is not (since it is parsed long before any
+clients ever connect).
+
+   Make sure your default global configuration is secure. If you are using
+IP-less virtual hosting, this is particularly important, since if the
+client never sends a `HOST' command, the client gets the global
+configuration. Even with IP-based virtual hosting it may be possible for
+clients to sometimes get the global configuration, for example if your
+local name server fails.
+
+   IP-based virtual hosting always takes precedence above IP-less virtual
+hosting.
+
+   With IP-less virtual hosting, access control cannot be performed on a
+per-site basis. This is because the client has to issue commands (ie. the
+`HOST' command at least) before the site name is known to the server.
+However you may still have a global "access control rule".
+
+METHODS
+=======
+
+Net::FTPServer->run ([\@ARGV]);
+     This is the main entry point into the FTP server. It starts the FTP
+     server running. This function never normally returns.
+
+     If no arguments are given, then command line arguments are taken from
+     the global `@ARGV' array.
+
+$ftps->reply ($code, $line, [$line, ...])
+     This function sends a standard single line or multi-line FTP server
+     reply to the client. The $code should be one of the standard reply
+     codes listed in RFC 959. The one or more `$line' arguments are the
+     (free text) of the reply. Do not include carriage returns at the end
+     of each `$line'.  This function adds the correct line ending format
+     as specified in the RFC.
+
+$ftps->config ($name);
+     Read configuration option $name from the configuration file.
+
+$ftps->ip_host_config ($ip_addr);
+     Look for a <Host> section which contains "ip: $ip_addr".  If one is
+     found, return the site name of the Host section. Otherwise return
+     undef.
+
+$sock = $self->open_data_connection;
+     Open a data connection. Returns the socket (an instance of
+     IO::Socket) or undef if it fails for some reason.
+
+$self->pre_configuration_hook ();
+     Hook: Called before command line arguments and configuration file are
+     read.
+
+     Status: optional.
+
+     Notes: You may append your own information to
+     `$self-'{version_string}> from this hook.
+
+$self->options_hook (\@args);
+     Hook: Called before command line arguments are parsed.
+
+     Status: optional.
+
+     Notes: You can use this hook to supply your own command line
+     arguments.  If you parse any arguments, you should remove them from
+     the @args array.
+
+$self->post_configuration_hook ();
+     Hook: Called after all command line arguments and configuration file
+     have been read and parsed.
+
+     Status: optional.
+
+$self->post_bind_hook ();
+     Hook: Called only in daemon mode after the control port is bound but
+     before starting the accept infinite loop block.
+
+     Status: optional.
+
+$self->pre_accept_hook ();
+     Hook: Called in daemon mode only just before `accept(2)' is called in
+     the parent FTP server process.
+
+     Status: optional.
+
+$self->post_accept_hook ();
+     Hook: Called both in daemon mode and in inetd mode just after the
+     connection has been accepted. This is called in the child process.
+
+     Status: optional.
+
+$rv = $self->access_control_hook;
+     Hook: Called after `accept(2)'-ing the connection to perform access
+     control. Detailed request information is contained in the $self
+     object.  If the function returns -1 then the socket is immediately
+     closed and no FTP processing happens on it. If the function returns 0,
+     then normal access control is performed on the socket before FTP
+     processing starts. If the function returns 1, then normal access
+     control is not performed on the socket and FTP processing begins
+     immediately.
+
+     Status: optional.
+
+$rv = $self->process_limits_hook;
+     Hook: Called after `accept(2)'-ing the connection to perform
+     per-process limits (eg. by using the setrlimit(2) system call).
+     Access control has already been performed and detailed request
+     information is contained in the `$self' object.
+
+     If the function returns -1 then the socket is immediately closed and
+     no FTP processing happens on it. If the function returns 0, then
+     normal per-process limits are applied before any FTP processing
+     starts. If the function returns 1, then normal per-process limits are
+     not performed and FTP processing begins immediately.
+
+     Status: optional.
+
+$rv = $self->authentication_hook ($user, $pass, $user_is_anon)
+     Hook: Called to perform authentication. If the authentication
+     succeeds, this should return 0. If the authentication fails, this
+     should return -1.
+
+     Status: required.
+
+$self->user_login_hook ($user, $user_is_anon)
+     Hook: Called just after user `$user' has successfully logged in. A
+     good place to change uid and chroot if necessary.
+
+     Status: optional.
+
+$dirh = $self->root_directory_hook;
+     Hook: Return an instance of a subclass of Net::FTPServer::DirHandle
+     corresponding to the root directory.
+
+     Status: required.
+
+$self->pre_command_hook;
+     Hook: This hook is called just before the server begins to wait for
+     the client to issue the next command over the control connection.
+
+     Status: optional.
+
+$rv = $self->command_filter_hook ($cmdline);
+     Hook: This hook is called immediately after the client issues command
+     `$cmdline', but before any checking or processing is performed on the
+     command. If this function returns -1, then the server immediately
+     goes back to waiting for the next command. If this function returns
+     0, then normal command filtering is carried out and the command is
+     processed. If this function returns 1 then normal command filtering
+     is not performed and the command processing begins immediately.
+
+     Important Note: This hook must be careful not to overwrite the global
+     $_ variable.
+
+     Do not use this function to add your own commands. Instead use the
+     `$self->{command_table}' and `$self->{site_command_table}' hashes.
+
+     Status: optional.
+
+$error = $self->transfer_hook ($mode, $file, $sock, \$buffer);
+          $mode     -  Open mode on the File object (Either reading or writing)
+          $file     -  File object as returned from DirHandle::open
+          $sock     -  Data IO::Socket object used for transfering
+          \$buffer  -  Reference to current buffer about to be written
+
+     The \$buffer is passed by reference to minimize the stack overhead
+     for efficiency purposes only.  It is not meant to be modified by the
+     transfer_hook subroutine.  (It can cause corruption if the length of
+     $buffer is modified.)
+
+     Hook: This hook is called after reading $buffer and before writing
+     $buffer to its destination.  If arg1 is "r", $buffer was read from
+     the File object and written to the Data socket.  If arg1 is "w",
+     $buffer will be written to the File object because it was read from
+     the Data Socket.  The return value is the error for not being able to
+     perform the write.  Return undef to avoid aborting the transfer
+     process.
+
+     Status: optional.
+
+$self->post_command_hook
+     Hook: This hook is called after all command processing has been
+     carried out on this command.
+
+     Status: optional.
+
+BUGS
+====
+
+   The SIZE, REST and RETR commands probably do not work correctly in
+ASCII mode.
+
+   REST does not work before STOR/STOU/APPE (is it supposed to?)
+
+   You cannot abort a transfer in progress yet. Nor can you check the
+status of a transfer in progress. Using the telnet interrupt commands can
+cause the FTP server to fail.
+
+   User upload/download limits.
+
+   Limit number of clients. Limit number of clients by host or IP address.
+
+   The following commands are recognized by `wu-ftpd', but are not yet
+implemented by `Net::FTPServer':
+
+     SITE CHMOD   There is a problem supporting this with our VFS.
+     SITE GPASS   Group functions are not really relevant for us.
+     SITE GROUP   -"- ditto -"-
+     SITE GROUPS  -"- ditto -"-
+     SITE INDEX   This is a synonym for SITE EXEC.
+     SITE MINFO   This command is no longer supported by wu-ftpd.
+     SITE NEWER   This command is no longer supported by wu-ftpd.
+     SITE UMASK   This command is difficult to support with VFS.
+
+   Symbolic links are not handled elegantly (or indeed at all) yet.
+
+   The program needs to log a lot more general transfer and access
+information to syslog.
+
+   Equivalent of ProFTPDE<39>s "DisplayReadme" function.
+
+   The ability to hide dot files (probably best to build this into the VFS
+layer). This should apply across all commands.  See ProFTPDE<39>s
+"IgnoreHidden" function.
+
+   Do ident (RFC913) authentication at login. Have a way to turn this on
+and off.
+
+   Access to LDAP authentication database (can currently be done using a
+PAM module). In general, we should support pluggable authentication.
+
+   Log formatting similar to ProFTPD command LogFormat.
+
+   More timeouts to avoid various denial of service attacks. For example,
+the server should always timeout when waiting too long for an active data
+connection.
+
+   Support for IPv6 (see RFC 2428), EPRT, EPSV commands.
+
+   Upload and download tar.gz/zip files automatically.
+
+   See also "XXX" comments in the code for other problems, missing features
+and bugs.
+
+FILES
+=====
+
+     /etc/ftpd.conf
+     /usr/lib/perl5/site_perl/5.005/Net/FTPServer.pm
+     /usr/lib/perl5/site_perl/5.005/Net/FTPServer/DirHandle.pm
+     /usr/lib/perl5/site_perl/5.005/Net/FTPServer/FileHandle.pm
+     /usr/lib/perl5/site_perl/5.005/Net/FTPServer/Handle.pm
+
+AUTHORS
+=======
+
+   Richard Jones (rich@annexia.org).
+
+COPYRIGHT
+=========
+
+   Copyright (C) 2000 Biblio@Tech Ltd., Unit 2-3, 50 Carnwath Road,
+London, SW6 3EG, UK
+
+SEE ALSO
+========
+
+   `Net::FTPServer::Handle(3)' in this node,
+`Net::FTPServer::FileHandle(3)' in this node,
+`Net::FTPServer::DirHandle(3)' in this node, `Authen::PAM(3)' in this node,
+`Net::FTP(3)' in this node, `perl(1)' in this node, RFC 765, RFC 959, RFC
+1579, RFC 2389, RFC 2428, RFC 2577, RFC 2640, Extensions to FTP Internet
+Draft draft-ietf-ftpext-mlst-NN.txt.
+
+

@@ -1,0 +1,1533 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Emacs,  Next: Emacs/EPL,  Prev: Eesh,  Up: Module List
+
+Redefine Perl's system primitives to work inside of Emacs
+*********************************************************
+
+NAME
+====
+
+   Emacs - Redefine Perl's system primitives to work inside of Emacs
+
+SYNOPSIS
+========
+
+     perlmacs -w -MEmacs -e main -- --display :0.0 file.txt
+
+     #! /usr/bin/perlmacs
+     use Emacs;
+     use Emacs::Lisp;
+     setq { $mail_self_blind = t; };
+     exit main ($0, "-q", @ARGV);
+
+DESCRIPTION
+===========
+
+   This module replaces STDIN, STDOUT, `STDERR', %ENV, %SIG, exit, and
+warn (via `$SIG{__WARN__}') with versions that work safely within an Emacs
+session.  In Perlmacs, it also defines a function named main, which
+launches an Emacs editing session from within a script.
+
+STDIN
+-----
+
+   Reading a line from Perl's STDIN filehandle causes a string to be read
+from the minibuffer with the prompt `"Enter input: "'.  To show a
+different prompt, use:
+
+     $string = &read_string ("Prompt: ");
+
+STDOUT
+------
+
+   Printing to Perl's STDOUT filehandle inserts text into the current
+buffer as though typed, unless you have changed the Lisp variable
+`standard-output' to do something different.
+
+STDERR and `warn'
+-----------------
+
+   Perl's warn operator and `STDERR' filehandle are redirected to the
+minibuffer.
+
+%ENV
+----
+
+   Access to %ENV is redirected to the Lisp variable `process-environment'.
+
+%SIG
+----
+
+   Setting signal handlers is not currently permitted under Emacs.
+
+exit
+----
+
+   exit calls `kill-emacs'.
+
+main (CMDLINE)
+--------------
+
+   When you `use Emacs' in a *perlmacs* script, a Perl sub named main may
+be used to invoke the Emacs editor.  This makes it possible to put
+customization code, which would normally appear as Lisp in `~/.emacs',
+into a Perl script.
+
+   NOTE: This function does not work under EPL.  You have to have Perlmacs
+to use it.  See `"EPL AND PERLMACS"', *Note Emacs/Lisp: Emacs/Lisp,.
+
+   For example, this startup code
+
+     (setq
+      user-mail-address "gnaeus@perl.moc"
+      mail-self-blind t
+      mail-yank-prefix "> "
+      )
+
+     (put 'eval-expression 'disabled nil)
+
+     (global-font-lock-mode 1 t)
+     (set-face-background 'highlight "maroon")
+     (set-face-background 'region "Sienna")
+
+   could be placed in a file with the following contents:
+
+     #! /usr/local/bin/perlmacs
+
+     use Emacs;
+     use Emacs::Lisp;
+
+     setq {
+     	$user_mail_address = 'gnaeus@perl.moc';
+     	$mail_self_blind = t;
+     	$mail_yank_prefix = '> ';
+     	$eval_expression{\*disabled} = undef;
+     };
+
+     &global_font_lock_mode(1, t);
+     &set_face_background(\*highlight, "maroon");
+     &set_face_background(\*region, "Sienna");
+
+     exit main($0, "-q", @ARGV);
+
+   When you wanted to run Emacs, you would invoke this program.
+
+   The arguments to main correspond to the `argv' of the main function in
+a C program.  The first argument should be the program's invocation name,
+as in this example.  -q inhibits running `~/.emacs' (which is the point,
+after all).
+
+BUGS
+====
+
+   * Problems with `main'.
+
+     `main()' doesn't work under EPL.  It may open an X display and not
+     close it.  Those are the most obvious of many problems with main.
+
+     The thing is, Emacs was not written with the expectation of being
+     embedded in another program, least of all a language interpreter such
+     as Perl.  Therefore, when Emacs is told to exit, it believes the
+     process is really about to exit, and it neglects to tidy up after
+     itself.
+
+     For best results, the value returned by main should be passed to
+     Perl's exit soon, as in this code:
+
+          exit (main($0, @args));
+
+COPYRIGHT
+=========
+
+   Copyright (C) 1998-2001 by John Tobey, jtobey@john-edwin-tobey.org.
+All rights reserved.
+
+     This program is free software; you can redistribute it and/or modify
+     it under the terms of the GNU General Public License as published by
+     the Free Software Foundation; either version 2 of the License, or
+     (at your option) any later version.
+
+     This program is distributed in the hope that it will be useful, but
+     WITHOUT ANY WARRANTY; without even the implied warranty of
+     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+     General Public License for more details.
+
+     You should have received a copy of the GNU General Public License
+     along with this program; see the file COPYING.  If not, write to the
+     Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+     MA 02111-1307  USA
+
+SEE ALSO
+========
+
+   *Note Perl: (perl.info)perl,, *Note Emacs/Lisp: Emacs/Lisp,, emacs.
+
+
+File: pm.info,  Node: Emacs/EPL,  Next: Emacs/EPL/Debug,  Prev: Emacs,  Up: Module List
+
+Protocol implementation and data conversions for Emacs Perl
+***********************************************************
+
+NAME
+====
+
+   Emacs::EPL - Protocol implementation and data conversions for Emacs Perl
+
+SYNOPSIS
+========
+
+     use Emacs::EPL ':server';
+     Emacs::EPL::loop;
+
+DESCRIPTION
+===========
+
+   This module is used internally by `epl.el' and Emacs::Lisp.
+
+   If you use eval to catch errors in Lisp functions, and `$@' contains a
+string beginning with `'.Emacs::EPL'' (note initial dot), be sure to die
+with the same string before returning control to Lisp.
+
+Protocol State Transition Table
+-------------------------------
+
+   This stuff is mainly for the benefit of the author.
+
+     NO.   CONSTRAINTS            INITIAL       MSG CLASS    FINAL
+     ----- ---------------------- ------------- ------------ --------------
+     (1)                          <0>           START        <1>
+     (2)                          <1>           RAISE        <0>
+     (3)                          <1>           RETURN       <2,0>
+     (4)                          <2,0>         RETURN       <0>
+     (5)                          <2,n>         UNREF        <3,0,n>
+     (6)                          <2,n>         CALL         <2,n+1>
+     (7)   n>0                    <2,n>         RETURN       <2,n-1>
+     (13)                         <3,0,n>       RETURN       <2,n>
+     (14)                         <3,m,n>       UNREF        <3,m+1,n>
+     (15)  m>0                    <3,m,n>       RETURN       <3,m-1,n>
+
+   The master is defined to be the process that sends the START message.
+The other process is the slave.  It follows by induction from the table
+that the master sends in states <0>, <2,n> for even n, and <3,m,n> for odd
+m+n, and that the slave sends in all other states.
+
+Message Classes
+---------------
+
+START
+     Initiate communication, e.g. by running a subprocess or opening a
+     connection.  The slave, if able, sends either a handshake (RETURN) or
+     an exception (RAISE) in response.  If an exception is raised, no
+     further communication is permitted.
+
+          frame = 1
+
+CALL
+     Request to run code.  The calling process may be reentered by a
+     subsequent CALL.  Our call ends when we receive a RETURN, RAISE, or
+     POP in the same frame or we send a POP in a next inner frame.  If we
+     receive a POP and subsequently use RETURN to exit this frame, the
+     value we return will be ignored.
+
+          frame += 1
+          Lisp: funcall
+          Perl: eval
+
+RETURN
+     Deliver the response to a CALL request (7), report successful startup
+     (3), or mark the end of a series of UNREF requests (13, 15).  Not
+     permitted in a popped frame.
+
+     The three meanings could have been given different names: "return",
+     "handshake", and "end_unrefs".
+
+          frame -= 1
+          Lisp: function return
+          Perl: eval return
+
+RAISE
+     Return via exception mechanism, i.e., non-locally.  RAISE has the same
+     protocol semantics as RETURN, except that it is permitted in popped
+     frames.  It is expected that unless the user has taken specific steps
+     (i.e., a "try" block) in the frame being returned to, the recipient
+     will propagate the exception by sending another RAISE with the same or
+     equivalent argument.
+
+          frame -= 1
+          Lisp: signal
+          Perl: die
+
+POP
+     Either terminate communication (4), or exit the current frame (11,
+     12).  This also says that we will ignore the argument of a subsequent
+     RETURN from this frame (but will not ignore a RAISE value).
+
+          frame -= 1
+          Lisp: throw, kill-emacs
+          Perl: exit, any nonlocal jump other than die
+
+UNREF
+     Send a list of handles that they have given us and that we promise
+     never to use again, so that they may free up some resources.  Maybe
+     the resources they free will include references to our stuff, so they
+     may send us some UNREF requests before ending the list with a RETURN.
+     They must not, however, issue any other kinds of requests until
+     they've sent RETURN in this frame.
+
+          frame += 1
+          Lisp: perl-free-ref, whatever garbage-detection means is in effect
+          Perl: DESTROY
+
+Thoughts
+--------
+
+   Mark-and-sweep garbage collection could be supported by:
+
+     (16)                         <2,n,@s>      GC           <4,n,@s>
+     (17)                         <4,n,@s>      RETURN(0)    <2,n,@s>
+     (18)                         <4,n,@s>      RETURN(1)    <5,0,n,@s>
+     (19)                         <5,0,n,@s>    RETURN       <3,0,n,@s>
+     (20)                         <5,m,n,@s>    MARK         <5,m+1,n,@s>
+     (21)  m>=1                   <5,m,n,@s>    RETURN       <5,m-1,n,@s>
+
+   Transition (17) gives the receiver a chance to refuse to support
+mark-and-sweep or simply to indicate that all references are in use.
+Which of these two is the case could be indicated by another return code.
+
+   It might be useful to distinguish between recursive and nonrecursive
+calls:
+
+     (22)                         <2,n>         SIMPLE_CALL  <6,n>
+     (23)                         <6,n>         RETURN       <2,n>
+
+   Further state classes could be introduced to allow UNREF, GC, RAISE, or
+POP operations during nonrecursive calls.  Better yet, add some boolean
+parameters to the states we've got and to CALL.
+
+   Hey, how about CALL/CC and START_THREAD.  Then of course you'd need
+JOIN, YIELD, LOCK, WAIT, ... .  Pretty soon you'd have yourself an
+operating system.  Yawn.
+
+   The current EPL implementation uses only transitions of types (1) to
+(15).
+
+COPYRIGHT
+=========
+
+   Copyright (C) 2001 by John Tobey, jtobey@john-edwin-tobey.org.  All
+rights reserved.
+
+     This program is free software; you can redistribute it and/or modify
+     it under the terms of the GNU General Public License as published by
+     the Free Software Foundation; either version 2 of the License, or
+     (at your option) any later version.
+
+     This program is distributed in the hope that it will be useful, but
+     WITHOUT ANY WARRANTY; without even the implied warranty of
+     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+     General Public License for more details.
+
+     You should have received a copy of the GNU General Public License
+     along with this program; see the file COPYING.  If not, write to the
+     Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+     MA 02111-1307  USA
+
+SEE ALSO
+========
+
+   *Note Emacs/Lisp: Emacs/Lisp,, *Note Emacs: Emacs,.
+
+
+File: pm.info,  Node: Emacs/EPL/Debug,  Next: Emacs/Lisp,  Prev: Emacs/EPL,  Up: Module List
+
+Demand-loaded protocol debugging support
+****************************************
+
+NAME
+====
+
+   Emacs::EPL::Debug - Demand-loaded protocol debugging support
+
+SYNOPSIS
+========
+
+     $Emacs::EPL::debug = 'stderr'; # or filename, scalarref, handle
+     Emacs::EPL::debug (@strings);
+
+DESCRIPTION
+===========
+
+   See the Texinfo documentation about debugging options.
+
+COPYRIGHT
+=========
+
+   Copyright (C) 2001 by John Tobey, jtobey@john-edwin-tobey.org.  All
+rights reserved.
+
+     This program is free software; you can redistribute it and/or modify
+     it under the terms of the GNU General Public License as published by
+     the Free Software Foundation; either version 2 of the License, or
+     (at your option) any later version.
+
+     This program is distributed in the hope that it will be useful, but
+     WITHOUT ANY WARRANTY; without even the implied warranty of
+     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+     General Public License for more details.
+
+     You should have received a copy of the GNU General Public License
+     along with this program; see the file COPYING.  If not, write to the
+     Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+     MA 02111-1307  USA
+
+SEE ALSO
+========
+
+   *Note Emacs/Lisp: Emacs/Lisp,, *Note Emacs: Emacs,.
+
+
+File: pm.info,  Node: Emacs/Lisp,  Next: Email/Find,  Prev: Emacs/EPL/Debug,  Up: Module List
+
+Support for writing Emacs extensions in Perl
+********************************************
+
+NAME
+====
+
+   Emacs::Lisp - Support for writing Emacs extensions in Perl
+
+SYNOPSIS
+========
+
+In Emacs
+--------
+
+     M-x perl-eval-expression RET 2+2 RET
+     M-x perl-eval-region RET
+     M-x perl-eval-buffer RET
+     ... and more ...
+
+In Perl
+-------
+
+     use Emacs::Lisp;
+
+     &switch_to_buffer('*scratch*');
+     &insert("Hello, world!\n");
+
+     setq { $cperl_font_lock = t };
+
+     &add_hook(\*find_file_hooks,
+     	      sub { &message("found a file!") });
+
+     use Emacs::Lisp qw($emacs_version $epl_version);
+     save_excursion {
+     	&set_buffer(&get_buffer_create("*test*"));
+     	&insert("This is ");
+     	&insert(&featurep(\*::xemacs) ? "XEmacs" : "Emacs");
+     	&insert(" version $emacs_version,\n");
+     	&insert("EPL version $epl_version.\n");
+     	&insert("Emacs::Lisp version is $Emacs::Lisp::VERSION.\n");
+     };
+
+DESCRIPTION
+===========
+
+   Emacs allows you to customize your environment using Lisp.  With EPL,
+you can use Perl, too.  This module allows Perl code to call functions and
+access variables of Lisp.
+
+   You still need to learn some Lisp in order to understand *The Elisp
+Manual*, which is the definitive reference for Emacs programming.  This
+document assumes a basic understanding of Emacs commands and Lisp data
+types.  I also assume familiarity with Perl's complex data structures
+(described in *Note Perlref: (perl.info)perlref,) and objects (see *Note
+Perlobj: (perl.info)perlobj,).
+
+Quick Start
+-----------
+
+   Run *emacs -l perl* and type:
+
+     C-x p e &insert ("hello!\n") RET
+
+   The string `"hello!"' should appear in your scratch buffer.  The Perl
+sub `&insert' has called the Emacs Lisp insert function, which inserts its
+string argument into the current buffer at point.
+
+   Paste this text into a buffer, select it, and type `M-x
+perl-eval-region RET':
+
+     sub doit { &message("Cool, huh?"); }
+     defun (\*perltest, interactive, \&doit);
+
+   Type `M-x perltest RET'.  The text will appear in the minibuffer.
+defun and interactive are used to create Emacs commands.
+
+EPL AND PERLMACS
+================
+
+   Perlmacs was (is?) a project that embedded a Perl interpreter into the
+Emacs binary so that it could run Lisp, Perl, or any combination of the
+two.  It uses Perl's C interface, which requires patching and recompiling
+Emacs.  As a result, each release is tied to a version of Emacs, it takes
+a lot of time and disk space to build, and it is not very portable.
+
+   EPL (Emacs Perl) accomplishes most of what Perlmacs can do, but it does
+not suffer from the same drawbacks.  It uses unmodified Emacs and Perl and
+lets them work together through IPC (pipes).  This may make some tasks
+much slower, but it is much more convenient to install and upgrade, and it
+works with XEmacs as well as Emacs 21 betas.
+
+   For the time being, this module attempts to support both Perlmacs and
+EPL.  The user-visible APIs are almost identical, except for EPL's lack of
+`Emacs::main()'.
+
+LISP SUPPORT FOR PERL
+=====================
+
+   Lisp code can check for Perl support using `(require 'perl)'.  In
+Perlmacs, some of the Perl functions are built in, and others are defined
+in `perl.el'.  When you use EPL, `epl.el' substitutes for the built-in
+support, but the same `perl.el' is used.
+
+Functions
+---------
+
+   The following Lisp functions do not rely on the Emacs::Lisp module.
+Use `C-h f <function-name> RET' within Emacs to see their doc strings.
+
+     perl-eval-expression  EXPRESSION
+     perl-eval-region      START END
+     perl-eval-buffer
+     perl-load-file        NAME
+     perl-eval             STRING &optional CONTEXT
+     perl-call             SUB &optional CONTEXT &rest ARGS
+     perl-eval-and-call    STRING &optional CONTEXT &rest ARGS
+     perl-to-lisp          OBJECT
+     perl-wrap             OBJECT
+     perl-value-p          OBJECT
+     perl-eval-raw         STRING &optional CONTEXT
+     perl-call-raw         SUB &optional CONTEXT &rest ARGS
+     make-perl-interpreter &rest ARGV
+     perl-destruct         &optional INTERPRETER
+     perl-gc               &optional PURGE
+     perl-free-refs        &rest REFS
+
+   The following Lisp variables affect the Perl interpreter and have doc
+strings accessible via `C-h f <variable-name> RET'.  They are:
+
+     perl-interpreter-program
+     perl-interpreter-args
+     perl-interpreter
+
+Data Conversions
+----------------
+
+   When Perl calls a Lisp function, its arguments are converted to Lisp
+objects, and the returned object is converted to a Perl value.  Likewise,
+when Lisp calls Perl, the arguments are converted from Lisp to Perl and
+the return values are converted to Lisp.
+
+   * Lisp has three scalar types.
+
+     Lisp integers, floats, and strings all become Perl scalars.  A simple
+     Perl scalar becomes either an integer, a float, or a string.
+
+     Interesting character encodings such as UTF-8 are not currently
+     supported.  I don't even know what happens to 8-bit characters during
+     string conversion.
+
+   * Lisp symbols correspond to globrefs.
+
+     Glob references become symbols in Lisp.  Underscores are swapped with
+     hyphens in the name, since Perl prefers underscores and Lisp prefers
+     hyphens.  See `' in this node for more information.
+
+   * Lisp's `nil' is equivalent to Perl's `undef' or `()'.
+
+     As an exception to the rule for symbols, `nil' in Lisp corresponds to
+     undef in Perl.
+
+     In Lisp, `nil' is really a symbol.  However, it is typically used as
+     the boolean value false.  Glob references evaluate to *true* in
+     boolean context.  It is much more natural to convert `nil' to undef.
+
+   * Arrayrefs correspond to lists.
+
+     Lists are a central data structure in Lisp.  To make it as easy as
+     possible to pass lists to Lisp functions that require them, Perl array
+     references are converted Lisp lists.  For example, the Perl expression
+     such as
+
+          ["x", ["y", 1]]
+
+     is converted to
+
+          '("x" ("y" 1))
+
+     in Lisp.
+
+   * Arrayref refs correspond to vectors.
+
+     Adding \ to an arrayref makea it an arrayref ref, which becomes a
+     vector in Lisp.  For example, `\[1, 2, undef]' becomes `[1 2 nil]'.
+
+   * Conses that are not lists become Emacs::Lisp::Cons objects.
+
+     Compatibility note:  Perlmacs does not have this feature.
+
+          $x = &cons("left", "right");
+          print ref($x);                # "Emacs::Lisp::Cons"
+          print $x->car;                # "left"
+          print $x->cdr;                # "right"
+
+     But:
+
+          $x = &cons ("top", undef);    # a Lisp list
+          print ref($x);                # "ARRAY"
+          print $x->[0];                # "top"
+
+   * Conversion uses "deep" copying by default.
+
+     Conversion of lists and vectors to arrayrefs and arrayref refs is
+     recursive by default.  Changes made by Lisp to a list will not affect
+     the Perl array of which it is a copy, nor will changes to a Perl array
+     affect a Lisp list.  See `' in this node about converting cyclic
+     structures.
+
+   * There are ways to make "shallow" copies.
+
+     A shallow copy simply wraps a Perl scalar in a Lisp object or vice
+     versa.  Wrapped Perl values appear as a Lisp objects of type
+     `perl-value'.  Wrapped Lisp values appear in Perl as objects of class
+     `Emacs::Lisp::Object'.  See `' in this node for issues relating to
+     wrapped data.
+
+     Where a data type has no natural equivalent in the other language,
+     shallow copying is the default.  Examples include Perl hashrefs and
+     Lisp buffer objects.
+
+     In Perl, the `lisp' function wraps its argument in a Lisp object.
+     This allows Perl arrays to be passed by reference to Lisp functions.
+     (Of course, the value returned by `lisp' is really a Perl value
+     wrapped in a Lisp object wrapped in a Perl object.)
+
+     An Emacs::Lisp::Object's `to_perl' method performs a deep copy (if
+     the argument is Lisp data) or unwraps its argument (if it is Perl
+     data).
+
+     Lisp functions called through package Emacs::Lisp convert their return
+     values using deep copying.  The same functions are accessible through
+     Emacs::Lisp::Object, which does shallow conversion and always returns
+     an Emacs::Lisp::Object object.
+
+     These examples show how the data wrapping functions work:
+
+          $x = lisp [1, 2, 3];
+          print ref($x);           # "Emacs::Lisp::Object"
+          print ref($x->to_perl);  # "ARRAY"
+          print @{&list(2, 3)};    # "23"
+
+          $x = Emacs::Lisp::Object::list(2, 3);
+          print ref($x);           # "Emacs::Lisp::Object"
+          print @{$x->to_perl};    # "23"
+
+Scripts
+-------
+
+   Perlmacs can run Perl programs.  By default, Perlmacs is installed
+under two names, *pmacs* and *perlmacs*.  Which name is used to invoke the
+program determines how it parses its command line.
+
+   If *perlmacs* is used (or, more precisely, any name containing
+"*perl*"), it behaves like Perl.  For example,
+
+     $ perlmacs script.pl
+
+   runs the Perl program script.pl.
+
+   When invoked as *pmacs*, it behaves like Emacs.  Example:
+
+     $ pmacs file.txt
+
+   This begins an editing session with `file.txt' in the current buffer.
+
+   The first command line argument can override the invocation name.  If
+it is *-emacs*, Emacs takes control.  If it is *-perl*, the program runs
+in Perl mode.
+
+   The *Emacs* module (that is, the Perl module named "Emacs") includes
+support for starting an editing session from within a Perlmacs script.
+See *Note Emacs: Emacs,.
+
+PERL SUPPORT FOR LISP
+=====================
+
+   The Emacs::Lisp module allows Perl programs to invoke Lisp functions
+and handle Lisp variables as if they were Perl subs and variables.
+
+   The directive `use Emacs::Lisp;' causes any use of a function not
+defined in Perl to invoke the Lisp function of the same name (with hyphens
+in place of underscores).  For example, this writes a message to the
+standard error stream (in Perl mode) or displays it in the minibuffer:
+
+     &message ("this is a test");
+
+Functions
+---------
+
+   This code calls the hypothetical Lisp function `foo-bar' with arguments
+4 and t.
+
+     &foo_bar(4, t);
+
+   The Lisp syntax for the same call would be
+
+     (foo-bar 4 t)
+
+   The ampersand (&) in the Perl example is not required, but it is needed
+for functions, such as read, eval, and print, which are Perl keywords.
+Using it with Emacs::Lisp is a good habit, so the examples in this
+document include it.
+
+   If you don't want an AUTOLOAD sub to affect your namespace, you may
+either put parentheses after "`use Emacs::Lisp'" or import to a different
+package, and use qualified function names.  For example:
+
+     use Emacs::Lisp ();
+     Emacs::Lisp::message("hello\n");
+
+     {package L; use Emacs::Lisp;}
+     L::message("goodbye\n");
+
+Symbols
+-------
+
+   Many Lisp functions take arguments that may be, or are required to be,
+symbols.  In Lisp, a symbol is a kind of name, but does not have the same
+type as a string.  Lisp programs typically use the quote operator to
+specify a symbol.  For example, this Lisp code refers to the `beep' symbol:
+
+     (run-at-time nil 1 'beep)
+
+   EPL uses glob references to specify symbols.  A literal globref begins
+with a backslash followed by an asterisk, so the last example would be
+written as
+
+     &run_at_time(undef, 1, \*beep);
+
+   in Perl.  (You may want to do `&cancel_function_timers(\*beep)' soon
+after trying this example.)
+
+   When comparing the returned values of Lisp functions to each other and
+to symbols, it is best to use the Lisp eq function instead of Perl's
+equality operators.
+
+     ### PREFERRED
+     if (&eq(&type_of($x), \*::cons)) { ... }
+
+     ### PROBABLY OK
+     if (&type_of($x) eq \*cons) { ... }
+     if (&type_of($x) == \*cons) { ... }
+
+Variables
+---------
+
+   In Lisp, variables play a role akin to that of Perl scalar variables.
+A variable may hold a number, a string, or a reference to any type of
+complex Lisp data structure.  (They are not called references in Lisp, but
+rather "objects".)
+
+   You can create a Perl alias for any reasonably named Lisp variable by
+saying `use Emacs::Lisp qw($varname);'.  Thereafter, assignment to
+`$varname' will update the Lisp value.  Changes made to the variable in
+Lisp will be reflected in Perl when `$varname' is used in expressions.
+
+   This example saves and replaces the value of the Lisp variable
+`inhibit-eol-conversion':
+
+     use Emacs::Lisp qw($inhibit_eol_conversion);
+     $old_val = $inhibit_eol_conversion;
+     $inhibit_eol_conversion = 1;
+
+   This sort of thing could be accomplished in Lisp as follows:
+
+     (setq old-val inhibit-eol-conversion)
+     (setq inhibit-eol-conversion 1)
+
+   (but you would probably rather use let instead, for which there is
+still no convenient Emacs::Lisp equivalent).  See also the setq function
+below.
+
+Property Lists
+--------------
+
+   Lisp symbols all have an associated object called a *plist*, for
+"property list".  The plist is an object just like any other, but it is
+typically used in a way vaguely resembling Perl's hashes.
+
+   Plists are not used nearly as often as Lisp functions and variables.
+If you are new to Lisp, you can probably skip this section.
+
+   A plist is different from a Perl hash.  Lookups are not based on string
+equality as with Perl, but rather on Lisp object equality of the eq
+variety.  For this reason, it is best to stick to the Lisp convention of
+using only symbols as keys.  (See `' in this node.)
+
+   Emacs::Lisp provides a shorthand notation for getting and setting plist
+elements.  If you say "`use Emacs::Lisp qw(%any_name)'", then subsequent
+access to the elements of `%any_name' will get or set the corresponding
+properties of the Lisp symbol `any-name'.
+
+   For example, the following Perl and Lisp fragments are more or less
+equivalent:
+
+     # Perl fragment
+     use Emacs::Lisp qw(%booboo %upcase_region);
+     $booboo{\*error_conditions} = [\*booboo, \*error];
+     $can_upcase = ! $upcase_region{\*disabled};
+
+     ; Lisp fragment
+     (put 'booboo 'error-conditions '(booboo error))
+     (setq can-upcase (not (get 'upcase-region 'disabled)))
+
+   See also the setq function below.
+
+Macros
+------
+
+   Lisp macros, such as setq and defun, do not work the same way functions
+do, although they are invoked using the function syntax.  (Here you see
+the vast philosophical chasm separating Perl from Lisp.  While Perl might
+have five syntaxes to mean the same thing, Lisp has one syntax with two
+meanings!)
+
+   Some macros are equivalent to Perl operators, such as if and while.
+Others have meanings peculiar to Lisp.  A few macros are implemented in
+Emacs::Lisp.  They are described below.  If you try to call a macro that
+has not been implemented, you will get an error message which may propose
+an alternative.
+
+catch SYMBOL,CODE
+     Evaluate CODE in a Lisp catch construct.  At any point during CODE's
+     execution, the throw function may be used to return control to the
+     end of the catch block.  For example:
+
+          $x = catch \*::out, sub {
+          	$y = 1;
+          	&throw(\*::out, 16);
+          	$y = 2;
+          };
+          print $x;  # prints 16
+          print $y;  # prints 1
+
+     Some Perl constructs have functionality similar to throw; for
+     example, return and last.  However, they do not work with catches in
+     Lisp code.
+
+defun SYMBOL,DOCSTRING,SPEC,CODE
+defun SYMBOL,DOCSTRING,CODE
+defun SYMBOL,SPEC,CODE
+defun SYMBOL,CODE
+     Make CODE callable as the Lisp function SYMBOL.  This is Lisp's
+     version of Perl's sub keyword.  A function defined in this way
+     becomes visible to Lisp code.
+
+     defun is useful for defining Emacs *commands*.  Commands are
+     functions that the user can invoke by typing `M-x <function-name>'.
+     A command may be bound to a key or sequence of keystrokes.  See the
+     Emacs documentation for specifics.
+
+     When defining a command, you must specify the interactive nature of
+     the command.  There are various codes to indicate that the command
+     acts on the current region, a file name to be read from the
+     minibuffer, etc.  Please see *The Elisp Manual* for details.
+
+     Emacs::Lisp's defun uses a SPEC returned by the interactive function
+     to specify a command's interactivity.  If no SPEC is given, the
+     function will still be callable by Lisp, but it will not be available
+     to the user via `M-x <function-name> RET' and cannot be bound to a
+     sequence of keystrokes.  Even commands that do not request
+     information from the user need an interactive spec.  See `' in this
+     node.
+
+     This example creates a command, `reverse-region-words', that replaces
+     a region of text with the same text after reversing the order of
+     words.  To be user-friendly, we'll provide a documentation string,
+     which will be accessible through the Emacs help system (`C-h f
+     reverse-region-words RET').
+
+          use Emacs::Lisp;
+          defun (\*reverse_region_words,
+          	   "Reverse the order of the words in the region.",
+          	   interactive("r"),
+          	   sub {
+          	       my ($start, $end) = @_;
+          	       my $text = &buffer_substring($start, $end);
+          	       $text = join('', reverse split (/(\s+)/, $text));
+          	       &delete_region($start, $end);
+          	       &insert($text);
+          	   });
+
+     If you try this example and invoke the help system, you may notice
+     something not quite right in the message.  It reads as follows:
+
+          reverse-region-words is an interactive Lisp function.
+          (reverse-region-words &optional START END &rest ARGS)
+
+          Reverse the order of the words in the region.
+
+     Notice the part about "&optional" and "&rest".  This means that Lisp
+     thinks the function accepts any number of arguments.  It knows the
+     names of the first two because of the assignment "`my ($start, $end)
+     = @_'".
+
+     But our function only works if it receives two args.  Specifying a
+     prototype documents this:
+
+          sub ($$) {
+          	my ($start, $end) = @_;
+          	...
+          }
+
+          reverse-region-words is an interactive Lisp function.
+          (reverse-region-words START END)
+
+interactive SPEC
+interactive
+     Used to generate the third (or, in the absence of a doc string, the
+     second) argument to defun.  This determines how a command's arguments
+     are obtained.
+
+     What distinguishes a "command" from an ordinary function in Emacs is
+     the presence of an interactive specifier in the defun expression.
+
+     SPEC may be a string, as described in *The Elisp Manual*, or a
+     reference to code which returns the argument list.  If no spec is
+     given, the command runs without user input.
+
+save_excursion BLOCK
+     Execute BLOCK within a Lisp `save-excursion' construct.  This
+     restores the current buffer and other settings to their original
+     values after the code has completed.  See *The Elisp Manual* for
+     details.
+
+setq BLOCK
+     BLOCK is searched for assignments of either of these forms:
+
+          $var = EXPR;
+          $hash{$key} = EXPR;
+
+     Every such `$var' and `%hash' is imported from the Emacs::Lisp module
+     as if you had said, "`use Emacs::Lisp qw($var %hash)'".  Afterwards,
+     BLOCK is executed.  This is a convenient way to assign to variables,
+     for example in customization code.
+
+     This code
+
+          use Emacs::Lisp;
+          setq {
+          	$A = 2*$foo[5];
+          	$B{\*foo} = "more than $A";
+          };
+
+     would have exactly the same effect as this:
+
+          use Emacs::Lisp qw(:DEFAULT $A %B);
+          $A = 2*$foo[5];
+          $B{\*foo} = "more than $A";
+
+     The following, which does not tie or import any variables, has the
+     same effect on Lisp as the above:
+
+          use Emacs::Lisp ();
+          Emacs::Lisp::set( \*A, 2*$foo[5] );
+          Emacs::Lisp::put( \*B, \*foo, "more than "
+            . &Emacs::Lisp::symbol_value( \*A ));
+
+unwind_protect (BODY, HANDLER)
+     Execute coderef BODY, returning its result.  Execute coderef HANDLER
+     after BODY finishes, even if BODY exits nonlocally through die or the
+     like.
+
+BUGS
+====
+
+   These are some of the known bugs in EPL and Emacs::Lisp.  If you find
+other bugs, please check that you have the latest version, and email me.
+
+   * Emacs::Lisp doesn't work outside of XEmacs.
+
+     If a Perl program not under the control of an Emacs process uses
+     Emacs::Lisp functions, Emacs::Lisp tries to run Emacs in batch mode.
+     This only works with GNU Emacs 21 beta, not Emacs 20 or XEmacs.  This
+     can probably be fixed, but I don't know what the problem is yet.
+
+     A real solution would involve talking to Emacs on a channel other than
+     its standard input and output.  This might allow one to run in
+     interactive mode with arbitrary command line options.  I don't know if
+     Emacs can use arbitrary file descriptors or named pipes.  I suspect
+     not.  If not, I guess I'll try inet sockets.  Other possibilities
+     would be ptys (Emacs loves them, I'm not overly fond) and an
+     intermediary perl process that talks to the original process over a
+     named pipe.
+
+   * Non-robust with respect to subprocess Perl dying.
+
+     Perl dies because of (e.g.) version mismatch between epl.el and
+     EPL.pm.  Then you can't exit Emacs, because it tries to tell Perl to
+     exit and gives you an error "Process perl not running".  Very
+     unfriendly.
+
+   * Within Lisp code, everything defaults to package `main'.
+
+     It would perhaps be best to give the Lisp evaluation environment the
+     notion of a "current package" such as Perl has.
+
+   * Symbols whose names contain :: or '
+
+     How can we convert them to and from Perl?
+
+   * High IPC overhead
+
+     Strings are copied more than they absolutely need to be.  Even if they
+     weren't, it's bound to be a lot slower than Perlmacs.
+
+   * Lisp hash tables are not deep-copied.
+
+     What to do?  Produce tied hashes whose keys can be any Lisp object?
+     Wrap hashes that contain non-string keys?
+
+   * XEmacs package autoloads commands but not key bindings.
+
+     I need to figure out how to do this.
+
+CAVEATS
+=======
+
+   * Conversion of scalar types is uncertain.
+
+     A defined, non-reference Perl scalar converted to Lisp becomes either
+     an integer, a float, or a string.  The method of choice is unclear.
+     This could be considered a bug, but it is somewhat inherent in the
+     languages' semantics, as Perl has no really good way to distinguish a
+     number from an equivalent string or an integer from a float.
+
+   * Conversion is not always reversible.
+
+     Information may be lost through the default ("deep") data conversion
+     process.  For example, the glob reference `\*::nil' and an empty
+     arrayref both become undef when converted to Lisp and back.  Perl and
+     Emacs support different ranges for integer values.  Integers that
+     don't fit are upgraded to floats, so the distinction is lost.
+
+   * Circular data structures are troublesome.
+
+     See `"Two-Phased Garbage Collection"', *Note Perlobj:
+     (perl.info)perlobj,.  Lisp data structures may be recursive (contain
+     references to themselves) without the danger of a memory leak,
+     because Lisp uses a periodic-mark-and-sweep garbage collector.
+
+     However, if a recursive structure involves any Perl references, it
+     may never be destroyable.
+
+     For best results, Perl code should handle mainly Perl data, and Lisp
+     code should handle mainly Lisp data.
+
+   * Cross-language references incur overhead.
+
+     For the benefit of Lisp's garbage collection, all Perl data that is
+     referenced by Lisp participates in mark-and-sweep.  For the benefit of
+     Perl's garbage collection, all Lisp objects that are referenced by
+     Perl maintain a (kind of) reference count.
+
+     A chain of Perl -> Lisp -> ... -> Perl references may take several
+     garbage collection cycles to be freed.  It is therefore probably best
+     to keep the number and complexity of such references to a minimum.
+
+     To make matters worse, if Emacs does not support weak hash tables,
+     Lisp must explicitly free its references to Perl data.  GNU Emacs 20
+     does not support weak hash tables, but Perlmacs solves this problem by
+     adding necessary support.  XEmacs 21 has weak hash tables, but EPL
+     does not yet know how to use them.
+
+TO DO
+=====
+
+   * Finish texinfo doc
+
+   * Delete/revise obsolete portions of POD
+
+   * Figure out how to handle hash tables
+
+   * Garbage collection for XEmacs
+
+   * Debian package target
+
+   * Overload Emacs::Lisp::Object in various ways
+
+   * Formal rules for scalar type conversion
+
+   * Regression-test multiple Emacses under Perl
+
+   * Regression-test any Perls under Emacs
+
+   * Steal from IPC::Open2
+
+   * Optimized regex find and replace functions
+
+   * Multibyte characters
+
+     Emacs has had them for some time.  Now Perl's UTF-8 support is
+     stabilizing.  It's time the two met.
+
+   * Special forms: let, defmacro, defvar.
+
+   * Make a way to get a tied filehandle that reads a buffer.
+
+   * Improve perl-eval-buffer, perl-eval-and-call, et al.
+
+COPYRIGHT
+=========
+
+   Copyright (C) 1998-2001 by John Tobey, jtobey@john-edwin-tobey.org.
+All rights reserved.
+
+     This program is free software; you can redistribute it and/or modify
+     it under the terms of the GNU General Public License as published by
+     the Free Software Foundation; either version 2 of the License, or
+     (at your option) any later version.
+
+     This program is distributed in the hope that it will be useful, but
+     WITHOUT ANY WARRANTY; without even the implied warranty of
+     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+     General Public License for more details.
+
+     You should have received a copy of the GNU General Public License
+     along with this program; see the file COPYING.  If not, write to the
+     Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+     MA 02111-1307  USA
+
+SEE ALSO
+========
+
+   *Note Perl: (perl.info)perl,, *Note Perlref: (perl.info)perlref,, *Note
+Perlobj: (perl.info)perlobj,, *Note Emacs: Emacs,, emacs, and *The Elisp
+Manual* (available where you got the Emacs source, or from
+ftp://ftp.gnu.org/pub/gnu/emacs/).
+
+
+File: pm.info,  Node: Email/Find,  Next: Email/Valid,  Prev: Emacs/Lisp,  Up: Module List
+
+Find RFC 822 email addresses in plain text
+******************************************
+
+NAME
+====
+
+     Email::Find - Find RFC 822 email addresses in plain text
+
+SYNOPSIS
+========
+
+     use Email::Find;
+     $num_found = find_emails($text, \&callback);
+
+DESCRIPTION
+===========
+
+   This is a module for finding a *subset* of RFC 822 email addresses in
+arbitrary text (`CAVEATS' in this node).  The addresses it finds are not
+guaranteed to exist or even actually be email addresses at all (`CAVEATS'
+in this node), but they will be valid RFC 822 syntax.
+
+   Email::Find will perform some heuristics to avoid some of the more
+obvious red herrings and false addresses, but there's only so much which
+can be done without a human.
+
+Functions
+---------
+
+   Email::Find exports one function, find_emails().  It works very similar
+to URI::Find's find_uris().
+
+     $num_emails_found = find_emails($text, \&callback);
+
+   The first argument is a block of text for find_emails to search through
+and manipulate.  Second is a callback routine which defines what to do
+with each email as they're found.  It returns the total number of emails
+found.
+
+   The callback is given two arguments.  The first is a Mail::Address
+object representing the address found.  The second is the actual original
+email as found in the text.  Whatever the callback returns will replace
+the original text.
+
+EXAMPLES
+========
+
+     # Simply print out all the addresses found leaving the text undisturbed.
+     find_emails($text, sub {
+                            my($email, $orig_email) = @_;
+                            print "Found ".$email->format."\n";
+                            return $orig_email;
+                        });
+
+     # For each email found, ping its host to see if its alive.
+     require Net::Ping;
+     $ping = Net::Ping->new;
+     my %Pinged = ();
+     find_emails($text, sub {
+                            my($email, $orig_email) = @_;
+                            my $host = $email->host;
+                            next if exists $Pinged{$host};
+                            $Pinged{$host} = $ping->ping($host);
+                        });
+
+     while( my($host, $up) = each %Pinged ) {
+         print "$host is ". $up ? 'up' : 'down' ."\n";
+     }
+
+     # Count how many addresses are found.
+     print "Found ", find_emails($text, sub { return $_[1] }), " addresses\n";
+
+     # Wrap each address in an HTML mailto link.
+     find_emails($text, sub {
+                            my($email, $orig_email) = @_;
+                            my($address) = $email->format;
+                            return qq|<a href="mailto:$address">$orig_email</a>|;
+                        });
+
+CAVEATS
+=======
+
+Why a subset of RFC 822?
+     I say that this module finds a *subset* of RFC 822 because if I
+     attempted to look for all possible valid RFC 822 addresses I'd wind
+     up practically matching the entire block of text!  The complete
+     specification is so wide open that its difficult to construct
+     soemthing that's not an RFC 822 address.
+
+     To keep myself sane, I look for the 'address spec' or 'global address'
+     part of an RFC 822 address.  This is the part which most people
+     consider to be an email address (the 'foo@bar.com' part) and it is
+     also the part which contains the information necessary for delivery.
+
+Why are some of the matches not email addresses?
+     Alas, many things which aren't email addresses *look* like email
+     addresses and parse just fine as them.  The biggest headache is email
+     and usenet message IDs.  I do my best to avoid them, but there's only
+     so much cleverness you can pack into one library.
+
+This module requires 5.005_63 or higher!
+     This module runs so slow as to be unusable with 5.005 stable.  I'm not
+     sure, but it might be because I build up my search regex using lots of
+     compiled regexes.  Either way, it runs orders of magnitude faster
+     under 5.005_63.
+
+     Perhaps in later versions I'll be able to tweak it to be efficient
+     with 5.005 stable.
+
+AUTHOR
+======
+
+   Copyright 2000, Michael G Schwern <schwern@pobox.com>.  All rights
+reserved.
+
+LICENSE
+=======
+
+   This module may not be used for the purposes of sending unsolicited
+email (ie. spamming) in any way, shape or form or for the purposes of
+generating lists for commercial sale without explicit permission from the
+author.
+
+   For everyone else this module is free software; you may redistribute it
+and/or modify it under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+     L<Email::Valid>, RFC 822, L<URI::Find>
+
+
+File: pm.info,  Node: Email/Valid,  Next: Embedding_API,  Prev: Email/Find,  Up: Module List
+
+Check validity of Internet email addresses
+******************************************
+
+NAME
+====
+
+   Email::Valid - Check validity of Internet email addresses
+
+SYNOPSIS
+========
+
+     use Email::Valid;
+     print (Email::Valid->address('maurice@hevanet.com') ? 'yes' : 'no');
+
+DESCRIPTION
+===========
+
+   This module determines whether an email address is well-formed, and
+optionally, whether a mail host exists for the domain.
+
+   Please note that there is no way to determine whether an address is
+deliverable without attempting delivery (for details, see perlfaq 9).
+
+PREREQUISITES
+=============
+
+   This module requires perl 5.004 or later and the Mail::Address module.
+Either the Net::DNS module or the nslookup utility is required for DNS
+checks.
+
+METHODS
+=======
+
+     Every method which accepts an <ADDRESS> parameter may
+     be passed either a string or an instance of the Mail::Address
+     class.  All errors raise an exception.
+
+new ( [PARAMS] )
+     This method is used to construct an Email::Valid object.  It accepts
+     an optional list of named parameters to control the behavior of the
+     object at instantiation.
+
+     The following named parameters are allowed.  See the individual
+     methods below of details.
+
+          -mxcheck
+          -fudge
+          -fqdn
+          -local_rules
+
+mx ( <ADDRESS>|<DOMAIN> )
+     This method accepts an email address or domain name and determines
+     whether a DNS record (A or MX) exists for it.
+
+     The method returns true if a record is found and undef if not.
+
+     Either the Net::DNS module or the nslookup utility is required for
+     DNS checks.  Using Net::DNS is the preferred method since error
+     handling is improved.  If Net::DNS is available, you can modify the
+     behavior of the resolver (e.g. change the default tcp_timeout value)
+     by manipulating the global Net::DNS::Resolver instance stored in
+     $Email::Valid::Resolver.
+
+rfc822 ( <ADDRESS> )
+     This method determines whether an address conforms to the RFC822
+     specification (except for nested comments).  It returns true if it
+     conforms and undef if not.
+
+fudge ( <TRUE>|<FALSE> )
+     Specifies whether calls to address() should attempt to correct common
+     addressing errors.  Currently, this results in the removal of spaces
+     in AOL addresses, and the conversion of commas to periods in
+     Compuserve addresses.  The default is false.
+
+fqdn ( <TRUE>|<FALSE> )
+     Species whether addresses passed to address() must contain a fully
+     qualified domain name (FQDN).  The default is true.
+
+local_rules ( <TRUE>|<FALSE> )
+     Specifies whether addresses passed to address() should be tested for
+     domain specific restrictions.  Currently, this is limited to certain
+     AOL restrictions that I'm aware of.  The default is false.
+
+mxcheck ( <TRUE>|<FALSE> )
+     Specifies whether addresses passed to address() should be checked for
+     a valid DNS entry.  The default is false.
+
+address ( <ADDRESS> )
+     This is the primary method which determines whether an email address
+     is valid.  It's behavior is modified by the values of mxcheck(),
+     local_rules(), fqdn(), and fudge().  If the address passes all
+     checks, the (possibly modified) address is returned as a string.
+     Otherwise, the undefined value is returned.  In a list context, the
+     method also returns an instance of the Mail::Address class
+     representing the email address.
+
+details ()
+     If the last call to address() returned undef, you can call this
+     method to determine why it failed.  Possible values are:
+
+          rfc822
+          local_rules
+          fqdn
+          mxcheck
+
+     If the class is not instantiated, you can get the same information
+     from the global $Email::Valid::Details.
+
+EXAMPLES
+========
+
+   Let's see if the address 'maurice@hevanet.com' conforms to the RFC822
+specification:
+
+     print (Email::Valid->address('maurice@hevanet.com') ? 'yes' : 'no');
+
+   Additionally, let's make sure there's a mail host for it:
+
+     print (Email::Valid->address( -address => 'maurice@hevanet.com',
+                                   -mxcheck => 1 ) ? 'yes' : 'no');
+
+   Let's see an example of how the address may be modified:
+
+     $addr = Email::Valid->address('Alfred Neuman <Neuman @ foo.bar>');
+     print "$addr\n"; # prints Neuman@foo.bar
+
+   Need to determine why an address failed?
+
+     unless(Email::Valid->address('maurice@hevanet')) {
+       print "address failed $Email::Valid::Details check.\n";
+     }
+
+   If an error is encountered, an exception is raised.  This is really
+only possible when performing DNS queries.  Trap any exceptions by
+wrapping the call in an eval block:
+
+     eval {
+       $addr = Email::Valid->address( -address => 'maurice@hevanet.com',
+                                      -mxcheck => 1 );
+     };
+     warn "an error was encountered: $@" if $@;
+
+BUGS
+====
+
+   Email::Valid should work with Perl for Win32.  In my experience,
+however, Net::DNS queries seem to take an extremely long time when a
+record cannot be found.
+
+AUTHOR
+======
+
+   Copyright 1998-1999, Maurice Aubrey <maurice@hevanet.com>.  All rights
+reserved.
+
+   This module is free software; you may redistribute it and/or modify it
+under the same terms as Perl itself.
+
+CREDITS
+=======
+
+   Significant portions of this module are based on the ckaddr program
+written by Tom Christiansen and the RFC822 address pattern developed by
+Jeffrey Friedl.  Neither were involved in the construction of this module;
+all errors are mine.
+
+   Thanks very much to the following people for their suggestions and bug
+fixes:
+
+     Otis Gospodnetic <otis@DOMINIS.com>
+     Kim Ryan <kimaryan@ozemail.com.au>
+     Pete Ehlke <pde@listserv.music.sony.com>
+     Lupe Christoph
+     David Birnbaum
+     Achim
+
+SEE ALSO
+========
+
+   Mail::Address, Net::DNS, perlfaq9
+
+
+File: pm.info,  Node: Embedding_API,  Next: Embedix/DB,  Prev: Email/Valid,  Up: Module List
+
+WebFetch Embedding API
+======================
+
+   As of version 0.10 of WebFetch, the Embedding API (application
+programming interface) was added.  WebFetch used to be mostly for use for
+saving captured web content to files.  The purpose of the Embedding API is
+to allow any Perl program to run a WebFetch module and capture its output
+for use within that program.
+
+   Once the information is available to other programs, there are as many
+possibilities as Perl allows for what to do with it.  So the Embedding API
+delivers on the implied promise that came from packaging WebFetch as Perl5
+modules instead of scripts.  Instead of just saving the information to
+files, now it's available within a program too.
+
+Conversion of WebFetch 0.09 Modules to the Embedding API
+========================================================
+
+   Old WebFetch 0.09 and earlier modules continue to work in what is called
+"0.09 compatibility mode".  Actually, the old strucutres are still there
+so it's more than just compatibility - the new Embedding API is triggered
+by the presence of new variables which contain more information.
+
+   The following modules were converted to the new API in WebFetch 0.10:
+*CNETnews, CNNsearch, COLA, Freshmeat, SiteNews, and Slashdot*.
+
+   The remaining modules have not been converted yet and operate in 0.09
+compatibility mode: *DebianNews, General, LinuxDevNet, LinuxTelephony,
+ListSubs, PerlStruct, 32BitsOnline and YahooBiz*.  Upcoming WebFetch
+releases will convert more until all the modules are done.
+
+   Modules that users have written for WebFetch 0.09 and earlier which are
+not (yet) distributed with WebFetch should also continue to work
+unmodified.  If they don't, that would be a bug and should be reported.
+
+How the Embedding API Works
+===========================
+
+   In WebFetch 0.09 and earlier, each module was responsible for saving its
+own information to a file, for all file formats that they supported.  Now
+the module saves to some predefined variables.  If the module was called
+from WebFetch's core command-line routines, the core will handle saving
+the files in all requested formats.  If the module was called from another
+program, now it has the option to look inside the returned data and do its
+own processing with it.
+
+   A WebFetch module which implements the Embedding API must define the
+following variables, which are defined in more detail in the WebFetch core
+module documentation:
+
+$obj->{data}
+     a hash reference which contains more data-related variables
+
+$obj->{actions}
+     a hash reference which defines things that the WebFetch core must do
+     with the data (i.e. where and how to save it.)  Entry may have hash
+     keys like "html", "xml", "wf" (WebFetch native format), and "rdf"
+     (XML Resource Definition Format) or other names if the proper handler
+     functions are defined.  (Your module can define its own handler
+     function and then use it to output your information.  See
+     WebFetch::SiteNews for an example.)
+
+$obj->{data}{fields}
+     an array reference which contains a list of field names in order.
+     This is part of the definition of the data captured and returned from
+     the module.
+
+$obj->{data}{wk_names}
+     a hash reference which uses hash keys of "well known names", field
+     names which WebFetch can attribute specific functions to (like title,
+     url, etc.)  and hash values of the names of the fields defined in
+     $obj->{data}{fields} that contain that data in this data set.
+
+$obj->{data}{records}
+     an array reference containing more array references - a
+     two-dimensional table of records containing fields of data.  Each
+     record is one unit/entry of information captured.  Each field within
+     a record corresponds by position within the array to the names in
+     $obj->{data}{fields}.
+
+   Programs which need to use this data can read it directly from the
+records and fields in $obj->{data}{records}.  Some sample code is shown in
+the WebFetch FAQ at http://www.webfetch.org/
+
+   A module which inherits from WebFetch and fails to provide these
+variables is assumed to be a WebFetch 0.09 module.  Any module in WebFetch
+0.09 compatibiltily mode is responsible to save its own HTML or other
+files.
+
+

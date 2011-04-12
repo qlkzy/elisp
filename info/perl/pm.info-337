@@ -1,0 +1,1739 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: SPOPS/Impl/SecurityObj,  Next: SPOPS/Impl/User,  Prev: SPOPS/HashFile,  Up: Module List
+
+Implement a security object and basic operations
+************************************************
+
+NAME
+====
+
+   SPOPS::Impl::Security - Implement a security object and basic operations
+
+SYNOPSIS
+========
+
+     use SPOPS::Secure qw( :all );
+     my $sec_class = 'SPOPS::Impl::Security';
+
+     # Create a security object with level WRITE
+     # for user $user on object $obj
+     my $sec = $sec_class->new();
+     $sec->{class}    = ref $obj;
+     $sec->{oid}      = $obj->id;
+     $sec->{scope}    = SEC_SCOPE_USER;
+     $sec->{scope_id} = $user->id;
+     $sec->{level}    = SEC_LEVEL_WRITE;
+     $sec->save;
+
+     # Clone that object and change its scope to
+     # GROUP and level to READ
+     my $secg = $sec->clone( scope => SEC_SCOPE_GROUP,
+                             scope_id => $group->id,
+                             level => SEC_LEVEL_READ );
+     $secg->save;
+
+DESCRIPTION
+===========
+
+   This class works a little behind-the-scenes, so you probably will not
+deal directly with it very much. Instead, check out *Note SPOPS/Secure:
+SPOPS/Secure, for module developer (and other) information.
+
+   Each security setting to an object is itself an object. In this manner
+we can use the SPOPS framework to create/edit/remove security settings.
+(Note that if you modify the 'SPOPS::Impl::SecurityObj' class to use
+'SPOPS::Secure' in its @ISA, you will probably collapse the Earth - or at
+least your system - in a self-referential object definition cycle. Do not
+do that.)
+
+METHODS
+=======
+
+   *fetch_match( $obj, scope =* SCOPE, scope_id => $ );
+
+   Returns a security object matching the $obj for the scope and scope_id
+passed in, undef if none found.
+
+   Examples:
+
+     my $sec_class = 'SPOPS::Impl::SecurityObj';
+
+     # Returns security object matching $obj with a scope of WORLD
+     my $secw = $sec_class->fetch_match( $obj, scope => SEC_SCOPE_WORLD );
+
+     # Returns security object matching $obj with a scope of GROUP
+     # matching the ID from $group
+     my $secg = $sec_class->fetch_match( $obj, scope => SEC_SCOPE_GROUP,
+                                         scope_id => $group->id );
+
+     # Returns security object matching $obj with a scope of USER
+     # matching the ID from $user
+     my $secg = $sec_class->fetch_match( $obj, scope => SEC_SCOPE_USER,
+                                         scope_id => $user->id );
+
+   *fetch_by_object( $obj, { user =* \@, group => \@ ... } )>
+
+   Returns a hashref with security information for a particular object.
+The keys of the hashref are SEC_SCOPE_WORLD, SEC_SCOPE_USER, and
+SEC_SCOPE_GROUP as exported by SPOPS::Secure.
+
+   You can restrict the security returned for USER and/or GROUP by passing
+a hashref of objects or ID values under the 'user' or 'group' keys.
+
+   You can also pass in a 'class' and 'oid' value to use that for the
+object identifier for the lookup.
+
+   Examples:
+
+     my \%info = $sec->fetch_by_object( $obj );
+
+   Returns all security information for $obj.
+
+     my \%info = $sec->fetch_by_object( $obj, { user => [ 1, 2, 3 ] } );
+
+   Returns $obj security information for WORLD, all GROUPs but only USERs
+with ID 1, 2 or 3.
+
+     my \%info = $sec->fetch_by_object( $obj, { user => [ 1, 2, 3 ],
+                                                group => [ 817, 901, 716 ] } );
+
+   Returns $obj security information for WORLD, USERs 1, 2 and 3 and
+GROUPs 817, 901, 716.
+
+TO DO
+=====
+
+BUGS
+====
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2001 intes.net, inc.. All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+AUTHORS
+=======
+
+   Chris Winters <chris@cwinters.com>
+
+
+File: pm.info,  Node: SPOPS/Impl/User,  Next: SPOPS/Key/DBI/Identity,  Prev: SPOPS/Impl/SecurityObj,  Up: Module List
+
+Create and manipulate users.
+****************************
+
+NAME
+====
+
+   SPOPS::User - Create and manipulate users.
+
+SYNOPSIS
+========
+
+     use SPOPS::User;
+     $user = SPOPS::User->new();
+
+     # Increment the user's login total
+     $user->increment_login();
+     print "Username: $user->{username}\n";
+
+DESCRIPTION
+===========
+
+METHODS
+=======
+
+   *fetch_by_username( $username, \%params )*
+
+   Class method. Retrieves a user object based on a $username rather than
+a user_id. Returns undef if no user found by that name.
+
+   *full_name()*
+
+   Returns the full name - it is accessed often enough that we just made
+an alias for concatenating the first and last names.
+
+   *make_public()*
+
+   Make this user part of the public group.
+
+   *check_password( $pw )*
+
+   Return a 1 if the password matches what is in the database, a 0 if not.
+
+TO DO
+=====
+
+BUGS
+====
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2001 intes.net, inc.. All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+AUTHORS
+=======
+
+   Chris Winters  <chris@cwinters.com>
+
+
+File: pm.info,  Node: SPOPS/Key/DBI/Identity,  Next: SPOPS/Key/DBI/Pool,  Prev: SPOPS/Impl/User,  Up: Module List
+
+Retrieve IDENTITY values from a supported DBI database
+******************************************************
+
+NAME
+====
+
+   SPOPS::Key::DBI::Identity - Retrieve IDENTITY values from a supported
+DBI database
+
+SYNOPSIS
+========
+
+     # Using a class-only defintion
+     package MySPOPS;
+     @MySPOPS::ISA = qw( SPOPS::Key::DBI::Identity  SPOPS::DBI );
+
+     # Using a config-only definition
+     'myspops' => {
+         'isa' => [ qw/ SPOPS::Key::DBI::Identity  SPOPS::DBI / ],
+         ...
+     },
+
+DESCRIPTION
+===========
+
+   This class enables a just-created object to the IDENTITY value returned
+by its last insert. Of course, this only works if you have an IDENTITY
+field in your table, such as:
+
+     CREATE TABLE my_table (
+       id    numeric( 8, 0 ) IDENTITY not null,
+       ...
+     )
+
+   This method is typically used in Sybase and Microsoft SQL Server
+databases. The client library (Open Client, FreeTDS, ODBC) should not make
+a difference to this module.
+
+METHODS
+=======
+
+   *pre_fetch_id()*
+
+   Ensure we only get the ID after the data are inserted.
+
+   *post_fetch_id()*
+
+   Retrieve the IDENTITY value after inserting a row.
+
+BUGS
+====
+
+   None.
+
+TO DO
+=====
+
+SEE ALSO
+========
+
+   `DBD::Sybase' in this node, `DBI' in this node
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2001 intes.net, inc.. All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+AUTHORS
+=======
+
+   Chris Winters  <chris@cwinters.com>
+
+
+File: pm.info,  Node: SPOPS/Key/DBI/Pool,  Next: SPOPS/Key/Random,  Prev: SPOPS/Key/DBI/Identity,  Up: Module List
+
+Retrieves ID field information from a pool
+******************************************
+
+NAME
+====
+
+   SPOPS::Key::DBI::Pool - Retrieves ID field information from a pool
+
+SYNOPSIS
+========
+
+     # In your configuration file
+
+     # Bind the value 'unique_value' to the field 'table'
+
+     my $spops = {
+       isa => [ qw/ SPOPS::Key::DBI::Pool SPOPS::DBI / ],
+       pool_sql   => 'select my_key from key_pool where table = ?',
+       pool_value => [ 'unique_value' ],
+       ...
+     };
+
+     # Use the values 'unique_value' and 'my_location' but use quoting
+     # rather than binding (some DBDs don't let you use bound values with
+     # stored procedures)
+
+     my $spops = {
+       isa => [ qw/ SPOPS::Key::DBI::Pool SPOPS::DBI / ],
+       pool_sql   => 'exec new_key %s, %s',
+       pool_value => [ 'unique_value', 'my_location' ],
+       pool_quote => 1,
+       ...
+     };
+
+DESCRIPTION
+===========
+
+   This module retrieves a value from a pool of key values matched up to
+tables. It is not as fast as IDENTITY fields (*Note
+SPOPS/Key/DBI/Identity: SPOPS/Key/DBI/Identity,, auto_incrementing values
+or sequences, but can be portable among databases and, most importantly,
+works in a replicated environment. It also has the benefit of being fairly
+simple to understand.
+
+   Currently, the key fetching procedure is implemented via a stored
+procedure for portability among tools in different languages, but it does
+not have to remain this way. It is perfectly feasible to program the
+entire procedure in perl.
+
+BUGS
+====
+
+   *Put this class before others in ISA*
+
+   Not really a bug, but you must put this class before any
+database-specific ones (like 'SPOPS::DBI::Sybase' or whatnot) in your
+@ISA, otherwise this class will not be able to do its work.
+
+TO DO
+=====
+
+   It might be a good idea to subclass this with a pure Perl solution.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2001 intes.net, inc.. All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+AUTHORS
+=======
+
+   Chris Winters  <chris@cwinters.com>
+
+
+File: pm.info,  Node: SPOPS/Key/Random,  Next: SPOPS/SQLInterface,  Prev: SPOPS/Key/DBI/Pool,  Up: Module List
+
+Creates a random alphanumeric code for the ID field
+***************************************************
+
+NAME
+====
+
+   SPOPS::Key::Random - Creates a random alphanumeric code for the ID field
+
+SYNOPSIS
+========
+
+     package MySPOPS;
+
+     @MySPOPS::ISA = qw( SPOPS::Key::Random SPOPS::DBI );
+
+DESCRIPTION
+===========
+
+   Very, very simple. We just use the *generate_random_code()* method in
+all SPOPS  classes to generate an n character code. The width of the code
+is determined by the field {id_width} in the CONFIG of the SPOPS
+implementation.
+
+BUGS
+====
+
+   *Getting a 'random' value*
+
+   If you are using this under mod_perl, you might have the problem of
+colliding ID fields. This seems to happen because the httpd children all
+have the same random seed, since they are all forked off from the same
+parent.
+
+   The solution is to put a 'srand()' in the PerlChildInitHandler,
+although mod_perl versions from 1.25 on might take care of this for you.
+
+TO DO
+=====
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2001 intes.net, inc.. All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+AUTHORS
+=======
+
+   Chris Winters  <chris@cwinters.com>
+
+
+File: pm.info,  Node: SPOPS/SQLInterface,  Next: SPOPS/Secure,  Prev: SPOPS/Key/Random,  Up: Module List
+
+Generic routines for DBI database interaction
+*********************************************
+
+NAME
+====
+
+   SPOPS::SQLInterface - Generic routines for DBI database interaction
+
+SYNOPSIS
+========
+
+     # Make this class a parent of my class
+     package My::DBIStuff;
+     use SPOPS::SQLInterface;
+     @My::DBIStuff::ISA = qw( SPOPS::SQLInterface );
+
+     # You should also be able to use it directly, but you
+     # need to pass in a database handler with every request
+     use SPOPS::SQLInterface;
+     my $dbc = 'SPOPS::SQLInterface';
+     my $db = DBI->connect( ... ) || die $DBI::errstr;
+     my $rows = $dbc->db_select( { select => [ qw/ uid first_name last_name / ],
+                                   from   => [ 'users' ],
+                                   where  => 'first_name = ? or last_name = ?',
+                                   value  => [ 'fozzie', "th' bear" ],
+                                   db     => $db } );
+     foreach my $row ( @{ $results } ) {
+       print "User ID $row->[0] is $row->[1] $row->[2]\n";
+     }
+
+DESCRIPTION
+===========
+
+   You are meant to inherit from this class, although you can use it as a
+standalone SQL abstraction tool as well, as long as you pass the database
+handle into every routine you call.
+
+DATABASE METHODS
+================
+
+   Relatively simple (!) methods to do the select, update, delete and
+insert statements, with the right values and table names being passed in.
+
+   All parameters are passed in via named values, such as:
+
+     $t->db_select( { select => [ 'this', 'that' ],
+                      from => [ 'mytable' ] } );
+
+   *VERY IMPORTANT*
+
+   The subclass that uses these methods must either pass in a DBI database
+handle via a named parameter (db) or make it available through a method of
+the class called 'global_db_handle'.
+
+METHODS
+=======
+
+   There are very few methods in this class, but each one can do quite a
+bit.
+
+db_select
+---------
+
+   Executes a SELECT. Return value depends on what you ask for.
+
+   Parameters:
+
+   select (\@)
+
+   Fields to select
+
+   *select_modifier* ($)
+
+   Clause to insert between 'SELECT' and fields (e.g., DISTINCT)
+
+   from (\@)
+
+   List of tables to select from
+
+   order ($)
+
+   Clause to order results by; if not given, the order depends entirely on
+the database.
+
+   where ($)
+
+   Clause to limit results. Note that you can use '?' for field values but
+they will get quoted as if they were a SQL_VARCHAR type of value.
+
+   return ($)
+
+   list: returns an arrayref of arrayrefs (default)
+
+   single: returns a single arrayref
+
+   hash: returns an arrayref of hashrefs
+
+   *single-list*: returns an arrayref with the first value of each record
+as the element.
+
+   value (\@)
+
+   List of values to bind, all as SQL_VARCHAR; they must match order of
+'?' in the where clause either passed in or within the SQL statement
+passed in.
+
+   sql ($)
+
+   Full statement to execute, although you may put '?' in the where clause
+and pass values for substitution. (No quoting hassles...)
+
+   Examples:
+
+   Perl statement:
+
+     $t->db_select( { select => [ qw/ first_name last_name /],
+                      from => [ 'users' ],
+                      where => 'last_name LIKE ?',
+                      value => 'moo%' } );
+
+   SQL statement:
+
+     SELECT first_name, last_name
+       FROM users
+      WHERE last_name LIKE 'moo%'
+
+   Returns:
+
+     [ [ 'stephen', 'moore' ],
+       [ 'charles', 'mooron' ],
+       [ 'stacy', 'moonshine' ] ]
+
+   Perl statement:
+
+     $t->db_select( { select => [ qw/ u.username l.login_date / ],
+                      from => [ 'users u', 'logins l' ],
+                      where => "l.login_date > '2000-04-18' and u.uid = l.uid"
+                      return => 'hash' } );
+
+   SQL statement:
+
+     SELECT u.username, l.login_date
+       FROM users u, logins l
+      WHERE l.login_date > '2000-04-18' and u.uid = l.uid
+
+   Returns:
+
+     [ { username => 'smoore',
+         login_date => '2000-05-01' },
+       { username => 'cmooron',
+         login_date => '2000-04-19' },
+       { username => 'smoonshine',
+         login_date => '2000-05-02' } ]
+
+   Perl statement:
+
+     $t->db_select( { select => [ qw/ login_name first_name last_name /],
+                      from => [ 'users' ],
+                      where => 'last_name LIKE ?',
+                      value => 'moo%',
+                      return => 'single-list' } );
+
+   SQL statement:
+
+     SELECT login_name, first_name, last_name
+       FROM users
+      WHERE last_name LIKE 'moo%'
+
+   Returns:
+
+     [ 'smoore',
+       'cmooron',
+       'smoonshine' ]
+
+db_insert
+---------
+
+   Create and execute an INSERT statement given the parameters passed in.
+
+   Parameters:
+
+   table ($)
+
+   Name of table to insert into
+
+   field (\@)
+
+   List of fieldnames to insert
+
+   value (\@)
+
+   List of values, matching up with order of field list.
+
+   *no_quote* (\%)
+
+   Fields that we should not quote
+
+   sql ($)
+
+   Full SQL statement to run; you can still pass in values to quote/bind
+if you use '?' in the statement.
+
+   *return_sth* ($)
+
+   If true, return the statement handle rather than a status.
+
+   Examples:
+
+   Perl statement:
+
+     $t->db_insert( { table => 'users',
+                      field => [ qw/ username first_name last_name password / ],
+                      value => [ 'cmw817', "Chris O'Winters" ] } );
+
+   SQL statement:
+
+     INSERT INTO users
+     ( username, first_name, last_name, password )
+     VALUES
+     ( 'cmw817', 'Chris', 'O''Winters', NULL )
+
+   Perl statement:
+
+     my $sql = qq/
+       INSERT INTO users ( username ) VALUES ( ? )
+     /;
+
+     foreach my $username ( qw/ chuck stinky jackson / ) {
+       $t->db_insert( { sql => $sql, value => [ $username ] } );
+     }
+
+   SQL statements:
+
+     INSERT INTO users ( username ) VALUES ( 'chuck' )
+     INSERT INTO users ( username ) VALUES ( 'stinky' )
+     INSERT INTO users ( username ) VALUES ( 'jackson' )
+
+db_update
+---------
+
+   Create and execute an UPDATE statement given the parameters passed in.
+
+   Parameters:
+
+   field (\@)
+
+   List of fieldnames we are updating
+
+   value (\@)
+
+   List of values corresponding to the fields we are updating.
+
+   table ($)
+
+   Name of table we are updating
+
+   where ($)
+
+   Clause that specifies the rows we are updating
+
+   *no_quote* (\%)
+
+   Specify fields not to quote
+
+   sql ($)
+
+   Full SQL statement to run; note that you can use '?' for values and
+pass in the raw values via the 'value' parameter, and they will be quoted
+as necessary.
+
+   Examples:
+
+   Perl statement:
+
+     $t->db_update( { field => [ qw/ first_name last_name / ],
+                      value => [ 'Chris', "O'Donohue" ],
+                      table => 'users',
+                      where => 'user_id = 98172' } );
+
+   SQL statement:
+
+     UPDATE users
+        SET first_name = 'Chris',
+            last_name = 'O''Donohue',
+      WHERE user_id = 98172
+
+db_delete
+---------
+
+   Removes the record indicated by %params from the database.
+
+   Parameters:
+
+   table ($)
+
+   Name of table from which we are removing records.
+
+   where ($)
+
+   Specify the records we are removing
+
+   value (\@)
+
+   List of values to bind to '?' that may be found either in the where
+clause passed in or in the where clause found in the SQL statement.
+
+   sql ($)
+
+   Full SQL statement to execute directly, although you can use '?' for
+values and pass the actual values in via the 'value' parameter.
+
+   Be careful: if you pass in the table but not the criteria, you will
+clear out your table! (Just like real SQL...)
+
+   Examples:
+
+   Perl statement:
+
+     $t->db_delete( { table => 'users', where => 'user_id = 98172' } );
+
+   SQL statement:
+
+     DELETE FROM users
+      WHERE user_id = 98172
+
+   Perl statement:
+
+     $t->db_delete( { table => 'users', where => 'last_name LIKE ?',
+                      value => [ 'moo%' ] } );
+
+   SQL statement:
+
+     DELETE FROM users
+      WHERE last_name LIKE 'moo%'
+
+   Perl statement:
+
+     $t->db_delete( { table => 'users' } );
+
+   SQL statement:
+
+     DELETE FROM users
+
+   Oops, just cleared out the 'users' table. Be careful!
+
+db_discover_types
+-----------------
+
+   Basically issue a dummy query to a particular table to get its schema.
+We save the DBI type information in the %TYPE_INFO lexical that all
+routines here can access.
+
+   If a DBD driver does not support the {TYPE} attribute of the statement
+handle, you have to specify some simple types in your class configuration
+or provide them somehow. This is still slightly tied to SPOPS
+implementations in OpenInteract, but only slightly.
+
+   Return a hashref of fieldnames as keys and DBI types as values.
+
+   Parameters:
+
+   table ($)
+
+   The name of a particular table. Note that this routine is not smart
+enough to distinguish between: users and *dbo.users* even though they
+might be the same table in the database. It is not particularly harmful if
+you use the same name twice in this manner, the module just has to do a
+little extra work.
+
+ERROR HANDLING
+==============
+
+   Like other classes in SPOPS, all errors encountered will result in the
+error information saved in *Note SPOPS/Error: SPOPS/Error, and a die()
+being thrown. (More later.)
+
+TO DO
+=====
+
+   *DBI binding conventions*
+
+   One of the things the DBI allows you to do is prepare a statement once
+and then execute it many times. It would be nice to allow that somehow.
+
+BUGS
+====
+
+SEE ALSO
+========
+
+   `DBI' in this node
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2001 intes.net, inc.. All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+AUTHORS
+=======
+
+   Chris Winters <chris@cwinters.com>
+
+   Rusty Foster <rusty@kuro5hin.org> was influential in the early days of
+this library.
+
+
+File: pm.info,  Node: SPOPS/Secure,  Next: SPOPS/Secure/Hierarchy,  Prev: SPOPS/SQLInterface,  Up: Module List
+
+Implement security across one or more classes of SPOPS objects
+**************************************************************
+
+NAME
+====
+
+   SPOPS::Secure - Implement security across one or more classes of SPOPS
+objects
+
+SYNOPSIS
+========
+
+     package MySPOPS::Class;
+
+     use SPOPS::Secure qw( :all ); # import the security constants
+
+     @MySPOPS::Class::ISA = qw( SPOPS::Secure SPOPS::DBI );
+
+DESCRIPTION
+===========
+
+   By adding this module into the @ISA variable for your SPOPS class, you
+implement a mostly transparent per-object security system. This security
+system relies on a few things being implemented:
+
+   * A SPOPS class implementing users
+
+   * A SPOPS class implementing groups
+
+   * A SPOPS class implementing security objects
+
+   Easy, eh? Fortunately, SPOPS comes with all three, although you are
+free to modify them as you see fit.
+
+Overview of Security
+--------------------
+
+   Security is implemented with a number of methods that are called within
+the SPOPS implementation module. For instance, every time you call fetch()
+on an object, the system first determines whether you have rights to do
+so. Similar callbacks are located in save() and remove(). If you do not
+either define the method in your SPOPS implementation or use this module,
+the action will always be allowed.
+
+   We use the Unix-style of permission scheme, separating the scope into:
+USER, GROUP and WORLD from most- to least-specific. (This is abbreviated
+as U/G/W.) When we check permissions, we check whether a security level is
+defined for the most-specific item first, then work our way up to the
+least_specific. (We use the term 'scope' frequently in the module and
+documentation - a 'specific scope' is a particular user or group, or the
+world.)
+
+   Even though we use the U/G/W scheme from Unix, we are not constrained
+by its history. There is no strict 'ownership' assigned to an object as
+there is to a Unix file. Instead, an object can have assigned to it
+permissions from any number of users, and any number of groups.
+
+   There are three settings for any object combined with a specific scope:
+
+     NONE:  The scope is barred from even seeing the object.
+     READ:  The scope can read the object but not save it.
+     WRITE: The scope can read, write and delete the object.
+
+   (To be explicit: WRITE permission implies READ permission as well; if a
+scope has WRITE permission for an object, it can do anything with it,
+including remove it.)
+
+Security Rules
+--------------
+
+   With security, there are some important assumptions. These rules are
+laid out here.
+
+   * *The most specific security wins.* This means that you might have set
+     permissions on an object to be SEC_LEVEL_WRITE for SEC_LEVEL_WORLD,
+     but if the user who is logged in has SEC_LEVEL_NONE, permission will
+     be denied.
+
+   * *All objects must have a WORLD permission.* Configuration for your
+     SPOPS object must include the *initial_security* hash. The only
+     required field is 'WORLD', which defines the default WORLD permission
+     for newly-created objects. If you do not include this, the system will
+     automatically set the WORLD permission to SEC_LEVEL_NONE, which is
+     probably not what you want.
+
+   For instance, look at an object that represents a news notice posted:
+
+     Object Class: MyApp::News
+     Object ID:    1625
+
+     ------------------------------------------------
+     | SCOPE | SCOPE_ID |  NONE  |  READ  |  WRITE  |
+     ------------------------------------------------
+     | USER  | 71827    |        |   X    |         |
+     | USER  | 6351     |   X    |        |         |
+     | USER  | 9182     |        |        |    X    |
+     | GROUP | 762      |        |   X    |         |
+     | GROUP | 938      |        |        |    X    |
+     | WORLD |          |        |   X    |         |
+     ------------------------------------------------
+
+   >From this, we can say:
+
+   * User 6351 can never view this notice. Even though the user might be a
+     part of a group that can; even though WORLD has READ permission.
+     Since the user is explicitly forbidden from viewing the notice,
+     nothing else matters.
+
+   * If a different User (say, 21092) who belongs to both Group 762 and
+     Group 938 tries to determine permission for this object, that User
+     will have WRITE permission since the system returns the highest
+     permission granted by all Group memberships.
+
+   * Any user who is not specified here and who does not belong to either
+     Group 762 or Group 938 will get READ permission to the object,
+     reverting to the permission for the scope WORLD.
+
+Setting Security for Created Objects
+------------------------------------
+
+   The Unix paradigm of file permissions assumes several things.
+
+User and Group Objects
+----------------------
+
+   It is a fundamental tenet of this persistence framework that it should
+have no idea what your application looks like.  However, since we deal
+with user and group objects, it is necessary to enforce some standards.
+
+   * Must be able to retrieve the ID of the object with the method call
+     'id'. The ID value can be numeric or it can be a string, but it must
+     have 16 or fewer characters.
+
+   * Must be able to get an arrayref of members. With a group object, you
+     must implement a method that returns users called 'user'. Similarly,
+     your user object must implement a method that returns the groups that
+     user belongs to via the method 'group':
+
+          # Note that 'login_name' is not required as a
+          # parameter; this is just an example
+          my $user_members = eval { $group->user };
+          foreach my $user ( @{ $user_members } ) {
+            print "Username is $user->{login_name}\n";
+          }
+
+          # Note that 'name' is not required as a
+          # parameter; this is just an example
+          my $groups = eval { $user->group };
+          foreach my $group ( @{ $groups } ) {
+            print "Group name is $group->{name}\n";
+          }
+
+   * Must be able to retrieve the logged-in user (and, by the rule stated
+     above, the groups that user belongs to).  This is done via the
+     *global_user_current* method call. The SPOPS object or other class
+     must be able to fulfill this method and return a user object.
+
+METHODS
+=======
+
+   The methods that this class implements can be used by any SPOPS class.
+The variable $item below refers to the fact that you can either do an
+object method call or a class method call. If you do a class method call,
+you must pass in the ID of the object for which you want to get or set
+security.
+
+   However, you may also implement security on the class level as well.
+For instance, if your application uses classes to implement modules within
+an application, you might wish to restrict the module by security very
+similar to the security implemented for individual objects. In this case,
+you would have a class name and no object ID (oid) value.
+
+   To do so, simply make the class a subclass of SPOPS::Secure.  All the
+methods remain exactly the same.
+
+check_security( [ \%params ] )
+------------------------------
+
+   The method get_security() returns a code corresponding to the LEVEL
+constants exported from this package. This code tells you what permissions
+the logged in user has. You can also pass user and group parameters to
+check security for other items as well.
+
+   Note that you can check security for multiple groups but only one user
+at a time. Passing an arrayref of user objects for the 'user' parameter
+will result in the first user object being checked and the remainder
+discarded. This is unlikely to be what you need.
+
+   Examples:
+
+     # Find the permission for the currently logged-in user for $item
+     $item->check_security();
+
+     # Get the security for this $item for a particuar
+     # user; note that this *does* find the groups this
+     # user belongs to and checks those as well
+     $item->check_security( user => $user );
+
+     # Find the security for this item for either of the
+     # groups specified
+     $item->check_security( group => [ $group, $group ] );
+
+get_security( [ \%params ] )
+----------------------------
+
+   Returns a hashref of security information about the particular class or
+object. The keys of the hashref are the constants, SEC_SCOPE_WORLD,
+SEC_SCOPE_GROUP and SEC_SCOPE_USER. The value corresponding to the
+SEC_SCOPE_WORLD key is simply the WORLD permission for the object or
+class. Similarly, the value of SEC_SCOPE_USER is the permission for the
+user specified. The SEC_SCOPE_GROUP key has as its value a hashref with
+the IDs of the group as keys. (Examples below)
+
+   Note that if the user specified does not have permissions for the
+class/object, then its entry is blank.
+
+   The parameters correspond to check_security. The default is to retrieve
+the security for the currently logged-in user and groups (plus WORLD), but
+you can restrict the output if necessary.
+
+   Note that the WORLD key is always set, no matter how much you restrict
+the user/groups.
+
+   Finally: this will not be on the test, since you will probably not need
+to use this very often. The *check_security()* and *set_security()*
+methods are likely the only interfaces you need with security whether it
+be object or class-based. The *get_security()* method is used primarily
+for internal purposes, but you might also need it if you are writing
+security administration tools.
+
+   Examples:
+
+     # Return a hashref using the currently logged-in
+     # user and the groups the user belongs to
+     #
+     # Sample of what $perm looks like:
+     # $perm = { 'u' => 4, 'w' => 1, 'g' => { 5162 => 4, 7182 => 8 } };
+     #
+     # Which means that the user has a permission of SEC_LEVEL_READ,
+     # the user belongs to two groups with IDs 5162 and 7182 which have
+     # permissions of READ and WRITE, respectively, and the WORLD
+     # permission is NONE.
+     my $perm = $item->get_security();
+
+     # Find the security for a particular user object and its groups
+     my $perm = $item->get_security( user => $that_user );
+
+     # Find the security for two groups, no user objects.
+     my $perm = $item->get_security( group => [ $group1, $group2 ] );
+
+get_security_scopes( \%params )
+-------------------------------
+
+   Called by *get_security()* to determine which scopes to use to check
+security on an object.
+
+set_security( \%params )
+------------------------
+
+   The method set_security() returns a status as to whether the permission
+has been set to what you requested.
+
+   The default is to operate on one item at a time, but you can specify
+many items at once with the 'multiple' parameter.
+
+   Examples:
+
+     # Set $item security for WORLD to READ
+
+     my $wrv =  $item->set_security( scope => SEC_SCOPE_WORLD,
+                                     level => SEC_LEVEL_READ );
+     unless ( $wrv ) {
+       # error! security not set properly
+     }
+
+     # Set $item security for GROUP $group to WRITE
+
+     my $grv =  $item->set_security( scope => SEC_SCOPE_GROUP,
+                                     scope_id => $group->id,
+                                     level => SEC_LEVEL_WRITE );
+     unless ( $grv ) {
+       # error! security not set properly
+     }
+
+     # Set $item security for USER objects whose IDs are the keys in the
+     # hash %multiple and whose values are the levels corresponding to the
+     # ID.
+     #
+     # (Note that this is a contrived example for setting up the %multiple
+     # hash - you should always do some sort of validation/checking before
+     # passing user-specified information to a method.)
+
+     my %multiple = (
+      $user1->id => $cgi->param( 'level_' . $user1->id ),
+      $user2->id => $cgi->param( 'level_' . $user2->id )
+     );
+     my $rv = $item->set_security( scope => SEC_SCOPE_USER,
+                                   level => \%multiple );
+     if ( $rv != scalar( keys %multiple ) ) {
+       # error! security not set properly for all items
+     }
+
+     # Set $item security for multiple scopes whose values
+     # are in the hash %multiple; note that the hash %multiple
+     # has a separate layer now since we're specifying multiple
+     # scopes within it.
+
+     my %multiple = (
+      SEC_SCOPE_USER() => {
+         $user1->id => $cgi->param( 'level_' . $user1->id ),
+         $user2->id => $cgi->param( 'level_' . $user2->id ),
+      },
+      SEC_SCOPE_GROUP() => {
+         $group1->id  => $cgi->param( 'level_group_' . $group1->id ),
+      },
+     );
+     my $rv = $item->set_security( scope => [ SEC_SCOPE_USER, SEC_SCOPE_GROUP ],
+                                   level => \%multiple );
+
+create_initial_security( \%params )
+-----------------------------------
+
+   Creates the initial security for an object. This can be simple, or this
+can be complicated :) It is designed to be flexible enough for us to
+easily plug-in security policy modules whenever we write them, but simple
+enough to be used just from the object configuration.
+
+   Object security configuration information is specified in the
+'creation_security' hashref in the object configuration. A typical setup
+might look like:
+
+     creation_security => {
+        u   => undef,
+        g   => { level => { 3 => 'WRITE' } },
+        w   => { level => 'READ'},
+     },
+
+   Each of the keys maps to a (hopefully intuitive) scope:
+
+     u = SEC_SCOPE_USER
+     g = SEC_SCOPE_GROUP
+     w = SEC_SCOPE_WORLD
+
+   For each scope you can either name security specifically or you can
+defer the decision-making process to a subroutine. The former is called
+'exact specification' and the latter 'code specification'. Both are
+described below.
+
+   Note that the 'level' values used ('WRITE' or 'READ' above) do not
+match up to the SEC_LEVEL_* values exported from this module. Instead they
+are just handy mnemonics to use - just lop off the 'SEC_LEVEL_' from the
+exported variable:
+
+     SEC_LEVEL_NONE  = 'NONE'
+     SEC_LEVEL_READ  = 'READ'
+     SEC_LEVEL_WRITE = 'WRITE'
+
+   *Exact specification*
+
+   'Exact specification' does exactly that - you specify the ID and
+security level of the users and/or groups, along with one for the 'world'
+scope if you like. This is handy for smaller sites where you might have a
+small number of groups.
+
+   The exact format is:
+
+     SCOPE => { level => { ID => LEVEL,
+                           ID => LEVEL, ... } }
+
+   Where 'SCOPE' is 'u' or 'g', 'ID' is the ID of the group/user and
+'LEVEL' is the level you want to assign to that group/user. So using our
+example above:
+
+     g   => { level => { 3 => 'WRITE' } },
+
+   We assign the security level 'SEC_LEVEL_WRITE' to the group with ID 3.
+
+   You can also use shortcuts.
+
+   For the SEC_SCOPE_USER scope, if you specify a level:
+
+     u    => { level => 'READ' }
+
+   Then that security level is assigned for the user who created the
+object.
+
+   For the SEC_SCOPE_GROUP scope, if you specify a level:
+
+     g    => { level => 'READ' }
+
+   Then that security level is assigned for all of the groups to which the
+user who created the object belongs.
+
+   If you specify anything other than a level for the SEC_SCOPE_WORLD
+scope, the system will discard the entry.
+
+   *Code specificiation*
+
+   You can also assign the entire process off to a separate routine:
+
+     creation_security => {
+        code => [ 'My::Package' => 'security_set' ]
+     },
+
+   This code should return a hashref formatted like this
+
+     {
+       u => SEC_LEVEL_*,
+       g => { gid => SEC_LEVEL_* },
+       w => SEC_LEVEL_*
+     }
+
+   If you do not include a scope in the hashref, no security information
+for that scope will be entered.
+
+   Parameters:
+
+     class
+       Specify the class you want to use to create the initial security.
+
+     oid
+       Specify the object ID you want to use to create the initial
+       security.
+
+TAGS FOR SCOPE/LEVEL
+====================
+
+   This module exports nothing by default. You can import specific tags
+that refer to the scope and level, or you can import groups of them.
+
+   Note that you should always use these tags. They may seem unwieldly,
+but they make your program easier to read and allow us to modify the
+values for these behind the scenes without you modifying any of your code.
+If you use the values directly, you will get what is coming to you.
+
+   You can import individual tags like this:
+
+     use SPOPS::Secure qw( SEC_SCOPE_WORLD );
+
+   Or you can import the tags in groups like this:
+
+     use SPOPS::Secure qw( :scope );
+
+   *Scope Tags*
+
+   * SEC_SCOPE_WORLD
+
+   * SEC_SCOPE_GROUP
+
+   * SEC_SCOPE_USER
+
+   *Level Tags*
+
+   * SEC_LEVEL_NONE
+
+   * SEC_LEVEL_READ
+
+   * SEC_LEVEL_WRITE
+
+   *Verbose Level Tags*
+
+   These tags return a text value for the different security levels.
+
+   * SEC_LEVEL_VERBOSE_NONE (returns 'NONE')
+
+   * SEC_LEVEL_VERBOSE_READ (returns 'READ')
+
+   * SEC_LEVEL_VERBOSE_WRITE (returns 'WRITE')
+
+   *Groups of Tags*
+
+   * scope: brings in all SEC_SCOPE tags
+
+   * level: brings in all SEC_LEVEL tags
+
+   * verbose: brings in all SEC_LEVEL_*_VERBOSE tags
+
+   * all: brings in all tags
+
+TO DO
+=====
+
+   *Sort out the different set_* methods*
+
+   The different set_* methods are currently quite confusing.
+
+   *Add SUMMARY level*
+
+   Think about adding a SUMMARY level of security. This would allow, for
+instance, search results to bring up an object and display a title and
+perhaps more (controlled by the object), but forbid actually viewing the
+entire object.
+
+   *Add caching*
+
+   Gotta gotta gotta get a caching interface done, where we simply say:
+
+     $object->cache_security_level( $user );
+
+   And cache the security level for that object for that user. **Any**
+security modifications to that object wipe out the cache for that object.
+
+BUGS
+====
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2001 intes.net, inc.. All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+AUTHORS
+=======
+
+   Chris Winters  <chris@cwinters.com>
+
+
+File: pm.info,  Node: SPOPS/Secure/Hierarchy,  Next: SPOPS/Tie,  Prev: SPOPS/Secure,  Up: Module List
+
+Define hierarchical security
+****************************
+
+NAME
+====
+
+   SPOPS::Secure::Hierarchy - Define hierarchical security
+
+SYNOPSIS
+========
+
+     # In your SPOPS configuration
+     'myobj' => {
+        'class' => 'My::FileObject',
+        'isa' => [ qw/ ... SPOPS::Secure::Hierarchy  ... / ],
+        'hierarchy_separator' => '/',
+        'hierarchy_field'     => 'myobj_id',
+        ...
+     },
+
+     # Every normal SPOPS security check will now go through a hierarchy
+     # check using '/' as a separator on the value of the object parameter
+     # 'myobj_id'
+
+     my $file_object = eval { My::FileObject->fetch(
+                                  '/docs/release/devel-only/v1.3/mydoc.html'
+                       ) };
+
+     # You can also use it as a standalone service. Note that the 'class'
+     # in this example is controlled by you and used as an identifier
+     # only.
+
+     my $level = eval { SPOPS::Secure::Hierarchy->check_security({
+                               class => 'My::Nonexistent::File::Class',
+                               user => $my_user, group => $my_group_list,
+                               security_object_class => 'My::SecurityObject',
+                               oid   => '/docs/release/devel-only/v1.3/mydoc.html',
+                               hierarchy_separator => '/',
+                        })
+                 };
+
+DESCRIPTION
+===========
+
+   The existing SPOPS security framework relies on a one-to-one mapping of
+security value to object. Sometimes you need security to filter down from
+a parent to any number of children, such as in a pseudo-filesystem of
+objects.
+
+   To accomplish this, every record needs to have an identifier that can
+be manipulated into a parent identifier. With filesystems (or URLs) this
+is simple. Given the pseudo-file:
+
+     /docs/release/devel-only/v1.3/mydoc.html
+
+   You have the following parents:
+
+     /docs/release/devel-only/v1.3
+     /docs/release/devel-only
+     /docs/release/
+     /docs/
+     <ROOT OBJECT> (explained below)
+
+   What this module does is check the security of each parent in the
+hierarchy. If no security settings are found for an item, the module tries
+to find security of its parent. This continues until either the parent
+hierarchy is exhausted or one of the parents has a security setting.
+
+   If the security were defined like this:
+
+   (Note: this is pseudo-code, and not necessarily the internal
+representation):
+
+     <ROOT OBJECT> =>
+          { world => SEC_LEVEL_READ,
+            group => { admin => SEC_LEVEL_WRITE } }
+
+     /docs/release/devel-only =>
+
+     { world => SEC_LEVEL_NONE,
+       group => { devel => SEC_LEVEL_WRITE } }
+
+   And our sample file is:
+
+     /docs/release/devel-only/v1.3/mydoc.html
+
+   And our users are:
+
+   * *racerx* is a member of groups 'public', 'devel' and
+     'mysteriouscharacters'
+
+   * *chimchim* is a member of groups 'public', 'sidekicks'
+
+   * *speed* is a member of groups 'public' and 'devel'
+
+   Then both the users racerx and speed would have SEC_LEVEL_WRITE access
+to the file while chimchim would have no access at all.
+
+   For the file:
+
+     /docs/release/public/v1.2/mydoc.html
+
+   All three users would have SEC_LEVEL_READ access since the permissions
+inherit from the <ROOT OBJECT>.
+
+What is the ROOT OBJECT?
+------------------------
+
+   If you have a hierarchy of security, you are going to need one object
+from which all security flows. No matter what kind of identifiers,
+separators, etc. that you're using, the root object always has the same
+object ID (For the curious, this object ID is available as the exported
+scalar `$ROOT_OBJECT_NAME' from this module).
+
+   If you do not create security for the root object manually,
+`SPOPS::Secure::Hierarchy' will do so for you. However, you should be
+aware that it will create the most stringent permissions for such an
+object and that you might have a difficult time creating/updating objects
+once this happens.
+
+   Here is how to create such security:
+
+     $class->create_root_object_security({
+              scope => [ SEC_SCOPE_WORLD, SEC_SCOPE_GROUP ],
+              level => { SEC_SCOPE_WORLD() => SEC_LEVEL_READ,
+                       , SEC_SCOPE_GROUP() => { 3 => SEC_LEVEL_WRITE } }
+     });
+
+   Now, every object created in your class will default to having READ
+permissions for WORLD and WRITE permissions for group ID 3.
+
+METHODS
+=======
+
+   Most of the functionality in this class is found in *Note SPOPS/Secure:
+SPOPS/Secure,. We override one of its methods and add one specific to the
+functionality of this module.
+
+   *get_hierarchy_levels( \%params )*
+
+   Retrieve security for each level of the hierarchy. Returns a list - the
+first element is a hashref with the keys as hierarchy elements and the
+values as the security settings for that element (like what you would get
+back if you checked only one item). The second element is a scalar with
+the key of the first item encountered which actually had security.
+
+   Example:
+
+   my ( $all_levels, $first ) = $obj->get_hierarchy_levels();  print
+"Level Info:\n", Data::Dumper::Dumper( $all_levels );
+
+     >Level Info:
+     > $VAR1 = {
+     >  '/docs/release/devel-only/v1.3/mydoc.html' => undef,
+     >  '/docs/release/devel-only/v1.3' => undef,
+     >  '/docs/release/devel-only' => { u => 4, g => undef, w => 8 },
+     >  '/docs/release/' => undef,
+     >  '/docs/' => undef,
+     >  'ROOT_OBJECT' => { u => undef, g => undef, w => 4 }
+     >};
+
+     print "First Level: ", $first;
+
+     > First Level: /docs/release/devel-only
+
+   *get_security( \%params )*
+
+   Returns: hashref of security information indexed by the scopes.
+
+   Parameters:
+
+     class ($) (not required if calling from object)
+       Class (or generic identifier) for which we would like to check
+       security
+
+     oid ($) (not required if calling from object)
+       Unique identifier for the object (or generic thing) needing to be
+       checked.
+
+     hierarchy_field ($) (only required if calling from object with no
+     configuration)
+       Field to be used for the hierarchy check. Most (all?) of the time
+       this will be the same as your configured 'id_field' in your SPOPS
+       configuration.
+
+     hierarchy_separator ($) (not required if calling from object with
+     configuration)
+       Character or characters used to split the hierarchy value into
+       pieces.
+
+     hierarchy_manip (optional)
+       Code reference that, given the value to be broken into chunks, will
+       return a hashref of information that describe the ways the
+       hierarchy information can be used.
+
+   *create_root_object_security( \%params )*
+
+   If you're trying to retrofit this security system into a class with
+already existing objects, you will need a way to bootstrap it so that you
+can perform the actions you like. This method will create initial security
+for you.
+
+   Parameters:
+
+     scope (\@ or $)
+       One or more SPOPS::Secure SCOPE constants that define the scopes
+       that you are defining security for.
+
+     level (\% or $)
+       If you have specified more than one item in the 'scope' parameter,
+       this is a hashref, the keys of which are the scopes defined. The
+       value may be a SPOPS::Secure LEVEL constant if the matching scope
+       is WORLD, or a hashref of object-id - LEVEL pairs if the matching
+       scope is USER or GROUP. (See L<What is the ROOT OBJECT?> above.)
+
+BUGS
+====
+
+TO DO
+=====
+
+   *Revisit when hierarchy field != primary key*
+
+   the _get_hierarchy_parameters has an assumption that the object ID will
+always be the hierarchy value. Fix this. (Putting off because this is
+unlikely.)
+
+NOTES
+=====
+
+   *Security for Each Parent not Required*
+
+   Note that each parent as we go up the hierarchy does not have to exist
+in terms of security. That is, since an object can be both a child and a
+parent, and a child can inherit from a parent, then the inheritance needs
+to be able to flow through more than one generation.
+
+SEE ALSO
+========
+
+   `SPOPS::Security' in this node
+
+AUTHORS
+=======
+
+   Chris Winters <chris@cwinters.com>
+
+   Christian Lemburg <lemburg@aixonix.de>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2001 intes.net, inc.. All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: SPOPS/Tie,  Next: SPOPS/Tie/StrictField,  Prev: SPOPS/Secure/Hierarchy,  Up: Module List
+
+Simple class implementing tied hash with some goodies
+*****************************************************
+
+NAME
+====
+
+   SPOPS::Tie - Simple class implementing tied hash with some goodies
+
+SYNOPSIS
+========
+
+     # Create the tied hash
+     use SPOPS::Tie;
+     my ( %data );
+     my @fields = qw( first_name last_name login birth_date );
+     tie %data, 'SPOPS::Tie', $class, \@fields;
+
+     # Store some simple properties
+     $data{first_name} = 'Charles';
+     $data{last_name}  = 'Barkley';
+     $data{login}      = 'cb';
+     $data{birth_date} = '1957-01-19';
+
+     # Store a temporary property
+     $data{tmp_rebound_avg} = 11.3;
+
+     while ( my ( $prop, $val ) = each %data ) {
+      printf( "%-15s: %s\n", $prop, $val );
+     }
+
+     # Note that output does not include 'tmp_rebound_avg'
+     >first_name     : Charles
+     >login          : cb
+     >last_name      : Barkley
+     >birth_date     : 1957-01-19
+
+DESCRIPTION
+===========
+
+   Stores data for a SPOPS object, and also some accompanying materials
+such as whether the object has been changed and any temporary variables.
+
+Checking Changed State
+----------------------
+
+   You can check whether the data have changed since the last fetch by
+either calling the method of the SPOPS object (recommended) or asking for
+the '_changed' key:
+
+     # See if this object has changed
+     if ( $obj->{_changed} ) {
+      ...do stuff...
+     }
+
+     # Tell the object that it has changed (force)
+     $obj->{_changed} = 1;
+
+   Note that this state is automatically tracked based on whether you set
+any property of the object, so you should never need to do this. See *Note
+SPOPS: SPOPS, for more information about the *changed* methods.
+
+Tracking Temporary Variables
+----------------------------
+
+   Note that this section only holds true if you have field-checking
+turned on (by passing an arrayref of fields in the 'field' key of the
+hashref passed as the second parameter in the tie call).
+
+   At times you might wish to keep information with the object that is
+only temporary and not supposed to be serialized with the object. However,
+the 'valid property' nature of the tied hash prevents you from storing
+information in properties with names other than those you pass into the
+initial call to tie(). What to do?
+
+   Have no fear! Simply prefix the property with 'tmp_' (or something
+else, see below) and SPOPS::Tie will keep the information at the ready for
+you:
+
+     my ( %data );
+     my $class = 'SPOPS::User';
+     tie %data, 'SPOPS::Tie', $class, [ qw/ first_name last_name login / ];
+     $data{first_name} = 'Chucky';
+     $data{last_name}  = 'Gordon';
+     $data{login}      = 'chuckg';
+     $data{tmp_inoculation} = 'Jan 16, 1981';
+
+   For as long as the hash %data is in scope, you can reference the
+property 'tmp_inoculation'. However, you can only reference it directly.
+You will not see the property if you iterate through hash using keys or
+each.
+
+Storing Information for Internal Use
+------------------------------------
+
+   The final kind of information that can be stored in a SPOPS object is
+'internal' information. This is similar to temporary variables, but is
+typically only used in the internal SPOPS mechanisms - temporary variables
+are often used to store computed results or other information for display
+rather than internal use.
+
+   For example, the *Note SPOPS/DBI: SPOPS/DBI, module allows you to
+create validating subroutines to ensure that your data conform to some
+sort of specification:
+
+     push @{ $obj->{_internal_validate} }, \&ensure_consistent_date;
+
+   Most of the time you will not need to deal with this, but check the
+documentation for the object you are using.
+
+METHODS
+=======
+
+   See *Note Tie/Hash: Tie/Hash, or *Note Perltie: (perl.info)perltie, for
+details of what the different methods do.
+
+TO DO
+=====
+
+   *Benchmarking*
+
+   We should probably benchmark this thing to see what it can do
+
+BUGS
+====
+
+SEE ALSO
+========
+
+   *Note Perltie: (perl.info)perltie,
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2001 intes.net, inc.. All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+AUTHORS
+=======
+
+   Chris Winters  <chris@cwinters.com>
+
+

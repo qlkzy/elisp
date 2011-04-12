@@ -1,0 +1,1773 @@
+This is Info file perl.info, produced by Makeinfo version 1.68 from the
+input file bigperl.texi.
+
+   settitle perl
+
+
+File: perl.info,  Node: perltie,  Next: perlbot,  Prev: perlobj,  Up: Top
+
+how to hide an object class in a simple variable
+************************************************
+
+NAME
+====
+
+   perltie - how to hide an object class in a simple variable
+
+SYNOPSIS
+========
+
+     tie VARIABLE, CLASSNAME, LIST
+
+     $object = tied VARIABLE
+
+     untie VARIABLE
+
+DESCRIPTION
+===========
+
+   Prior to release 5.0 of Perl, a programmer could use dbmopen() to
+connect an on-disk database in the standard Unix dbm(3x) format magically
+to a %HASH in their program.  However, their Perl was either built with
+one particular dbm library or another, but not both, and you couldn't
+extend this mechanism to other packages or types of variables.
+
+   Now you can.
+
+   The tie() function binds a variable to a class (package) that will
+provide the implementation for access methods for that variable.  Once
+this magic has been performed, accessing a tied variable automatically
+triggers method calls in the proper class.  The complexity of the class is
+hidden behind magic methods calls.  The method names are in ALL CAPS,
+which is a convention that Perl uses to indicate that they're called
+implicitly rather than explicitly-just like the BEGIN() and END()
+functions.
+
+   In the tie() call, VARIABLE is the name of the variable to be
+enchanted.  `CLASSNAME' is the name of a class implementing objects of the
+correct type.  Any additional arguments in the LIST are passed to the
+appropriate constructor method for that class-meaning TIESCALAR(),
+TIEARRAY(), TIEHASH(), or TIEHANDLE().  (Typically these are arguments
+such as might be passed to the dbminit() function of C.) The object
+returned by the "new" method is also returned by the tie() function, which
+would be useful if you wanted to access other methods in `CLASSNAME'. (You
+don't actually have to return a reference to a right "type" (e.g., HASH or
+`CLASSNAME') so long as it's a properly blessed object.)  You can also
+retrieve a reference to the underlying object using the tied() function.
+
+   Unlike dbmopen(), the tie() function will not use or require a module
+for you-you need to do that explicitly yourself.
+
+Tying Scalars
+-------------
+
+   A class implementing a tied scalar should define the following methods:
+TIESCALAR, FETCH, STORE, and possibly DESTROY.
+
+   Let's look at each in turn, using as an example a tie class for scalars
+that allows the user to do something like:
+
+     tie $his_speed, 'Nice', getppid();
+     tie $my_speed,  'Nice', $$;
+
+   And now whenever either of those variables is accessed, its current
+system priority is retrieved and returned.  If those variables are set,
+then the process's priority is changed!
+
+   We'll use Jarkko Hietaniemi <`jhi@iki.fi'>'s BSD::Resource class (not
+included) to access the PRIO_PROCESS, PRIO_MIN, and PRIO_MAX constants
+from your system, as well as the getpriority() and setpriority() system
+calls.  Here's the preamble of the class.
+
+     package Nice;
+     use Carp;
+     use BSD::Resource;
+     use strict;
+     $Nice::DEBUG = 0 unless defined $Nice::DEBUG;
+
+TIESCALAR classname, LIST
+     This is the constructor for the class.  That means it is expected to
+     return a blessed reference to a new scalar (probably anonymous) that
+     it's creating.  For example:
+
+          sub TIESCALAR {
+              my $class = shift;
+              my $pid = shift || $$; # 0 means me
+
+          if ($pid !~ /^\d+$/) {
+              carp "Nice::Tie::Scalar got non-numeric pid $pid" if $^W;
+              return undef;
+          }
+
+          unless (kill 0, $pid) { # EPERM or ERSCH, no doubt
+              carp "Nice::Tie::Scalar got bad pid $pid: $!" if $^W;
+              return undef;
+          }
+
+          return bless \$pid, $class;
+              }
+
+     This tie class has chosen to return an error rather than raising an
+     exception if its constructor should fail.  While this is how
+     dbmopen() works, other classes may well not wish to be so forgiving.
+     It checks the global variable $^W to see whether to emit a bit of
+     noise anyway.
+
+FETCH this
+     This method will be triggered every time the tied variable is accessed
+     (read).  It takes no arguments beyond its self reference, which is the
+     object representing the scalar we're dealing with.  Because in this
+     case we're using just a SCALAR ref for the tied scalar object, a
+     simple $$self allows the method to get at the real value stored
+     there.  In our example below, that real value is the process ID to
+     which we've tied our variable.
+
+          sub FETCH {
+              my $self = shift;
+              confess "wrong type" unless ref $self;
+              croak "usage error" if @_;
+              my $nicety;
+              local($!) = 0;
+              $nicety = getpriority(PRIO_PROCESS, $$self);
+              if ($!) { croak "getpriority failed: $!" }
+              return $nicety;
+          }
+
+     This time we've decided to blow up (raise an exception) if the renice
+     fails-there's no place for us to return an error otherwise, and it's
+     probably the right thing to do.
+
+STORE this, value
+     This method will be triggered every time the tied variable is set
+     (assigned).  Beyond its self reference, it also expects one (and only
+     one) argument-the new value the user is trying to assign.
+
+          sub STORE {
+              my $self = shift;
+              confess "wrong type" unless ref $self;
+              my $new_nicety = shift;
+              croak "usage error" if @_;
+
+          if ($new_nicety < PRIO_MIN) {
+              carp sprintf
+                "WARNING: priority %d less than minimum system priority %d",
+                    $new_nicety, PRIO_MIN if $^W;
+              $new_nicety = PRIO_MIN;
+          }
+
+          if ($new_nicety > PRIO_MAX) {
+              carp sprintf
+                "WARNING: priority %d greater than maximum system priority %d",
+                    $new_nicety, PRIO_MAX if $^W;
+              $new_nicety = PRIO_MAX;
+          }
+
+          unless (defined setpriority(PRIO_PROCESS, $$self, $new_nicety)) {
+              confess "setpriority failed: $!";
+          }
+          return $new_nicety;
+              }
+
+DESTROY this
+     This method will be triggered when the tied variable needs to be
+     destructed.  As with other object classes, such a method is seldom
+     necessary, because Perl deallocates its moribund object's memory for
+     you automatically-this isn't C++, you know.  We'll use a DESTROY
+     method here for debugging purposes only.
+
+          sub DESTROY {
+              my $self = shift;
+              confess "wrong type" unless ref $self;
+              carp "[ Nice::DESTROY pid $$self ]" if $Nice::DEBUG;
+          }
+
+   That's about all there is to it.  Actually, it's more than all there is
+to it, because we've done a few nice things here for the sake of
+completeness, robustness, and general aesthetics.  Simpler TIESCALAR
+classes are certainly possible.
+
+Tying Arrays
+------------
+
+   A class implementing a tied ordinary array should define the following
+methods: TIEARRAY, FETCH, STORE, FETCHSIZE, STORESIZE and perhaps DESTROY.
+
+   FETCHSIZE and STORESIZE are used to provide `$#array' and equivalent
+`scalar(@array)' access.
+
+   The methods POP, PUSH, SHIFT, UNSHIFT, SPLICE, DELETE, and EXISTS are
+required if the perl operator with the corresponding (but lowercase) name
+is to operate on the tied array. The Tie::Array class can be used as a
+base class to implement the first five of these in terms of the basic
+methods above.  The default implementations of DELETE and EXISTS in
+Tie::Array simply croak.
+
+   In addition EXTEND will be called when perl would have pre-extended
+allocation in a real array.
+
+   This means that tied arrays are now complete. The example below needs
+upgrading to illustrate this. (The documentation in Tie::Array is more
+complete.)
+
+   For this discussion, we'll implement an array whose indices are fixed at
+its creation.  If you try to access anything beyond those bounds, you'll
+take an exception.  For example:
+
+     require Bounded_Array;
+     tie @ary, 'Bounded_Array', 2;
+     $| = 1;
+     for $i (0 .. 10) {
+         print "setting index $i: ";
+         $ary[$i] = 10 * $i;
+         $ary[$i] = 10 * $i;
+         print "value of elt $i now $ary[$i]\n";
+     }
+
+   The preamble code for the class is as follows:
+
+     package Bounded_Array;
+     use Carp;
+     use strict;
+
+TIEARRAY classname, LIST
+     This is the constructor for the class.  That means it is expected to
+     return a blessed reference through which the new array (probably an
+     anonymous ARRAY ref) will be accessed.
+
+     In our example, just to show you that you don't *really* have to
+     return an ARRAY reference, we'll choose a HASH reference to represent
+     our object.  A HASH works out well as a generic record type: the
+     `{BOUND}' field will store the maximum bound allowed, and the
+     `{ARRAY}' field will hold the true ARRAY ref.  If someone outside the
+     class tries to dereference the object returned (doubtless thinking it
+     an ARRAY ref), they'll blow up.  This just goes to show you that you
+     should respect an object's privacy.
+
+          sub TIEARRAY {
+          	my $class = shift;
+          	my $bound = shift;
+          	confess "usage: tie(\@ary, 'Bounded_Array', max_subscript)"
+          	    if @_ || $bound =~ /\D/;
+          	return bless {
+          	    BOUND => $bound,
+          	    ARRAY => [],
+          	}, $class;
+          }
+
+FETCH this, index
+     This method will be triggered every time an individual element the
+     tied array is accessed (read).  It takes one argument beyond its self
+     reference: the index whose value we're trying to fetch.
+
+          sub FETCH {
+            my($self,$idx) = @_;
+            if ($idx > $self->{BOUND}) {
+          	confess "Array OOB: $idx > $self->{BOUND}";
+            }
+            return $self->{ARRAY}[$idx];
+          }
+
+     As you may have noticed, the name of the FETCH method (et al.) is the
+     same for all accesses, even though the constructors differ in names
+     (TIESCALAR vs TIEARRAY).  While in theory you could have the same
+     class servicing several tied types, in practice this becomes
+     cumbersome, and it's easiest to keep them at simply one tie type per
+     class.
+
+STORE this, index, value
+     This method will be triggered every time an element in the tied array
+     is set (written).  It takes two arguments beyond its self reference:
+     the index at which we're trying to store something and the value
+     we're trying to put there.  For example:
+
+          sub STORE {
+            my($self, $idx, $value) = @_;
+            print "[STORE $value at $idx]\n" if _debug;
+            if ($idx > $self->{BOUND} ) {
+              confess "Array OOB: $idx > $self->{BOUND}";
+            }
+            return $self->{ARRAY}[$idx] = $value;
+          }
+
+DESTROY this
+     This method will be triggered when the tied variable needs to be
+     destructed.  As with the scalar tie class, this is almost never
+     needed in a language that does its own garbage collection, so this
+     time we'll just leave it out.
+
+   The code we presented at the top of the tied array class accesses many
+elements of the array, far more than we've set the bounds to.  Therefore,
+it will blow up once they try to access beyond the 2nd element of @ary, as
+the following output demonstrates:
+
+     setting index 0: value of elt 0 now 0
+     setting index 1: value of elt 1 now 10
+     setting index 2: value of elt 2 now 20
+     setting index 3: Array OOB: 3 > 2 at Bounded_Array.pm line 39
+             Bounded_Array::FETCH called at testba line 12
+
+Tying Hashes
+------------
+
+   As the first Perl data type to be tied (see dbmopen()), hashes have the
+most complete and useful tie() implementation.  A class implementing a
+tied hash should define the following methods: TIEHASH is the constructor.
+FETCH and STORE access the key and value pairs.  EXISTS reports whether a
+key is present in the hash, and DELETE deletes one.  CLEAR empties the
+hash by deleting all the key and value pairs.  FIRSTKEY and NEXTKEY
+implement the keys() and each() functions to iterate over all the keys.
+And DESTROY is called when the tied variable is garbage collected.
+
+   If this seems like a lot, then feel free to inherit from merely the
+standard Tie::Hash module for most of your methods, redefining only the
+interesting ones.  See *Note Tie/Hash: (pm.info)Tie/Hash, for details.
+
+   Remember that Perl distinguishes between a key not existing in the hash,
+and the key existing in the hash but having a corresponding value of
+undef.  The two possibilities can be tested with the exists() and
+`defined()' functions.
+
+   Here's an example of a somewhat interesting tied hash class:  it gives
+you a hash representing a particular user's dot files.  You index into the
+hash with the name of the file (minus the dot) and you get back that dot
+file's contents.  For example:
+
+     use DotFiles;
+     tie %dot, 'DotFiles';
+     if ( $dot{profile} =~ /MANPATH/ ||
+          $dot{login}   =~ /MANPATH/ ||
+          $dot{cshrc}   =~ /MANPATH/    )
+     {
+     	print "you seem to set your MANPATH\n";
+     }
+
+   Or here's another sample of using our tied class:
+
+     tie %him, 'DotFiles', 'daemon';
+     foreach $f ( keys %him ) {
+     	printf "daemon dot file %s is size %d\n",
+     	    $f, length $him{$f};
+     }
+
+   In our tied hash DotFiles example, we use a regular hash for the object
+containing several important fields, of which only the `{LIST}' field will
+be what the user thinks of as the real hash.
+
+USER
+     whose dot files this object represents
+
+HOME
+     where those dot files live
+
+CLOBBER
+     whether we should try to change or remove those dot files
+
+LIST
+     the hash of dot file names and content mappings
+
+   Here's the start of `Dotfiles.pm':
+
+     package DotFiles;
+     use Carp;
+     sub whowasi { (caller(1))[3] . '()' }
+     my $DEBUG = 0;
+     sub debug { $DEBUG = @_ ? shift : 1 }
+
+   For our example, we want to be able to emit debugging info to help in
+tracing during development.  We keep also one convenience function around
+internally to help print out warnings; whowasi() returns the function name
+that calls it.
+
+   Here are the methods for the DotFiles tied hash.
+
+TIEHASH classname, LIST
+     This is the constructor for the class.  That means it is expected to
+     return a blessed reference through which the new object (probably but
+     not necessarily an anonymous hash) will be accessed.
+
+     Here's the constructor:
+
+          sub TIEHASH {
+          	my $self = shift;
+          	my $user = shift || $>;
+          	my $dotdir = shift || '';
+          	croak "usage: @{[&whowasi]} [USER [DOTDIR]]" if @_;
+          	$user = getpwuid($user) if $user =~ /^\d+$/;
+          	my $dir = (getpwnam($user))[7]
+          		|| croak "@{[&whowasi]}: no user $user";
+          	$dir .= "/$dotdir" if $dotdir;
+
+          my $node = {
+              USER    => $user,
+              HOME    => $dir,
+              LIST    => {},
+              CLOBBER => 0,
+          };
+
+          opendir(DIR, $dir)
+          	|| croak "@{[&whowasi]}: can't opendir $dir: $!";
+          foreach $dot ( grep /^\./ && -f "$dir/$_", readdir(DIR)) {
+              $dot =~ s/^\.//;
+              $node->{LIST}{$dot} = undef;
+          }
+          closedir DIR;
+          return bless $node, $self;
+              }
+
+     It's probably worth mentioning that if you're going to filetest the
+     return values out of a readdir, you'd better prepend the directory in
+     question.  Otherwise, because we didn't chdir() there, it would have
+     been testing the wrong file.
+
+FETCH this, key
+     This method will be triggered every time an element in the tied hash
+     is accessed (read).  It takes one argument beyond its self reference:
+     the key whose value we're trying to fetch.
+
+     Here's the fetch for our DotFiles example.
+
+          sub FETCH {
+          	carp &whowasi if $DEBUG;
+          	my $self = shift;
+          	my $dot = shift;
+          	my $dir = $self->{HOME};
+          	my $file = "$dir/.$dot";
+
+          unless (exists $self->{LIST}->{$dot} || -f $file) {
+              carp "@{[&whowasi]}: no $dot file" if $DEBUG;
+              return undef;
+          }
+
+          if (defined $self->{LIST}->{$dot}) {
+              return $self->{LIST}->{$dot};
+          } else {
+              return $self->{LIST}->{$dot} = `cat $dir/.$dot`;
+          }
+              }
+
+     It was easy to write by having it call the Unix cat(1) command, but it
+     would probably be more portable to open the file manually (and
+     somewhat more efficient).  Of course, because dot files are a Unixy
+     concept, we're not that concerned.
+
+STORE this, key, value
+     This method will be triggered every time an element in the tied hash
+     is set (written).  It takes two arguments beyond its self reference:
+     the index at which we're trying to store something, and the value
+     we're trying to put there.
+
+     Here in our DotFiles example, we'll be careful not to let them try to
+     overwrite the file unless they've called the clobber() method on the
+     original object reference returned by tie().
+
+          sub STORE {
+          	carp &whowasi if $DEBUG;
+          	my $self = shift;
+          	my $dot = shift;
+          	my $value = shift;
+          	my $file = $self->{HOME} . "/.$dot";
+          	my $user = $self->{USER};
+
+          croak "@{[&whowasi]}: $file not clobberable"
+              unless $self->{CLOBBER};
+
+          open(F, "> $file") || croak "can't open $file: $!";
+          print F $value;
+          close(F);
+              }
+
+     If they wanted to clobber something, they might say:
+
+          $ob = tie %daemon_dots, 'daemon';
+          $ob->clobber(1);
+          $daemon_dots{signature} = "A true daemon\n";
+
+     Another way to lay hands on a reference to the underlying object is to
+     use the tied() function, so they might alternately have set clobber
+     using:
+
+          tie %daemon_dots, 'daemon';
+          tied(%daemon_dots)->clobber(1);
+
+     The clobber method is simply:
+
+          sub clobber {
+          	my $self = shift;
+          	$self->{CLOBBER} = @_ ? shift : 1;
+          }
+
+DELETE this, key
+     This method is triggered when we remove an element from the hash,
+     typically by using the delete() function.  Again, we'll be careful to
+     check whether they really want to clobber files.
+
+          sub DELETE   {
+          	carp &whowasi if $DEBUG;
+
+          my $self = shift;
+          my $dot = shift;
+          my $file = $self->{HOME} . "/.$dot";
+          croak "@{[&whowasi]}: won't remove file $file"
+              unless $self->{CLOBBER};
+          delete $self->{LIST}->{$dot};
+          my $success = unlink($file);
+          carp "@{[&whowasi]}: can't unlink $file: $!" unless $success;
+          $success;
+              }
+
+     The value returned by DELETE becomes the return value of the call to
+     delete().  If you want to emulate the normal behavior of delete(),
+     you should return whatever FETCH would have returned for this key.
+     In this example, we have chosen instead to return a value which tells
+     the caller whether the file was successfully deleted.
+
+CLEAR this
+     This method is triggered when the whole hash is to be cleared,
+     usually by assigning the empty list to it.
+
+     In our example, that would remove all the user's dot files!  It's
+     such a dangerous thing that they'll have to set CLOBBER to something
+     higher than 1 to make it happen.
+
+          sub CLEAR    {
+          	carp &whowasi if $DEBUG;
+          	my $self = shift;
+          	croak "@{[&whowasi]}: won't remove all dot files for $self->{USER}"
+          	    unless $self->{CLOBBER} > 1;
+          	my $dot;
+          	foreach $dot ( keys %{$self->{LIST}}) {
+          	    $self->DELETE($dot);
+          	}
+          }
+
+EXISTS this, key
+     This method is triggered when the user uses the exists() function on
+     a particular hash.  In our example, we'll look at the `{LIST}' hash
+     element for this:
+
+          sub EXISTS   {
+          	carp &whowasi if $DEBUG;
+          	my $self = shift;
+          	my $dot = shift;
+          	return exists $self->{LIST}->{$dot};
+          }
+
+FIRSTKEY this
+     This method will be triggered when the user is going to iterate
+     through the hash, such as via a keys() or each() call.
+
+          sub FIRSTKEY {
+          	carp &whowasi if $DEBUG;
+          	my $self = shift;
+          	my $a = keys %{$self->{LIST}};		# reset each() iterator
+          	each %{$self->{LIST}}
+          }
+
+NEXTKEY this, lastkey
+     This method gets triggered during a keys() or each() iteration.  It
+     has a second argument which is the last key that had been accessed.
+     This is useful if you're carrying about ordering or calling the
+     iterator from more than one sequence, or not really storing things in
+     a hash anywhere.
+
+     For our example, we're using a real hash so we'll do just the simple
+     thing, but we'll have to go through the LIST field indirectly.
+
+          sub NEXTKEY  {
+          	carp &whowasi if $DEBUG;
+          	my $self = shift;
+          	return each %{ $self->{LIST} }
+          }
+
+DESTROY this
+     This method is triggered when a tied hash is about to go out of
+     scope.  You don't really need it unless you're trying to add debugging
+     or have auxiliary state to clean up.  Here's a very simple function:
+
+          sub DESTROY  {
+          	carp &whowasi if $DEBUG;
+          }
+
+   Note that functions such as keys() and values() may return huge lists
+when used on large objects, like DBM files.  You may prefer to use the
+each() function to iterate over such.  Example:
+
+     # print out history file offsets
+     use NDBM_File;
+     tie(%HIST, 'NDBM_File', '/usr/lib/news/history', 1, 0);
+     while (($key,$val) = each %HIST) {
+         print $key, ' = ', unpack('L',$val), "\n";
+     }
+     untie(%HIST);
+
+Tying FileHandles
+-----------------
+
+   This is partially implemented now.
+
+   A class implementing a tied filehandle should define the following
+methods: TIEHANDLE, at least one of PRINT, PRINTF, WRITE, READLINE, GETC,
+READ, and possibly CLOSE and DESTROY.  The class can also provide: BINMODE,
+OPEN, EOF, FILENO, SEEK, TELL - if the corresponding perl operators are
+used on the handle.
+
+   It is especially useful when perl is embedded in some other program,
+where output to STDOUT and STDERR may have to be redirected in some
+special way. See nvi and the Apache module for examples.
+
+   In our example we're going to create a shouting handle.
+
+     package Shout;
+
+TIEHANDLE classname, LIST
+     This is the constructor for the class.  That means it is expected to
+     return a blessed reference of some sort. The reference can be used to
+     hold some internal information.
+
+          sub TIEHANDLE { print "<shout>\n"; my $i; bless \$i, shift }
+
+WRITE this, LIST
+     This method will be called when the handle is written to via the
+     syswrite function.
+
+          sub WRITE {
+          	$r = shift;
+          	my($buf,$len,$offset) = @_;
+          	print "WRITE called, \$buf=$buf, \$len=$len, \$offset=$offset";
+          }
+
+PRINT this, LIST
+     This method will be triggered every time the tied handle is printed to
+     with the print() function.  Beyond its self reference it also expects
+     the list that was passed to the print function.
+
+          sub PRINT { $r = shift; $$r++; print join($,,map(uc($_),@_)),$\ }
+
+PRINTF this, LIST
+     This method will be triggered every time the tied handle is printed to
+     with the printf() function.  Beyond its self reference it also
+     expects the format and list that was passed to the printf function.
+
+          sub PRINTF {
+              shift;
+              my $fmt = shift;
+              print sprintf($fmt, @_)."\n";
+          }
+
+READ this, LIST
+     This method will be called when the handle is read from via the read
+     or sysread functions.
+
+          sub READ {
+          	my $self = shift;
+          	my $$bufref = \$_[0];
+          	my(undef,$len,$offset) = @_;
+          	print "READ called, \$buf=$bufref, \$len=$len, \$offset=$offset";
+          	# add to $$bufref, set $len to number of characters read
+          	$len;
+          }
+
+READLINE this
+     This method will be called when the handle is read from via <HANDLE>.
+     The method should return undef when there is no more data.
+
+          sub READLINE { $r = shift; "READLINE called $$r times\n"; }
+
+GETC this
+     This method will be called when the getc function is called.
+
+          sub GETC { print "Don't GETC, Get Perl"; return "a"; }
+
+CLOSE this
+     This method will be called when the handle is closed via the close
+     function.
+
+          sub CLOSE { print "CLOSE called.\n" }
+
+DESTROY this
+     As with the other types of ties, this method will be called when the
+     tied handle is about to be destroyed. This is useful for debugging and
+     possibly cleaning up.
+
+          sub DESTROY { print "</shout>\n" }
+
+   Here's how to use our little example:
+
+     tie(*FOO,'Shout');
+     print FOO "hello\n";
+     $a = 4; $b = 6;
+     print FOO $a, " plus ", $b, " equals ", $a + $b, "\n";
+     print <FOO>;
+
+The untie Gotcha
+----------------
+
+   If you intend making use of the object returned from either tie() or
+tied(), and if the tie's target class defines a destructor, there is a
+subtle gotcha you must guard against.
+
+   As setup, consider this (admittedly rather contrived) example of a tie;
+all it does is use a file to keep a log of the values assigned to a scalar.
+
+     package Remember;
+
+     use strict;
+     use warnings;
+     use IO::File;
+
+     sub TIESCALAR {
+         my $class = shift;
+         my $filename = shift;
+         my $handle = new IO::File "> $filename"
+                          or die "Cannot open $filename: $!\n";
+
+     print $handle "The Start\n";
+     bless {FH => $handle, Value => 0}, $class;
+         }
+
+     sub FETCH {
+         my $self = shift;
+         return $self->{Value};
+     }
+
+     sub STORE {
+         my $self = shift;
+         my $value = shift;
+         my $handle = $self->{FH};
+         print $handle "$value\n";
+         $self->{Value} = $value;
+     }
+
+     sub DESTROY {
+         my $self = shift;
+         my $handle = $self->{FH};
+         print $handle "The End\n";
+         close $handle;
+     }
+
+     1;
+
+   Here is an example that makes use of this tie:
+
+     use strict;
+     use Remember;
+
+     my $fred;
+     tie $fred, 'Remember', 'myfile.txt';
+     $fred = 1;
+     $fred = 4;
+     $fred = 5;
+     untie $fred;
+     system "cat myfile.txt";
+
+   This is the output when it is executed:
+
+     The Start
+     1
+     4
+     5
+     The End
+
+   So far so good.  Those of you who have been paying attention will have
+spotted that the tied object hasn't been used so far.  So lets add an
+extra method to the Remember class to allow comments to be included in the
+file - say, something like this:
+
+     sub comment {
+         my $self = shift;
+         my $text = shift;
+         my $handle = $self->{FH};
+         print $handle $text, "\n";
+     }
+
+   And here is the previous example modified to use the comment method
+(which requires the tied object):
+
+     use strict;
+     use Remember;
+
+     my ($fred, $x);
+     $x = tie $fred, 'Remember', 'myfile.txt';
+     $fred = 1;
+     $fred = 4;
+     comment $x "changing...";
+     $fred = 5;
+     untie $fred;
+     system "cat myfile.txt";
+
+   When this code is executed there is no output.  Here's why:
+
+   When a variable is tied, it is associated with the object which is the
+return value of the TIESCALAR, TIEARRAY, or TIEHASH function.  This object
+normally has only one reference, namely, the implicit reference from the
+tied variable.  When untie() is called, that reference is destroyed.
+Then, as in the first example above, the object's destructor (DESTROY) is
+called, which is normal for objects that have no more valid references;
+and thus the file is closed.
+
+   In the second example, however, we have stored another reference to the
+tied object in $x.  That means that when untie() gets called there will
+still be a valid reference to the object in existence, so the destructor
+is not called at that time, and thus the file is not closed.  The reason
+there is no output is because the file buffers have not been flushed to
+disk.
+
+   Now that you know what the problem is, what can you do to avoid it?
+Well, the good old -w flag will spot any instances where you call untie()
+and there are still valid references to the tied object.  If the second
+script above this near the top `use warnings 'untie'' or was run with the
+-w flag, Perl prints this warning message:
+
+     untie attempted while 1 inner references still exist
+
+   To get the script to work properly and silence the warning make sure
+there are no valid references to the tied object before untie() is called:
+
+     undef $x;
+     untie $fred;
+
+SEE ALSO
+========
+
+   See *Note DB_File: (pm.info)DB_File, or *Note Config: (pm.info)Config,
+for some interesting tie() implementations.
+
+BUGS
+====
+
+   Tied arrays are *incomplete*.  They are also distinctly lacking
+something for the `$#ARRAY' access (which is hard, as it's an lvalue), as
+well as the other obvious array functions, like push(), pop(), shift(),
+unshift(), and splice().
+
+   You cannot easily tie a multilevel data structure (such as a hash of
+hashes) to a dbm file.  The first problem is that all but GDBM and
+Berkeley DB have size limitations, but beyond that, you also have problems
+with how references are to be represented on disk.  One experimental
+module that does attempt to address this need partially is the MLDBM
+module.  Check your nearest CPAN site as described in *Note Perlmodlib:
+perlmodlib, for source code to MLDBM.
+
+AUTHOR
+======
+
+   Tom Christiansen
+
+   TIEHANDLE by Sven Verdoolaege <`skimo@dns.ufsia.ac.be'> and Doug
+MacEachern <`dougm@osf.org'>
+
+
+File: perl.info,  Node: perltodo,  Next: perlhack,  Prev: perlintern,  Up: Top
+
+Perl TO-DO List
+***************
+
+NAME
+====
+
+   perltodo - Perl TO-DO List
+
+DESCRIPTION
+===========
+
+   This is a list of wishes for Perl.  It is maintained by Nathan
+Torkington for the Perl porters.  Send updates to
+*perl5-porters@perl.org*.  If you want to work on any of these projects,
+be sure to check the perl5-porters archives for past ideas, flames, and
+propaganda.  This will save you time and also prevent you from
+implementing something that Larry has already vetoed.  One set of archives
+may be found at:
+
+     http://www.xray.mpe.mpg.de/mailing-lists/perl5-porters/
+
+Infrastructure
+==============
+
+Mailing list archives
+---------------------
+
+   Chaim suggests contacting egroup and asking them to archive the other
+perl.org mailing lists.  Probably not advocacy, but definitely
+perl6-porters, etc.
+
+Bug tracking system
+-------------------
+
+   Richard Foley *richard@perl.org* is writing one.  We looked at several,
+like gnats and the Debian system, but at the time we investigated them,
+none met our needs.  Since then, Jitterbug has matured, and may be worth
+reinvestigation.
+
+   The system we've developed is the recipient of perlbug mail, and any
+followups it generates from perl5-porters.  New bugs are entered into a
+mysql database, and sent on to perl5-porters with the subject line
+rewritten to include a "ticket number" (unique ID for the new bug).  If
+the incoming message already had a ticket number in the subject line, then
+the message is logged against that bug.  There is a separate email
+interface (not forwarding to p5p) that permits porters to claim,
+categorize, and close tickets.
+
+   There is also a web interface to the system at http://bugs.perl.org.
+
+   The current delay in implementation is caused by perl.org lockups.  One
+suspect is the mail handling system, possibly going into loops.
+
+   We still desperately need a bugmaster, someone who will look at every
+new "bug" and kill those that we already know about, those that are not
+bugs at all, etc.
+
+Regression Tests
+----------------
+
+   The test suite for Perl serves two needs: ensuring features work, and
+ensuring old bugs have not been reintroduced.  Both need work.
+
+   Brent LaVelle (lavelle@metronet.com) has stepped forward to work on
+performance tests and improving the size of the test suite.
+
+Coverage
+     Do the tests that come with Perl exercise every line (or every block,
+     or ...)  of the Perl interpreter, and if not then how can we make them
+     do so?
+
+Regression
+     No bug fixes should be made without a corresponding testsuite
+     addition.  This needs a dedicated enforcer, as the current pumpking
+     is either too lazy or too stupid or both and lets enforcement wander
+     all over the map.  :-)
+
+__DIE__
+     Tests that fail need to be of a form that can be readily mailed to
+     perlbug and diagnosed with minimal back-and-forth's to determine
+     which test failed, due to what cause, etc.
+
+suidperl
+     We need regression/sanity tests for suidperl
+
+The 25% slowdown from perl4 to perl5
+     This value may or may not be accurate, but it certainly is
+     eye-catching.  For some things perl5 is faster than perl4, but often
+     the reliability and extensability have come at a cost of speed.  The
+     benchmark suite that Gisle released earlier has been hailed as both a
+     fantastic solution and as a source of entirely meaningless figures.
+     Do we need to test "real applications"?  Can you do so?  Anyone have
+     machines to dedicate to the task?  Identify the things that have grown
+     slower, and see if there's a way to make them faster.
+
+Configure
+=========
+
+   Andy Dougherty maintain(ed|s) a list of "todo" items for the configure
+that comes with Perl.  See Porting/pumpkin.pod in the latest source
+release.
+
+Install HTML
+------------
+
+   Have "make install" give you the option to install HTML as well.  This
+would be part of Configure.  Andy Wardley (certified Perl studmuffin) will
+look into the current problems of HTML installation-is 'installhtml'
+preventing this from happening cleanly, or is pod2html the problem?  If
+the latter, Brad Appleton's pod work may fix the problem for free.
+
+Perl Language
+=============
+
+our ($var)
+----------
+
+   Declare global variables (lexically or otherwise).
+
+64-bit Perl
+-----------
+
+   Verify complete 64 bit support so that the value of sysseek, or -s, or
+stat(), or tell can fit into a perl number without losing precision.  Work
+with the perl-64bit mailing list on perl.org.
+
+Prototypes
+----------
+
+Named prototypes
+     Add proper named prototypes that actually work usefully.
+
+Indirect objects
+     Fix prototype bug that forgets indirect objects.
+
+Method calls
+     Prototypes for method calls.
+
+Context
+     Return context prototype declarations.
+
+Scoped subs
+     lexically-scoped subs, e.g. my sub
+
+Perl Internals
+==============
+
+magic_setisa
+------------
+
+   magic_setisa should be made to update %FIELDS [???]
+
+Garbage Collection
+------------------
+
+   There was talk of a mark-and-sweep garbage collector at TPC2, but the
+(to users) unpredictable nature of its behaviour put some off.  Sarathy, I
+believe, did the work.  Here's what he has to say:
+
+   Yeah, I hope to implement it someday too.  The points that were raised
+in TPC2 were all to do with calling DESTROY() methods, but I think we can
+accomodate that by extending bless() to stash extra information for
+objects so we track their lifetime accurately for those that want their
+DESTROY() to be predictable (this will be a speed hit, naturally, and will
+therefore be optional, naturally. :)
+
+   [N.B. Don't even ask me about this now!  When I have the time to write
+a cogent summary, I'll post it.]
+
+Reliable signals
+----------------
+
+   Sarathy and Dan Sugalski are working on this.  Chip posted a patch
+earlier, but it was not accepted into 5.005.  The issue is tricky, because
+it has the potential to greatly slow down the core.
+
+   There are at least three things to consider:
+
+Alternate runops() for signal despatch
+     Sarathy and Dan are discussed this on perl5-porters.
+
+Figure out how to die() in delayed sighandler
+Add tests for Thread::Signal
+Automatic tests against CPAN
+     Is there some way to automatically build all/most of CPAN with the
+     new Perl and check that the modules there pass all the tests?
+
+Interpolated regex performance bugs
+-----------------------------------
+
+     while (<>) {
+       $found = 0;
+       foreach $pat (@patterns) {
+         $found++ if /$pat/o;
+       }
+       print if $found;
+     }
+
+   The qr// syntax added in 5.005 has solved this problem, but it needs
+more thorough documentation.
+
+Memory leaks from failed eval/regcomp
+-------------------------------------
+
+   The only known memory leaks in Perl are in failed code or regexp
+compilation.  Fix this.  Hugo Van Der Sanden will attempt this but won't
+have tuits until January 1999.
+
+Make XS easier to use
+---------------------
+
+   There was interest in SWIG from porters, but nothing has happened
+lately.
+
+Make embedded Perl easier to use
+--------------------------------
+
+   This is probably difficult for the same reasons that "XS For Dummies"
+will be difficult.
+
+Namespace cleanup
+-----------------
+
+     CPP-space:    restrict CPP symbols exported from headers
+     header-space: move into CORE/perl/
+     API-space:    begin list of things that constitute public api
+     env-space:    Configure should use PERL_CONFIG instead of CONFIG etc.
+
+MULTIPLICITY
+------------
+
+   Complete work on safe recursive interpreters `Perl->new()'.  Sarathy
+says that a reference implementation exists.
+
+MacPerl
+-------
+
+   Chris Nandor and Matthias Neeracher are working on better integrating
+MacPerl into the Perl distribution.
+
+Documentation
+=============
+
+   There's a lot of documentation that comes with Perl.  The quantity of
+documentation makes it difficult for users to know which section of which
+manpage to read in order to solve their problem.  Tom Christiansen has
+done much of the documentation work in the past.
+
+A clear division into tutorial and reference
+--------------------------------------------
+
+   Some manpages (e.g., perltoot and perlreftut) clearly set out to
+educate the reader about a subject.  Other manpages (e.g., perlsub) are
+references for which there is no tutorial, or are references with a slight
+tutorial bent.  If things are either tutorial or reference, then the
+reader knows which manpage to read to learn about a subject, and which
+manpage to read to learn all about an aspect of that subject.  Part of the
+solution to this is:
+
+Remove the artificial distinction between operators and functions
+-----------------------------------------------------------------
+
+   History shows us that users, and often porters, aren't clear on the
+operator-function distinction.  The present split in reference material
+between perlfunc and perlop hinders user navigation.  Given that perlfunc
+is by far the larger of the two, move operator reference into perlfunc.
+
+More tutorials
+--------------
+
+   More documents of a tutorial nature could help.  Here are some
+candidates:
+
+Regular expressions
+     Robin Berjon (r.berjon@ltconsulting.net) has volunteered.
+
+I/O
+     Mark-Jason Dominus (mjd@plover.com) has an outline for perliotut.
+
+pack/unpack
+     This is badly needed.  There has been some discussion on the subject
+     on perl5-porters.
+
+Debugging
+     Ronald Kimball (rjk@linguist.dartmouth.edu) has volunteered.
+
+Include a search tool
+---------------------
+
+   perldoc should be able to 'grep' fulltext indices of installed POD
+files.  This would let people say:
+
+     perldoc -find printing numbers with commas
+
+   and get back the perlfaq entry on 'commify'.
+
+   This solution, however, requires documentation to contain the keywords
+the user is searching for.  Even when the users know what they're looking
+for, often they can't spell it.
+
+Include a locate tool
+---------------------
+
+   perldoc should be able to help people find the manpages on a particular
+high-level subject:
+
+     perldoc -find web
+
+   would tell them manpages, web pages, and books with material on web
+programming.  Similarly `perldoc -find databases', `perldoc -find
+references' and so on.
+
+   We need something in the vicinity of:
+
+     % perl -help random stuff
+     No documentation for perl function `random stuff' found
+     The following entry in perlfunc.pod matches /random/a:
+       =item rand EXPR
+
+     =item rand
+
+     Returns a random fractional number greater than or equal to C<0> and less
+     than the value of EXPR.  (EXPR should be positive.)  If EXPR is
+     omitted, the value C<1> is used.  Automatically calls C<srand()> unless
+     C<srand()> has already been called.  See also C<srand()>.
+
+     (Note: If your rand function consistently returns numbers that are too
+     large or too small, then your version of Perl was probably compiled
+     with the wrong number of RANDBITS.)
+       The following pod pages seem to have /stuff/a:
+     perlfunc.pod	(7 hits)
+     perlfaq7.pod	(6 hits)
+     perlmod.pod		(4 hits)
+     perlsyn.pod		(3 hits)
+     perlfaq8.pod	(2 hits)
+     perlipc.pod		(2 hits)
+     perl5004delta.pod	(1 hit)
+     perl5005delta.pod	(1 hit)
+     perlcall.pod	(1 hit)
+     perldelta.pod	(1 hit)
+     perlfaq3.pod	(1 hit)
+     perlfaq5.pod	(1 hit)
+     perlhist.pod	(1 hit)
+     perlref.pod		(1 hit)
+     perltoc.pod		(1 hit)
+     perltrap.pod	(1 hit)
+       Proceed to open perlfunc.pod? [y] n
+       Do you want to speak perl interactively? [y] n
+       Should I dial 911? [y] n
+       Do you need psychiatric help? [y] y
+       <PELIZA> Hi, what bothers you today?
+            A Python programmer in the next cubby is driving me nuts!
+       <PELIZA> Hmm, thats fixable.  Just [rest censored]
+
+Separate function manpages by default
+-------------------------------------
+
+   Perl should install 'manpages' for every function/operator into the 3pl
+or 3p manual section.  By default.  The splitman program in the Perl
+source distribution does the work of turning big perlfunc into little 3p
+pages.
+
+Users can't find the manpages
+-----------------------------
+
+   Make perldoc tell users what they need to add to their .login or .cshrc
+to set their MANPATH correctly.
+
+Install ALL Documentation
+-------------------------
+
+   Make the standard documentation kit include the VMS, OS/2, Win32,
+Threads, etc information.  installperl and pod/Makefile should know enough
+to copy README.foo to perlfoo.pod before building everything, when
+appropriate.
+
+Outstanding issues to be documented
+-----------------------------------
+
+   Tom has a list of 5.005_5* features or changes that require
+documentation.
+
+   Create one document that coherently explains the delta between the last
+camel release and the current release.  perldelta was supposed to be that,
+but no longer.  The things in perldelta never seemed to get placed in the
+right places in the real manpages, either.  This needs work.
+
+Adapt www.linuxhq.com for Perl
+------------------------------
+
+   This should help glorify documentation and get more people involved in
+perl development.
+
+Replace man with a perl program
+-------------------------------
+
+   Can we reimplement man in Perl?  Tom has a start.  I believe some of
+the Linux systems distribute a manalike.  Alternatively, build on perldoc
+to remove the unfeatures like "is slow" and "has no apropos".
+
+Unicode tutorial
+----------------
+
+   We could use more work on helping people understand Perl's new Unicode
+support that Larry has created.
+
+Modules
+=======
+
+Update the POSIX extension to conform with the POSIX 1003.1 Edition 2
+---------------------------------------------------------------------
+
+   The current state of the POSIX extension is as of Edition 1, 1991,
+whereas the Edition 2 came out in 1996.  ISO/IEC 9945:1-1996(E), ANSI/IEEE
+Std 1003.1, 1996 Edition. ISBN 1-55937-573-6.  The updates were legion:
+threads, IPC, and real time extensions.
+
+Module versions
+---------------
+
+   Automate the checking of versions in the standard distribution so it's
+easy for a pumpking to check whether CPAN has a newer version that we
+should be including?
+
+New modules
+-----------
+
+   Which modules should be added to the standard distribution?  This ties
+in with the SDK discussed on the perl-sdk list at perl.org.
+
+Profiler
+--------
+
+   Make the profiler (Devel::DProf) part of the standard release, and
+document it well.
+
+Tie Modules
+-----------
+
+VecArray
+     Implement array using vec().  Nathan Torkington has working code to
+     do this.
+
+SubstrArray
+     Implement array using substr()
+
+VirtualArray
+     Implement array using a file
+
+ShiftSplice
+     Defines shift et al in terms of splice method
+
+Procedural options
+------------------
+
+   Support procedural interfaces for the common cases of Perl's
+gratuitously OOO modules.  Tom objects to "use IO::File" reading many
+thousands of lines of code.
+
+RPC
+---
+
+   Write a module for transparent, portable remote procedure calls.  (Not
+core).  This touches on the CORBA and ILU work.
+
+y2k localtime/gmtime
+--------------------
+
+   Write a module, Y2k::Catch, which overloads localtime and gmtime's
+returned year value and catches "bad" attempts to use it.
+
+Export File::Find variables
+---------------------------
+
+   Make File::Find export $name etc manually, at least if asked to.
+
+Ioctl
+-----
+
+   Finish a proper Ioctl module.
+
+Debugger attach/detach
+----------------------
+
+   Permit a user to debug an already-running program.
+
+Regular Expression debugger
+---------------------------
+
+   Create a visual profiler/debugger tool that stepped you through the
+execution of a regular expression point by point.  Ilya has a module to
+color-code and display regular expression parses and executions.  There's
+something at http://tkworld.org/ that might be a good start, it's a Tk/Tcl
+RE wizard, that builds regexen of many flavours.
+
+Alternative RE Syntax
+---------------------
+
+   Make an alternative regular expression syntax that is accessed through
+a module.  For instance,
+
+     use RE;
+     $re = start_of_line()
+         ->literal("1998/10/08")
+         ->optional( whitespace() )
+         ->literal("[")
+         ->remember( many( or( "-", digit() ) ) );
+
+     if (/$re/) {
+       print "time is $1\n";
+     }
+
+   Newbies to regular expressions typically only use a subset of the full
+language.  Perhaps you wouldn't have to implement the full feature set.
+
+Bundled modules
+---------------
+
+   Nicholas Clark (nick@flirble.org) had a patch for storing modules in
+zipped format.  This needs exploring and concluding.
+
+Expect
+------
+
+   Adopt IO::Tty, make it as portable as Don Libes' "expect" (can we link
+against expect code?), and perfect a Perl version of expect.  IO::Tty and
+expect could then be distributed as part of the core distribution,
+replacing Comm.pl and other hacks.
+
+GUI::Native
+-----------
+
+   A simple-to-use interface to native graphical abilities would be
+welcomed.  Oh, Perl's access Tk is nice enough, and reasonably portable,
+but it's not particularly as fast as one would like.  Simple access to the
+mouse's cut buffer or mouse-presses shouldn't required loading a few
+terabytes of Tk code.
+
+Update semibroken auxiliary tools; h2ph, a2p, etc.
+--------------------------------------------------
+
+   Kurt Starsinic is working on h2ph.  mjd has fixed bugs in a2p in the
+past.  a2p apparently doesn't work on nawk and gawk extensions.  Graham
+Barr has an Include module that does h2ph work at runtime.
+
+POD Converters
+--------------
+
+   Brad's PodParser code needs to become part of the core, and the Pod::*
+and pod2* programs rewritten to use this standard parser.  Currently the
+converters take different options, some behave in different fashions, and
+some are more picky than others in terms of the POD files they accept.
+
+pod2html
+--------
+
+   A short-term fix: pod2html generates absolute HTML links.  Make it
+generate relative links.
+
+Podchecker
+----------
+
+   Something like lint for Pod would be good.  Something that catches
+common errors as well as gross ones.  Brad Appleton is putting together
+something as part of his PodParser work.
+
+Tom's Wishes
+============
+
+Webperl
+-------
+
+   Design a webperl environment that's as tightly integrated and as
+easy-to-use as Perl's current command-line environment.
+
+Mobile agents
+-------------
+
+   More work on a safe and secure execution environment for mobile agents
+would be neat; the Safe.pm module is a start, but there's a still a lot to
+be done in that area.  Adopt Penguin?
+
+POSIX on non-POSIX
+------------------
+
+   Standard programming constructs for non-POSIX systems would help a lot
+of programmers stuck on primitive, legacy systems.  For example, Microsoft
+still hasn't made a usable POSIX interface on their clunky systems, which
+means that standard operations such as alarm() and fork(), both critical
+for sophisticated client-server programming, must both be kludged around.
+
+   I'm unsure whether Tom means to emulate alarm( )and fork(), or merely
+to provide a document like perlport.pod to say which features are portable
+and which are not.
+
+Portable installations
+----------------------
+
+   Figure out a portable semi-gelled installation, that is, one without
+full paths.  Larry has said that he's thinking about this.  Ilya pointed
+out that perllib_mangle() is good for this.
+
+Win32 Stuff
+===========
+
+Rename new headers to be consistent with the rest
+-------------------------------------------------
+
+Sort out the spawnvp() mess
+---------------------------
+
+Work out DLL versioning
+-----------------------
+
+Style-check
+-----------
+
+Would be nice to have
+=====================
+
+`pack "(stuff)*"'
+Contiguous bitfields in pack/unpack
+lexperl
+Bundled perl preprocessor
+Use posix calls internally where possible
+format BOTTOM
+-i rename file only when successfully changed
+All ARGV input should act like <>
+report HANDLE [formats].
+support in perlmain to rerun debugger
+lvalue functions
+     Tuomas Lukka, on behalf of the PDL project, greatly desires this and
+     Ilya has a patch for it (probably against an older version of Perl).
+     Tuomas points out that what PDL really wants is lvalue methods, not
+     just subs.
+
+Possible pragmas
+================
+
+'less'
+------
+
+   (use less memory, CPU)
+
+Optimizations
+=============
+
+constant function cache
+-----------------------
+
+foreach(reverse...)
+-------------------
+
+Cache eval tree
+---------------
+
+   Unless lexical outer scope used (mark in &compiling?).
+
+rcatmaybe
+---------
+
+Shrink opcode tables
+--------------------
+
+   Via multiple implementations selected in peep.
+
+Cache hash value
+----------------
+
+   Not a win, according to Guido.
+
+Optimize away @_ where possible
+-------------------------------
+
+Optimize sort by { $a <=> $b }
+------------------------------
+
+   Greg Bacon added several more sort optimizations.  These have made it
+into 5.005_55, thanks to Hans Mulder.
+
+Rewrite regexp parser for better integrated optimization
+--------------------------------------------------------
+
+   The regexp parser was rewritten for 5.005.  Ilya's the regexp guru.
+
+Vague possibilities
+===================
+
+ref function in list context
+     This seems impossible to do without substantially breaking code.
+
+make tr/// return histogram in list context?
+Loop control on do{} et al
+Explicit switch statements
+     Nobody has yet managed to come up with a switch syntax that would
+     allow for mixed hash, constant, regexp checks.  Submit implementation
+     with syntax, please.
+
+compile to real threaded code
+structured types
+Modifiable $1 et al
+     The intent is for this to be a means of editing the matched portions
+     of the target string.
+
+To Do Or Not To Do
+==================
+
+   These are things that have been discussed in the past and roundly
+criticized for being of questionable value.
+
+Making my() work on "package" variables
+---------------------------------------
+
+   Being able to say my($Foo::Bar), something that sounds ludicrous and
+the 5.6 pumpking has mocked.
+
+"or" testing defined not truth
+------------------------------
+
+   We tell people that `||' can be used to give a default value to a
+variable:
+
+     $children = shift || 5;		# default is 5 children
+
+   which is almost (but not):
+
+     $children = shift;
+     $children = 5 unless $children;
+
+   but if the first argument was given and is "0", then it will be
+considered false by `||' and 5 used instead.  Really we want an `||'-like
+operator that behaves like:
+
+     $children = shift;
+     $children = 5 unless defined $children;
+
+   Namely, a `||' that tests defined-ness rather than truth.  One was
+discussed, and a patch submitted, but the objections were many.  While
+there were objections, many still feel the need.  At least it was decided
+that `??' is the best name for the operator.
+
+"dynamic" lexicals
+------------------
+
+     my $x;
+     sub foo {
+       local $x;
+     }
+
+   Localizing, as Tim Bunce points out, is a separate concept from whether
+the variable is global or lexical.  Chip Salzenberg had an implementation
+once, but Larry thought it had potential to confuse.
+
+"class"-based, rather than package-based "lexicals"
+---------------------------------------------------
+
+   This is like what the Alias module provides, but the variables would be
+lexicals reserved by perl at compile-time, which really are indices
+pointing into the pseudo-hash object visible inside every method so
+declared.
+
+Threading
+=========
+
+Modules
+-------
+
+   Which of the standard modules are thread-safe?  Which CPAN modules?
+How easy is it to fix those non-safe modules?
+
+Testing
+-------
+
+   Threading is still experimental.  Every reproducible bug identifies
+something else for us to fix.  Find and submit more of these problems.
+
+$AUTOLOAD
+---------
+
+exit/die
+--------
+
+   Consistent semantics for exit/die in threads.
+
+External threads
+----------------
+
+   Better support for externally created threads.
+
+Thread::Pool
+------------
+
+thread-safety
+-------------
+
+   Spot-check globals like statcache and global GVs for thread-safety.
+"*Part done*", says Sarathy.
+
+Per-thread GVs
+--------------
+
+   According to Sarathy, this would make @_ be the same in threaded and
+non-threaded, as well as helping solve problems like filehandles (the same
+filehandle currently cannot be used in two threads).
+
+Compiler
+========
+
+Optimization
+------------
+
+   The compiler's back-end code-generators for creating bytecode or
+compilable C code could use optimization work.
+
+Byteperl
+--------
+
+   Figure out how and where byteperl will be built for the various
+platforms.
+
+Precompiled modules
+-------------------
+
+   Save byte-compiled modules on disk.
+
+Executables
+-----------
+
+   Auto-produce executable.
+
+Typed lexicals
+--------------
+
+   Typed lexicals should affect B::CC::load_pad.
+
+Win32
+-----
+
+   Workarounds to help Win32 dynamic loading.
+
+END blocks
+----------
+
+   END blocks need saving in compiled output, now that CHECK blocks are
+available.
+
+_AUTOLOAD
+---------
+
+   _AUTOLOAD prodding.
+
+comppadlist
+-----------
+
+   Fix comppadlist (names in comppad_name can have fake SvCUR from where
+newASSIGNOP steals the field).
+
+Cached compilation
+------------------
+
+   Can we install modules as bytecode?
+
+Recently Finished Tasks
+=======================
+
+Figure a way out of $^(capital letter)
+--------------------------------------
+
+   Figure out a clean way to extend $^(capital letter) beyond the 26
+alphabets.  (${^WORD} maybe?)
+
+   Mark-Jason Dominus sent a patch which went into 5.005_56.
+
+Filenames
+---------
+
+   Keep filenames in the distribution and in the standard module set be
+8.3 friendly where feasible.  Good luck changing the standard modules,
+though.
+
+Foreign lines
+-------------
+
+   Perl should be more generous in accepting foreign line terminations.
+Mostly done in 5.005.
+
+Namespace cleanup
+-----------------
+
+     symbol-space: "pl_" prefix for all global vars
+                   "Perl_" prefix for all functions
+
+     CPP-space:	  stop malloc()/free() pollution unless asked
+
+ISA.pm
+------
+
+   Rename and alter ISA.pm.  *Done*.  It is now base.pm.
+
+gettimeofday
+------------
+
+   See Time::HiRes.
+
+autocroak?
+----------
+
+   This is the Fatal.pm module, so any builtin that that does not return
+success automatically die()s.  If you're feeling brave, tie this in with
+the unified exceptions scheme.
+
+

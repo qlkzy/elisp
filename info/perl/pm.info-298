@@ -1,0 +1,1940 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: POE/Wheel/ReadWrite,  Next: POE/Wheel/SocketFactory,  Prev: POE/Wheel/ListenAccept,  Up: Module List
+
+POE Read/Write Logic Abstraction
+********************************
+
+NAME
+====
+
+   POE::Wheel::ReadWrite - POE Read/Write Logic Abstraction
+
+SYNOPSIS
+========
+
+     $wheel = new POE::Wheel::ReadWrite(
+
+     # To read and write from the same handle, such as a socket, use
+     # the Handle parameter:
+     Handle       => $file_or_socket_handle,       # Handle to read/write
+
+     # To read and write from different handles, such as a dual pipe to
+     # a child process, or a console, use InputHandle and OutputHandle:
+     InputHandle  => $readable_filehandle,         # Handle to read
+     OutputHandle => $writable_filehandle,         # Handle to write
+
+     Driver       => new POE::Driver::Something(), # How to read/write it
+
+     # To read and write using the same line discipline, such as
+     # Filter::Line, use the Filter parameter:
+     Filter       => new POE::Filter::Something(), # How to parse in and out
+
+     # To read and write using different line disciplines, such as
+     # stream out and line in:
+     InputFilter  => new POE::Filter::Something(),     # Read data one way
+     OUtputFilter => new POE::Filter::SomethingElse(), # Write data another
+
+     InputState   => $input_state_name,  # Input received state
+     FlushedState => $flush_state_name,  # Output flushed state
+     ErrorState   => $error_state_name,  # Error occurred state
+
+     # To enable callbacks for high and low water events (using any one
+     # of these options requires the rest):
+     HighMark  => $high_mark_octets, # Outgoing high-water mark
+     HighState => $high_mark_state,  # State to call when high-water reached
+     LowMark   => $low_mark_octets,  # Outgoing low-water mark
+     LowState  => $low_mark_state,   # State to call when low-water reached
+       );
+
+     $wheel->put( $something );
+     $wheel->event( ... );
+
+     # To set both the input and output filters at once:
+     $wheel->set_filter( new POE::Filter::Something );
+
+     # To set an input filter or an output filter:
+     $wheel->set_input_filter( new POE::Filter::Something );
+     $wheel->set_output_filter( new POE::Filter::Something );
+
+     # To alter the high or low water marks:
+     $wheel->set_high_mark( $new_high_mark_octets );
+     $wheel->set_low_mark( $new_low_mark_octets );
+
+     # To fetch driver statistics:
+     $pending_octets   = $wheel->get_driver_out_octets();
+     $pending_messages = $wheel->get_driver_out_messages();
+
+     # To retrieve the wheel's ID:
+     print $wheel->ID;
+
+DESCRIPTION
+===========
+
+   The ReadWrite wheel does buffered, select-based I/O on a filehandle.
+It generates events for common file conditions, such as when data has been
+read or flushed.  This wheel includes a put() method.
+
+PUBLIC METHODS
+==============
+
+   * POE::Wheel::ReadWrite::put($logical_data_chunk)
+
+     The put() method uses a POE::Filter to translate the logical data
+     chunk into a serialized (streamable) representation.  It then uses a
+     POE::Driver to enqueue or write the data to a filehandle.  It also
+     manages the wheel's write select so that any buffered data can be
+     flushed when the handle is ready.
+
+     The put() method returns a boolean value indicating whether the
+     wheel's high water mark has been reached.  It will always return false
+     if the wheel doesn't have a high water mark set.
+
+     Data isn't flushed to the underlying filehandle, so it's easy for
+     put() to exceed a wheel's high water mark without generating a
+     HighState event.
+
+   * POE::Wheel::ReadWrite::event(...)
+
+     Please see POE::Wheel.
+
+   * POE::Wheel::ReadWrite::set_filter( $poe_filter )
+
+     The set_filter method changes the filter that the ReadWrite wheel uses
+     to translate between streams and logical chunks of data.  It sets both
+     the read and write filters.  It uses filters' get_pending() method to
+     preserve any unprocessed input between the previous and new filters.
+
+     Please be aware that this method has complex and perhaps non-obvious
+     side effects.  The description of POE::Filter::get_pending() discusses
+     them further.
+
+     POE::Filter::HTTPD does not support the get_pending() method.
+     Switching from an HTTPD filter to another one will display a reminder
+     that it sn't supported.
+
+   * POE::Wheel::ReadWrite::set_input_filter( $poe_filter )
+     POE::Wheel::ReadWrite::set_output_filter( $poe_filter )
+
+     These perform similar functions to the &set_filter method, but they
+     change the input or output filters separately.
+
+   * POE::Wheel::ReadWrite::set_high_mark( $high_mark_octets )
+     POE::Wheel::ReadWrite::set_low_mark( $low_mark_octets )
+
+     Sets the high and low watermark octet counts.  They will not take
+     effect until the next $wheel->put() or internal buffer flush.
+     POE::Wheel::ReadWrite->event() can change the high and low watermark
+     events.
+
+   * POE::Wheel::ReadWrite::ID()
+
+     Returns the ReadWrite wheel's unique ID.  This can be used to
+     associate the wheel's events back to the wheel itself.
+
+EVENTS AND PARAMETERS
+=====================
+
+   * InputState
+
+     The InputState event contains the name of the state that will be
+     called for each chunk of logical data returned by the ReadWrite
+     wheel's filter.
+
+     The ARG0 parameter contains the chunk of logical data that was
+     received.  ARG1 contains the ID of the wheel that received the input.
+
+     A sample InputState state:
+
+          sub input_state {
+            my ($heap, $input, $wheel_id) = @_[HEAP, ARG0, ARG1];
+            print "Echoing input from wheel $wheel_id: $input\n";
+            $heap->{wheel}->put($input);     # Echo it back.
+          }
+
+   * FlushedState
+
+     The FlushedState event contains the name of the state that will be
+     called whenever the wheel's driver's output queue becomes empty.  This
+     signals that all pending data has been written.  It comes with a
+     single parameter, ARG0, that indicates which wheel flushed its buffer.
+
+     A sample FlushedState state:
+
+          sub flushed_state {
+            # Stop a wheel after all outgoing data is flushed.
+            # This frees the wheel's resources, including the
+            # filehandle, and closes the connection.
+            delete $_[HEAP]->{wheel}->{$_[ARG0]};
+          }
+
+   * ErrorState
+
+     The ErrorState event contains the name of the state that will be
+     called when a file error occurs.  The ReadWrite wheel knows what to do
+     with EAGAIN, so it's not considered a true error.
+
+     The ARG0 parameter contains the name of the function that failed.
+     ARG1 and ARG2 contain the numeric and string versions of $! at the
+     time of the error, respectively.  ARG3 holds the ID of the wheel that
+     encountered an error; this is good for times when you have several
+     wheels and need to know which one's having trouble.
+
+     A sample ErrorState state:
+
+          sub error_state {
+            my ($heap, $operation, $errnum, $errstr, $wheel_id) =
+              @_[HEAP, ARG0, ARG1..ARG3];
+            warn "$operation error $errnum: $errstr\n";
+            delete $heap->{wheels}->{$wheel_id}; # shut down that wheel
+          }
+
+   * HighState
+
+     The HighState event indicates when the wheel's driver's output buffer
+     has grows to reach HighMark octets of unwritten data.  This event will
+     fire once when the output buffer reaches HighMark, and it will not
+     fire again until a LowState event occurs.
+
+     HighState and LowState together are used for flow control.  The idea
+     is to perform some sort of throttling when HighState is called and
+     resume full-speed transmission when LowState is called.
+
+     HighState comes with ARG0, the ID of the wheel that encountered the
+     high-water condition.
+
+   * LowState
+
+     The LowState event indicates when a wheel's driver's output buffer
+     shrinks down to LowMark octets of unwritten data.  This event will
+     only fire when the output buffer reaches LowMark after a HighState
+     event.
+
+     HighState and LowState together are used for flow control.  The idea
+     is to perform some sort of throttling when HighState is called and
+     resume full-speed transmission when LowState is called.
+
+     LowState comes with ARG0, the ID of the wheel that encounterd the
+     low-water condition.
+
+SEE ALSO
+========
+
+   POE::Wheel; POE::Wheel::FollowTail; POE::Wheel::ListenAccept;
+POE::Wheel::SocketFactory
+
+BUGS
+====
+
+   Oh, probably some.
+
+AUTHORS & COPYRIGHTS
+====================
+
+   Please see the POE manpage.
+
+
+File: pm.info,  Node: POE/Wheel/SocketFactory,  Next: POSIX,  Prev: POE/Wheel/ReadWrite,  Up: Module List
+
+POE Socket Creation Logic Abstraction
+*************************************
+
+NAME
+====
+
+   POE::Wheel::SocketFactory - POE Socket Creation Logic Abstraction
+
+SYNOPSIS
+========
+
+     use Socket; # For the constants
+
+     # Listening Unix domain socket.
+     $wheel = new POE::Wheel::SocketFactory(
+       SocketDomain => AF_UNIX,               # Sets the socket() domain
+       BindAddress  => $unix_socket_address,  # Sets the bind() address
+       SuccessState => $success_state,        # State to call upon accept()
+       FailureState => $state_failure,        # State to call upon error
+       # Optional parameters (and default values):
+       SocketType   => SOCK_STREAM,           # Sets the socket() type
+     );
+
+     # Connecting Unix domain socket.
+     $wheel = new POE::Wheel::SocketFactory(
+       SocketDomain  => AF_UNIX,              # Sets the socket() domain
+       RemoteAddress => $unix_server_address, # Sets the connect() address
+       SuccessState  => $success_state,       # State to call on connection
+       FailureState  => $state_failure,       # State to call on error
+       # Optional parameters (and default values):
+       SocketType    => SOCK_STREAM,          # Sets the socket() type
+       # Optional parameters (that have no defaults):
+       BindAddress   => $unix_client_address, # Sets the bind() address
+     );
+
+     # Listening Internet domain socket.
+     $wheel = new POE::Wheel::SocketFactory(
+       BindAddress    => $inet_address,       # Sets the bind() address
+       BindPort       => $inet_port,          # Sets the bind() port
+       SuccessState   => $success_state,      # State to call upon accept()
+       FailureState   => $state_failure,      # State to call upon error
+       # Optional parameters (and default values):
+       SocketDomain   => AF_INET,             # Sets the socket() domain
+       SocketType     => SOCK_STREAM,         # Sets the socket() type
+       SocketProtocol => 'tcp',               # Sets the socket() protocol
+       ListenQueue    => SOMAXCONN,           # The listen() queue length
+       Reuse          => 'no',                # Lets the port be reused
+     );
+
+     # Connecting Internet domain socket.
+     $wheel = new POE::Wheel::SocketFactory(
+       RemoteAddress  => $inet_address,       # Sets the connect() address
+       RemotePort     => $inet_port,          # Sets the connect() port
+       SuccessState   => $success_state,      # State to call on connection
+       FailureState   => $state_failure,      # State to call on error
+       # Optional parameters (and default values):
+       SocketDomain   => AF_INET,             # Sets the socket() domain
+       SocketType     => SOCK_STREAM,         # Sets the socket() type
+       SocketProtocol => 'tcp',               # Sets the socket() protocol
+       Reuse          => 'no',                # Lets the port be reused
+     );
+
+     $wheel->event( ... );
+
+     $wheel->ID();
+
+DESCRIPTION
+===========
+
+   This wheel creates sockets, generating events when something happens to
+them.  Success events come with connected, ready to use sockets.  Failure
+events are accompanied by error codes, similar to other wheels'.
+
+   SocketFactory currently supports Unix domain sockets, and TCP sockets
+within the Internet domain.  Other protocols are forthcoming, eventually;
+let the author or mailing list know if they're needed sooner.
+
+PUBLIC METHODS
+==============
+
+   * POE::Wheel::SocketFactory::new()
+
+     The new() method does most of the work.  It has parameters for just
+     about every aspect of socket creation: socket(), setsockopt(), bind(),
+     listen(), connect() and accept().  Thankfully they all aren't used at
+     the same time.
+
+     (!!!) The new() method always returns the SocketFactory wheel's
+     reference, even if the constructor didn't succeed.  This is different
+     from versions before 0.1106.
+
+     The parameters:
+
+        * SocketDomain
+
+          SocketDomain is the DOMAIN parameter for the socket() call.
+          Currently supported values are AF_UNIX, AF_INET, PF_UNIX and
+          PF_INET.  It defaults to AF_INET if omitted.
+
+        * SocketType
+
+          SocketType is the TYPE parameter for the socket() call.
+          Currently supported values are SOCK_STREAM and SOCK_DGRAM
+          (although datagram sockets aren't tested at this time).  It
+          defaults to SOCK_STREAM if omitted.
+
+        * SocketProtocol
+
+          SocketProtocol is the PROTOCOL parameter for the socket() call.
+          Protocols may be specified by name or number (see
+          /etc/protocols, or the equivalent file).  The only supported
+          protocol at this time is 'tcp'.  SocketProtocol is ignored for
+          Unix domain sockets.  It defaults to 'tcp' if omitted from an
+          Internet socket constructor.
+
+        * BindAddress
+
+          BindAddress is the local interface address that the socket will
+          be bound to.
+
+          For Internet domain sockets: The bind address may be a string
+          containing a dotted quad, a host name, or a packed Internet
+          address (without the port).  It defaults to INADDR_ANY if it's
+          not specified, which will try to bind the socket to every
+          interface.  If any interface has a socket already bound to the
+          BindPort, then bind() (and the SocketFactory) will fail.
+
+          For Unix domain sockets: The bind address is a path where the
+          socket will be created.  It is required for server sockets and
+          datagram client sockets.  If a file exists at the bind address,
+          then bind() (and the SocketFactory) will fail.
+
+        * BindPort
+
+          BindPort is the port of the local interface(s) that the socket
+          will try to bind to.  It is ignored for Unix sockets and
+          recommended for Internet sockets.  It defaults to 0 if omitted,
+          which will bind the socket to an unspecified available port.
+
+          The bind port may be a number, or a name in the /etc/services (or
+          equivalent) database.
+
+        * ListenQueue
+
+          ListenQueue specifies the length of the socket's listen() queue.
+          It defaults to SOMAXCONN if omitted.  SocketFactory will ensure
+          that ListenQueue doesn't exceed SOMAXCONN.
+
+          It should go without saying that ListenQueue is only appropriate
+          for listening sockets.
+
+        * RemoteAddress
+
+          RemoteAddress is the remote address to which the socket should
+          connect.  If present, the SocketFactory will create a connecting
+          socket; otherwise, the SocketFactory will make a listening
+          socket.
+
+          The remote address may be a string containing a dotted quad, a
+          host name, a packed Internet address, or a Unix socket path.  It
+          will be packed, with or without an accompanying RemotePort as
+          necessary for the socket domain.
+
+        * RemotePort
+
+          RemotePort is the port to which the socket should connect.  It is
+          required for connecting Internet sockets and ignored in all other
+          cases.
+
+          The remote port may be a number, or a name in the /etc/services
+          (or equivalent) database.
+
+   * POE::Wheel::SocketFactory::event(...)
+
+     Please see POE::Wheel.
+
+   * POE::Wheel::SocketFactory::getsockname()
+
+     Returns the value of getsockname() as called with the SocketFactory's
+     socket.
+
+     This is useful for finding out what the SocketFactory's internal
+     socket has bound to when it's been instructed to use BindAddress =>
+     INADDR_ANY and/or BindPort => INADDR_ANY.
+
+   * POE::Wheel::SocketFactory::ID()
+
+     Returns the SocketFactory wheel's unique ID.  This can be used to
+     associate the wheel's events back to the wheel itself.
+
+EVENTS AND PARAMETERS
+=====================
+
+   * SuccessState
+
+     The SuccessState parameter defines a state name or coderef to call
+     upon a successful connect or accept.  The operation it succeeds on
+     depends on the type of socket created.
+
+     For connecting sockets, the success state/coderef is called when the
+     socket has connected.  For listening sockets, the success
+     state/coderef is called for each successfully accepted client
+     connection.
+
+     ARG0 contains the connected or accepted socket.
+
+     For INET sockets, ARG1 and ARG2 hold the socket's remote address and
+     port, respectively.
+
+     For Unix client sockets, ARG1 contains the server address and ARG2 is
+     undefined.  Some systems have trouble getting the address of a
+     socket's remote end, so ARG1 may be undefined if there was trouble
+     determining it.
+
+     ARG3 contains a unique ID for the SocketFactory that generated the
+     event.  This is useful for associating socket statuses with particular
+     socket factories.
+
+     According to _Perl Cookbook_, the remote address for accepted Unix
+     domain sockets is undefined.  So ARG1 and ARG2 are, too.
+
+   * FailureState
+
+     The FailureState parameter defines a state name or coderef to call
+     when a socket error occurs.  The SocketFactory knows what to do with
+     EAGAIN, so that's not considered an error.
+
+     The ARG0 parameter contains the name of the function that failed.
+     ARG1 and ARG2 contain the numeric and string versions of $! at the
+     time of the error, respectively.
+
+     ARG3 contains a unique ID for the SocketFactory that generated the
+     event.  This is useful for associating socket statuses with particular
+     socket factories.
+
+     A sample ErrorState state:
+
+          sub error_state {
+            my ($operation, $errnum, $errstr) = @_[ARG0, ARG1, ARG2];
+            warn "$operation error $errnum: $errstr\n";
+          }
+
+SEE ALSO
+========
+
+   POE::Wheel; POE::Wheel::FollowTail; POE::Wheel::ListenAccept;
+POE::Wheel::ReadWrite; POE::Wheel::SocketFactory
+
+BUGS
+====
+
+   Many (if not all) of the croak/carp/warn/die statements should fire
+back $state_failure instead.
+
+AUTHORS & COPYRIGHTS
+====================
+
+   Please see the POE manpage.
+
+
+File: pm.info,  Node: POSIX,  Next: PPM,  Prev: POE/Wheel/SocketFactory,  Up: Module List
+
+Perl interface to IEEE Std 1003.1
+*********************************
+
+NAME
+====
+
+   POSIX - Perl interface to IEEE Std 1003.1
+
+SYNOPSIS
+========
+
+     use POSIX;
+     use POSIX qw(setsid);
+     use POSIX qw(:errno_h :fcntl_h);
+
+     printf "EINTR is %d\n", EINTR;
+
+     $sess_id = POSIX::setsid();
+
+     $fd = POSIX::open($path, O_CREAT|O_EXCL|O_WRONLY, 0644);
+     	# note: that's a filedescriptor, *NOT* a filehandle
+
+DESCRIPTION
+===========
+
+   The POSIX module permits you to access all (or nearly all) the standard
+POSIX 1003.1 identifiers.  Many of these identifiers have been given
+Perl-ish interfaces.  Things which are `#defines' in C, like EINTR or
+O_NDELAY, are automatically exported into your namespace.  All functions
+are only exported if you ask for them explicitly.  Most likely people will
+prefer to use the fully-qualified function names.
+
+   This document gives a condensed list of the features available in the
+POSIX module.  Consult your operating system's manpages for general
+information on most features.  Consult *Note Perlfunc:
+(perl.info)perlfunc, for functions which are noted as being identical to
+Perl's builtin functions.
+
+   The first section describes POSIX functions from the 1003.1
+specification.  The second section describes some classes for signal
+objects, TTY objects, and other miscellaneous objects.  The remaining
+sections list various constants and macros in an organization which
+roughly follows IEEE Std 1003.1b-1993.
+
+NOTE
+====
+
+   The POSIX module is probably the most complex Perl module supplied with
+the standard distribution.  It incorporates autoloading, namespace games,
+and dynamic loading of code that's in Perl, C, or both.  It's a great
+source of wisdom.
+
+CAVEATS
+=======
+
+   A few functions are not implemented because they are C specific.  If you
+attempt to call these, they will print a message telling you that they
+aren't implemented, and suggest using the Perl equivalent should one
+exist.  For example, trying to access the setjmp() call will elicit the
+message "setjmp() is C-specific: use eval {} instead".
+
+   Furthermore, some evil vendors will claim 1003.1 compliance, but in fact
+are not so: they will not pass the PCTS (POSIX Compliance Test Suites).
+For example, one vendor may not define EDEADLK, or the semantics of the
+errno values set by open(2) might not be quite right.  Perl does not
+attempt to verify POSIX compliance.  That means you can currently
+successfully say "use POSIX",  and then later in your program you find
+that your vendor has been lax and there's no usable ICANON macro after
+all.  This could be construed to be a bug.
+
+FUNCTIONS
+=========
+
+_exit
+     This is identical to the C function `_exit()'.
+
+abort
+     This is identical to the C function `abort()'.
+
+abs
+     This is identical to Perl's builtin `abs()' function.
+
+access
+     Determines the accessibility of a file.
+
+          if( POSIX::access( "/", &POSIX::R_OK ) ){
+          	print "have read permission\n";
+          }
+
+     Returns undef on failure.
+
+acos
+     This is identical to the C function `acos()'.
+
+alarm
+     This is identical to Perl's builtin `alarm()' function.
+
+asctime
+     This is identical to the C function `asctime()'.
+
+asin
+     This is identical to the C function `asin()'.
+
+assert
+     Unimplemented.
+
+atan
+     This is identical to the C function `atan()'.
+
+atan2
+     This is identical to Perl's builtin `atan2()' function.
+
+atexit
+     atexit() is C-specific: use END {} instead.
+
+atof
+     atof() is C-specific.
+
+atoi
+     atoi() is C-specific.
+
+atol
+     atol() is C-specific.
+
+bsearch
+     bsearch() not supplied.
+
+calloc
+     calloc() is C-specific.
+
+ceil
+     This is identical to the C function `ceil()'.
+
+chdir
+     This is identical to Perl's builtin chdir() function.
+
+chmod
+     This is identical to Perl's builtin chmod() function.
+
+chown
+     This is identical to Perl's builtin `chown()' function.
+
+clearerr
+     Use method `IO::Handle::clearerr()' instead.
+
+clock
+     This is identical to the C function `clock()'.
+
+close
+     Close the file.  This uses file descriptors such as those obtained by
+     calling `POSIX::open'.
+
+          $fd = POSIX::open( "foo", &POSIX::O_RDONLY );
+          POSIX::close( $fd );
+
+     Returns undef on failure.
+
+closedir
+     This is identical to Perl's builtin `closedir()' function.
+
+cos
+     This is identical to Perl's builtin `cos()' function.
+
+cosh
+     This is identical to the C function `cosh()'.
+
+creat
+     Create a new file.  This returns a file descriptor like the ones
+     returned by `POSIX::open'.  Use `POSIX::close' to close the file.
+
+          $fd = POSIX::creat( "foo", 0611 );
+          POSIX::close( $fd );
+
+ctermid
+     Generates the path name for the controlling terminal.
+
+          $path = POSIX::ctermid();
+
+ctime
+     This is identical to the C function `ctime()'.
+
+cuserid
+     Get the character login name of the user.
+
+          $name = POSIX::cuserid();
+
+difftime
+     This is identical to the C function `difftime()'.
+
+div
+     div() is C-specific.
+
+dup
+     This is similar to the C function `dup()'.
+
+     This uses file descriptors such as those obtained by calling
+     `POSIX::open'.
+
+     Returns undef on failure.
+
+dup2
+     This is similar to the C function `dup2()'.
+
+     This uses file descriptors such as those obtained by calling
+     `POSIX::open'.
+
+     Returns undef on failure.
+
+errno
+     Returns the value of errno.
+
+          $errno = POSIX::errno();
+
+execl
+     execl() is C-specific.
+
+execle
+     execle() is C-specific.
+
+execlp
+     execlp() is C-specific.
+
+execv
+     execv() is C-specific.
+
+execve
+     execve() is C-specific.
+
+execvp
+     execvp() is C-specific.
+
+exit
+     This is identical to Perl's builtin exit() function.
+
+exp
+     This is identical to Perl's builtin `exp()' function.
+
+fabs
+     This is identical to Perl's builtin `abs()' function.
+
+fclose
+     Use method `IO::Handle::close()' instead.
+
+fcntl
+     This is identical to Perl's builtin `fcntl()' function.
+
+fdopen
+     Use method `IO::Handle::new_from_fd()' instead.
+
+feof
+     Use method `IO::Handle::eof()' instead.
+
+ferror
+     Use method `IO::Handle::error()' instead.
+
+fflush
+     Use method `IO::Handle::flush()' instead.
+
+fgetc
+     Use method `IO::Handle::getc()' instead.
+
+fgetpos
+     Use method `IO::Seekable::getpos()' instead.
+
+fgets
+     Use method `IO::Handle::gets()' instead.
+
+fileno
+     Use method `IO::Handle::fileno()' instead.
+
+floor
+     This is identical to the C function `floor()'.
+
+fmod
+     This is identical to the C function `fmod()'.
+
+fopen
+     Use method `IO::File::open()' instead.
+
+fork
+     This is identical to Perl's builtin fork() function.
+
+fpathconf
+     Retrieves the value of a configurable limit on a file or directory.
+     This uses file descriptors such as those obtained by calling
+     `POSIX::open'.
+
+     The following will determine the maximum length of the longest
+     allowable pathname on the filesystem which holds `/tmp/foo'.
+
+          $fd = POSIX::open( "/tmp/foo", &POSIX::O_RDONLY );
+          $path_max = POSIX::fpathconf( $fd, &POSIX::_PC_PATH_MAX );
+
+     Returns undef on failure.
+
+fprintf
+     fprintf() is C-specific-use printf instead.
+
+fputc
+     fputc() is C-specific-use print instead.
+
+fputs
+     fputs() is C-specific-use print instead.
+
+fread
+     fread() is C-specific-use read instead.
+
+free
+     free() is C-specific.
+
+freopen
+     freopen() is C-specific-use open instead.
+
+frexp
+     Return the mantissa and exponent of a floating-point number.
+
+          ($mantissa, $exponent) = POSIX::frexp( 3.14 );
+
+fscanf
+     fscanf() is C-specific-use <> and regular expressions instead.
+
+fseek
+     Use method `IO::Seekable::seek()' instead.
+
+fsetpos
+     Use method `IO::Seekable::setpos()' instead.
+
+fstat
+     Get file status.  This uses file descriptors such as those obtained by
+     calling `POSIX::open'.  The data returned is identical to the data
+     from Perl's builtin stat function.
+
+          $fd = POSIX::open( "foo", &POSIX::O_RDONLY );
+          @stats = POSIX::fstat( $fd );
+
+ftell
+     Use method `IO::Seekable::tell()' instead.
+
+fwrite
+     fwrite() is C-specific-use print instead.
+
+getc
+     This is identical to Perl's builtin `getc()' function.
+
+getchar
+     Returns one character from STDIN.
+
+getcwd
+     Returns the name of the current working directory.
+
+getegid
+     Returns the effective group id.
+
+getenv
+     Returns the value of the specified enironment variable.
+
+geteuid
+     Returns the effective user id.
+
+getgid
+     Returns the user's real group id.
+
+getgrgid
+     This is identical to Perl's builtin `getgrgid()' function.
+
+getgrnam
+     This is identical to Perl's builtin `getgrnam()' function.
+
+getgroups
+     Returns the ids of the user's supplementary groups.
+
+getlogin
+     This is identical to Perl's builtin `getlogin()' function.
+
+getpgrp
+     This is identical to Perl's builtin `getpgrp()' function.
+
+getpid
+     Returns the process's id.
+
+getppid
+     This is identical to Perl's builtin `getppid()' function.
+
+getpwnam
+     This is identical to Perl's builtin getpwnam() function.
+
+getpwuid
+     This is identical to Perl's builtin getpwuid() function.
+
+gets
+     Returns one line from STDIN.
+
+getuid
+     Returns the user's id.
+
+gmtime
+     This is identical to Perl's builtin `gmtime()' function.
+
+isalnum
+     This is identical to the C function, except that it can apply to a
+     single character or to a whole string.
+
+isalpha
+     This is identical to the C function, except that it can apply to a
+     single character or to a whole string.
+
+isatty
+     Returns a boolean indicating whether the specified filehandle is
+     connected to a tty.
+
+iscntrl
+     This is identical to the C function, except that it can apply to a
+     single character or to a whole string.
+
+isdigit
+     This is identical to the C function, except that it can apply to a
+     single character or to a whole string.
+
+isgraph
+     This is identical to the C function, except that it can apply to a
+     single character or to a whole string.
+
+islower
+     This is identical to the C function, except that it can apply to a
+     single character or to a whole string.
+
+isprint
+     This is identical to the C function, except that it can apply to a
+     single character or to a whole string.
+
+ispunct
+     This is identical to the C function, except that it can apply to a
+     single character or to a whole string.
+
+isspace
+     This is identical to the C function, except that it can apply to a
+     single character or to a whole string.
+
+isupper
+     This is identical to the C function, except that it can apply to a
+     single character or to a whole string.
+
+isxdigit
+     This is identical to the C function, except that it can apply to a
+     single character or to a whole string.
+
+kill
+     This is identical to Perl's builtin kill() function.
+
+labs
+     labs() is C-specific, use abs instead.
+
+ldexp
+     This is identical to the C function `ldexp()'.
+
+ldiv
+     ldiv() is C-specific, use / and int instead.
+
+link
+     This is identical to Perl's builtin link() function.
+
+localeconv
+     Get numeric formatting information.  Returns a reference to a hash
+     containing the current locale formatting values.
+
+     The database for the *de* (Deutsch or German) locale.
+
+          $loc = POSIX::setlocale( &POSIX::LC_ALL, "de" );
+          print "Locale = $loc\n";
+          $lconv = POSIX::localeconv();
+          print "decimal_point	= ", $lconv->{decimal_point},	"\n";
+          print "thousands_sep	= ", $lconv->{thousands_sep},	"\n";
+          print "grouping	= ", $lconv->{grouping},	"\n";
+          print "int_curr_symbol	= ", $lconv->{int_curr_symbol},	"\n";
+          print "currency_symbol	= ", $lconv->{currency_symbol},	"\n";
+          print "mon_decimal_point = ", $lconv->{mon_decimal_point}, "\n";
+          print "mon_thousands_sep = ", $lconv->{mon_thousands_sep}, "\n";
+          print "mon_grouping	= ", $lconv->{mon_grouping},	"\n";
+          print "positive_sign	= ", $lconv->{positive_sign},	"\n";
+          print "negative_sign	= ", $lconv->{negative_sign},	"\n";
+          print "int_frac_digits	= ", $lconv->{int_frac_digits},	"\n";
+          print "frac_digits	= ", $lconv->{frac_digits},	"\n";
+          print "p_cs_precedes	= ", $lconv->{p_cs_precedes},	"\n";
+          print "p_sep_by_space	= ", $lconv->{p_sep_by_space},	"\n";
+          print "n_cs_precedes	= ", $lconv->{n_cs_precedes},	"\n";
+          print "n_sep_by_space	= ", $lconv->{n_sep_by_space},	"\n";
+          print "p_sign_posn	= ", $lconv->{p_sign_posn},	"\n";
+          print "n_sign_posn	= ", $lconv->{n_sign_posn},	"\n";
+
+localtime
+     This is identical to Perl's builtin `localtime()' function.
+
+log
+     This is identical to Perl's builtin `log()' function.
+
+log10
+     This is identical to the C function `log10()'.
+
+longjmp
+     longjmp() is C-specific: use die instead.
+
+lseek
+     Move the file's read/write position.  This uses file descriptors such
+     as those obtained by calling `POSIX::open'.
+
+          $fd = POSIX::open( "foo", &POSIX::O_RDONLY );
+          $off_t = POSIX::lseek( $fd, 0, &POSIX::SEEK_SET );
+
+     Returns undef on failure.
+
+malloc
+     malloc() is C-specific.
+
+mblen
+     This is identical to the C function `mblen()'.
+
+mbstowcs
+     This is identical to the C function `mbstowcs()'.
+
+mbtowc
+     This is identical to the C function `mbtowc()'.
+
+memchr
+     memchr() is C-specific, use index() instead.
+
+memcmp
+     memcmp() is C-specific, use eq instead.
+
+memcpy
+     memcpy() is C-specific, use = instead.
+
+memmove
+     memmove() is C-specific, use = instead.
+
+memset
+     memset() is C-specific, use x instead.
+
+mkdir
+     This is identical to Perl's builtin `mkdir()' function.
+
+mkfifo
+     This is similar to the C function `mkfifo()'.
+
+     Returns undef on failure.
+
+mktime
+     Convert date/time info to a calendar time.
+
+     Synopsis:
+
+          mktime(sec, min, hour, mday, mon, year, wday = 0, yday = 0, isdst = 0)
+
+     The month (`mon'), weekday (`wday'), and yearday (`yday') begin at
+     zero.  I.e. January is 0, not 1; Sunday is 0, not 1; January 1st is
+     0, not 1.  The year (year) is given in years since 1900.  I.e. The
+     year 1995 is 95; the year 2001 is 101.  Consult your system's
+     `mktime()' manpage for details about these and the other arguments.
+
+     Calendar time for December 12, 1995, at 10:30 am.
+
+          $time_t = POSIX::mktime( 0, 30, 10, 12, 11, 95 );
+          print "Date = ", POSIX::ctime($time_t);
+
+     Returns undef on failure.
+
+modf
+     Return the integral and fractional parts of a floating-point number.
+
+          ($fractional, $integral) = POSIX::modf( 3.14 );
+
+nice
+     This is similar to the C function `nice()'.
+
+     Returns undef on failure.
+
+offsetof
+     offsetof() is C-specific.
+
+open
+     Open a file for reading for writing.  This returns file descriptors,
+     not Perl filehandles.  Use `POSIX::close' to close the file.
+
+     Open a file read-only with mode 0666.
+
+          $fd = POSIX::open( "foo" );
+
+     Open a file for read and write.
+
+          $fd = POSIX::open( "foo", &POSIX::O_RDWR );
+
+     Open a file for write, with truncation.
+
+          $fd = POSIX::open( "foo", &POSIX::O_WRONLY | &POSIX::O_TRUNC );
+
+     Create a new file with mode 0640.  Set up the file for writing.
+
+          $fd = POSIX::open( "foo", &POSIX::O_CREAT | &POSIX::O_WRONLY, 0640 );
+
+     Returns undef on failure.
+
+opendir
+     Open a directory for reading.
+
+          $dir = POSIX::opendir( "/tmp" );
+          @files = POSIX::readdir( $dir );
+          POSIX::closedir( $dir );
+
+     Returns undef on failure.
+
+pathconf
+     Retrieves the value of a configurable limit on a file or directory.
+
+     The following will determine the maximum length of the longest
+     allowable pathname on the filesystem which holds `/tmp'.
+
+          $path_max = POSIX::pathconf( "/tmp", &POSIX::_PC_PATH_MAX );
+
+     Returns undef on failure.
+
+pause
+     This is similar to the C function `pause()'.
+
+     Returns undef on failure.
+
+perror
+     This is identical to the C function `perror()'.
+
+pipe
+     Create an interprocess channel.  This returns file descriptors like
+     those returned by `POSIX::open'.
+
+          ($fd0, $fd1) = POSIX::pipe();
+          POSIX::write( $fd0, "hello", 5 );
+          POSIX::read( $fd1, $buf, 5 );
+
+pow
+     Computes $x raised to the power $exponent.
+
+          $ret = POSIX::pow( $x, $exponent );
+
+printf
+     Prints the specified arguments to STDOUT.
+
+putc
+     putc() is C-specific-use print instead.
+
+putchar
+     putchar() is C-specific-use print instead.
+
+puts
+     puts() is C-specific-use print instead.
+
+qsort
+     qsort() is C-specific, use sort instead.
+
+raise
+     Sends the specified signal to the current process.
+
+rand
+     rand() is non-portable, use Perl's rand instead.
+
+read
+     Read from a file.  This uses file descriptors such as those obtained
+     by calling `POSIX::open'.  If the buffer `$buf' is not large enough
+     for the read then Perl will extend it to make room for the request.
+
+          $fd = POSIX::open( "foo", &POSIX::O_RDONLY );
+          $bytes = POSIX::read( $fd, $buf, 3 );
+
+     Returns undef on failure.
+
+readdir
+     This is identical to Perl's builtin `readdir()' function.
+
+realloc
+     realloc() is C-specific.
+
+remove
+     This is identical to Perl's builtin `unlink()' function.
+
+rename
+     This is identical to Perl's builtin rename() function.
+
+rewind
+     Seeks to the beginning of the file.
+
+rewinddir
+     This is identical to Perl's builtin `rewinddir()' function.
+
+rmdir
+     This is identical to Perl's builtin `rmdir()' function.
+
+scanf
+     scanf() is C-specific-use <> and regular expressions instead.
+
+setgid
+     Sets the real group id for this process.
+
+setjmp
+     setjmp() is C-specific: use eval {} instead.
+
+setlocale
+     Modifies and queries program's locale.  The following examples assume
+
+          use POSIX qw(setlocale LC_ALL LC_CTYPE);
+
+     has been issued.
+
+     The following will set the traditional UNIX system locale behavior
+     (the second argument `"C"').
+
+          $loc = setlocale( LC_ALL, "C" );
+
+     The following will query the current LC_CTYPE category.  (No second
+     argument means 'query'.)
+
+          $loc = setlocale( LC_CTYPE );
+
+     The following will set the LC_CTYPE behaviour according to the locale
+     environment variables (the second argument "").  Please see your
+     systems `setlocale(3)' in this node documentation for the locale
+     environment variables' meaning or consult *Note Perllocale:
+     (perl.info)perllocale,.
+
+          $loc = setlocale( LC_CTYPE, "" );
+
+     The following will set the LC_COLLATE behaviour to Argentinian
+     Spanish. NOTE: The naming and availability of locales depends on your
+     operating system. Please consult *Note Perllocale:
+     (perl.info)perllocale, for how to find out which locales are
+     available in your system.
+
+          $loc = setlocale( LC_ALL, "es_AR.ISO8859-1" );
+
+setpgid
+     This is similar to the C function `setpgid()'.
+
+     Returns undef on failure.
+
+setsid
+     This is identical to the C function `setsid()'.
+
+setuid
+     Sets the real user id for this process.
+
+sigaction
+     Detailed signal management.  This uses POSIX::SigAction objects for
+     the action and `oldaction' arguments.  Consult your system's sigaction
+     manpage for details.
+
+     Synopsis:
+
+          sigaction(sig, action, oldaction = 0)
+
+     Returns undef on failure.
+
+siglongjmp
+     siglongjmp() is C-specific: use die instead.
+
+sigpending
+     Examine signals that are blocked and pending.  This uses POSIX::SigSet
+     objects for the `sigset' argument.  Consult your system's sigpending
+     manpage for details.
+
+     Synopsis:
+
+          sigpending(sigset)
+
+     Returns undef on failure.
+
+sigprocmask
+     Change and/or examine calling process's signal mask.  This uses
+     POSIX::SigSet objects for the `sigset' and `oldsigset' arguments.
+     Consult your system's sigprocmask manpage for details.
+
+     Synopsis:
+
+          sigprocmask(how, sigset, oldsigset = 0)
+
+     Returns undef on failure.
+
+sigsetjmp
+     sigsetjmp() is C-specific: use eval {} instead.
+
+sigsuspend
+     Install a signal mask and suspend process until signal arrives.  This
+     uses POSIX::SigSet objects for the `signal_mask' argument.  Consult
+     your system's sigsuspend manpage for details.
+
+     Synopsis:
+
+          sigsuspend(signal_mask)
+
+     Returns undef on failure.
+
+sin
+     This is identical to Perl's builtin `sin()' function.
+
+sinh
+     This is identical to the C function `sinh()'.
+
+sleep
+     This is identical to Perl's builtin `sleep()' function.
+
+sprintf
+     This is identical to Perl's builtin `sprintf()' function.
+
+sqrt
+     This is identical to Perl's builtin `sqrt()' function.
+
+srand
+     srand().
+
+sscanf
+     sscanf() is C-specific-use regular expressions instead.
+
+stat
+     This is identical to Perl's builtin stat() function.
+
+strcat
+     strcat() is C-specific, use .= instead.
+
+strchr
+     strchr() is C-specific, use index() instead.
+
+strcmp
+     strcmp() is C-specific, use eq instead.
+
+strcoll
+     This is identical to the C function `strcoll()'.
+
+strcpy
+     strcpy() is C-specific, use = instead.
+
+strcspn
+     strcspn() is C-specific, use regular expressions instead.
+
+strerror
+     Returns the error string for the specified errno.
+
+strftime
+     Convert date and time information to string.  Returns the string.
+
+     Synopsis:
+
+          strftime(fmt, sec, min, hour, mday, mon, year, wday = -1, yday = -1, isdst = -1)
+
+     The month (`mon'), weekday (`wday'), and yearday (`yday') begin at
+     zero.  I.e. January is 0, not 1; Sunday is 0, not 1; January 1st is
+     0, not 1.  The year (year) is given in years since 1900.  I.e., the
+     year 1995 is 95; the year 2001 is 101.  Consult your system's
+     `strftime()' manpage for details about these and the other arguments.
+     If you want your code to be portable, your format (fmt) argument
+     should use only the conversion specifiers defined by the ANSI C
+     standard.  These are `aAbBcdHIjmMpSUwWxXyYZ%'.  The given arguments
+     are made consistent as though by calling `mktime()' before calling
+     your system's `strftime()' function, except that the `isdst' value is
+     not affected.
+
+     The string for Tuesday, December 12, 1995.
+
+          $str = POSIX::strftime( "%A, %B %d, %Y", 0, 0, 0, 12, 11, 95, 2 );
+          print "$str\n";
+
+strlen
+     strlen() is C-specific, use length instead.
+
+strncat
+     strncat() is C-specific, use .= instead.
+
+strncmp
+     strncmp() is C-specific, use eq instead.
+
+strncpy
+     strncpy() is C-specific, use = instead.
+
+stroul
+     stroul() is C-specific.
+
+strpbrk
+     strpbrk() is C-specific.
+
+strrchr
+     strrchr() is C-specific, use rindex() instead.
+
+strspn
+     strspn() is C-specific.
+
+strstr
+     This is identical to Perl's builtin `index()' function.
+
+strtod
+     String to double translation. Returns the parsed number and the number
+     of characters in the unparsed portion of the string.  Truly
+     POSIX-compliant systems set $! ($ERRNO) to indicate a translation
+     error, so clear $! before calling strtod.  However, non-POSIX systems
+     may not check for overflow, and therefore will never set $!.
+
+     strtod should respect any POSIX *setlocale()* settings.
+
+     To parse a string $str as a floating point number use
+
+          $! = 0;
+          ($num, $n_unparsed) = POSIX::strtod($str);
+
+     The second returned item and $! can be used to check for valid input:
+
+          if (($str eq '') || ($n_unparsed != 0) || !$!) {
+              die "Non-numeric input $str" . $! ? ": $!\n" : "\n";
+          }
+
+     When called in a scalar context strtod returns the parsed number.
+
+strtok
+     strtok() is C-specific.
+
+strtol
+     String to (long) integer translation.  Returns the parsed number and
+     the number of characters in the unparsed portion of the string.  Truly
+     POSIX-compliant systems set $! ($ERRNO) to indicate a translation
+     error, so clear $! before calling strtol.  However, non-POSIX systems
+     may not check for overflow, and therefore will never set $!.
+
+     strtol should respect any POSIX *setlocale()* settings.
+
+     To parse a string $str as a number in some base $base use
+
+          $! = 0;
+          ($num, $n_unparsed) = POSIX::strtol($str, $base);
+
+     The base should be zero or between 2 and 36, inclusive.  When the base
+     is zero or omitted strtol will use the string itself to determine the
+     base: a leading "0x" or "0X" means hexadecimal; a leading "0" means
+     octal; any other leading characters mean decimal.  Thus, "1234" is
+     parsed as a decimal number, "01234" as an octal number, and "0x1234"
+     as a hexadecimal number.
+
+     The second returned item and $! can be used to check for valid input:
+
+          if (($str eq '') || ($n_unparsed != 0) || !$!) {
+              die "Non-numeric input $str" . $! ? ": $!\n" : "\n";
+          }
+
+     When called in a scalar context strtol returns the parsed number.
+
+strtoul
+     String to unsigned (long) integer translation.  strtoul is identical
+     to strtol except that strtoul only parses unsigned integers.  See
+     strtol for details.
+
+     Note: Some vendors supply strtod and strtol but not strtoul.  Other
+     vendors that do suply strtoul parse "-1" as a valid value.
+
+strxfrm
+     String transformation.  Returns the transformed string.
+
+          $dst = POSIX::strxfrm( $src );
+
+sysconf
+     Retrieves values of system configurable variables.
+
+     The following will get the machine's clock speed.
+
+          $clock_ticks = POSIX::sysconf( &POSIX::_SC_CLK_TCK );
+
+     Returns undef on failure.
+
+system
+     This is identical to Perl's builtin `system()' function.
+
+tan
+     This is identical to the C function `tan()'.
+
+tanh
+     This is identical to the C function `tanh()'.
+
+tcdrain
+     This is similar to the C function `tcdrain()'.
+
+     Returns undef on failure.
+
+tcflow
+     This is similar to the C function `tcflow()'.
+
+     Returns undef on failure.
+
+tcflush
+     This is similar to the C function `tcflush()'.
+
+     Returns undef on failure.
+
+tcgetpgrp
+     This is identical to the C function `tcgetpgrp()'.
+
+tcsendbreak
+     This is similar to the C function `tcsendbreak()'.
+
+     Returns undef on failure.
+
+tcsetpgrp
+     This is similar to the C function `tcsetpgrp()'.
+
+     Returns undef on failure.
+
+time
+     This is identical to Perl's builtin `time()' function.
+
+times
+     The times() function returns elapsed realtime since some point in the
+     past (such as system startup), user and system times for this
+     process, and user and system times used by child processes.  All
+     times are returned in clock ticks.
+
+          ($realtime, $user, $system, $cuser, $csystem) = POSIX::times();
+
+     Note: Perl's builtin `times()' function returns four values, measured
+     in seconds.
+
+tmpfile
+     Use method `IO::File::new_tmpfile()' instead.
+
+tmpnam
+     Returns a name for a temporary file.
+
+          $tmpfile = POSIX::tmpnam();
+
+tolower
+     This is identical to Perl's builtin `lc()' function.
+
+toupper
+     This is identical to Perl's builtin `uc()' function.
+
+ttyname
+     This is identical to the C function `ttyname()'.
+
+tzname
+     Retrieves the time conversion information from the tzname variable.
+
+          POSIX::tzset();
+          ($std, $dst) = POSIX::tzname();
+
+tzset
+     This is identical to the C function `tzset()'.
+
+umask
+     This is identical to Perl's builtin umask() function.
+
+uname
+     Get name of current operating system.
+
+          ($sysname, $nodename, $release, $version, $machine ) = POSIX::uname();
+
+ungetc
+     Use method `IO::Handle::ungetc()' instead.
+
+unlink
+     This is identical to Perl's builtin `unlink()' function.
+
+utime
+     This is identical to Perl's builtin `utime()' function.
+
+vfprintf
+     vfprintf() is C-specific.
+
+vprintf
+     vprintf() is C-specific.
+
+vsprintf
+     vsprintf() is C-specific.
+
+wait
+     This is identical to Perl's builtin wait() function.
+
+waitpid
+     Wait for a child process to change state.  This is identical to Perl's
+     builtin `waitpid()' function.
+
+          $pid = POSIX::waitpid( -1, &POSIX::WNOHANG );
+          print "status = ", ($? / 256), "\n";
+
+wcstombs
+     This is identical to the C function `wcstombs()'.
+
+wctomb
+     This is identical to the C function `wctomb()'.
+
+write
+     Write to a file.  This uses file descriptors such as those obtained by
+     calling `POSIX::open'.
+
+          $fd = POSIX::open( "foo", &POSIX::O_WRONLY );
+          $buf = "hello";
+          $bytes = POSIX::write( $b, $buf, 5 );
+
+     Returns undef on failure.
+
+CLASSES
+=======
+
+POSIX::SigAction
+----------------
+
+new
+     Creates a new POSIX::SigAction object which corresponds to the C
+     `struct sigaction'.  This object will be destroyed automatically when
+     it is no longer needed.  The first parameter is the fully-qualified
+     name of a sub which is a signal-handler.  The second parameter is a
+     POSIX::SigSet object, it defaults to the empty set.  The third
+     parameter contains the `sa_flags', it defaults to 0.
+
+          $sigset = POSIX::SigSet->new(SIGINT, SIGQUIT);
+          $sigaction = POSIX::SigAction->new( 'main::handler', $sigset, &POSIX::SA_NOCLDSTOP );
+
+     This POSIX::SigAction object should be used with the
+     `POSIX::sigaction()' function.
+
+POSIX::SigSet
+-------------
+
+new
+     Create a new SigSet object.  This object will be destroyed
+     automatically when it is no longer needed.  Arguments may be supplied
+     to initialize the set.
+
+     Create an empty set.
+
+          $sigset = POSIX::SigSet->new;
+
+     Create a set with SIGUSR1.
+
+          $sigset = POSIX::SigSet->new( &POSIX::SIGUSR1 );
+
+addset
+     Add a signal to a SigSet object.
+
+          $sigset->addset( &POSIX::SIGUSR2 );
+
+     Returns undef on failure.
+
+delset
+     Remove a signal from the SigSet object.
+
+          $sigset->delset( &POSIX::SIGUSR2 );
+
+     Returns undef on failure.
+
+emptyset
+     Initialize the SigSet object to be empty.
+
+          $sigset->emptyset();
+
+     Returns undef on failure.
+
+fillset
+     Initialize the SigSet object to include all signals.
+
+          $sigset->fillset();
+
+     Returns undef on failure.
+
+ismember
+     Tests the SigSet object to see if it contains a specific signal.
+
+          if( $sigset->ismember( &POSIX::SIGUSR1 ) ){
+          	print "contains SIGUSR1\n";
+          }
+
+POSIX::Termios
+--------------
+
+new
+     Create a new Termios object.  This object will be destroyed
+     automatically when it is no longer needed.  A Termios object
+     corresponds to the termios C struct.  new() mallocs a new one,
+     getattr() fills it from a file descriptor, and setattr() sets a file
+     descriptor's parameters to match Termios' contents.
+
+          $termios = POSIX::Termios->new;
+
+getattr
+     Get terminal control attributes.
+
+     Obtain the attributes for stdin.
+
+          $termios->getattr()
+
+     Obtain the attributes for stdout.
+
+          $termios->getattr( 1 )
+
+     Returns undef on failure.
+
+getcc
+     Retrieve a value from the c_cc field of a termios object.  The c_cc
+     field is an array so an index must be specified.
+
+          $c_cc[1] = $termios->getcc(1);
+
+getcflag
+     Retrieve the c_cflag field of a termios object.
+
+          $c_cflag = $termios->getcflag;
+
+getiflag
+     Retrieve the c_iflag field of a termios object.
+
+          $c_iflag = $termios->getiflag;
+
+getispeed
+     Retrieve the input baud rate.
+
+          $ispeed = $termios->getispeed;
+
+getlflag
+     Retrieve the c_lflag field of a termios object.
+
+          $c_lflag = $termios->getlflag;
+
+getoflag
+     Retrieve the c_oflag field of a termios object.
+
+          $c_oflag = $termios->getoflag;
+
+getospeed
+     Retrieve the output baud rate.
+
+          $ospeed = $termios->getospeed;
+
+setattr
+     Set terminal control attributes.
+
+     Set attributes immediately for stdout.
+
+          $termios->setattr( 1, &POSIX::TCSANOW );
+
+     Returns undef on failure.
+
+setcc
+     Set a value in the c_cc field of a termios object.  The c_cc field is
+     an array so an index must be specified.
+
+          $termios->setcc( &POSIX::VEOF, 1 );
+
+setcflag
+     Set the c_cflag field of a termios object.
+
+          $termios->setcflag( $c_cflag | &POSIX::CLOCAL );
+
+setiflag
+     Set the c_iflag field of a termios object.
+
+          $termios->setiflag( $c_iflag | &POSIX::BRKINT );
+
+setispeed
+     Set the input baud rate.
+
+          $termios->setispeed( &POSIX::B9600 );
+
+     Returns undef on failure.
+
+setlflag
+     Set the c_lflag field of a termios object.
+
+          $termios->setlflag( $c_lflag | &POSIX::ECHO );
+
+setoflag
+     Set the c_oflag field of a termios object.
+
+          $termios->setoflag( $c_oflag | &POSIX::OPOST );
+
+setospeed
+     Set the output baud rate.
+
+          $termios->setospeed( &POSIX::B9600 );
+
+     Returns undef on failure.
+
+Baud rate values
+     B38400 B75 B200 B134 B300 B1800 B150 B0 B19200 B1200 B9600 B600 B4800
+     B50 B2400 B110
+
+Terminal interface values
+     TCSADRAIN TCSANOW TCOON TCIOFLUSH TCOFLUSH TCION TCIFLUSH TCSAFLUSH
+     TCIOFF TCOOFF
+
+c_cc field values
+     VEOF VEOL VERASE VINTR VKILL VQUIT VSUSP VSTART VSTOP VMIN VTIME NCCS
+
+c_cflag field values
+     CLOCAL CREAD CSIZE CS5 CS6 CS7 CS8 CSTOPB HUPCL PARENB PARODD
+
+c_iflag field values
+     BRKINT ICRNL IGNBRK IGNCR IGNPAR INLCR INPCK ISTRIP IXOFF IXON PARMRK
+
+c_lflag field values
+     ECHO ECHOE ECHOK ECHONL ICANON IEXTEN ISIG NOFLSH TOSTOP
+
+c_oflag field values
+     OPOST
+
+PATHNAME CONSTANTS
+==================
+
+Constants
+     _PC_CHOWN_RESTRICTED _PC_LINK_MAX _PC_MAX_CANON _PC_MAX_INPUT
+     _PC_NAME_MAX _PC_NO_TRUNC _PC_PATH_MAX _PC_PIPE_BUF _PC_VDISABLE
+
+POSIX CONSTANTS
+===============
+
+Constants
+     _POSIX_ARG_MAX _POSIX_CHILD_MAX _POSIX_CHOWN_RESTRICTED
+     _POSIX_JOB_CONTROL _POSIX_LINK_MAX _POSIX_MAX_CANON _POSIX_MAX_INPUT
+     _POSIX_NAME_MAX _POSIX_NGROUPS_MAX _POSIX_NO_TRUNC _POSIX_OPEN_MAX
+     _POSIX_PATH_MAX _POSIX_PIPE_BUF _POSIX_SAVED_IDS _POSIX_SSIZE_MAX
+     _POSIX_STREAM_MAX _POSIX_TZNAME_MAX _POSIX_VDISABLE _POSIX_VERSION
+
+SYSTEM CONFIGURATION
+====================
+
+Constants
+     _SC_ARG_MAX _SC_CHILD_MAX _SC_CLK_TCK _SC_JOB_CONTROL _SC_NGROUPS_MAX
+     _SC_OPEN_MAX _SC_SAVED_IDS _SC_STREAM_MAX _SC_TZNAME_MAX _SC_VERSION
+
+ERRNO
+=====
+
+Constants
+     E2BIG EACCES EADDRINUSE EADDRNOTAVAIL EAFNOSUPPORT EAGAIN EALREADY
+     EBADF EBUSY ECHILD ECONNABORTED ECONNREFUSED ECONNRESET EDEADLK
+     EDESTADDRREQ EDOM EDQUOT EEXIST EFAULT EFBIG EHOSTDOWN EHOSTUNREACH
+     EINPROGRESS EINTR EINVAL EIO EISCONN EISDIR ELOOP EMFILE EMLINK
+     EMSGSIZE ENAMETOOLONG ENETDOWN ENETRESET ENETUNREACH ENFILE ENOBUFS
+     ENODEV ENOENT ENOEXEC ENOLCK ENOMEM ENOPROTOOPT ENOSPC ENOSYS ENOTBLK
+     ENOTCONN ENOTDIR ENOTEMPTY ENOTSOCK ENOTTY ENXIO EOPNOTSUPP EPERM
+     EPFNOSUPPORT EPIPE EPROCLIM EPROTONOSUPPORT EPROTOTYPE ERANGE EREMOTE
+     ERESTART EROFS ESHUTDOWN ESOCKTNOSUPPORT ESPIPE ESRCH ESTALE
+     ETIMEDOUT ETOOMANYREFS ETXTBSY EUSERS EWOULDBLOCK EXDEV
+
+FCNTL
+=====
+
+Constants
+     FD_CLOEXEC F_DUPFD F_GETFD F_GETFL F_GETLK F_OK F_RDLCK F_SETFD
+     F_SETFL F_SETLK F_SETLKW F_UNLCK F_WRLCK O_ACCMODE O_APPEND O_CREAT
+     O_EXCL O_NOCTTY O_NONBLOCK O_RDONLY O_RDWR O_TRUNC O_WRONLY
+
+FLOAT
+=====
+
+Constants
+     DBL_DIG DBL_EPSILON DBL_MANT_DIG DBL_MAX DBL_MAX_10_EXP DBL_MAX_EXP
+     DBL_MIN DBL_MIN_10_EXP DBL_MIN_EXP FLT_DIG FLT_EPSILON FLT_MANT_DIG
+     FLT_MAX FLT_MAX_10_EXP FLT_MAX_EXP FLT_MIN FLT_MIN_10_EXP FLT_MIN_EXP
+     FLT_RADIX FLT_ROUNDS LDBL_DIG LDBL_EPSILON LDBL_MANT_DIG LDBL_MAX
+     LDBL_MAX_10_EXP LDBL_MAX_EXP LDBL_MIN LDBL_MIN_10_EXP LDBL_MIN_EXP
+
+LIMITS
+======
+
+Constants
+     ARG_MAX CHAR_BIT CHAR_MAX CHAR_MIN CHILD_MAX INT_MAX INT_MIN LINK_MAX
+     LONG_MAX LONG_MIN MAX_CANON MAX_INPUT MB_LEN_MAX NAME_MAX NGROUPS_MAX
+     OPEN_MAX PATH_MAX PIPE_BUF SCHAR_MAX SCHAR_MIN SHRT_MAX SHRT_MIN
+     SSIZE_MAX STREAM_MAX TZNAME_MAX UCHAR_MAX UINT_MAX ULONG_MAX USHRT_MAX
+
+LOCALE
+======
+
+Constants
+     LC_ALL LC_COLLATE LC_CTYPE LC_MONETARY LC_NUMERIC LC_TIME
+
+MATH
+====
+
+Constants
+     HUGE_VAL
+
+SIGNAL
+======
+
+Constants
+     SA_NOCLDSTOP SA_NOCLDWAIT SA_NODEFER SA_ONSTACK SA_RESETHAND
+     SA_RESTART SA_SIGINFO SIGABRT SIGALRM SIGCHLD SIGCONT SIGFPE SIGHUP
+     SIGILL SIGINT SIGKILL SIGPIPE SIGQUIT SIGSEGV SIGSTOP SIGTERM SIGTSTP
+     SIGTTIN SIGTTOU SIGUSR1 SIGUSR2 SIG_BLOCK SIG_DFL SIG_ERR SIG_IGN
+     SIG_SETMASK SIG_UNBLOCK
+
+STAT
+====
+
+Constants
+     S_IRGRP S_IROTH S_IRUSR S_IRWXG S_IRWXO S_IRWXU S_ISGID S_ISUID
+     S_IWGRP S_IWOTH S_IWUSR S_IXGRP S_IXOTH S_IXUSR
+
+Macros
+     S_ISBLK S_ISCHR S_ISDIR S_ISFIFO S_ISREG
+
+STDLIB
+======
+
+Constants
+     EXIT_FAILURE EXIT_SUCCESS MB_CUR_MAX RAND_MAX
+
+STDIO
+=====
+
+Constants
+     BUFSIZ EOF FILENAME_MAX L_ctermid L_cuserid L_tmpname TMP_MAX
+
+TIME
+====
+
+Constants
+     CLK_TCK CLOCKS_PER_SEC
+
+UNISTD
+======
+
+Constants
+     R_OK SEEK_CUR SEEK_END SEEK_SET STDIN_FILENO STDOUT_FILENO
+     STRERR_FILENO W_OK X_OK
+
+WAIT
+====
+
+Constants
+     WNOHANG WUNTRACED
+
+Macros
+     WIFEXITED WEXITSTATUS WIFSIGNALED WTERMSIG WIFSTOPPED WSTOPSIG
+
+CREATION
+========
+
+   This document generated by ./mkposixman.PL version 19960129.
+
+

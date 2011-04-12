@@ -1,0 +1,1616 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Script,  Next: Search/Binary,  Prev: Schedule/Match,  Up: Module List
+
+(Win32) system administrator`s library - for login and application startup scripts, etc
+***************************************************************************************
+
+NAME
+====
+
+   Script - (Win32) system administrator`s library - for login and
+application startup scripts, etc
+
+SYNOPSIS
+========
+
+     use Script;                      # or use Script ':DEFAULT'
+     $a =FileRead('c:\\autoexec.bat');
+     FileDelete('-r','c:\\tmp\\*');
+     FileEdit('c:\\autoexec.bat',sub{s/(SET *TMP *= *)/${1}c:\\tmp/i});
+     use Script ':ALL';               # import from @EXPORT and @EXPORT_OK
+     Print('Using','all','functions','from','@EXPORT','and','@EXPORT_OK');
+     use Script ':ALL',':OVER';       # silently overwrite with imported
+
+DESCRIPTION
+===========
+
+   At primary this module was written for system administrator needs in
+centralised administration of Win32 clients: logon and application startup
+scripts, etc. Later some functions useful in Windows NT server scripts was
+added. Now many functions may run on UNIX or may be developed for it. But
+area of Win32 servers and clients is very specific.
+
+   This module was made for several reasons:
+
+   - for useful functions does not (yet?) implemented as core perl
+functions.
+
+   - for more flexible and powerful functional style programming
+functions, than exists.
+
+   - to load used perl modules when required, with "eval('use ...')".
+
+   - to support scripting modes: printing of commands executed, die on
+errors.
+
+   This module calls for it`s functions many other modules from standard
+and site perl libraries and OS commands, and depends on their
+implementations and limitations. GUI functions implemented with Perl Tk.
+
+   Currently this module is implemented and tested on Win32 platform.
+
+
+VARIABLES
+=========
+
+     use vars qw($Interact $GUI $Echo $ErrorDie $Error $FileLog $Print);
+
+     # example usage: $Script::Interact=0
+
+     $Interact   =1;   # interact with user in functions as Prompt, Die, GUIMsg
+     $GUI        =1;   # use GUI interaction instead of terminal in functions
+                       # as Die, GUIMsg
+     $Echo       =1;   # print commands as 'set echo on' in DOS
+     $ErrorDie   =0;   # die on error if 1, 2 inside Try
+     $@ = $Error ='';  # last error occurred
+     $FileLog    ='';  # log file name (LOG handle) for Echo, Print, errors...
+     $Print      ='';  # external print routine reference
+
+   NOTE:
+
+   Some functions have not printout, and are not controlled by $Echo. Some
+functions are not controlled by $Echo due to used components.
+
+RESULTS of FUNCTIONS
+====================
+
+   Some (boolean) functions returns TRUE to show success, or FALSE (0, ").
+
+   Returning values functions returns on error empty value: 0 or " or ().
+
+   Undefined and negative results are escaped as possible for better
+functional programming style support.  Values '0E0' or '0 but true'
+(numeric 0 and logical true) are not used.
+
+   Variable $@ or $Error may be used to distinguish erroneous empty values
+from normal.
+
+CLASSES of FUNCTIONS
+====================
+
+   (see *Note Exporter: Exporter,)
+
+   @EXPORT = qw(CPTranslate Die Echo FileACL FileCompare FileCopy FileCRC
+FileCwd FileDelete FileEdit FileFind FileGlob FileHandle FileIni FileLnk
+FileMkDir FileNameMax FileNameMin FileRead FileSize FileSpace FileTrack
+FileWrite FTPCmd GUIMsg NetUse Pause Platform Print Registry Run RunInf
+RunKbd SMTPSend StrTime UserEnvInit UserPath);
+
+   @EXPORT_OK = qw(FileLog TrAnsi2Oem TrOem2Ansi Try(@) TryHdr);
+
+   %EXPORT_TAGS = ('ALL'=>[@EXPORT,@EXPORT_OK], 'OVER'=>[]);
+
+Error processing functions
+     Try, TryHdr
+
+File functions
+     FileACL, FileCompare, FileCopy, FileCRC, FileCwd, FileDelete,
+     FileEdit, FileFind, FileGlob, FileHandle, FileIni, FileLnk, FileLog,
+     FileMkDir, FileNameMax, FileNameMin, FileRead, FileSize, FileSpace,
+     FileTrack, FileWrite
+
+FTP functions
+     FTPCmd
+
+Registry functions
+     Registry
+
+Run & Misc functions
+     Run, RunInf, RunKbd, NetUse, Platform, UserEnvInit, UserPath
+
+Mail functions
+     SMTPSend
+
+String functions
+     CPTranslate, TrAnsi2Oem, TrOem2Ansi, StrTime
+
+Interactive functions
+     Die, GUIMsg, Pause, Print, Echo
+
+Obsolete functions
+     TrAnsi2Oem, TrOem2Ansi
+
+FUNCTIONS
+=========
+
+CPTranslate ( fromCP, toCP, string,... ) -> $translatedString
+
+TrAnsi2Oem ( ansiString ) -> oemString - obsolete, not recommended
+
+TrOem2Ansi ( oemString ) -> ansiString - obsolete, not recommended
+     Translates strings from codepage fromCP to codepage toCP, returns
+     translated string or list of strings.  Codepages may be 'oem',
+     '866','ansi', '1251','koi' prone of koi8, '8859-5' prone of ISO
+     8859-5.
+
+Die ( ?string,... )
+     Displays blank delimited strings to user and dies with error code 1.
+     As a default message $@ is used.  For GUI uses GUIMsg with text
+     translated from 'oem' to 'ansi'.  If $Interact == 0, does not waits
+     for user response.
+
+Echo ( text,... ) -> success
+     Prints given text list delimited with blanks and terminated with
+     "\n". May be switched off with $Echo or redefined with $Print.
+
+FileACL ( ?'-r+', fileMask, ?sub(...), user => access,... ) -> success
+     Sets access control list for directories and files matching fileMask
+     and sub.  Without given access control list, prints current, this
+     behaviour may be changed.  Uses FileFind, `Win32::FileSecurity|Win32'
+     in this node.
+
+     Options: 'r'ecurse subdirectories, '+' - add ACL entries instead of
+     replacing them.
+
+     Sub parameters are like in FileFind.
+
+     Access: 'add' (not implemented), 'add&read', 'add&list' (not
+     implemented), 'read', 'change', 'full', reference to array of array
+     references [[directory low level rights],[file low level rights]].
+
+FileCompare ( file1, file2 ) -> differs
+     Compares two files and returns 0 for identical files, 1 for unequal
+     files, -1 when error.  Uses `File::Compare|File' in this node
+
+FileCopy ( ?'-rdfi', fromFileMask, toPath ) -> success
+     Copies fromFileMask to toPath. On 'MSWin32' uses `xcopy' with
+     switches H, R, K, E, Q, Z.
+
+     Options: 'r'ecurse subdirectories, 'd'irectory target hint, 'f'ile
+     target hint, 'i'gnore errors - continue copying.
+
+FileCRC (?'-adler', file) -> CRC
+     Calculates CRC of file or 0 if error. Uses `Compress::Zlib|Compress'
+     in this node.
+
+     Options: 'adler' or 'adler32' or '-a adler', 'crc32' (default).
+
+FileDelete ( ?'-r', fileMask,... ) -> success
+     Deletes files and directories fileMask. Uses FileGlob.
+
+     Options: 'r'ecurse subdirectories.
+
+FileCwd () -> cwd
+     eval('use Cwd; getcwd()')
+
+FileEdit ( ?'-im', file, ?fileTo, sub(section, @variables)) -> success
+FileEdit ( file, ?'-im', sub ) - obsolete, not recommended
+     Edits given file with given sub using local variable $_ for text to
+     edit.  Uses FileRead, FileWrite, `File::Copy|File' in this node.
+
+     Options: 'i'nplace edit in memory (default), 'i ext' - use temporary
+     file with given extension, 'm'ultiline edit instead of evaluation sub
+     for each row of file.
+
+     Parameters of sub: $_, $_[0] - section name (determined with '[' sign
+     in row beginning),  @_(1...) - temporary variables with lifetime of
+     FileEdit execution.
+
+FileFind ( ?'-i!dlmrs', fileMask,..., sub(\@stat,path,name)...) -> num_matches
+FileFind ( ?'-i!dlmrs', fileMask,..., sub(\@stat,,,result)...) -> result
+FileFind ( ?'-i!dlmrs', sub(\@stat), fileMask...) - obsolete, not recommended
+     Finds files and directories with given mask and evaluates sub,
+     locally setting $_ to filename. Returns number of sub agrees, or
+     result if defined, or 0 on errors. There may be several subs and
+     several filemasks for each sub, and they will be executed within one
+     transaction of FileFind call.  Uses FileGlob
+
+     Options: 'i'gnore stat errors, '!' - not, 'd'irectories, 'l'ow before
+     deep scan, 'm'ountpoints, 'r'ecurse directories, 's'ymlinks.
+
+     Parameters of sub are local $_ with full current filename, $_[0] with
+     reference to @stat array, $_[1] with path, $_[2] with filename, $_[3]
+     as optional result storage (initially undefined).  Sub can return
+     undefined value in $_ to signal stop, determine directories with
+     $_[0]->[2] & 0040000, prevent recursing by assigning $_[0]->[2] =0.
+
+     Options for FileFind and based on it functions as FileACL, FileSize
+     should and should not be the same. FileFind defaulty recurses, other
+     commands traditionally not. Set of FileFind options may be extended
+     in future, but existing programs should be preserved, and so FileFind
+     options should be negative instead of traditionally positive options
+     of other commands.  Based on FileFind functions are restricted, not
+     using all possible FileFind features. All functions may be called
+     from comprehensive FileFind to get all features.
+
+FileGlob ( mask ) -> filelist
+     Globs filenames with mask and returns list of them such as standard
+     function glob. On error returns empty list?  When $^O eq 'MSWin32'
+     own implementation with fragments from `File::DosGlob|File' in this
+     node is used, else glob is called.
+
+     Standard glob is not well on Win32 platforms, when working with
+     filenames in foreign languages and calling external executable
+     dosglob.exe should be placed in path.
+
+     `File::DosGlob|File' in this node has some problems with non-english
+     letters in filenames and long filenames.
+
+FileHandle ( \*filehandle, sub(oldhandle) ) -> result
+FileHandle ( filename, sub(oldhandle) ) -> result
+     Selects given filehandle, evals sub, selects previously selected
+     handle.  For filename, temporarily opens file with handle 'HANDLE',
+     selects this handle, evals sub...  Returns result of sub, or empty
+     (") if error.
+
+FileIni ( ?'-', file, item,... ) -> success
+FileIni ( ?'-', file) -> hash of items
+     Edits ini-file in Windows format with given items.  Without items
+     returns a hash structure $hash{section}->{name}=value.  Uses
+     FileRead, FileWrite.
+
+     Options: reserved for future use.
+
+     Format of items: '[sectionName]', ';comment', [name => value];
+     ['[sectionName]', op], [';comment', op], [name, value, op]
+
+     Operations: '+' - set (default), '-' -delete, 'i'nitial value,
+     'o'ptional value.
+
+FileLnk (?'-mda', ?filename) -> Win32::Shortcut object
+FileLnk (?'-mdac', filename, path, args, dir, description, show, hotkey, iconlocation, iconnumber ) -> Success
+FileLnk (?'-mdac', filename, {-path=>path, -arg=>args, -dir=>dir, -desc=>description, -show=>show, -hot=>hotkey, -il=>iconlocation, -in=>iconnumber}) -> Success
+     Returns `Win32::Shortcut|Win32' in this node object or creates Win32
+     shortcut file.  Uses `Win32::Shortcut|Win32' in this node.  Filename
+     may be absolute or relative to 'm'enu or 'd'esktop according to this
+     options.  Default filename extension is '.lnk'.  Names of parameters
+     for shortcut may be given above or may be names of properties of
+     `Win32::Shortcut|Win32' in this node object.
+
+     Options: 'm'enu relative filename, 'd'esktop relative filename, 'a'll
+     users profile use instead of current user profile, 'c'reate shortcut
+     file instead of update.
+
+FileLog (logfile) -> success
+FileLog () -> filename
+FileLog (undef)
+     Sets or requests log file name, opens log file with LOG handle for
+     errors, warnings, Echo, Print.
+
+FileMkDir ( dir, ?mask) -> success
+     Executes standard `mkdir|perlfunc' in this node call, uses optional
+     access mask (0777 default).
+
+FileNameMax ( fileMask, ?sub(fullName, $_=fileName, digits)) -> max || (name, max)
+     Finds filename with maximal number in it. Returns this number or list
+     of full filename and number in list context.  Numeric comparing is
+     used.  Sub may be used to translate filename to comparable value or
+     ignore values.  Uses FileGlob
+
+FileNameMin ( fileMask, ?sub(fullName, $_=fileName, digits)) -> name || (name, min)
+     Finds filename with minimal number in it. Returns full name of this
+     file or list of full filename and number in list context.  Numeric
+     comparing is used.  Sub may be used to translate filename to
+     comparable value or ignore values.  Uses FileGlob
+
+FileRead ( ?'-asb', file, ?sub ) -> list of rows || data
+     Reads given file into memory as array or list ('-a'), text scalar
+     ('-s'), binary scalar ('-b'). Default, '-a' or '-b', is determined
+     with `wantarray|perlfunc' in this node.
+
+     If sub is defined, it is evaluated for each row read into local $_,
+     and with '-a' option results of each evaluation are returned as a
+     list, true is returned otherwise.
+
+     On error returns empty list or scalar, according to option
+     '-a','-s','-b'.
+
+FileSize ( ?opt, fileMask, ?sub ) -> size in bytes
+     Returns total size in bytes for directories and files matching
+     fileMask and sub.  Uses FileFind with given options (-i default),
+     parameters of sub are the same.
+
+FileSpace ( ?filesystem ) -> free disk space in bytes
+     Returns free disk space in bytes for specified dir.  Uses
+     `\%COMSPEC\% /c dir $dir`.
+
+FileTrack ( ?'-it!cdrt', sourceDir, destDir, ?sub(\@stat,path,name)) -> arcDir
+     Tracks changed files matched 'sub' in 'sourceDir' into 'destDir'.
+     Returns path to new archive directory inside 'destDir' or empty
+     string if none archived.  'Sub' gets current filename in $_ and
+     returns 'true' if match.  Code and interface are like FileFind.  Uses
+     FileCopy, FileCRC, FileGlob.
+
+     Options: 'i'gnore errors, 't'est and track CRC, '!' - not, 'c'opy
+     changed files, 'd'irectories, 'r'ecurse directories, 't'ime check.
+
+FileWrite ( ?'-b', file, data,...) -> success
+     Writes given data into given file. Option '-b' chooses binary mode and
+     binary write. Without '-b', each element of data list is printed with
+     trailing "\n" added.
+
+FTPCmd ( host, user, passwd, ?command, command, ?arguments) -> success
+FTPCmd ( {-host=>host, -user=>user, -passwd=>passwd}, ?command, command, ?arguments) -> success
+FTPCmd ( {-s=>host, -u=>user, -p=>passwd}, ?command, command, ?arguments) -> success
+     Executes FTP command. First command may be
+     'ascii','binary','ebcdic','byte'.  Second command may be 'dir', 'ls',
+     'get', 'put', sub($ftp).  Returns result of command executed, for
+     'dir' and 'ls' - list of values.  Uses `Net::FTP|Net' in this node.
+
+GUIMsg ( title, string,...)
+GUIMsg ( text )
+     Popups given message to user.  Uses `Tk|Tk' in this node.
+
+NetUse ( disk, resource ) -> success
+     Executes Windows commands 'net use disk /d' and 'net use disk
+     resource'.  Uses Run
+
+Pause ( ?text,... ) -> response
+     Prints given text list delimited with blanks and terminated with "\n",
+     reads row from STDIN and returns it.
+
+Platform ( parameter ) -> value
+     Determine value of parameter: 'os', 'osname', 'win32', 'ver',
+     'patch', 'lang', 'prodid', 'windir', 'name', 'domain', 'host',
+     'hostdomain', 'user','userdomain'...  Uses available environment
+     variables, perl functions, OS commands, stored in registry values.
+     'windir' parameter may be used when Win32 'windir' environment
+     variable is not available.
+
+Print ( text,... ) -> success
+     Prints given text list delimited with blanks and terminated with
+     "\n". May be redefined with $Print.
+
+Registry (?'-\\|/', key) -> value
+Registry (?'-\\|/', key, ?type, value) -> success
+Registry (?'-\\|/', key, value, ?type) - possible, but not recommended
+     Works with values in Windows registry: returns value for given key
+     and name, sets given value, deletes if undefined value given.  Uses
+     `Win32::TieRegistry|Win32' in this node, error processing is
+     unsupported.
+
+     Option defines delimiter for key parts: '\\' (default), '|' or '/'.
+
+     Value name may be delimited with double delimiter ('key\\\\name') as
+     recommended `Win32::TieRegistry|Win32' in this node, or single
+     delimiter ('key\\name') as also supported.
+
+     Last parts of key not present in registry are automatically created,
+     that improves behaviour of `Win32::TieRegistry|Win32' in this node.
+
+     Type may be 'REG_SZ' (default), 'REG_EXPAND_SZ', 'REG_BINARY',
+     'REG_MULTI_SZ', 'REG_DWORD'.
+
+Run (command, ?arguments) -> success
+     Runs specified command with `system|perlfunc' in this node call,
+     returns !($? || $!).  Shell is used as in `system|perlfunc' in this
+     node call - if command and arguments are in the same string.  Last
+     argument may be sub to print to program called.
+
+RunInf (filename, ?section, ?reboot mode) -> run string
+     Generates command to run to install given inf-file on Windows.
+     Default section name is 'DefaultInstall'.  Default reboot mode is
+     128, not 132 as in Windows file association.
+
+RunKbd (?timeout, title mask) -> window handle
+RunKbd (?timeout, title mask, ?timeout, keyboard string) -> success
+RunKbd (?timeout, title mask, ") -> success
+     Finds window with title mask (regexp) given and types keyboard string
+     into it.  Without keyboard string returns handle of window found.
+     With empty keyboard string waits window to disappear.  Find operation
+     retries to be sucessful within timeout.  Keyboard typing is delayed
+     with timeout.  Uses `Win32::GuiTest|Win32' in this node.  Special
+     symbols in keyboard string: '~' -ENTER, '+' -SHIFT, '^' -CONTROL, '%'
+     -ALT; () - grouping, {} - quote special characters; {BACKSPACE},
+     {BS}, {BKSP} - backkspace; {BREAK}, {CAPS}, {DELETE}, {DOWN}, {END},
+     {ENTER}, {ESCAPE}, {HELP}, {HOME}, {INSERT}, {LEFT}, {NUMLOCK},
+     {PGDN}, {PGUP}, {PRTSCR}, {RIGHT}, {SCROLL}, {PAUSE}; {F1} .. {F24}.
+
+SMTPSend ( host, ?from, ?\@to, row,... ) - > success
+     Sends MIME message to SMTP host, catenating rows via "\n". If 'from'
+     or 'to' argument undefined, values are searched within rows of message
+     as 'From:', 'Sender:', 'To:'. If array reference 'to' occurs in place
+     of of message row, it will be converted to 'To:' MIME string.  Uses
+     `Net::SMTP|Net' in this node.
+
+StrTime ( ?mask, ?@time ) -> string
+     Converts given date-time array into string using given mask.  Default
+     mask is 'dd.mm.yy hh:mm:ss', constructs are 'yyyy', 'yy', 'mm', 'dd',
+     'hh', 'ss'.  Default time is 'localtime(time)'.
+
+Try ( eval {...}, default ) -> result
+Try ( eval {...}, \&catch ) -> result
+Try ( sub  {...}, ... ) -> result
+     Try-Catch construction.  Function Try returns result of eval on
+     success.  If error occurred (determined by $@), it returns default
+     value or result of catch evaluation.
+
+TryHdr (subject, stage)
+TryHdr (undef, stage)
+     Declare title and/or stage name of transaction to insert into $@
+     inside Try.  May be used only inside Try(sub{},...).
+
+UserEnvInit ( ?'-nhy' )
+     Initiates user`s environment on Win32.  Uses
+     `Win32::TieRegistry|Win32' in this node, `cacls', reskit utilities
+     `winset', `setx'.
+
+     Default options are '-nhy', option '-y' redefines environment
+     variables when they defined, options may be '-n', '-ny', '-h'.
+
+     Option 'n' sets on Win95 environment variables used on WinNT: 'OS',
+     'COMPUTERNAME', 'USERNAME'.
+
+     Option 'h' works if 'c:/Home' directory exists. It creates directory
+     'c:/Home/Username' if it not exists (WinNT ACL setting applied), sets
+     it to 'HOME' environment variable, sets value for
+
+
+
+
+
+
+
+
+
+
+     $$Registry{'CUser\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User
+     Shell Folders\\\\Personal'} to 'c:/Home/Username' or 'c:/Home/Work'
+     (for systems with single user profile).
+
+UserPath (user) -> home dir
+UserPath (user, subdir) -> home subdir
+     Returns path to user profile directory or subdirectory on Win32 or
+     path to user home directory ($ENV{HOME}) or subdirectory on other
+     platforms.  User may be 'all' users, 'default', " - current.  Subdir
+     on Win32 may be 'Desktop', 'Personal','Programs','Start
+     Menu','Startup', and other Win32 registry names under 'Explorer /
+     Shell Folders'.  If Win32 subdir is not found for user, 'all users'
+     profile' is used, and vice versa.
+
+VERSION
+=======
+
+25/09-27/10/2000
+----------------
+
+Changed
+     Echo, Print - are exported by default (moved from @EXPORT_OK to
+     @EXPORT).
+
+     FileACL - processed files are printed, not echoed; uses 'cacls.exe'
+     when possible.
+
+     FileCopy - '-d' removed from 'cp'.
+
+     FileCopy - uses Run(...sub{}).
+
+     FileGlob - support for filenames with '()'.
+
+     FileLog - $SIG{__DIE__} dies if !defined($^S) too.
+
+     FileSpace - digit grouping symbol may be ','.
+
+     FileTrack - internal filehandle renamed from 'LOG' to 'TRACK'.
+
+     NetUse - invokes 'net use ... /Yes' on Win95.
+
+     Registry - supports unnamed registry values.
+
+     Run - last argument may be sub to print to program called.
+
+     UserPath - excludes blanks at the end of path as may be on WinNT.
+
+31/07-15/09/2000
+----------------
+
+New
+     FileCwd
+
+     FileLnk
+
+     RunKbd
+
+     RunInf
+
+     UserPath
+
+Changed
+     `$ErrorDie' - value 2 introduced and used inside Try because of $^S
+     may be incorrect inside eval('string') or do(script).
+
+     FileCopy - used pipe to answer to xcopy before system call because of
+     codepage translation problem in open(commandline) on Win32 and
+     incorrect $? of wait of `IPC::Open3|IPC' in this node on Win95.
+
+     FileEdit - restored sub's parameter $_[0] with with section name,
+     removed 28/02/2000.
+
+     FileFind, FileTrack - filenames with '?' are ignored only when $^O eq
+     'MSWin32'.
+
+     FileFind - options added: !'l'ow before deep scan, 'm'ountpoints,
+     's'ymlinks.
+
+     FileGlob - created own implementation for 'MSWin32' supporting
+     non-english letters and long filenames instead of
+     `File::DosGlob|File' in this node.
+
+     FileHandle - uses caller's namespace for HANDLE.
+
+     FileTrack - added '!t' option to disable mtime checking.
+
+     FTPCmd - first parameter may be hash ref with host, username and
+     password.
+
+     Pause - returns string entered as documented, instead of chomp result.
+
+     Platform - new parameter 'windir'.
+
+16-17/06/2000, 03-05/07/2000, FileTrack and some corrections
+------------------------------------------------------------
+
+New
+     FileTrack
+
+Changed
+     FileCopy - translates '/' into '\' under Win32.  FileFind - corrected
+     regular expressions for options.  Pause    - chomp used.
+
+08/05/2000, Log writing and some corrections
+--------------------------------------------
+
+New
+     FileLog
+
+Changed
+     FileFind - filepath and filename inserted into sub args after stat
+     reference; FileMkDir - new default mode is 0777; StrTime - always
+     4-digit years after 2000
+
+24/03/2000, Improved error processing
+-------------------------------------
+
+   Module Carp used, croak should be called instead of `TryErr' or die.
+
+Removed
+     `TryErr', `TryEnd'
+
+New
+     TryHdr
+
+12/02/2000 - 28/02/2000, Error processing and UNIX compatibility
+----------------------------------------------------------------
+
+   Error processing made with eval{} and $@, see Try.  Variable $Error is
+syncronised with $@ and becomes optional.
+
+   $^O (osname) introduced into some functions.
+
+New
+     Echo, Try, `TryEnd', `TryErr', $@
+
+Changed
+     Die, FileCopy ('cp -dpRf' for unix compatibility), FileEdit (removed
+     parameter with section name), FileFind (backslash replaced with slash
+     for unix compatibility, -i introduced), FileGlob (glob for unix
+     compatibility), FileSize (options, -i FileFind option), FileSpace
+     ('df -k' used for unix), Platform ($^O (osname) and getlogin), Print
+     ($Echo dependence moved into Echo), SMTPSend
+
+Removed
+     `PrintErr' and $PrintErr (use warn and $SIG{__WARN__} instead)
+
+Problems
+     FileACL (failure `Win32::FileSecurity|Win32' in this node on
+     non-local users and groups), FileFind (failure stat on non-standard
+     filenames, f.e. with '?')
+
+ToDo
+     FileFind - review options and arguments.  It should accept violating
+     needs when deleting and creating.  When creating, sub should see
+     directories first, when deleting - contents first.
+
+     FTPCmd, Platform, SMTPSend, - approve and test.
+
+Analysis of functions:
+          p - 5 - platform (windows specific) realisation only, 2 - unix+win
+          w - 3 - windows specific
+          e -   - no error handling
+             31 - total number of functions
+
+          pwe
+           CPTranslate           e
+           Die                   e
+           Echo                  e
+           FileACL             p
+           FileCompare
+           FileCopy            2
+           FileCRC
+           FileDelete
+           FileEdit
+           FileFind
+           FileGlob              e
+           FileHandle
+           FileIni
+           FileMkDir
+           FileNameMax
+           FileNameMin
+           FileRead
+           FileSize
+           FileSpace           p
+           FileWrite
+           FTPCmd
+           GUIMsg
+           NetUse              pw
+           Pause
+           Platform            ?
+           Print                 e
+           Registry            pw
+           Run
+           SMTPSend
+           StrTime               e
+           UserEnvInit         pw
+
+19/10 - 08/11/99, First documented release
+------------------------------------------
+
+Source changing
+     Functions sorted alphabetically.
+
+New variables:
+     $Interact, $GUI, $Echo
+
+Removed variables:
+     $noInteract (replaced with $Interact)
+
+New functions:
+     CPTranslate, FileACL, FileHandle, FileMkDir, FileSize, FileSpace,
+     Platform, SMTPSend
+
+Changed functions:
+     FileCopy, FileFind, FileGlob, FileNameMax, FileNameMin, Registry
+
+ToDo:
+     RetCodes - '0E0' for successful empty?
+
+     FileACL - debug and develop.
+
+     FileFind - corrected stat bug for filenames with sign '?'.
+
+     FileFind - review options and arguments.
+
+     FileFind - should accept violating needs when deleting and creating.
+     When creating, sub should see directories first, when deleting -
+     contents first.
+
+     FTPCmd - approve and test.
+
+     Platform - approve and test.
+
+     Print and `PrintErr' - should this functions be exported by default?
+
+     UserEnvInit - approve and test, especially for russian WinNT.
+
+24/02/99 - 02/07/99, Corrections and Developments
+-------------------------------------------------
+
+   Corrections and developments was made 02/07/99, 28/06/99, 23/06/99,
+15/06/99, 01/04/99, 25/03/99, 23/03/99, 20/03/99, 19/03/99, 17/03/99,
+15/03/99, 13/03/99, 12/03/99, 09/03/99, 06/03/99, 03/03/99, 02/03/99,
+01/03/99, 27/02/99, 24/02/99
+
+18/02/99 13:04, First release
+-----------------------------
+
+   A small module with a few functions was created and turned onto
+exploitation.
+
+AUTHOR
+======
+
+   Andrew V Makarow <makarow@mail.com>, Denis E Medvedyuk <demed@mail.com>
+
+
+File: pm.info,  Node: Search/Binary,  Next: Search/Dict,  Prev: Script,  Up: Module List
+
+generic binary search
+*********************
+
+NAME
+====
+
+   Search::Binary - generic binary search
+
+SYNOPSIS
+========
+
+     use Seach::Binary;
+     $pos = binary_search($min, $max, $val, $read, $handle, [$size]);
+
+DESCRIPTION
+===========
+
+   `binary_search' implements a generic binary search algorithm returning
+the position of the first record whose *index value* is greater than or
+equal to $val. The search routine does not define any of the terms
+position, record or *index value*, but leaves their interpretation and
+implementation to the user supplied function `&$read()'. The only
+restriction is that positions must be integer scalars.
+
+   During the search the read function will be called with three arguments:
+the input parameters $handle and $val, and a position.  If the position is
+not undef, the read function should read the first whole record starting
+at or after the position; otherwise, the read function should read the
+record immediately following the last record it read.  The search
+algorithm will guarantee that the first call to the read function will not
+be with a position of undef.  The read function needs to return a two
+element array consisting of the result of comparing $val with the index
+value of the read record and the position of the read record. The
+comparison value must be positive if $val is strictly greater than the
+index value of the read record, 0 if equal, and negative if strictly less.
+Furthermore, the returned position value must be greater than or equal to
+the position the read function was called with.
+
+   The input parameters `$min' and `$max' are positions and represents the
+extent of the search. Only records which begin at positions within this
+range (inclusive) will be searched. Moreover, `$min' must be the starting
+position of a record. If present $size is a difference between positions
+and determines when the algorithms switches to a sequential search. $val is
+an index value. The value of $handle is of no consequence to the binary
+search algorithm; it is merely passed as a convenience to the read
+function.
+
+COPYRIGHT
+=========
+
+     Copyright 1998, Erik Rantapaa
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Search/Dict,  Next: Search/InvertedIndex,  Prev: Search/Binary,  Up: Module List
+
+search for key in dictionary file
+*********************************
+
+NAME
+====
+
+   Search::Dict, look - search for key in dictionary file
+
+SYNOPSIS
+========
+
+     use Search::Dict;
+     look *FILEHANDLE, $key, $dict, $fold;
+
+DESCRIPTION
+===========
+
+   Sets file position in FILEHANDLE to be first line greater than or equal
+(stringwise) to $key.  Returns the new file position, or -1 if an error
+occurs.
+
+   The flags specify dictionary order and case folding:
+
+   If *$dict* is true, search by dictionary order (ignore anything but word
+characters and whitespace).
+
+   If *$fold* is true, ignore case.
+
+
+File: pm.info,  Node: Search/InvertedIndex,  Next: Search/InvertedIndex/AutoLoader,  Prev: Search/Dict,  Up: Module List
+
+A manager for inverted index maps
+*********************************
+
+NAME
+====
+
+   Search::InvertedIndex - A manager for inverted index maps
+
+SYNOPSIS
+========
+
+     use Search::InvertedIndex;
+
+     my $database = Search::InvertedIndex::DB::DB_File_SplitHash->new({
+                -map_name => '/www/search-engine/databases/test-maps/test',
+     				-multi => 4,
+               -file_mode => 0644,
+               -lock_mode => 'EX',
+            -lock_timeout => 30,
+          -blocking_locks => 0,
+               -cachesize => 1000000,
+           -write_through => 0,
+         -read_write_mode => 'RDWR';
+           });
+
+     my $inv_map = Search::Inverted->new({ -database => $database });
+
+   ########################################################## # Example
+Update ##########################################################
+
+     my $index_data = "Some scalar - complex structure refs are ok";
+
+     my $update = Search::InvertedIndex::Update->new({
+                                  -group => 'keywords',
+                                  -index => 'http://www.nihongo.org/',
+                                   -data => $index_data,
+                                   -keys => {
+                                               'some' => 10,
+                                             'scalar' => 20,
+                                            'complex' => 15,
+                                          'structure' => 15,
+                                               'refs' => 15,
+                                                'are' => 15,
+                                                 'ok' => 15,
+                                            },
+                                            });
+     my $result = $inv_map->update({ -update => $update });
+
+   ########################################################## # Example
+Query # '-nodes' is an anon list of Search::InvertedIndex::Query # objects
+(this allows constructing complex booleans by # nesting).  # # '-leafs' is
+an anon list of Search::InvertedIndex::Query::Leaf # objects (used for
+individual search terms).  #
+##########################################################
+
+     my $query_leaf1 = Search::InvertedIndex::Query::Leaf->new({
+                                             -key => 'complex',
+                                           -group => 'keywords',
+                                          -weight => 1,
+                                          });
+
+     my $query_leaf2 = Search::InvertedIndex::Query::Leaf->new({
+                                             -key => 'structure',
+                                           -group => 'keywords',
+                                          -weight => 1,
+                                          });
+     my $query_leaf3 = Search::InvertedIndex::Query::Leaf->new({
+                                             -key => 'gold',
+                                           -group => 'keywords',
+                                          -weight => 1,
+                                          });
+     my $query1 = Search::InvertedIndex::Query->new({
+                        -logic => 'and',
+                       -weight => 1,
+                        -nodes => [],
+                        -leafs => [$query_leaf1,$query_leaf2],
+                     });
+     my $query2 = Search::InvertedIndex::Query->new({
+                        -logic => 'or',
+                       -weight => 1,
+                        -nodes => [$query1],
+                        -leafs => [$query_leaf3],
+                     });
+
+     my $result = $inv_map->search({ -query => $query2 });
+
+   ##########################################################
+
+     $inv_map->close;
+
+DESCRIPTION
+===========
+
+   Provides the core of an inverted map based search engine. By mapping
+'keys' to 'indexes' it provides ultra-fast look ups of all 'indexes'
+containing specific 'keys'. This produces highly scalable behavior where
+thousands, or even millions of records can be searched extremely quickly.
+
+   Available database drivers are:
+
+     Search::InvertedIndex::DB::DB_File_SplitHash
+     Search::InvertedIndex::DB::Mysql
+
+   Check the POD documentation for each database driver to determine
+initialization requirements.
+
+CHANGES
+=======
+
+     1.00 1999.06.16 - Initial release
+
+     1.01 1999.06.17 - Documentation fixes and fix to 'close' method in
+                       Search::InvertedIndex::DB::DB_File_SplitHash
+
+     1.02 1999.06.18 - Major bugfix to locking system.
+                       Performance tweaking. Roughly 3x improvement.
+
+     1.03 1999.06.30 - Documentation fixes.
+
+     1.04 1999.07.01 - Documentation fixes and caching system bugfixes.
+
+     1.05 1999.10.20 - Altered ranking computation on search results
+
+     1.06 1999.10.20 - Removed 'use attrs' usage to improve portability
+
+     1.07 1999.11.09 - "Cosmetic" changes to avoid warnings in Perl 5.004
+
+     1.08 2000.01.25 - Bugfix to 'Search::InvertedIndex::DB:DB_File_SplitHash' submodule
+                       and documentation additions/fixes
+
+     1.09 2000.03.23 - Bugfix to 'Search::InvertedIndex::DB:DB_File_SplitHash' submodule
+                       to manage case where 'open' is not performed before close is called.
+
+     1.10 2000.07.05 - Delayed loading of serializer and added option to select
+                       which serializer (Storable or Data::Dumper) to use at instance 'new' time.
+                       This should allow module to be loaded by mod_perl via the 'PerlModule'
+                       conf directive and enable use on platforms that do not support
+                       'Storable' (such as Macintosh).
+
+     1.11 2000.11.29 - Added 'Search::InvertedIndex::DB::Mysql' (authored by
+                       Michael Cramer <cramer@webkist.com>) database driver
+                       to package.
+
+Public API
+----------
+
+`new($parm_ref);'
+     Provides the interface for obtaining a new Search::InvertedIndex
+     object for manipulating a inverted database.
+
+     Example 1:
+
+          my $database = Search::InvertedIndex::DB::DB_File_SplitHash->new({
+                      -map_name =>
+          			             '/www/search-engine/databases/test-map_names/test',
+          				-multi => 4,
+                     -file_mode => 0644,
+                     -lock_mode => 'EX',
+                  -lock_timeout => 30,
+                -blocking_locks => 0,
+                     -cachesize => 1000000,
+                 -write_through => 0,
+               -read_write_mode => 'RDONLY',
+                   -stringifier => ['Storable','Data::Dumper'],
+                 });
+
+          my $inv_map = Search::InvertedIndex->new({
+                         '-database' => $database,
+                '-search_cache_size' => 1000,
+                 '-search_cache_dir' => '/var/tmp/search_cache',
+              });
+
+     The -database parameter is required and must be a
+     'Search::InvertedIndex::DB::...'  type database object. The other two
+     parameters are optional and define the location and size of the
+     search cache. If omitted, no search caching will be done.
+
+     The optional '-stringifier' parameter can be used to override the
+     default use of 'Storable' (with fallback to 'Data::Dumper') as the
+     stringifier used for storing data by the module. Specifiying
+     -stringifier => 'Data::Dumper' would specify using 'Data::Dumper'
+     (only) as the stringifier while specifiying -stringifier =>
+     ['Data::Dumper','Storable'] would specify to use Data::Dumper by
+     preference (but to fall back to 'Storable' if Data::Dumper was not
+     available). If a database was created using a particular serializer,
+     it will automatically detect it and attempt to use the correct one.
+
+`lock($parm_ref);'
+     Changes a lock on the underlaying database.
+
+     Forces 'sync' if the stat is changed from 'EX' to a lower lock state
+     (i.e. 'SH' or 'UN'). Croaks on errors.
+
+     Example:
+
+          $inv->lock({ -lock_mode => 'EX' [, -lock_timeout => 30] [, -blocking_locks => 0],
+                });
+
+     The only _required_ parameter is the -lock_mode. The other parameters
+     can be inherited from the object state. If the other parameters are
+     used, they change the object state to match the new settings.
+
+`status($parm_ref);'
+     Returns the requested status line for the database. Allowed requests
+     are '-open', and '-lock'.
+
+     Example 1:  my $status = $inv_map->status(-open); # Returns either
+     '1' or '0'
+
+     Example 2:  my $status = $inv_map->status(-lock_mode); # Returns
+     'UN', 'SH' or 'EX'
+
+`update($parm_ref);'
+     Performs an update on the map. This is designed for
+     adding/changing/deleting a bunch of related information in a single
+     block update.  It takes a Search::InvertedIndex::Update object as
+     input. It assumes that you wish to remove all references to the
+     specified index and replace them with a new list of references. It
+     can also will update the -data for the -index. If -data is passed and
+     the -index does not already exist, a new index record will be
+     created. It is a fatal error to pass a non-existant index without a
+     -data parm to initialize it. It is also a fatal error to pass an
+     update for a non-existant -group.
+
+     Passing an empty -keys has the effect of deleting the index from
+     group (but not from the system).
+
+     Example:
+
+          my $update = Search::InvertedIndex::Update->new(...);
+          $inv_map->update({ -update => $update });
+
+     It is much faster to update a index using the update method than the
+     add_entry_to_group method in most cases because the batching of
+     changes allows for efficiency optimizations when there is more than
+     one key.
+
+`preload_update($parm_ref);'
+     'preload_update' places the passed 'update' object data into a pending
+     queue which is not reflected in the searchable database until the
+     'update_group' method has been called. This allows the loading
+     process to be streamlined for maximum performance on large full
+     updates. This method is not appropriate to incremental updates as the
+     'update_group' method destroys the previous searchable data set on
+     execution.
+
+     It also places the database effectively offline during the update, so
+     this is not a suitable method for updating a 'online' database.
+     Updates should happen on an 'offline' copy that is then swapped into
+     place with the 'online' database.
+
+     Example:
+
+          my $update = Search::InvertedIndex::Update->new(...);
+          $inv_map->preload_update({ -update => $update });
+                 .
+          		.
+          		.
+          $inv_map->update_group({ -group => 'test' });
+
+`clear_preload_update_for_group($parm_ref);'
+     This clears all the data from the preload area for the specified
+     group.
+
+`update_group($parm_ref);'
+     This clears the specifed group and loads all preloaded data (updates
+     batch loaded through the 'preload_update' method pending finalization.
+
+     This is by far the fastest way to load a large set of data into the
+     search system - but it is an 'all or nothing' approach. No
+     'incremental' updating is possible via this interface - the
+     update_group completely erases all previously searchable data from
+     the group and replaces it with the pending 'preload'ed data.
+
+     Examples:
+
+          $inv_map->update_group({ -group => 'test' });
+
+          $inv_map->update_group({ -group => 'test', -block_size => 65536 });
+
+     -block_size determines the 'chunking factor' used to limit the amount
+     of memory the update uses (it corresponds roughly to the number of
+     line entry items to be processed in memory at one time). Higher
+     '-block_size's will improve performance until you run out of real
+     memory. The default is 65536.
+
+     Since an exclusive lock should be held during the entire process, the
+     database is essentially inaccessible until the update is complete. It
+     is probably inadvisable to use this method of updating without
+     keeping an 'online' and a seperate 'offline' database and copy over
+     the 'offline' to 'online' after completion of the mass update on the
+     'offline' database.
+
+`search($parm_ref);'
+     Performs a query on the map and returns the results as a
+     Search::InvertedIndex::Result object containing the keys and rankings.
+
+     Example:
+
+          my $query = Search::InvertedIndex::Query->new(...);
+          my $result = $inv_map->search({ -query => $query });
+
+     Performs a complex multi-key match search with boolean logic and
+     optional search term weighting.
+
+     The search request is formatted as follows:
+
+     my $result = $inv_map->search({ -query => $query });
+
+     where '$query' is a Search::InvertedIndex::Query object.
+
+     Each node can either be a specific search term with an optional
+     weighting term (a Search::InvertedIndex::Query::Leaf object) or a
+     logic term with its own sub-branches (a Search::Inverted::Query
+     object).
+
+     The weightings are applied to the returned matches for each search
+     term by multiplication of their base ranking before combination with
+     the other logic terms.
+
+     This allows recursive use of search to resolve arbitrarily complex
+     boolean searches and weight different search terms.
+
+`data_for_index($parm_ref);'
+     Returns the data record for the passed -index. Returns undef if no
+     matching -index is in the system.
+
+     Example:   my $data = $self->data_for_index({ -index => $index });
+
+`clear_all;'
+     Completely clears the contents of the database and the search cache.
+
+`clear_cache;'
+     Completely clears the contents of the search cache.
+
+`close;'
+     Closes the currently open -map and flushes all associated buffers.
+
+`DESTROY;'
+     Closes the currently open -map and flushes all associated buffers.
+
+`number_of_groups;'
+     Returns the raw number of groups in the system.
+
+     Example: my $n = $inv_map->number_of_groups;
+
+`number_of_indexes;'
+     Returns the raw number of indexes in the system.
+
+     Example: my $n = $inv_map->number_of_indexes;
+
+`number_of_keys;'
+     Returns the raw number of keys in the system.
+
+     Example: my $n = $inv_map->number_of_keys;
+
+`number_of_indexes_in_group($parm_ref);'
+     Returns the raw number of indexes in a specific group.
+
+     Example: my $n = $inv_map->number_of_indexes_in_group({ -group =>
+     $group });
+
+`number_of_keys_in_group($parm_ref);'
+     Returns the raw number of keys in a specific group.
+
+     Example: my $n = $inv_map->number_of_keys_in_group({ -group => $group
+     });
+
+`add_group($parm_ref);'
+     Adds a new '-group' to the map. There is normally no need to call
+     this method from outside the module. The addition of new -groups is
+     done automatically when adding new entries.
+
+     Example: $inv_map->add_group({ -group => $group });
+
+     croaks if unable to successfuly create the group for some reason.
+
+     It silently eats attempts to create an existing group.
+
+`add_index($parm_ref);'
+     Adds a index entry to the system.
+
+     Example: $inv_map->add_index({ -index => $index, -data => $data });
+
+     If the 'index' is the same as an existing index, the '-data' for that
+     index will be updated.
+
+     -data can be pretty much any scalar. strings/object/hash/array
+     references are ok.  They will be transparently serialized using
+     Storable (preferred) or Data::Dumper.
+
+     This method should be called to set the '-data' record returned by
+     searches to something useful. If you do not, you will have to
+     maintain the information you want to show to users seperately from
+     the main search engine core.
+
+     The method returns the index_enum of the index.
+
+`add_index_to_group($parm_ref);'
+     Adds an index entry to a group. If the index does not already exist
+     in the system, adds it to the system as well.
+
+     Example: $inv_map->add_index_to_group({ -group => $group, '-index' =>
+     $index[, -data => $data]});
+
+     Returns the 'index_enum' for the index record.
+
+     If the 'index' is the same as an existing key, the 'index_enum' of the
+     existing index will be returned.
+
+     There is normally no need to call this method directly. Addition of
+     index to groups is handled automatically during addition of new
+     entries.
+
+     It cannot be used to add index to non-existant groups. This is a
+     feature not a bug.
+
+`add_key_to_group($parm_ref);'
+     Adds a key entry to a group.
+
+     Example: $inv_map->_add_key({ -group => $group, -key => $key });
+
+     Returns the 'key_enum' for the key record.
+
+     If the 'key' is the same as an existing key, the 'key_enum' of the
+     existing key will be returned.
+
+     There is normally no need to call this method directly. Addition of
+     keys to groups is handled automatically during addition of new
+     entries.
+
+     It cannot be used to add keys to non-existant groups. This is a
+     feature not a bug.
+
+`add_entry_to_group($parm_ref);'
+     Adds a reference to a particular index for a key with a ranking to a
+     specific group.
+
+     Example: $inv_map->add_entry_to_group({ -group => $group, -key =>
+     $key, -index => $index, -ranking => $ranking });
+
+     This method cannot be used to create new -indexes or -groups. This is
+     a feature, not a bug.  It *will* create new -keys as needed.
+
+`remove_group($parm_ref);'
+     Remove all entries for a group from the map.
+
+     Example: $inv_map->remove_group({ -group => $group });
+
+     This removes all key and key/index entries for the group and all
+     other group specific data from the map.
+
+     Use this method when you wish to completely delete a searchable
+     'group' from the map without disturbing other existing groups.
+
+`remove_entry_from_group($parm_ref);'
+     Remove a specific key<->index entry from the map for a group.
+
+     Example: $inv_map->remove_entry_from_group({ -group => $group, -key
+     => $key, -index => $index });
+
+     Does not remove the -key or -index from the database or the group -
+     only the entries mapping the two to each other.
+
+`remove_index_from_group ($parm_ref);'
+     Remove all references to a specific index for all keys for a group.
+
+     Example: $inv_map->_remove_index_from_group({ -group => $group,
+     -index => $index });
+
+     Note: This *does not* remove the index from the _system_ - just a
+     specific       group.
+
+     It is a null operation to remove an undeclared index or to remove a
+     declared index from a group where it is not used.
+
+`remove_index_from_all ($parm_ref);'
+     Remove all references to a specific index from the system.
+
+     Example: $inv_map->_remove_index_from_all({ -index => $index });
+
+     This *completely* removes it from all groups and the master system
+     entries.
+
+     It is a null operation to remove an undefined index.
+
+`remove_key_from_group($parm_ref);'
+     Remove all references to a specific key for all indexes for a group.
+
+     Example: $inv_map->remove({ -group => $group, -key => $key });
+
+     Returns undef if the key speced was not even in database.  Returns
+     '1' if the key speced was in the database, and has             been
+     successfully deleted.
+
+     croaks on errors.
+
+`list_all_keys_in_group($parm_ref);'
+     Returns an anonymous array containing a list of all defined keys in
+     the specified group.
+
+     Example:  $keys = $inv_map->list_all_keys_in_group({ -group => $group
+     });
+
+     Note: This can result in *HUGE* returned lists. If you have a lot of
+     records in the group, you are better off using the iteration support
+     ('first_key_in_group', 'next_key_in_group').
+
+`first_key_in_group($parm_ref);'
+     Returns the 'first' key in the -group based on hash ordering.
+
+     Returns 'undef' if there are no keys in the group.
+
+     Example: my $first_key = $inv_map->first_key_in_group({-group =>
+     $group});
+
+`next_key_in_group($parm_ref);'
+     Returns the 'next' key in the group based on hash ordering.
+
+     Returns 'undef' when there are no more keys in the group or if the
+     passed -key is not in the group map.
+
+     Example: my $next_key = $inv_map->next_key_in_group({ -group =>
+     $group, -key => $key });
+
+`list_all_indexes_in_group($parm_ref);'
+     Returns an anonymous array containing a list of all defined indexes
+     in the group
+
+     Example: $indexes = $inv_map->list_all_indexes_in_group({ -group =>
+     $group });
+
+     Note: This can result in *HUGE* returned lists. If you have a lot of
+     records in the group, you are better off using the iteration support
+     (first_index_in_group(), next_index_in_group())
+
+`first_index_in_group;'
+     Returns the 'first' index in the -group based on hash ordering.
+     Returns 'undef' if there are no indexes in the group.
+
+     Example: my $first_index = $inv_map->first_index_in_group({ -group =>
+     $group });
+
+`next_index_in_group({-group =' $group, -index => $index});>
+     Returns the 'next' index in the -group based on hash ordering.
+     Returns 'undef' if there are no more indexes.
+
+     Example: my $next_index = $inv_map->next_index_in_group({-group =>
+     group, -index => $index});
+
+`list_all_indexes;'
+     Returns an anonymous array containing a list of all defined indexes
+     in the map.
+
+     Example: $indexes = $inv_map->list_all_indexes;
+
+     Note: This can result in *HUGE* returned lists. If you have a lot of
+     records in the map or do not have a lot memory, you are better off
+     using the iteration support ('first_index', 'next_index')
+
+`first_index;'
+     Returns the 'first' index in the system based on hash ordering.
+     Returns 'undef' if there are no indexes.
+
+     Example: my $first_index = $inv_map->first_index;
+
+`next_index({-index =' $index});>
+     Returns the 'next' index in the system based on hash ordering.
+     Returns 'undef' if there are no more indexes.
+
+     Example: my $next_index = $inv_map->next_index({-index => $index});
+
+`list_all_groups;'
+     Returns an anonymous array containing a list of all defined groups in
+     the map.
+
+     Example: $groups = $inv_map->list_all_groups;
+
+     If you have a lot of groups in the map or do not have a lot of memory,
+     you are better off using the iteration support ('first_group',
+     'next_group')
+
+`first_group;'
+     Returns the 'first' group in the system based on hash ordering.
+     Returns 'undef' if there are no groups.
+
+     Example: my $first_group = $inv_map->first_group;
+
+`next_group ({-group =' $group });>
+     Returns the 'next' group in the system based on hash ordering.
+     Returns 'undef' if there are no more groups.
+
+     Example: my $next_group = $inv_map->next_group({-group => $group});
+
+Internals
+---------
+
+   The routines after this point are _internal_ to the object.  Do not
+access them from outside the object.
+
+   They are documented in the POD for code maintainence reasons only.
+
+   You Have Been Warned. ;)
+
+`_bare_search($parm_ref);'
+     Performs a query on the map and returns the results as a an anonymous
+     array containing the keys and rankings.
+
+     Example:
+
+          my $query = Search::InvertedIndex::Query->new(...);
+          my $result = $inv_map->search({ -query => $query });
+
+     Performs a complex multi-key match search with boolean logic and
+     optional search term weighting.
+
+     The search request is formatted as follows:
+
+     my $result = $inv_map->search({ -query => $query });
+
+     where '$query' is a Search::InvertedIndex::Query object.
+
+     Each node can either be a specific search term with an optional
+     weighting term (a Search::InvertedIndex::Query::Leaf object) or a
+     logic term with its own sub-branches (a Search::Inverted::Query
+     object).
+
+     The weightings are applied to the returned matches for each search
+     term by multiplication of their base ranking before combination with
+     the other logic terms.
+
+     This allows recursive use of search to resolve arbitrarily complex
+     boolean searches and weight different search terms.
+
+     Returns a reference to a hash of indexes and their rankings.
+
+`_get_data_for_index_enum($parm_ref);'
+     Returns the data record for the passed -index_enum.
+
+     Returns undef if no data record exists for the requested -index_enum.
+
+     Example:   my $data = $self->_get_data_for_index_enum({ -index_enum
+     => $index_enum });
+
+`_and($terms);'
+     Takes the passed list of search data results and merges them via
+     logical _and. Merged ranking is the sum of the individual rankings.
+
+`_nand($terms);'
+     Takes the passed list of search data results and merges them via
+     logical NAND (Not And). Merged ranking is the sum of the individual
+     rankings.
+
+`_or($terms);'
+     Takes the passed list of search data results and merges them via
+     logical OR. Merged ranking is the sum of the individual rankings.
+
+`_pack_list($hash_ref);'
+     Internal method. Not for access outside of the module.
+
+     Packs the passed hash ref of enum keys and signed 16 bit int values
+     into a dense binary structure. There is an endian dependancy here.
+
+`_unpack_list($packed_list);'
+     Internal method. Not for access outside of the module.
+
+     Unpacks the passed dense binary structure into an anonymous hash of
+     enum keys and signed 16 bit int values.  There is an endian
+     dependancy here.
+
+`_increment_enum($enum_value);'
+     Internal method. Not for access outside of the module.
+
+     Increments an 'enum' (internally a 12 digit hexadecimal number) by 1.
+
+`_untaint($string);'
+     Untaints the passed string. Use with care.
+
+DATABASE STRUCTURES
+===================
+
+   The inverted database uses a complex overlay built on a generic
+key/value accessible database (it really is fairly 'database agnostic').
+
+   It is organized into sub-sets of information by database key name space:
+
+     ; Counter. Incremented for new groups, decremented for deleted groups.
+     number_of_groups        -> # (decimal integer)
+
+     ; Counter. Incremented for new indexes, decremented for deleted indexes.
+     number_of_indexes       -> # (decimal integer)
+
+     ; Counter. Incremented for new keys, decremented for deleted keys.
+     number_of_keys          -> # (decimal integer)
+
+     ; The 'high water' mark used in assigning new index_enum keys
+     index_enum_counter      -> # (12 digit hex number)
+
+     ; Maps an index ("file") to its assigned index enumeration key
+     $INDEX<index>               -> index_enum
+
+     ; Maps the assigned index enumeration back to the index ("file") and
+     ; provides pointers to the 'next' and 'prev' index_enums in the system
+     $INDEX_ENUM<index_enum>         -> _next_index_enum_ _prev_index_enum_ index
+
+     ; Maps the 'first' 'index_enum' for the system
+     ${INDEX_ENUM}first_index_enum     -> index_enum of 'first' index_enum for the system
+
+     ; Data record for the index ("File"). Wrapped using 'Storable' or 'Data::Dumper'
+     $INDEX_ENUM_DATA<index_enum>_data   -> data
+
+     ; The 'high water' mark used in assigning new group_enum keys
+     group_enum_counter      -> # (12 digit hex number)
+
+     ; Maps a group's name to its assigned group enumeration key
+     $GROUP<groupname>           -> group_enum
+
+     ; Maps the assigned group enumeration key to a group and provides
+     ; pointers to the 'next' and 'previous' groups in the system.
+     $GROUP_ENUM<group_enum>         -> _prev_group_enum_ _next_group_enum_ $group
+
+     ; Maps the 'first' 'group_enum' for the system
+     ${GROUP_ENUM}first_group_enum     -> group_enum of 'first' group_enum for the system
+
+     ; Counter. Incremented for new keys, decremented for deleted keys.
+     $GROUP_ENUM_DATA<group_enum>_number_of_keys     -> # (decimal integer)
+
+     ; Counter. Incremented for new indexes, decremented for deleted indexes.
+     $GROUP_ENUM_DATA<group_enum>_number_of_indexes  -> #  (decimal integer)
+
+     ; 'High water' mark used in assigning new key_enum values for keys
+     $GROUP_ENUM_DATA<group_enum>_key_enum_counter   -> # (12 digit hex number)
+
+     ; Maps the 'first' 'key_enum' for the group
+     $GROUP_ENUM_DATA<group_enum>_first_key_enum         -> key_enum of 'first' key_enum
+
+     ; Maps the 'first' 'index_enum' for the group
+     $GROUP_ENUM_DATA<group_enum>_first_index_enum       -> index_enum of 'first' index_enum for the group
+
+     ; network order packed list of (6 byte) key_enums and
+     ; (16 bit signed) relevance rankings for the specified group_enum
+     ; and index_enum
+     $GROUP_ENUM_DATA<group_enum>$INDEXED_KEY_LIST<index_enum>           -> key_list
+
+     ; Pointers to the 'next' and 'previous' index_enums for this group.
+     $GROUP_ENUM_DATA<group_enum>$INDEX_ENUM_GROUP_CHAIN<index_enum>           -> _prev_index_enum_ _next_index_enum_
+
+     ; network order packed list of (6 byte) index_enums
+     ; and (16 bit signed) relevance rankings for the specified group_enum
+     ; and key_enum
+     $GROUP_ENUM_DATA<group_enum>$KEYED_INDEX_LIST<key_enum>             -> index_list
+
+     ; Maps 'key's to 'key_enum's
+     $GROUP_ENUM_DATA<group_enum>$KEY_TO_KEY_ENUM<key>                  -> key_enum
+
+     ; Maps 'key_enum's to 'key's and provides pointers to the
+     ; 'next' and 'previous' keys for the group
+     $GROUP_ENUM_DATA<group_enum>$KEY_ENUM_TO_KEY_AND_CHAIN<key_enum>             -> _prev_key_enum_ _next_key_enum_ key
+
+VERSION
+=======
+
+   1.11
+
+COPYRIGHT
+=========
+
+   Copyright 1999, Benjamin Franz (<URL:http://www.nihongo.org/snowhare/>)
+and FreeRun Technologies, Inc. (<URL:http://www.freeruntech.com/>). All
+Rights Reserved.  This software may be copied or redistributed under the
+same terms as Perl itelf.
+
+AUTHOR
+======
+
+   Benjamin Franz
+
+TODO
+====
+
+   Everything.
+
+   Concept item for evaluation: By storing a dense list of all indexed
+keywords, you would be able to use a regular expression or other fuzzy
+search matching scheme comparatively efficiently, locate possible words
+via a grep and then search on the possibilities. Seems to make sense to
+implement that as _another_ module that uses this module as a backend.
+'Search::InvertedIndex::Fuzzy' perhaps.
+
+SEE ALSO
+========
+
+     Search::InvertedIndex::Query  Search::InvertedIndex::Query::Leaf
+     Search::InvertedIndex::Result Search::InvertedIndex::Update
+     Search::InvertedIndex::DB::DB_File_SplitHash
+     Search::InvertedIndex::DB::Mysql
+
+

@@ -1,0 +1,1377 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Quantum/Entanglement,  Next: Quantum/Superpositions,  Prev: Qtk/QuickTk/scripts,  Up: Module List
+
+QM entanglement of variables in perl
+************************************
+
+NAME
+====
+
+   Quantum::Entanglement - QM entanglement of variables in perl
+
+SYNOPSIS
+========
+
+     use Quantum::Entanglement qw(:DEFAULT :complex :QFT);
+
+     my $c = entangle(1,0,i,1);    # $c = |0> + i|1>
+     my $d = entangle(1,0,1,1);    # $d = |0> + |1>
+
+     $e = $c * $d; # $e now |0*0> + i|0*1> + |1*0> + i|1*1>, connected to $c, $d
+
+     if ($e == 1) { # observe, probabilistically chose an outcome
+       # if we are here, ($c,$d) = i|(1,1)>
+       print "* \$e == 1\n";
+     }
+     else { # one of the not 1 versions of $e chosen
+       # if we are here, ($c,$d) = |(0,0)> + i|(1,0)> + |(0,1)>
+       print "* \$e != 1\n";
+     }
+
+BACKGROUND
+==========
+
+     "Quantum Mechanics - the dreams that stuff is made of."
+
+   Quantum mechanics is one of the stranger things to have emerged from
+science over the last hundred years.  It has led the way to new
+understanding of a diverse range of fundamental physical phenomena and,
+should recent developments prove fruitful, could also lead to an entirely
+new mode of computation where previously intractable problems find
+themselves open to easy solution.
+
+   While the detailed results of quantum theory are hard to prove, and
+even harder to understand, there are a handful of concepts from the theory
+which are more easily understood.  Hopefully this module will shed some
+light on a few of these and their consequences.
+
+   One of the more popular interpretations of quantum mechanics holds that
+instead of particles always being in a single, well defined, state they
+instead exist as an almost ghostly overlay of many different states (or
+values) at the same time.  Of course, it is our experience that when we
+look at something, we only ever find it in one single state.  This is
+explained by the many states of the particle collapsing to a single state
+and highlights the importance of observation.
+
+   In quantum mechanics, the state of a system can be described by a set
+of numbers which have a probability amplitude associated with them.  This
+probability amplitude is similar to the normal idea of probability except
+for two differences.  It can be a complex number, which leads to
+interference between states, and the probability with which we might
+observe a system in a particular state is given by the modulus squared of
+this amplitude.
+
+   Consider the simple system, often called a *qubit*, which can take the
+value of 0 or 1.  If we prepare it in the following superposition of
+states (a fancy way of saying that we want it to have many possible values
+at once):
+
+     particle = 1 * (being equal to 1) + (1-i) * (being equal to 0)
+
+   we can then measure (observe) the value of the particle.  If we do
+this, we find that it will be equal to 1 with a probability of
+
+     1**2 / (1**2 + (1-i)(1+i) )
+
+   and equal to zero with a probability of
+
+     (1+i)(1-i) / (1**2 + (1-i)(1+i) )
+
+   the factors on the bottom of each equation being necessary so that the
+chance of the particle ending up in any state at all is equal to one.
+
+   Observing a particle in this way is said to collapse the wave-function,
+or superposition of values, into a single value, which it will retain from
+then onwards.  A simpler way of writing the equation above is to say that
+
+     particle = 1 |1> + (1-i) |0>
+
+   where the probability amplitude for a state is given as a 'multiplier'
+of the value of the state, which appears inside the `< | ' >> pattern (this
+is called a *ket*, as sometimes the *bra* or `< <  | '>, pattern appears
+to the left of the probability amplitudes in these equations).
+
+   Much of the power of quantum computation comes from collapsing states
+and modifying the probability with which a state might collapse to a
+particular value as this can be done to each possible state at the same
+time, allowing for fantastic degrees of parallelism.
+
+   Things also get interesting when you have multiple particles together
+in the same system.  It turns out that if two particles which exist in
+many states at once interact, then after doing so, they will be linked to
+one another so that when you measure the value of one you also affect the
+possible values that the other can take.  This is called entanglement and
+is important in many quantum algorithms.
+
+DESCRIPTION
+===========
+
+   Essentially, this allows you to put variables into a superposition of
+states, have them interact with each other (so that all states interact)
+and then observe them (testing to see if they satisfy some comparison
+operator, printing them) which will collapse the entire system so that it
+is consistent with your knowledge.
+
+   As in quantum physics, the outcome of an observation will be the result
+of selecting one of the states of the system at random.  This might affect
+variables other than the ones observed, as they are able to remember their
+history.
+
+   For instance, you can say:
+
+     $foo = entangle(1,0,1,1); # foo = |0> + |1>
+     $bar = entangle(1,0,1,1); # bar = |0> + |1>
+
+   if at this point we look at the values of $foo or $bar, we will see
+them collapse to zero half of the time and one the other half of the time.
+We will also find that us looking at $foo will have no effect on the
+possible values, or chance of getting any one of those values, of $bar.
+
+   If we restrain ourselves a little and leave $foo and $bar unobserved we
+can instead play some games with them.  We can use our entangled variables
+just as we would any other variable in perl, for instance,
+
+     $c = $foo * $bar;
+
+   will cause $c to exist in a superposition of all the possible outcomes
+of multiplying each state of $foo with each state in $bar.  If we now
+measure the value of $c, we will find that one quarter of the time it will
+be equal to one, and three quarters of the time it will be equal to zero.
+
+   Lets say we do this, and $c turns out to be equal to zero this time,
+what does that leave $foo and $bar as?  Clearly we cannot have both $foo
+and $bar both equal to one, as then $c would have been equal to one, but
+all the other possible values of $foo and $bar can still occur.  We say
+that the state of $foo is now entangled to the state of $bar so that
+
+     ($foo, $bar ) = |0,0> + |0,1> + |1,0>.
+
+   If we now measure $foo, one third of the time it will be equal to one
+and two thirds of the time, it will come out as zero.  If we do this and
+get one, this means that should we observe $bar it will be equal to zero so
+that our earlier measurement of $c still makes sense.
+
+Use of this module
+==================
+
+   To use this module in your programs, simply add a
+
+     use Quantum::Entanglement;
+
+   line to the top of your code,  if you want to use complex probability
+amplitudes, you should instead say:
+
+     use Quantum::Entanglement qw(:complex :DEFAULT);
+
+   which will import the `Math::Complex i Re Im rho theta arg cplx cplxe'
+functions / constants into your package.
+
+   You can also import a Quantum Fourier transform, which acts on the
+probability amplitudes of a state (see below) by addind a `:QFT' tag.
+
+   This module adds an entangle function to perl, this puts a variable
+into multiple states simultaneously.  You can then cause this variable to
+interact with other entangled, or normal, values the result of which will
+also be in many states at once.
+
+   The different states which a variable can take each have an associated
+complex probability amplitude, this can lead to interesting behaviour, for
+instance, a root-not logic gate (see q_logic, below).
+
+entangle
+--------
+
+   This sets up a new entangled variable:
+
+     $foo = entangle(prob1, val1, prob2, val2, ...);
+
+   The probability values are strictly speaking probability amplitudes,
+and can be complex numbers (corresponding to a phase or wave-ish nature
+(this is stretching things slightly...)).  To use straight numbers, just
+use them, to use complex values, supply a Math::Complex number.
+
+   Thus
+
+     $foo = entangle(1, 0, 1+4*i, 1);
+
+   corresponds to:
+
+     foo = 1|0> + (1 + 4i)|1>
+
+   The probabilities do not need to be normalized, this is done by the
+module whenever required (ie. when observing variables).
+
+Non-observational operations
+----------------------------
+
+   We can now use our entangled variable just as we would any normal
+variable in perl.  Much of the time we will be making it do things where
+we do not find anything out about the value of our variable, if this is
+the case, then the variable does not collapse, although any result of its
+interactions will be entangled with itself.
+
+Observational Operators
+-----------------------
+
+   Whenever you perform an operation on an entangled variable which should
+increase your level of knowledge about the value of the variable you will
+cause it to collapse into a single state or set of states.  All logical
+comparison (`==', gt ....) operators, as well as string and num -ifying
+and boolean observation will cause collapse.
+
+   When an entangled variable is observed in this way, sets of states which
+would satisfy the operator are produced (ie. for $a < 2, all states <2 and
+all >= 2).  One of these sets of states is then selected randomly, using
+the probability amplitudes associated with the states.  The result of
+operating on this state is then returned.  Any other states are then
+destroyed.
+
+   For instance, if
+
+     $foo = entangle(1,2,1,3,1,5,1,7);
+            # |2> +|3> + |5> +|7>
+     then saying
+
+     print '$foo is greater than four' if ($foo > 4);
+
+   will cause $foo to be either `< |2' + |3> >> or `< |5' +7> >>.
+
+   Of course, if you had said instead:
+
+     $foo = entangle(-1,2,1,3,1,5,1,7);
+              # -1|2> + |3> + |5> +|7>
+
+   then if `$foo' was measured here, it would come out as any one of
+2,3,5,7 with equal likelyhood (remember, amplitude squared).  But saying
+
+     print '$foo is greater than four' if ($foo > 4);
+
+   will cause foo to be `< |2' or 3> >> with a probability of `(-1 + 1) ==
+0' or `< |5 or 7' >> with probability of `(1 + 1)/2 == 1'.  Thus `< $foo '
+4 >> will always be true.
+
+   It is possible to perform operations like these on an entangled
+variable without causing collapse by using p_op (below).
+
+   When performing an observation, the module can do two things to the
+states which can no longer be valid (those to which it did not collapse,
+|2 or 3> in the example above).  It can either internally set the
+probability of them collapsing to be zero or it can delete them entirely.
+This could have consequences if you are writing parallel functions that
+rely on there being a certain number of states in a variable, even after
+collapse.
+
+   The default is for collapsed states to be destroyed, to alter this
+behaviour, set the `$Quantum::Entanglement::destroy' variable to a false
+value.  In general though, you can leave this alone.
+
+Breaking this behaviour
+-----------------------
+
+   Although not the default, it is possible to cause observation (for
+boolean context or with comparison operators only) to act in a more
+purposeful manner.  If the variable:
+
+     $Quantum::Entanglement::conform
+
+   has a true value, then the overloaded operations provided by this
+module will try their very best to return "truth" instead of selecting
+randomly from both "true" and "false" outcomes.
+
+   For example:
+
+     $foo = entangle(1,0,1,1,1,3); # foo = |0> + |1> + |3>
+     $Quantum::Entanglement::conform = 1;
+     print "\$foo > 0\n" if $foo > 0;
+                                   # foo now = |1> + |3>
+     print "\$foo == 3\n" if $foo == 3;
+                                   # foo now = |3>
+
+   will always output:
+
+     $foo > 0
+     $foo == 3
+
+   Of course, setting this variable somewhat defeats the point of the
+module, but it could lead to some interesting pre-calculating algorithms
+which are fed with entangled input, which is then later defined (by
+testing ==, say )with the answer of the calculation appearing, as if by
+magic, in some other variable.  See also the section `save_state' in this
+node.
+
+p_op
+----
+
+   This lets you perform conditional operations on variables in a
+superposition of states *without actually looking at them*.  This returns
+a new superposed variable, with states given by the outcome of the p_op.
+You cannot, of course, gain any information about the variables involved
+in the p_op by doing this.
+
+     $rt = p_op(var1, op, var2, code if true, code if false).
+
+   op should be a string representing the operation to be performed (eg.
+`"=="').  The two code arguments should be references to subs the return
+values of which will be used as the value of the corresponding state
+should the expression be true or false.
+
+   If no code is provided, the return value of the operator itself is
+evaluated in boolean context, if true, 1 or if false, 0 is used as the
+corresponding state of the returned variable.  Only one of var1 and var2
+need to be entangled states.  The values of the states being tested are
+placed into the $QE::arg1 and $QE::arg2 variables should the subroutines
+want to play with them (these are localized aliases to the actual values,
+so modify at your peril (or pleasure)).
+
+   The semantics are best shown by example:
+
+     $gas = entangle(1, 'bottled', 1, 'released');
+       # gas now in states |bottled> + |released>
+
+     $cat_health = p_op($gas, 'eq', 'released',
+                             sub {'Dead'},
+                             sub {'Alive'});
+       # cat,gas now in states |Alive, bottled> + |Dead, released>
+
+   This is similar to parallel execution of the following psuedo code:
+
+     if (gas is in bottle) { # not probabilistic, as we don't look
+       cat is still alive
+     }
+     else {
+       cat is dead
+     }
+
+   The cat can now be observed (with a conditional test say) and doing so
+will collapse both the cat and the gas:
+
+     if ($cat_health eq 'Dead') {# again, outcome is probabilistic
+       # thus gas = |released>
+     }
+     else {
+       # thus gas = |bottled>
+     }
+
+   This also lets you use some other 'binary' operators on a superposition
+of states by immediatly observing the return value of the parallel op.
+
+     $string = entangle(1,'aa', 1, 'bb', 1, 'ab', 1, 'ba');
+     $regex = qr/(.)\1/;
+
+     if (q_op($string, '=~', $regex)) { # again, probabilistic
+       # if here, string = |aa> + |bb>
+     }
+     else {
+       # if here, string = |ab> + |ba>
+     }
+
+p_func
+------
+
+   This lets you perform core functions and subs through the states of a
+superposition without observing and produce a new variable corresponding
+to a superposition of the results of the function.
+
+     <p_func("func" ,entangled var,[more vars,] [optional args])
+
+   Any number of entangled variables can be passed to the function,
+optional args begin with the first non-entangled var.
+
+   The optional args will be passed to the subroutine or function
+unmodified.
+
+   eg. `p_func('substr', $foo, 1,1)' will perform `substr($state, 1,1)' on
+each state in $foo.  Saying `p_func('substr', $foo,$bar,1)' will evaluate
+`substr($s_foo, $s_bar,1)' for each state in $foo and $bar.
+
+   You can also specify a subroutine, either in the same package that
+p_func is called from, or with a fully qualified name.
+
+     sub foo {my $state = $_[0]; return ${$_[1]}[$state]}
+     @foo = qw(one two three);
+     $foo = entangle(1,1,1,2,1,3); # |1> + |2> + |3>
+     $bar = p_func('foo', $foo, \@foo);
+
+     # bar now |one> + |two> + |three>
+
+   You can also pass a code reference as first arg (cleaner)...
+
+     $bar = p_func(\&foo, $foo, \@foo);
+
+q_logic
+-------
+
+   This allows you to create new states, increasing the amount of global
+state as you do so.  This lets you apply weird quantum logic gates to your
+variables, amongst other things.
+
+     q_logic(code ref, entangled var [,more vars] );
+
+   The code ref is passed a list of probabilities and values corresponding
+to the state currently being examined. (prob, val, [prob, val..])  code
+ref must return a list of the following format:
+
+     (prob, val, prob, val ...) # as entangle basically
+
+   For instance, this is a root-not gate:
+
+     sub root_not {
+       my ($prob, $val) = @_;
+       return( $prob * (i* (1/sqrt(2))), $val,
+     	   $prob * (1/sqrt(2)), !$val ? 1 : 0);
+     }
+
+     $foo = entangle(1,0);
+     $foo = q_logic(\&root_not, $foo);
+
+     # if $foo is observed here, it will collapse to both 0 and 1, at random
+
+     $foo = q_logic(\&root_not, $foo);
+
+     print "\$foo is 1\n" if $foo; # always works, $foo is now 1.
+
+   This corresponds to the following:
+
+     foo = |0>
+
+     root_not( foo )
+
+     foo is now in state: sqrt(2)i |0> + sqrt(2) |1>
+
+     root_not (foo)
+
+     foo in state: (0.5 - 0.5) |0> + (0.5i + 0.5i) |1>
+
+     which if observed gives
+
+     foo = 0|0> + i|1> which must collapse to 1.
+
+   Neat, huh?
+
+save_state
+----------
+
+   Having set up a load of entangled variables, you might wish to store
+their superposed state for later restoration.  This is acheived using the
+save_state function:
+
+     $state = save_state( [list of entangled variables] );
+
+   To restore the states of the entangled variables, simply call the
+`restore_state' method on the $state:
+
+     ($foo, $bar) = $state->restore_state;
+
+   Once a state is restored, all other entangled variables will loose
+their values, so make sure that your save_state with everything you might
+want to use later.
+
+   Multiple different states can be saved and restored independently, but
+only one set of global states can be active at once, if a little caution
+is applied, this should not cause any problems.
+
+   See the demo calc_cache for an example of use.
+
+QFT
+---
+
+   This provides a quantum fourier transform which acts on the probability
+amplitudes of a state, creating a new state with the same values as the
+initial state but with new probability amplitudes.  FTs like this are used
+in many quantum algorithms where it is important to find the periodicity
+of some function (for instance, Shor).
+
+   This will only work if you have carefully populated your states,
+essentially if only one call has been made to the entangle function (you
+can have many 'result' variables lying around, but only one 'seed' state).
+This sort of breaks encapsulation, so this might change in the future!
+
+   See `~/demo/shor.pl' for an example of the use of this function.
+
+Quantum::Entanglement::show_states
+----------------------------------
+
+   This allows you to find out the states that your variables are in, it
+does not count as observation.
+
+   If called without arguments, this shows all the possible arrangements
+of values which the system can exist in, for instance, if you had two
+entangled variables:
+
+     $foo = entangle(1,0,1,1);
+     $bar = entangle(1,0,1,1);
+
+     print Quantum::Entanglement::show_states;
+
+   outputs:
+
+     1|0>   1|0>
+     1|1>   1|0>
+     1|0>   1|1>
+     1|1>   0|1>
+
+   If called as a method (or with a list of entangled vars) it will only
+return the states available to that variable, thus:
+
+     $foo = entangle(1,0,1,1);
+     print $foo->show_states;
+
+   outputs:
+
+     1|0> + 1|1>
+
+   The ordering of the output of this function may change in later versions
+of this module.
+
+EXPORT
+======
+
+   This module exports quite a bit, entangle, save_state, p_op, p_func and
+q_logic.  If used with qw(:complex) it will also export the following
+functions / constants from the Math::Complex module: `i Re Im rho theta
+arg cplx cplxe'.
+
+AUTHOR
+======
+
+   Alex Gough (`alex@rcon.org').  Any comments, suggestions or bug reports
+are warmly welcomed.
+
+SEE ALSO
+========
+
+   perl(1).  *Note Quantum/Superpositions: Quantum/Superpositions,. *Note
+Math/Complex: Math/Complex,.  `http:' in this node  - 1985 Paper by David
+Deutsch.  `http:' in this node  - Machines, Logic and Quantum Physics,
+ David Deutsch, Artur Ekert, Rossella Lupacchini.
+
+   Various examples are provided in the `~/demo/' directory of the
+distribution.
+
+BUGS
+====
+
+   This is slow(ish) but fun, so hey!
+
+Shortcomings
+------------
+
+   This module does fall short of physical reality in a few important
+areas, some of which are listed below:
+
+No eigenfunction like behaviour
+     All operators share the same set of eigenfunctions, in real QM this
+     is sometimes not the case, so observing one thing would cause some
+     other thing (even if already observed) to fall into a superposition
+     of states again.
+
+Certain observables cannot simultaneously have precisely defined values.
+     This follows from the point above.  The famous uncertainty principle
+     follows from the fact that position and momentum have different sets
+     of eigenfunctions.  In this module, it is always possible to collapse
+     the system so that a value is known for every entangled variable.
+
+Perl is not a quantum computing device
+     Perl, alas, is currently only implemented on classical computers, this
+     has the disadvantage that any quantum algorithm will not run in
+     constant time but will quite likely run in exponential time.  This
+     might be remedied in future releases of perl.  Just not anytime soon.
+
+Quantum information cannot be copied with perfect fidelity
+     It is impossible to perfectly clone a real entangled state without
+     'damaging' in some way either the original or the copy.  In this
+     module, it is possible for this to happen as we have special access
+     to the states of our variables.
+
+Cannot generate perfectly random numbers
+     It is well known that classical computers cannot produce a perfectly
+     random sequence of numbers, as this module runs on one of these, it
+     also suffers the same fate.  It is possible to give a classical
+     computer access to a perfect random number generator though
+     (essentially by linking it to a suitable physical system) in which
+     case this is no longer a problem.
+
+COPYRIGHT
+=========
+
+   This code is copyright (c) Alex Gough, 2001.  All Rights Reserved.
+This module is free software.  It may be used, redistributed and/or
+modified under the same terms as perl itself.
+
+
+File: pm.info,  Node: Quantum/Superpositions,  Next: Quine,  Prev: Quantum/Entanglement,  Up: Module List
+
+QM-like superpositions in Perl
+******************************
+
+NAME
+====
+
+   Quantum::Superpositions - QM-like superpositions in Perl
+
+VERSION
+=======
+
+   This document describes version 1.03 of Quantum::Superpositions,
+released August 11, 2000.
+
+SYNOPSIS
+========
+
+     use Quantum::Superpositions;
+
+     if ($x == any($a, $b, $c)) { ...  }
+
+     while ($nextval < all(@thresholds)) { ... }
+
+     $max = any(@value) < all(@values);
+
+     use Quantum::Superpositions BINARY => [ CORE::index ];
+
+     print index( any("opts","tops","spot"), "o" );
+     print index( "stop", any("p","s") );
+
+BACKGROUND
+==========
+
+   Under the standard interpretation of quantum mechanics, until they are
+observed, particles exist only as a discontinuous probability function.
+Under the Cophenhagen Interpretation, this situation is often visualized
+by imagining the state of an unobserved particle to be a ghostly overlay
+of all its possible observable states simultaneously. For example, a
+particle that might be observed in state A, B, or C may be considered to
+be in a pseudo-state where it is simultaneously in states A, B, and C.
+Such a particle is said to be in a superposition of states.
+
+   Research into applying particle superposition in construction of
+computer hardware is already well advanced. The aim of such research is to
+develop reliable quantum memories, in which an individual bit is stored as
+some measurable property of a quantised particle (a qubit). Because the
+particle can be physically coerced into a superposition of states, it can
+store bits that are simultaneously 1 and 0.
+
+   Specific processes based on the interactions of one or more qubits
+(such as interference, entanglement, or additional superposition) are then
+be used to construct quantum logic gates. Such gates can in turn be
+employed to perform logical operations on qubits, allowing logical and
+mathematical operations to be executed in parallel.
+
+   Unfortunately, the math required to design and use quantum algorithms
+on quantum computers is painfully hard. The Quantum::Superpositions module
+offers another approach, based on the superposition of entire scalar
+values (rather than individual qubits).
+
+DESCRIPTION
+===========
+
+   The Quantum::Superpositions module adds two new operators to Perl: any
+and all.
+
+   Each of these operators takes a list of values (states) and
+superimposes them into a single scalar value (a superposition), which can
+then be stored in a standard scalar variable.
+
+   The any and all operators produce two distinct kinds of superposition.
+The any operator produces a disjunctive superposition, which may
+(notionally) be in any one of its states at any time, according to the
+needs of the algorithm that uses it.
+
+   In contrast, the all operator creates a conjunctive superposition,
+which is always in every one of its states simultaneously.
+
+   Superpositions are scalar values and hence can participate in
+arithmetic and logical operations just like any other type of scalar.
+However, when an operation is applied to a superposition, it is applied
+(notionally) in parallel to each of the states in that superposition.
+
+   For example, if a superposition of states 1, 2, and 3 is multiplied by
+2:
+
+     $result = any(1,2,3) * 2;
+
+   the result is a superposition of states 2, 4, and 6. If that result is
+then compared with the value 4:
+
+     if ($result == 4) { print "fore!" }
+
+   then the comparison also returns a superposition: one that is both true
+and false (since the equality is true for one of the states of $result and
+false for the other two).
+
+   Of course, a value that is both true and false is of no use in an if
+statement, so some mechanism is needed to decide which superimposed
+boolean state should take precedence.
+
+   This mechanism is provided by the two types of superposition available.
+A disjunctive superposition is true if any of its states is true, whereas
+a conjunctive superposition is true only if all of its states are true.
+
+   Thus the previous example does print "fore!", since the if condition is
+equivalent to:
+
+     if (any(2,4,6) == 4)...
+     
+     It suffices that any one of 2, 4, or 6 is equal to 4, so the condition
+     is true and the C<if> block executes.
+
+   On the other hand, had the control statement been:
+
+     if (all(2,4,6) == 4)...
+
+   the condition would fail, since it is not true that all of 2, 4, and 6
+are equal to 4.
+
+   Operations are also possible between two superpositions:
+
+     if (all(1,2,3)*any(5,6) < 21)
+             { print "no alcohol"; }
+     
+     if (all(1,2,3)*any(5,6) < 18)
+             { print "no entry"; }
+     
+     if (any(1,2,3)*all(5,6) < 18)
+             { print "under-age" }
+     
+     In this example, the string "no alcohol" is printed because the
+     superposition produced by the multiplication is the Cartesian product of
+     the respective states of the two operands: C<all(5,6,10,12,15,18)>.
+     Since all of these resultant states are less that 21, the condition is
+     true. In contrast, the string "no entry" is not printed, because not all
+     the product's states are less than 18.
+
+   Note that the type of the first operand determines the type of the
+result of an operation.  Hence the third string - "underage" - is printed,
+because multiplying a disjunctive superposition by a conjunctive
+superposition produces a result that is disjunctive:
+`any(5,6,10,12,15,18)'. The condition of the if statement asks whether any
+of these values is less than 18, which is true.
+
+Composite Superpositions
+------------------------
+
+   The states of a superposition may be any kind of scalar value - a
+number, a string, or a reference:
+
+     $wanted = any("Mr","Ms").any(@names);
+     if ($name eq $wanted) { print "Reward!"; }
+
+     $okay = all(\&check1,\&check2);
+     die unless $okay->();
+
+     my $large =
+             all(    BigNum->new($centillion),
+                     BigNum->new($googol),
+                     BigNum->new($SkewesNum)
+             );
+     @huge =  grep {$_ > $large} @nums;
+
+   More interestingly, since the individual states of a superposition are
+scalar values and a superposition is itself a scalar value, a
+superposition may have states that are themselves superpositions:
+
+     $ideal = any( all("tall", "rich", "handsome"),
+                   all("rich", "old"),
+                   all("smart","Australian","rich")
+                 );
+
+   Operations involving such a composite superposition operate recursively
+and in parallel on each its states individually and then recompose the
+result. For example:
+
+     while (@features = get_description) {
+             if (any(@features) eq $ideal) {
+                     print "True love";
+             }
+     }
+
+   The `any(@features) eq $ideal' equality is true if the input
+characteristics collectively match any of the three superimposed
+conjunctive superpositions. That is, if the characteristics collectively
+equate to each of "tall" and "rich" and "handsome", or to both "rich" and
+"old", or to all three of "smart" and "Australian" and "rich".
+
+Eigenstates
+-----------
+
+   It is useful to be able to determine the list of states that a given
+superposition represents.  In fact, it is not the *states* per se, but the
+values to which the states may collapse - the *eigenstates* that are
+useful.
+
+   In programming terms this is the set of values `@ev' for a given
+superposition $s such that `any(@ev) == $s' or `any(@ev) eq $s'.
+
+   This list is provided by the `eigenstates' operator, which may be
+called on any superposition:
+
+     print "The factor was: ",
+           eigenstates($factor);
+
+     print "Don't use any of:",
+           eigenstates($badpasswds);
+
+Boolean evaluation of superpositions
+------------------------------------
+
+   The examples shown above assume the same meta-semantics for both
+arithmetic and boolean operations, namely that a binary operator is
+applied to the Cartesian product of the states of its two operands,
+regardless of whether the operation is arithmetic or logical. Thus the
+comparison of two superpositions produces a superposition of 1's and 0's,
+representing any (or all) possible comparisons between the individual
+states of the two operands.
+
+   The drawback of applying arithmetic metasemantics to logical operations
+is that it causes useful information to be lost. Specifically, which
+states were responsible for the success of the comparison. For example, it
+is possible to determine if any number in the array `@newnums' is less
+than all those in the array `@oldnums' with:
+
+     if (any(@newnums) < @all(oldnums)) {
+       print "New minimum detected";
+     }
+
+   But this is almost certainly unsatisfactory, because it does not reveal
+which element(s) of `@newnum' caused the condition to be true.
+
+   It is, however, possible to define a different meta-semantics for
+logical operations between superpositions; one that preserves the
+intuitive logic of comparisons but also gives limited access to the states
+that cause those comparsions to succeed.
+
+   The key is to deviate from the arithmetic view of superpositional
+comparison (namely, that a compared superposition yields a superposition
+of compared state combinations).  Instead, the various comparison
+operators are redefined so that they form a superposition of those
+eigenstates of the left operand that cause the operation to be true. In
+other words, the old meta-semantics superimposed the result of each
+parallel comparison, whilst the new meta-semantics superimposes the left
+operands of each parallel comparison that succeeds.
+
+   For example, under the original semantics, the comparisons:
+
+     all(7,8,9) <= any(5,6,7)        #A
+     all(5,6,7) <= any(7,8,9)        #B
+     any(6,7,8) <= all(7,8,9)        #C
+
+   would yield:
+
+     all(0,0,1,0,0,0,0,0,0)          #A (false)
+     all(1,1,1,1,1,1,1,1,1)          #B (true)
+     any(1,1,1,1,1,1,0,1,1)          #C (true)
+
+   Under the new semantics they would yield:
+
+     all(7)                          #A (false)
+     all(5,6,7)                      #B (true)
+     any(6,7)                        #C (true)
+
+   The success of the comparison (the truth of the result) is no longer
+determined by the values of the resulting states, but by the number of
+states in the resulting superposition.
+
+   The Quantum::Superpositions module treats logical operations and
+boolean conversions in exactly this way.  Under these meta-semantics, it
+is possible to check a comparison and also determine which eigenstates of
+the left operand were responsible for its success:
+
+     $newmins = any(@newnums) < all(@oldnums);
+
+     if ($newmins) {
+             print "New minima found:", eigenstates($newmins);
+     }
+
+   Thus, these semantics provide a mechanism to conduct parallel searches
+for minima and maxima :
+
+     sub min {
+       eigenstates( any(@_) <= all(@_) )
+     }
+
+     sub max {
+       eigenstates( any(@_) >= all(@_) )
+     }
+
+   These definitions are also quite intuitive, almost declarative: the
+minimum is any value that is less-than-or-equal-to all of the other
+values; the maximum is any value that is greater-than-or-equal to all of
+them.
+
+String evaluation of superpositions
+-----------------------------------
+
+   Converting a superposition to a string produces a string that encode
+the simplest set of eigenstates equivalent to the original superposition.
+
+   If there is only one eigenstate, the stringification of that state is
+the string representation.  This eliminates the need to explicitly apply
+the `eigenstates' operator when only a single resultant state is possible.
+For example:
+
+     print "lexicographically first: ",
+           any(@words) le all(@words);
+
+   In all other cases, superpositions are stringified in the format:
+`"all(*eigenstates*)"' or `"any(*eigenstates*)"'.
+
+Numerical evaluation of superpositions
+--------------------------------------
+
+   Providing an implicit conversion to numeric (for situations where
+superpositions are used as operands to an arithmetic operation, or as
+array indices) is more challenging than stringification, since there is no
+mechanism to capture the entire state of a superposition in a single
+non-superimposed number.
+
+   Again, if the superposition has a single eigenstate, the conversion is
+just the standard conversion for that value. For instance, to output the
+value in an array element with the smallest index in the set of indices @i:
+
+     print "The smallest element is: ",
+           $array[any(@i)<=all(@i)];
+
+   If the superposition has no eigenstates, there is no numerical value to
+which it could collapse, so the result is undef.
+
+   If a disjunctive superposition has more than one eigenstate, that
+superposition could collapse to any of those values. And it is convenient
+to allow it to do exactly that - collapse (pseudo-)randomly to one of its
+eigenstates.  Indeed, doing so provides a useful notation for random
+selection from a list:
+
+     print "And the winner is...",
+           $entrant[any(0..$#entrant)];
+
+Superpositions as subroutine arguments
+--------------------------------------
+
+   When a superposition is used as a subroutine argument, that subroutine
+is applied in parallel to each state of the superposition and the results
+re-superimposed to form the same type of superposition. For example, given:
+
+     $n1 = any(1,4,9);
+     $r1 = sqrt($n1);
+
+     $n2 = all(1,4,9);
+     $r2 = pow($n2,3);
+
+     $r3 = pow($n1,$r1);
+
+   then $r1 contains the disjunctive superposition `any(1,2,3)', `$r2'
+contains the conjunctive superposition `all(1,64,729)', and <$r3 >
+contains the conjunctive superposition `any(1,4,9,16,64,81,729)'.
+
+   Because the built-in sqrt and pow functions don't know about
+superpositions, the module provides a mechanism for informing them that
+their arguments may be superimposed.
+
+   If the call to `use Quantum::Superpositions' is given an argument list,
+that list specifies which functions should be rewritten to handle
+superpositions. Unary functions and subroutine can be "quantized" like  so:
+
+     sub incr    { $_[0]+1 }
+     sub numeric { $_[0]+0 eq $_[0] }
+
+     use Quantum::Superpositions
+             UNARY         => ["CORE::int", "main::incr"],
+             UNARY_LOGICAL => ["main::numeric"];
+
+   For binary functions and subroutines use:
+
+     sub max  { $_[0] < $_[1] ? $_[1] : $_[0] }
+
+     sub same { my $failed; $IG{__WARN__}=sub{$failed=1};
+                return $_[0] eq $_[1] || $_[0]==$_[1] && !$failed;
+              }
+
+     use Quantum::Superpositions
+             BINARY         => ['main::max', 'CORE::index'],
+             BINARY_LOGICAL => ['main::same'];
+
+EXAMPLES
+========
+
+Primality testing
+-----------------
+
+   The power of programming with scalar superpositions is perhaps best seen
+by returning the quantum computing's favourite adversary: prime numbers.
+Here, for example is an O(1) prime-number tester, based on naive trial
+division:
+
+     sub is_prime {
+       my ($n) = @_;
+       return $n % all(2..sqrt($n)+1) != 0
+     }
+
+   The subroutine takes a single argument ($n) and computes (in parallel)
+its modulus with respect to every integer between 2 and `sqrt($n)'.  This
+produces a conjunctive superposition of moduli, which is then compared
+with zero.  That comparison will only be true if all the moduli are not
+zero, which is precisely the requirement for an integer to be prime.
+
+   Because `is_prime' takes a single scalar argument, it can also be
+passed a superposition.  For example, here is a constant-time filter for
+detecting whether a number is part of a pair of twin primes:
+
+     sub has_twin {
+             my ($n) = @_;
+             return is_prime($n) && is_prime($n+any(+2,-2);
+     }
+
+Set membership and intersection
+-------------------------------
+
+   Set operations are particularly easy to perform using superimposable
+scalars.  For example, given an array of values `@elems', representing the
+elements of a set, the value `$v' is an element of that set if:
+
+     $v == any(@elems)
+
+   Note that this is equivalent to the definition of an eigenstate. That
+equivalence can be used to compute set intersections. Given two
+disjunctive superpositions, `$s1=any(@elems1)' and `$s2=any(@elems2)',
+representing two sets, the values that constitute the intersection of
+those sets must be eigenstates of both <$s1> and `$s2'. Hence:
+
+     @intersection = eigenstates(all($s1, $s2));
+
+   This result can be extended to extract the common elements from an
+arbitrary number of arrays in parallel:
+
+     @common = eigenstates( all(     any(@list1),
+                                     any(@list2),
+                                     any(@list3),
+                                     any(@list4),
+                               )
+                  );
+
+Factoring
+---------
+
+   Factoring numbers is also trivial using superpositions.  The factors of
+an integer N are all the quotients q of N/n (for all positive integers n <
+N) that are also integral. A positive number q is integral if floor(q)==q.
+Hence the factors of a given number are computed by:
+
+     sub factors {
+       my ($n) = @_;
+       my $q = $n / any(2..$n-1);
+       return eigenstates(floor($q)==$q);
+     }
+
+Query processing
+----------------
+
+   Superpositions can also be used to perform text searches.  For example,
+to determine whether a given string ($target) appears in a collection of
+strings (@db):
+
+     use Quantum::Superpositions BINARY => ["CORE::index"];
+
+     $found = index(any(@db), $target) >= 0;
+
+   To determine which of the database strings contain the target:
+
+     sub contains_str {
+             if (index($dbstr, $target) >= 0) {
+                     return $dbstr;
+             }
+     }
+
+     $found = contains_str(any(@db), $target);
+     @matches = eigenstates $found;
+
+   It is also possible to superimpose the target string, rather than the
+database, so as to search a single string for any of a set of targets:
+
+     sub contains_targ {
+             if (index($dbstr, $target) >= 0) {
+                     return $target;
+             }
+     }
+
+     $found = contains_targ($string, any(@targets));
+     @matches = eigenstates $found;
+
+   or in every target simultaneously:
+
+     $found = contains_targ($string, all(@targets));
+     @matches = eigenstates $found;
+
+AUTHOR
+======
+
+   Damian Conway (damian@conway.org)
+
+BUGS
+====
+
+   There are undoubtedly serious bugs lurking somewhere in code this funky
+:-) Bug reports and other feedback are most welcome.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1998-2000, Damian Conway. All Rights Reserved.  This
+module is free software. It may be used, redistributed and/or modified
+under the terms of the Perl Artistic License   (see
+http://www.perl.com/perl/misc/Artistic.html)
+
+
+File: pm.info,  Node: Quine,  Next: Quota,  Prev: Quantum/Superpositions,  Up: Module List
+
+extension for creating quines
+*****************************
+
+NAME
+====
+
+   Quine - extension for creating quines
+
+SYNOPSIS
+========
+
+     #!/usr/bin/perl -w
+
+     use Quine;
+
+     # rest of code here
+
+DESCRIPTION
+===========
+
+   This module simply prints the content of the program using the module.
+This type of program is called a "quine".
+
+AUTHOR
+======
+
+     Jeff "japhy" Pinyan
+     CPAN ID: PINYAN
+     japhy@pobox.com
+     http://www.pobox.com/~japhy/
+
+
+File: pm.info,  Node: Quota,  Next: R3,  Prev: Quine,  Up: Module List
+
+Perl interface to file system quotas
+************************************
+
+NAME
+====
+
+   Quota - Perl interface to file system quotas
+
+SYNOPSIS
+========
+
+     use Quota;
+
+     ($block_curr, $block_soft, $block_hard, $block_timelimit,
+      $inode_curr, $inode_soft, $inode_hard, $inode_timelimit) =
+     Quota::query($dev [,$uid]);
+
+     ($block_curr, $block_soft, $block_hard, $block_timelimit,
+      $inode_curr, $inode_soft, $inode_hard, $inode_timelimit) =
+     Quota::rpcquery($host, $path [,$uid]);
+
+     Quota::setqlim($dev, $uid, $block_soft, $block_hard,
+     		   $inode_soft, $inode_hard [,$tlo]);
+
+     Quota::sync([$dev]);
+
+     $arg = Quota::getqcarg([$path]);
+
+     Quota::setmntent();
+     ($dev, $path, $type, $opts) = Quota::getmntent();
+     Quota::endmntent();
+
+DESCRIPTION
+===========
+
+   The Quota module provides access to file system quotas.  The quotactl
+system call or ioctl is used to query or set quotas on the local host, or
+queries are submitted via RPC to a remote host.  Mount tables can be
+parsed with *getmntent* and paths can be translated to device files (or
+whatever the actual *quotactl* implementations needs as argument) of the
+according file system.
+
+Functions
+---------
+
+*($bc,$bs,$bh,$bt, $ic,$is,$ih,$it) = Quota::query($dev, $uid, $isgrp)*
+     Get current usage and quota limits for a given file system and user.
+     The user is specified by its numeric uid; defaults to the process'
+     real uid.
+
+     The type of $dev varies from system to system. It's the argument
+     which is used by the *quotactl* implementation to address a specific
+     file system. It may be the path of a device file (e.g. */dev/sd0a*)
+     or the path of the mount point or the quotas file at the top of the
+     file system (e.g. */home.stand/quotas*). However you do not have to
+     worry about that; use *Quota::getqcarg* to automatically translate
+     any path inside a file system to the required $dev argument.
+
+     $dev may also be in the form of *hostname:path*, which has the module
+     transparently query the given host via a remote procedure call (RPC).
+     In case you have *NFS* (or similar network mounts), this type of
+     argument may also be produced by *Quota::getqcarg*. Note: RPC queries
+     require *rquotad(1m)* to be running on the target system. If the
+     daemon or host are down, the timeout is 12 seconds.
+
+     In *$bc* and *$ic* the current usage in blocks and inodes is returned.
+     *$bs* and *$is* are the soft limits, *$bh* and *$ih* hard limits. If
+     the soft limit is exceeded, writes by this user will fail for blocks
+     or inodes after *$bt* or $it is reached. These times are expressed as
+     usual, i.e. in elapsed seconds since 00:00 1/Jan/1970 GMT.
+
+     Note: When the quota limits are not exceeded, the timestamps are
+     meaningless and should be ignored. When hard and soft limits are
+     zero, there is no limit for that user. On most systems Quota::query
+     will return undef in that case and errno will be set to ESRCH.
+
+     When *$isgrp* is given and set to 1, *$uid* is taken as gid and group
+     quotas are queried. This is not supported across RPC and even locally
+     only on a few architectures (e.g. Linux and other BSD based Unix
+     variants, OSF/1 and  AIX - check the quotactl(2) man page on your
+     systems). If unsupported, this flag is ignored.
+
+*Quota::setqlim($dev, $uid, $bs,$bh, $is,$ih, $tlo, $isgrp)*
+     Sets quota limits for the given user. Meanings of $dev, *$uid*,
+     *$bs*, *$bh*, *$is* and *$ih* are the same as in *Quota::query*.
+
+     *$tlo* decides how the time limits are initialized: 0: The time
+     limits are set to *NOT STARTED*, i.e. the time limits are not
+     initialized until the first write attempt by this user.  This is the
+     default.  1: The time limits are set to *7.0 days*.  More
+     alternatives (i.e. setting a specific time) aren't available in most
+     implementations.
+
+     When *$isgrp* is given and set to 1, *$uid* is taken as gid and group
+     quota limits are set. This is supported only on a few architectures
+     (see above). If unsupported, this flag is ignored.
+
+     Note: if you want to set the quota of a particular user to zero, i.e.
+     no write permission, you must not set all limits to zero, since that
+     is equivalent to unlimited access. Instead set only the hard limit to
+     0 and the soft limit for example to 1.
+
+     Note that you cannot set quotas via RPC.
+
+Quota::sync($dev)
+     Have the kernel update the quota file on disk or all quota files if
+     no argument given (the latter doesn't work on all systems, in
+     particular on *HP-UX 10.10*).
+
+     The main purpose of this function is to check if quota is enabled in
+     the kernel and for a particular file system. Read the *quotaon(1m)*
+     man page on how to enable quotas on a file system.
+
+*($bc,$bs,$bh,$bt, $ic,$is,$ih,$it) =*
+     *Quota::rpcquery($host,$path,$uid)*
+
+     This is equivalent to *Quota::query("$host:$path",$uid)*, i.e.  query
+     quota for a given user on a given remote host via RPC.  $path is the
+     path of any file or directory inside the wanted file system on the
+     remote host.
+
+*$arg = Quota::getqcarg($path)*
+     Get the required $dev argument for *Quota::query* and *Quota::setqlim*
+     for the file system you want to operate on. $path is any path of an
+     existing file or directory inside that file system. The path argument
+     is optional and defaults to the current working directory.
+
+     The type of $dev varies between operating systems, i.e. different
+     implementations of the quotactl functionality. Hence it's important
+     for compatibility to always use this module function and not really
+     pass a device file to *Quota::query* (as returned by *Quota::getdev*).
+     See also above at *Quota::query*
+
+*$dev = Quota::getdev($path)*
+     Returns the device entry in the mount table for a particular file
+     system, specified by any path of an existing file or directory inside
+     it. $path defaults to the working directory. This device entry need
+     not really be a device. For example on network mounts (*NFS*) it's
+     *"host:mountpath"*, with *amd(1m)* it may be something completely
+     different.
+
+     *NEVER* use this to produce a $dev argument for other functions of
+     this module, since it's not compatible. On some systems *quotactl*
+     does not work on devices but on the quotas file or some other kind of
+     argument. Always use *Quota::getqcarg*.
+
+Quota::setmntent()
+     Opens or resets the mount table. This is required before the first
+     invocation of *Quota::getmntent*.
+
+     Note: on some systems there is no equivalent function in the C
+     library.  But you still have to call this module procedure for
+     initialization of module-internal variables.
+
+*($dev, $path, $type, $opts) = Quota::getmntent()*
+     Returns the next entry in the system mount table. This table contains
+     information about all currently mounted (local or remote) file
+     systems.  The format and location of this table (e.g. */etc/mtab*)
+     vary from system to system. This function is provided as a compatible
+     way to parse it. (On some systems, like *OSF/1*, this table isn't
+     accessible as a file at all, i.e. only via *Quota::getmntent*).
+
+Quota::endmntent()
+     Close the mount table. Should be called after the last use of
+     *Quota::getmntent* to free possibly allocated file handles and memory.
+     Always returns undef.
+
+Quota::strerr()
+     Translates $! to a quota-specific error text. You should always use
+     this function to output error messages, since the normal messages
+     don't always make sense for quota errors (e.g. *ESRCH*: *No such
+     process*, here: *No quota for this user*)
+
+RETURN VALUES
+=============
+
+   Functions that are supposed return lists or scalars, return undef upon
+errors. As usual $! contains the error code (see *Quota::strerr*).
+
+   *Quota::endmntent* always returns undef. All other functions return
+undef only upon errors.
+
+EXAMPLES
+========
+
+   An example for each function can be found in the test script test.pl.
+See also the contrib directory, which contains some longer scripts, kindly
+donated by users of the module.
+
+BUGS
+====
+
+   With remote quotas we have to rely on the remote system to state
+correctly which block size the quota values are referring to.
+Unfortunately on Linux the rpc.rquotad reports a block size of 4
+kilobytes, which is wildly incorrect. So you either need to fix your Linux
+rquotad or keep *#define LINUX_RQUOTAD_BUG* defined, which will
+Quota::query always let assume all remote partners in reality report 1kB
+blocks. Of course that'll break with mixed systems, so better fix your
+rquotad. For more info on other Linux bugs please see INSTALL.
+
+AUTHORS
+=======
+
+   This module was created 1995 by Tom Zoerner (tomzo@nefkom.net) and
+since then continually improved and ported to many operating- and
+file-systems. Numerous people have contributed to this process; for a
+complete list of names please see the CHANGES document.
+
+SEE ALSO
+========
+
+   perl(1), edquota(1m), quotactl(2) or quotactl(7I), mount(1m), mtab(4)
+or mnttab(4), quotaon(1m), setmntent(3), getmntent(3) or getmntinfo(3),
+endmntent(3), rpc(3), rquotad(1m).
+
+

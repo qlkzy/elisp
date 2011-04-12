@@ -1,0 +1,1514 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: BSD/Itimer,  Next: BSD/Resource,  Prev: BSD/Ipfwgen,  Up: Module List
+
+Perl extension for accessing interval timers
+********************************************
+
+NAME
+====
+
+   BSD::Itimer - Perl extension for accessing interval timers
+
+SYNOPSIS
+========
+
+     use BSD::Itimer;
+     my($interval_sec, $interval_usec, $current_sec, $current_usec) =
+       getitimer(ITIMER_REAL);
+     my($interval_sec, $interval_usec, $current_sec, $current_usec) =
+       setitimer(ITIMER_REAL, $interval_sec, $interval_usec,
+     	      $current_sec, $current_usec));
+
+DESCRIPTION
+===========
+
+   This module provides access to the interval timers many operating
+systems provide from perl.  Interval timers conceptually have microsecond
+resolution (hardware typically limits actual granularity), with the
+ability to reschedule the timer on a fixed repeating interval.  There are
+usually several timers available with a different concept of "time".
+
+OVERVIEW
+========
+
+   The interval timer is accessed by two exported functions, getitimer and
+setitimer.  Most Unix systems have three interval timers available for
+program use.  The current BSD::Itimer implementation knows about the
+following timers, where implemented:
+
+   *ITIMER_REAL* - This timer decrements in real time.  A SIGALRM is
+delivered when this timer expires.
+
+   *ITIMER_VIRTUAL* - This timer decrements in real time when the calling
+process is running.  Delivers SIGVTALRM when it expires.
+
+   *ITIMER_PROF* - This timer runs when the calling process is running,
+and when the operating system is operating on behalf of the calling
+process.  A SIGPROF is delivered when the timer expires.
+
+   *ITIMER_REALPROF* - This timer is available under Solaris only.
+Consult the setitimer(2) manual page for more information.
+
+   Interval timers are represented as four item integer lists.  The first
+two integers comprise the second and microsecond parts of the timer's
+repeat interval.  The second pair represent the second and microsecond
+parts of the current timer value.
+
+   The getitimer function expects a single argument naming the timer to
+fetch.  It returns a four element list, or an empty list on failure.
+
+   The setitimer function expects a argument naming the timer to set, and
+a four element list representing the interval.  It returns the previous
+setting of the timer, or an empty list on failure.  Setting a timer's
+repeat interval to 0 will cancel the timer after its next delivery.
+Setting it's current value to 0 will immediately cancel the timer.
+
+SEE ALSO
+========
+
+   perl(1), setitimer(2)
+
+AUTHOR
+======
+
+   Daniel Hagerty <hag@linnaean.org>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1999 Daniel Hagerty. All rights reserved. This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+BUGS
+====
+
+   Could use a friendly interface.
+
+
+File: pm.info,  Node: BSD/Resource,  Next: BTRIEVE/SAVE,  Prev: BSD/Itimer,  Up: Module List
+
+BSD process resource limit and priority functions
+*************************************************
+
+NAME
+====
+
+   BSD::Resource - BSD process resource limit and priority functions
+
+SYNOPSIS
+========
+
+     use BSD::Resource;
+
+     #
+     # the process resource consumption so far
+     #
+
+     ($usertime, $systemtime,
+      $maxrss, $ixrss, $idrss, $isrss, $minflt, $majflt, $nswap,
+      $inblock, $oublock, $msgsnd, $msgrcv,
+      $nsignals, $nvcsw, $nivcsw) = getrusage($ru_who);
+
+     $rusage = getrusage($ru_who);
+
+     #
+     # the process resource limits
+     #
+
+     ($nowsoft, $nowhard) = getrlimit($resource);
+
+     $rlimit = getrlimit($resource);
+
+     $success = setrlimit($resource, $newsoft, $newhard);
+
+     #
+     # the process scheduling priority
+     #
+
+     $nowpriority = getpriority($pr_which, $pr_who);
+
+     $success = setpriority($pr_which, $pr_who, $priority);
+
+     # The following is not a BSD function.
+     # It is a Perlish utility for the users of BSD::Resource.
+
+     $rlimits = get_rlimits();
+
+DESCRIPTION
+===========
+
+getrusage
+---------
+
+     ($usertime, $systemtime,
+      $maxrss, $ixrss, $idrss, $isrss, $minflt, $majflt, $nswap,
+      $inblock, $oublock, $msgsnd, $msgrcv,
+      $nsignals, $nvcsw, $nivcsw) = getrusage($ru_who);
+
+     $rusage = getrusage($ru_who);
+
+     # $ru_who argument is optional; it defaults to RUSAGE_SELF
+
+     $rusage = getrusage();
+
+   The $ru_who argument is either `RUSAGE_SELF' (the current process) or
+`RUSAGE_CHILDREN' (all the child processes of the current process) or it
+maybe left away in which case `RUSAGE_SELF' is used.
+
+   The `RUSAGE_CHILDREN' is the total sum of all the so far *terminated*
+(either successfully or unsuccessfully) child processes: there is no way
+to find out information about child processes still running.
+
+   On some systems (those supporting both getrusage() and the POSIX
+threads) there is also `RUSAGE_THREAD'. The BSD::Resource supports the
+`RUSAGE_THREAD' if it is present but understands nothing more about the
+POSIX threads themselves.  Similarly for `RUSAGE_BOTH': some systems
+support retrieving the sums of the self and child resource consumptions
+simultaneously.
+
+   In list context getrusage() returns the current resource usages as a
+list. On failure it returns an empty list.
+
+   The elements of the list are, in order:
+index	name		meaning usually (quite system dependent)
+
+     0	utime		user time
+     1	stime		system time
+         	 2	maxrss		maximum shared memory or current resident set
+     3	ixrss		integral shared memory
+     4	idrss		integral or current unshared data
+     5	isrss		integral or current unshared stack
+     6	minflt		page reclaims
+     7	majflt		page faults
+         	 8	nswap		swaps
+     9	inblock		block input operations
+     	10	oublock		block output operations
+     	11	msgsnd		messages sent
+     	12	msgrcv		messaged received
+     	13	nsignals	signals received
+     	14	nvcsw		voluntary context switches
+     	15	nivcsw		involuntary context switches
+
+   In scalar context getrusage() returns the current resource usages as a
+an object. The object can be queried via methods named exactly like the
+middle column, name, in the above table.
+
+     $ru = getrusage();
+     print $ru->stime, "\n";
+
+     $total_context_switches = $ru->nvcsw + $ru->nivcsw;
+
+   For a detailed description about the values returned by getrusage()
+please consult your usual C programming documentation about getrusage()
+and also the header file `<sys/resource.h>'.  (In *Solaris*, this might be
+`<sys/rusage.h>').
+
+   Note 1: officially *HP-UX* does not support getrusage() at all but for
+the time being, it does seem to.
+
+   Note 2: Because not all kernels are BSD and also because of the sloppy
+support of getrusage() by many vendors many of the values may not be
+updated.
+
+   For example *Solaris 1* claims in `<sys/rusage.h>' that the `ixrss' and
+the `isrss' fields are always zero.
+
+   In *SunOS 5.5 and 5.6* the getrusage() leaves most of the fiels zero
+and therefore getrusage() is not even used, instead of that the */proc*
+interface is used.  The mapping is not perfect: the maxrss field is really
+the current resident size instead of the maximum, the idrss is really the
+current heap size instead of the integral data, the isrss is really the
+current stack size instead of the integral stack.  The ixrss has no
+sensible counterpart at all so it stays zero.
+
+getrlimit
+---------
+
+     ($nowsoft, $nowhard) = getrlimit($resource);
+
+     $rlimit = getrlimit($resource);
+
+   The $resource argument can be one of
+
+     $resource		usual meaning		usual unit
+
+     RLIMIT_CPU		CPU time		seconds
+
+     RLIMIT_FSIZE		file size		bytes
+
+     RLIMIT_DATA		data size		bytes
+             RLIMIT_STACK		stack size		bytes
+             RLIMIT_CORE		coredump size		bytes
+             RLIMIT_RSS		resident set size	bytes
+         	RLIMIT_MEMLOCK		memory locked data size	bytes
+
+     RLIMIT_NPROC		number of processes	1
+
+     RLIMIT_NOFILE		number of open files	1
+     RLIMIT_OFILE		number of open files	1
+             RLIMIT_OPEN_MAX		number of open files	1
+
+     RLIMIT_AS		(virtual) address space	bytes
+             RLIMIT_VMEM		virtual memory (space)	bytes
+
+     RLIMIT_TCACHE		maximum number of	1
+     			cached threads
+
+     RLIMIT_AIO_MEM		maximum memory locked	bytes
+     			for POSIX AIO
+     RLIMIT_AIO_OPS		maximum number		1
+     			for POSIX AIO ops
+
+   *What limits are available depends on the operating system*.  See below
+for `get_rlimits()' on how to find out which limits are available, for the
+exact documentation consult the documentation of your operatgiing system.
+The two groups (`NOFILE', C`OFILE', <OPEN_MAX>) and (`AS', `VMEM') are
+aliases within themselves.
+
+   Two meta-resource-symbols might exist
+
+     RLIM_NLIMITS
+     RLIM_INFINITY
+
+   `RLIM_NLIMITS' being the number of possible (but not necessarily fully
+supported) resource limits, see also the get_rlimits() call below.
+`RLIM_INFINITY' is useful in setrlimit(), the `RLIM_INFINITY' is
+represented as -1.
+
+   In list context `getrlimit()' returns the current soft and hard resource
+limits as a list.  On failure it returns an empty list.
+
+   Processes have soft and hard resource limits.  On crossing the soft
+limit they receive a signal (for example the `SIGXCPU' or `SIGXFSZ',
+corresponding to the `RLIMIT_CPU' and `RLIMIT_FSIZE', respectively).  The
+processes can trap and handle some of these signals, please see `Signals',
+*Note Perlipc: (perl.info)perlipc,.  After the hard limit the processes
+will be ruthlessly killed by the `KILL' signal which cannot be caught.
+
+   NOTE: the level of 'support' for a resource varies. Not all the systems
+
+     a) even recognise all those limits
+     b) really track the consumption of a resource
+     c) care (send those signals) if a resource limit is exceeded
+
+   Again, please consult your usual C programming documentation.
+
+   One notable exception for the better: officially *HP-UX* does not
+support getrlimit() at all but for the time being, it does seem to.
+
+   In scalar context getrlimit() returns the current soft and hard
+resource limits as an object. The object can be queried via methods `cur'
+and max, the current and maximum resource limits for the `$resource',
+respectively.
+
+getpriority
+-----------
+
+     $nowpriority = getpriority($pr_which, $pr_who);
+
+     # the default $pr_who is 0 (the current $pr_which)
+
+     $nowpriority = getpriority($pr_which);
+
+     # the default $pr_which is PRIO_PROCESS (the process priority)
+
+     $nowpriority = getpriority();
+
+   getpriority() returns the current priority. NOTE: getpriority() can
+return zero or negative values completely legally. On failure
+getpriority() returns undef (and $! is set as usual).
+
+   The priorities returned by getpriority() are in the (inclusive) range
+`PRIO_MIN'...`PRIO_MAX'.  The $pr_which argument can be any of
+PRIO_PROCESS (a process) `PRIO_USER' (a user), or `PRIO_PGRP' (a process
+group). The $pr_who argument tells which process/user/process group, 0
+signifying the current one.
+
+   Usual values for `PRIO_MIN', `PRIO_MAX', are -20, 20. A negative value
+means better priority (more impolite process), a positive value means
+worse priority (more polite process).
+
+   NOTE: in *AIX* if the BSD compatibility library is not installed or not
+found by the installation procedure of the BSD::Resource the `PRIO_MIN' is
+0 (corresponding to -20) and `PRIO_MAX' is 39 (corresponding to 19, the
+BSD priority 20 is unreachable).
+
+setrlimit
+---------
+
+     $success = setrlimit($resource, $newsoft, $newhard);
+
+   setrlimit() returns true on success and undef on failure.
+
+   NOTE: A normal user process can only lower its resource limits.  Soft
+or hard limit `RLIM_INFINITY' means as much as possible, the real hard
+limits are normally buried inside the kernel and are *very*
+system-dependent.
+
+setpriority
+-----------
+
+     $success = setpriority($pr_which, $pr_who, $priority);
+
+     # NOTE! If there are two arguments the second one is
+     # the new $priority (not $pr_who) and the $pr_who is
+     # defaulted to 0 (the current $pr_which)
+
+     $success = setpriority($pr_which, $priority);
+
+     # The $pr_who defaults to 0 (the current $pr_which) and
+     # the $priority defaults to half of the PRIO_MAX, usually
+     # that amounts to 10 (being a nice $pr_which).
+
+     $success = setpriority($pr_which);
+
+     # The $pr_which defaults to PRIO_PROCESS,
+
+     $success = setpriority();
+
+   setpriority() is used to change the scheduling priority.  A positive
+priority means a more polite process/process group/user; a negative
+priority means a more impoite process/process group/user.  The priorities
+handled by setpriority() are [`PRIO_MIN',`PRIO_MAX'].  A normal user
+process can only lower its priority (make it more positive).
+
+   NOTE: A successful call returns 1, a failed one 0.
+
+times
+-----
+
+     use BSD::Resource qw(times);
+
+     ($user, $system, $child_user, $child_system) = times();
+
+   The BSD::Resource module offers a times() implementation that has
+usually slightly better time granularity than the times() by Perl core.
+The time granularity of the latter is usually 1/60 seconds while the
+former may achieve submilliseconds.
+
+   NOTE: The current implementation uses two getrusage() system calls: one
+with RUSAGE_SELF and one with RUSAGE_CHILDREN.  Therefore the operation is
+not `atomic': the times for the children are recorded a little bit later.
+
+   NOTE: times() is not imported by default by BSD::Resource.    You need
+to tell that you want to use it.
+
+   *NOTE: This is not a real BSD function.*
+
+get_rlimits
+-----------
+
+     $rlimits = get_rlimits();
+
+   *NOTE: This is not a real BSD function. It is a convenience function.*
+
+   get_rlimits() returns a reference to hash which has the names of the
+available resource limits as keys and their indices (those which are
+needed as the first argument to getrlimit() and setrlimit()) as values.
+For example:
+
+     $r = get_rlimits();
+     print "ok.\n" if ($r->{'RLIM_STACK'} == RLIM_STACK);
+
+ERRORS
+======
+
+   *      Your vendor has not defined BSD::Resource macro RLIMIT_...
+
+     The code tried to call getrlimit/setrlimit for a resource limit that
+     your operating system vendor/supplier does not support.  Portable code
+     should use get_rlimits() to check which resource limits are defined.
+
+EXAMPLES
+========
+
+     # the user and system times so far by the process itself
+
+     ($usertime, $systemtime) = getrusage();
+
+     # ditto in OO way
+
+     $ru = getrusage();
+
+     $usertime   = $ru->utime;
+     $systemtime = $ru->stime;
+
+     # get the current priority level of this process
+
+     $currprio = getpriority();
+
+VERSION
+=======
+
+   Release 1.08
+
+AUTHOR
+======
+
+   Jarkko Hietaniemi, `jhi@iki.fi'
+
+
+File: pm.info,  Node: BTRIEVE/SAVE,  Next: Barcode/Code128,  Prev: BSD/Resource,  Up: Module List
+
+Perl extension to manipulate BTRIEVE SAVE records.
+**************************************************
+
+NAME
+====
+
+     BTRIEVE::SAVE - Perl extension to manipulate BTRIEVE SAVE records.
+
+SYNOPSIS
+========
+
+     use BTRIEVE::SAVE
+     my $btr = BTRIEVE::SAVE->new('cc057.std','cc057.dar');
+     $btr->parse_file();
+     my $recs = $btr->{'array'};
+     for (@$recs) {
+         my($rhfixed,$rfixed,$rvar)=@{$_->{values}};
+         print $rhfixed->{'Title'}."\n";
+     }
+
+     # Often the first record is some kind of header.  Generally one
+         # treats header records differently from those that follow. E.g.,
+         # they often have counts of the following records that must be
+         # adjusted if we are gonna kill or add records.  Here we leave it
+         # alone.
+
+     my $output = "";
+     $header=shift @$recs;
+
+     my $data = $header->fixed.$header->var;
+     $output .= $header->counted_rec($data);
+     
+     foreach my $rec (@$recs) {
+         my($rhfixed,$rfixed,$rvar)=@{$rec->{values}};
+         $rhfixed->{'Title'} =~s/^\s*the/The/;
+         $output .=$rec->counted_rec_hash();
+     }
+     $output .="\cZ"; # now $output is a legal Btrieve save record.
+     # For large records, one may want to do everything incrementally.
+     
+     open OUT,">>cc057.das"
+               or die "Could not open cc057.das for append: $!\n";
+     binmode OUT;
+     my $incbtr = BTRIEVE->new('cc057.std','cc057.dar');
+     my $header = $incbtr->next_rec();
+     my $data = $header->fixed.$header->var;
+     print OUT $header->counted_rec($data);
+     
+     while (defined( my $rec=$incbtr->next_rec) ) {
+         my($rhfixed,$rfixed,$rvar)=@{$rec->{values}};
+         $rhfixed->{'Title'} =~s/^\s*the/The/;
+         print OUT $rec->counted_rec_hash();
+     }
+     print OUT "\cZ";
+     close OUT or die "Could not close cc057.das: $!\n";
+
+DESCRIPTION
+===========
+
+   BTRIEVE::SAVE is a Perl 5 module for reading in, manipulating, and
+outputting Pervasive's save file format for its Btrieve products.
+
+   BTRIEVE::SAVE uses BTRIEVE::SAVE::REC which abstracts an individual
+record in the entire file.
+
+   You must have a config file for your save file: this allows
+BTRIEVE::SAVE::REC to analyse the fixed parts and find the variable parts
+of each BTRIEVE::SAVE record.
+
+Downloading and Installing
+--------------------------
+
+Download
+     Download the latest version from
+     http://www.cpan.org/modules/by-module/BTRIEVE. The module is provided
+     in standard CPAN distribution format. It will extract into a directory
+     BTRIEVE-version with any necessary subdirectories.  Change into the
+     BTRIEVE top directory.
+
+Unix Install
+          perl Makefile.PL
+          make
+          make test
+          make install
+
+Win9x/WinNT/Win2000 Install
+          perl Makefile.PL
+          perl test.pl
+          perl install.pl
+
+Test
+     Once you have installed BTRIEVE::SAVE, you can check if Perl can find
+     it. Change to some other directory and execute from the command line:
+
+          perl -e "use BTRIEVE::SAVE"
+
+     If you do not get any response that means everything is OK! If you get
+     an error like *Can't locate method "use" via package BTRIEVE::SAVE*
+     then Perl is not able to find BTRIEVE/SAVE.pm-double check that the
+     file copied it into the right place during the install.
+
+Todo
+----
+
+   * Support for the other 12 documented btrieve data types.
+
+   * Help for adding the names column in the config file.
+
+   * More detailed warnings/sanity checks on the config file and save file.
+
+Notes
+-----
+
+   Please let us know if you run into any difficulties using
+BTRIEVE::SAVE-we'd be happy to try to help. Also, please contact us if you
+notice any bugs, or if you would like to suggest an
+improvement/enhancement. Email addresses are listed at the bottom of this
+page. Lane is probably the most interested in making this work, so may be
+your best initial bet.
+
+BTRIEVE::SAVE::REC structure.
+-----------------------------
+
+   A save file record on disk looks like:
+
+     __________________________________________
+     |   Fixed,          | Fixed,   |           |
+     Count[, ] |   indexed.        | left-over|  Variable |\r\n
+     |___________________|__________|___________|
+
+   The Count is the number of "boxed bytes" (excluding the count itself,
+the following comma or space, and the final two bytes at the end). Count is
+an unpadded ascii integer, like "524".
+
+   Count is followed by either a comma or a space. BTRIEVE::SAVE::REC
+writes a comma, but reads either comma or space.
+
+   The boxes are binary data. BTRIEVE::SAVE::REC will not interpret the
+(fixed, left-over) or variable boxes, and will parse the (fixed, indexed)
+data into a hash based on a template and names determined from the config
+file.
+
+   The last two boxes may be empty; if the sum of the lengths is equal to
+the fixed_length defined in the config file the (fixed, left-over) box
+will have no bytes. Variable will be non-empty if and only if Count >
+fixed_length.
+
+   The number of bytes covered by the first two fields is equal to
+fixed_length.  (In theory the (fixed, indexed) and (fixed, left-over)
+could be intermixed, with possible overlaps.  Has anyone seen this?  Docs
+saying that Pervasive won't support this?)
+
+   The final two bytes are unix return and newline bytes.
+
+   A save file is a bunch of save file records concatenated with no
+intervening bytes followed by "\cZ".
+
+   Each BTRIEVE::SAVE::REC has admin information in its {opt} key and data
+in its {values} key.
+
+     {opt} has keys:
+       {fixed_defs} keys a ref to an array of hashes with keys:
+         {len}      - length in bytes of the field
+         {name}     - the user-defined name of that field, found from an
+                      extra column in the config file. The config file
+                      cannot use "ZZ" as a field name; one of the {name}s
+                      is always set to "ZZ" to handle fixed length
+                      information which is unaccounted for by btrieve's
+                      keys.
+         {type}     - Btrieve's idea of the type of that field.
+
+     The array of hashes is in the order that the defining lines occur
+     in the config file.
+
+     {template} - pack template used for extracting values
+     {names}    - ref to array of names as in fixed_defs.
+                  This is not strictly necessary.
+     
+     {len}      - total length of the fixed part of the record.  This
+                  must be at least equal to the sum of the {len}'s in
+                  the {fixed_defs}.
+
+     {values} is a ref to an array
+         [$rhfixed,$rfixed,$rvar]
+     
+         where $rhfixed is a ref to a hash with keys from the {opt}{names}
+         and values the unpacked version of the btrieve-defined
+         fixed portion of the record.
+     
+         "ZZ" will always be the last element in {names};
+
+     $rhfixed->{'ZZ'} will include all the bytes of the btrieve fixed
+     part of the record that are not accounted for by the config
+     file. (This means it can be empty.)  $rfixed is a reference to
+     the btrieve-defined fixed portion of the record and $rvar is a
+     reference to the btrieve-defined variable portion of the record.
+
+     Parsing and definitions of the {fixed_defs} appears to assume that
+     all keys are consecutive and that any fixed-length information not
+     accounted for by key defs occurs at the end.
+
+     If you come across non-consecutive keys in a -stat file, make up
+     extra key fields to cover the missing parts. This will make
+     BTRIEVE::SAVE::REC happy.
+
+     If folk actually see these kinds of keys, please alert us.  We can
+     document this as a limitation. (We also take patches....). We are
+     also interested if folk find examples of overlapping key defs.
+
+BTRIEVE::SAVE structure.
+------------------------
+
+   Each BTRIEVE::SAVE record has keys:
+
+     {opt} with keys:
+          {file}      - a file name that BTRIEVE::SAVE will read from.
+          {handle}    - a stored filehandle that BTRIEVE::SAVE will use,
+     		     based on the {file}
+          {increment} - how many records to attempt to read at a time
+                        in parse_file().
+          {proto_rec} - A BTRIEVE::SAVE::REC with empty {values}, used
+                        for filling in elements of BTRIEVE::SAVE->{array}.
+          {config}    - The config file used to define the {proto_rec}
+                        and all elements of the {array}
+
+     {array} which is a ref to an array (0-based) of BTRIEVE::SAVE::RECs
+             with structure determined by {opt}{proto_rec}.
+
+METHODS
+=======
+
+   Here is a list of the methods in BTRIEVE::SAVE and ::REC that are
+available to you for reading in, manipulating and outputting BTRIEVE::SAVE
+data.
+
+new(),newconfig()
+-----------------
+
+     Creates a new BTRIEVE::SAVE object; also used for ::REC.
+
+     $x = BTRIEVE::SAVE->new('cc057.std');
+     $x = BTRIEVE::SAVE->new('cc057.std','cc057.dat');
+
+     $rec = BTRIEVE::SAVE::REC->new($ranames,$rtemplate,
+                                    $packed_length,$rhfixed_defs);
+     $rec = BTRIEVE::SAVE::REC->newconfig('cc057.std');
+
+   BTRIEVE::SAVE has an optional config file first parameter and an
+optional file parameter to create and populate the object with data from a
+file. If a file is specified it will read in the entire file. If you wish
+to read in only portions of the file see openbtr(), nextbtr(), and
+closebtr() below or use next_rec() and BTRIEVE::SAVE::RECs directly.
+
+   BTRIEVE::SAVE::REC allows creation with defined state with new() and
+also from a config file with newconfig(). See the last EXAMPLE below for a
+definition of the format of the config file.
+
+config()
+--------
+
+   Installs a prototypical BTRIEVE::SAVE::REC in the BTRIEVE::SAVE object
+based on the contents of the config file.
+
+     $x= BTRIEVE::SAVE->new();
+     $x->config('cc057.std');
+
+openbtr()
+---------
+
+   Openbtr sets up incremental reading for a BTRIEVE SAVE file. It takes a
+hashref with key 'file' (name of the btrieve file). Increment defines how
+many records to read in and is taken from the object or defaulted to 1.
+
+     $x = BTRIEVE::SAVE->new('cc057.std');
+     $x->openbtr({file=>"cc057.dat",increment=>"2"});
+     $x->openbtr({file=>"cc057.dat"});
+
+nextbtr()
+---------
+
+   Once a file is open nextbtr() can be used to read in the next group of
+records. The increment can be passed to change the amount of records read
+in if necessary. An increment of -1 will read in the rest of the file.
+
+     $x->nextbtr();
+     $x->nextbtr(10);
+     $x->nextbtr(-1);
+
+   nextbtr() will return the amount of records read in.
+
+     $y=$x->nextbtr();
+     print "$y more records read in!";
+
+closebtr()
+----------
+
+   If you are finished reading in records from a file you should close it
+immediately.
+
+     $x->closebtr();
+
+parse_file()
+------------
+
+   Parse_file reads in a file, possibly incrementally. It APPENDS the
+record to the BTRIEVE::SAVE {array} field. It returns the number of
+records read.
+
+     $y=$x->parse_file();
+     print "$y records read!\n";
+
+next_rec()
+----------
+
+   Next_rec returns a new BTRIEVE::SAVE::REC record with the same
+structure as {proto_rec} and {values} based on the bits in the next record.
+
+     my $rec=$x->next_rec;
+
+next_recbits()
+--------------
+
+   Next_recbits returns the data in the next record on-disk. It
+side-effects the position of the file pointer implied by the handle.
+
+     my $string_rec = $x->next_recbits
+
+output()
+--------
+
+   Output dumps all records in {array} to a file (if passed one) in
+Btrieve's save file format.  It returns a string version of this if there
+is no file passed.
+
+     $x->output(">cc057.das");
+     my $btr_save_string = $x->output();
+
+as_string()
+-----------
+
+   As_string returns a string version in Btrieve's save file format of
+{array}.
+
+     my $btr_save_string = $x->as_string();
+
+save_to_rdb()
+-------------
+
+   Save_to_rdb takes an rdb filename, save filename, error file name, and
+config file name.  Also takes the field name for unindexed fixed info and
+var info, and strings to translate into from tab and newline characters.
+Writes an rdb file using the save file and config information; warns and
+writes to the rdb formatted error file if there are problems in the data.
+
+     $btr->save_to_rdb('f.rdb','f.sav','ferr.sav',
+     		           'ZZ','VAR','<TAB>','<RET>');
+
+rdb_to_save()
+-------------
+
+   Rdb_to_save takes an rdb filename, save filename, error file name, and
+config file name.  Also takes the field name for unindexed fixed info and
+var info, and strings to translate into tab and newline characters. Writes
+an rdb file using the rdb file and config information; warns and writes to
+the save formatted error file if there are problems in the data.
+
+     $btr->rdb_to_save('f.rdb','f.sav','ferr.rdb',
+     		           'ZZ','VAR','<TAB>','<RET>');
+
+BTRIEVE::SAVE::REC METHODS
+==========================
+
+copy_struct()
+-------------
+
+   Copy_struct takes a record and returns a new BTRIEVE::SAVE::REC with
+empty {values} and the same {opt}s.
+
+     my $new_rec=$rec->copy_struct();
+
+parse_string()
+--------------
+
+   Parse_string takes a string representation of a btrieve record
+(typically from next_recbits) and returns a new record with the same
+{opt}s and appropriate {values}. Parse_string makes sure that all optional
+fields (ZZ and the var field) are initialised to empty strings if
+undefined.
+
+     my $curr_rec=$rec->parse-string($string_rec);
+
+counted_rec()
+-------------
+
+   Counted_rec takes a string version of a record and returns a string
+that can represent this on-disk in Btrieve's save file format.
+
+     my $save_rec = $rec->counted_rec($string_rec);
+
+counted_rec_hash()
+------------------
+
+   Counted_rec_hash will take the hash and variable information in
+{values} and return a legal string in Btrieve's save file format.
+
+     my $save_rec = $rec->counted_rec_hash();
+
+fixed()
+-------
+
+   Fixed will return a string representation of the fixed string
+information in {values}.
+
+     my $fix_string = $rec->fixed;
+
+var()
+-----
+
+   Var will return a string representation of the var string information
+in {values}.
+
+     my $var_string = $rec->var;
+
+data()
+------
+
+   Data will return a string representation of a record using the hash and
+variable information in {values}.
+
+     my $data = $rec->data();
+
+fix_hash_to_string()
+--------------------
+
+   Fix_hash_to_string returns the fixed part of a record based on its hash
+{values}.  If you want to get access to the raw fixed part, use fixed().
+
+     my $fixed = $rec->fix_hash_to_string();
+
+EXAMPLES
+========
+
+   Here are a few examples to fire your imagination.
+
+   * Input. This example will read in a tab-delimited file and output a
+     Btrieve save file. Last field is variable.
+
+          #!/usr/bin/perl
+          use BTRIEVE::SAVE; # ::REC comes along for the ride.
+          my $proto_rec = BTRIEVE::SAVE::REC->newconfig("config.std");
+
+          open F,"import.tab"
+                     or die "Could not open import.tab for read: $!\n";
+          open OUT,">output.dat"
+                     or die "Could not open output.dat for write: $!\n";
+          binmode OUT;
+          while (<F>) {
+          	  chomp;
+          	  my @fields= split(/\t/);
+          	  my $var = pop @fields;
+          	  my $data = (join "",@fields).$var;
+          	  print OUT $proto_rec->counted_rec($data);
+           }
+           print OUT "\cZ";
+
+          close F;
+          close OUT;
+
+   * Feeling paranoid? I know I am.
+
+     Let's say somebody comes to you with a large tab delimited file, a
+     BTRIEVE config file (forced on her by external software), and a
+     burning desire that her data become one with BTRIEVE.
+
+     And she added data to the file by hand over the last 3 years. And she
+     is not quite sure that she got the right lengths for the indexes.
+
+     Fortunately her tab-delimited file is in /rdb format so at least the
+     field names are available. She tells you that the last, very
+     important, field is variable length. The order of names in the rdb
+     file is different than that in the save file spec, and you won't write
+     a filter to fix that (go figure).
+
+     /Rdb files look like:
+
+          Author	   Title                Opinion_of_AACR2
+          ------	   ------               ----------------
+          Fred	   Fred's holidays      Better than chocolate
+          James	   James' elbows        Larger than several trucks
+
+          See
+          http://www2.linuxjournal.com/lj-issues/issue67/3294.html
+          for details on /rdb which is a cool idea.
+
+          $ grep '<VAR>\|<RET>' file.rdb |wc -l
+            0
+          $ cat rdb_btr.pl
+          #!/usr/bin/perl
+          print "Usage: rdb_btr.pl <rdbfile><conf><savefile><error rdbfile>"
+                  unless scalar @ARGV ==4;
+          my ($rdb,$config,$save,$err) = @ARGV;
+          my $btr = BTRIEVE::SAVE->new($config);
+          $btr->rdb_to_save($rdb,$save,$err,
+          		           'ZZ','Opinion_of_AACR2','<TAB>','<RET>');
+          
+          $ rdb_btr.pl file.rdb file.std file.sav file.err
+            Paranoia 2: Lengths do not match for Title at line 6.
+            Paranoia 1: Number of fields do not match rdb spec at line 300.
+          $ wc -l file.err
+            4
+          $ etbl file.err
+          (Time passes as you edit the relevant lines' problems.)
+          $ rdb_btr.pl file.err file.std file2.sav file2.err
+          $ wc -l file2.err
+            2
+          $ perl -ne 'print unless /^\cZ$/' file.sav | cat - file2.sav > clean.sav
+
+          *Whew*
+
+   * Someone hands you a BTRIEVE file. Having paid the tax to Pervasive you
+     have a command line utility "butil" with many options, including
+     -load, -save, -stat and -clone.
+
+     You want to get the file out into /rdb tab-delimited form so you only
+     need -save and -stat.
+
+          $ butil -save file.btr file.dat
+          $ butil -stat file.btr > file.std
+          
+          (Edit file.std to add an extra column thusly:)
+          
+          (Leave what's above here alone...)
+          Record Length = 171
+          Record Length = <whatever you want the fixed length to be.>
+
+          (...leave the next alone until the Key defs below.
+          Some columns elided for space.)
+          
+          Key         Pos..     Type        Null V..    ACS
+              Segment      Len..       Flags       Uniq..
+            0    1      1    4  Zstring         - .. 8   --
+            1    1      5    4  Integer  MD     - .. 8   --
+          
+          (..and what's after alone.)
+          
+          
+          Add an extra column:
+          
+          Key         Pos..    Type         Null V..    ACS
+              Segment      Len..        Flags      Uniq..    Langname
+            0    1      1    4  Zstring         --.. 8  --   Author
+            1    1      5    4  Integer  MD     --.. 8  --   dbcn
+
+          $ cat btr_rdb.pl
+          #!/usr/bin/perl
+          print "Usage: btr_rdb.pl <rdbfile><conf><savefile><error savefile>"
+                  unless scalar @ARGV ==4;
+          my ($rdb,$config,$save,$err) = @ARGV;
+          my $btr = BTRIEVE::SAVE->new($config);
+          $btr->save_to_rdb($rdb,$save,$err,
+          		           'ZZ','VAR','<TAB>','<RET>');
+
+          $ rdb_btr.pl file.rdb file.std file.sav file.err
+          $ wc file.err
+            0       1       1 file.err
+          $
+
+AUTHORS
+=======
+
+   Chuck Bearden cbearden@rice.edu
+
+   Bill Birthisel wcbirthisel@alum.mit.edu
+
+   Derek Lane dereklane@pobox.com
+
+   Charles McFadden chuck@vims.edu
+
+   Ed Summers esummers@odu.edu
+
+SEE ALSO
+========
+
+   perl(1), www.pervasive.com, "Btrieve Complete" by Jim Kyle
+(Addison-Wesley 1995).
+
+COPYRIGHT
+=========
+
+   Copyright (C) 2000, Bearden, Birthisel, Lane, McFadden, Summers.  All
+rights reserved.  Copyright (C) 2000, Duke University, Lane. All rights
+reserved.
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself. Feb 15 2000.
+
+
+File: pm.info,  Node: Barcode/Code128,  Next: Barcode/Cuecat,  Prev: BTRIEVE/SAVE,  Up: Module List
+
+Generate CODE 128 bar codes
+***************************
+
+NAME
+====
+
+   Barcode::Code128 - Generate CODE 128 bar codes
+
+SYNOPSIS
+========
+
+     use Barcode::Code128;
+     
+     $code = new Barcode::Code128;
+
+REQUIRES
+========
+
+   Perl 5.004, Carp, Exporter, GD
+
+EXPORTS
+=======
+
+   By default, nothing.  However there are a number of constants that
+represent special characters used in the CODE 128 symbology that you may
+wish to include.  For example if you are using the EAN-128 or UCC-128
+code, the string to encode begins with the FNC1 character.  To encode the
+EAN-128 string "00 0 0012345 555555555 8", you would do the following:
+
+     use Barcode::Code128 'FNC1';
+     $code = new Barcode::Code128;
+     $code->text(FNC1.'00000123455555555558');
+
+   To have this module export one or more of these characters, specify
+them on the use statement or use the special token ':all' instead to
+include all of them.  Examples:
+
+     use Barcode::Code128 qw(FNC1 FNC2 FNC3 FNC4 Shift);
+     use Barcode::Code128 qw(:all);
+
+   Here is the complete list of the exportable characters.  They are
+assigned to high-order ASCII characters purely arbitrarily for the
+purposes of this module; the values used do not reflect any part of the
+CODE 128 standard.  Warning: Using the `CodeA', `CodeB', `CodeC',
+`StartA', `StartB', `StartC', and Stop codes may cause your barcodes to be
+invalid, and be rejected by scanners.  They are inserted automatically as
+needed by this module.
+
+     CodeA      0xf4        CodeB      0xf5         CodeC      0xf6
+     FNC1       0xf7        FNC2       0xf8         FNC3       0xf9
+     FNC4       0xfa        Shift      0xfb         StartA     0xfc
+     StartB     0xfd        StartC     0xfe         Stop       0xff
+
+DESCRIPTION
+===========
+
+   Barcode::Code128 generates bar codes using the CODE 128 symbology.  The
+typical use this is for generating a PNG file with the `png()' method
+which uses the GD package by Lincoln Stein.  When this PNG file is
+printed, it can be scanned by most modern hand-held bar code readers.  The
+application which drove the invention of this module places the PNG file
+on a web page which the user must print out and submit along with
+supporting documents.  The bar code helps the receiving agency record when
+it has been received.
+
+   Since the GD module is required you will need to install it before
+installing this module.  You can obtain it from the CPAN (Comprehensive
+Perl Archive Network) repository of your choice under the directory
+`authors/id/LDS'.  Visit http://www.perl.com/ for more information about
+CPAN.  The GD home page is: http://stein.cshl.org/WWW/software/GD/GD.html
+
+METHODS
+=======
+
+$object = new Barcode::Code128
+     Creates a new barcode object.
+
+$object->png($text)
+$object->png($text, $x, $y)
+     Generate a PNG file and return it.  Typically you will either print
+     the result to standard output or save it to a file.  The contents of
+     the return value from this method are a binary file, so if you are
+     working on an operating system that makes a distinction between text
+     and binary files be sure to call binmode(FILEHANDLE) before writing
+     the PNG to it.  Example:
+
+          open(PNG, ">code128.png") or die "Can't write code128.png: $!\n";
+          binmode(PNG);
+          print PNG $object->png("CODE 128");
+          close(PNG);
+
+     Note: All of the arguments to this function are optional.  If you have
+     previously specified $text to the barcode(), encode(), or text()
+     methods, you do not need to specify it again.  The $x and `$y'
+     variables specify the size of the barcode within PNG file in pixels.
+     The overall image will be an extra 20 pixels taller to accomodate the
+     plaintext rendering of the encoded message (in black on a transparent
+     background).  If size(s) are not specified, they will be set to the
+     minimum size, which is the length of the barcode plus 40 pixels
+     horizontally, and 15% of the length of the barcode vertically.
+
+$object->barcode($text)
+     Computes the bar code for the specified text.  The result will be a
+     string of '#' and space characters representing the dark and light
+     bands of the bar code.  You can use this if you have an alternate
+     printing system besides the `png()' method.
+
+     Note: The $text parameter is optional. If you have previously
+     specified $text to the encode() or text() methods, you do not need to
+     specify it again.
+
+Housekeeping Functions
+----------------------
+
+   The rest of the methods defined here are only for internal use, or if
+you really know what you are doing.  Some of them may be useful to authors
+of classes that inherit from this one, or may be overridden by subclasses.
+If you just want to use this module to generate bar codes, you can stop
+reading here.
+
+$object->encode
+$object->encode($text)
+     Do the encoding.  If $text is supplied, will automatically call the
+     text() method to set that as the text value first.
+
+$object->text($text)
+$text = $object->text
+     Set or retrieve the text for this barcode.  This will be called
+     automatically by encode() or barcode() so typically this will not be
+     used directly by the user.
+
+$object->start($code)
+     If the code (see code()) is already defined, then adds the CodeA,
+     CodeB, or CodeC character as appropriate to the encoded message inside
+     the object.  Typically for internal use only.
+
+$object->stop()
+     Computes the check character and appends it along with the Stop
+     character, to the encoded string.  Typically for internal use only.
+
+$object->code($code)
+$code = $object->code
+     Set or retrieve the code for this barcode.  $code may be 'A', 'B', or
+     'C'.  Typically for internal use only.  Not particularly meaningful
+     unless called during the middle of encoding.
+
+CLASS VARIABLES
+===============
+
+   None.
+
+DIAGNOSTICS
+===========
+
+Image width $x is too small for bar code
+     You have specified an image width that does not allow enough space for
+     the bar code to be displayed.  The minimum allowable is the size of
+     the bar code itself plus 40 pixels.  If in doubt, just omit the width
+     value when calling `png()' and it will use the minimum.
+
+Image height $y is too small for bar code
+     You have specified an image height that does not allow enough space
+     for the bar code to be displayed.  The minimum allowable is 15% of the
+     width of the bar code.  If in doubt, just omit the height value when
+     calling `png()' and it will use the minimum.
+
+Unable to create $x x $y PNG image
+     An error occurred when initializing a GD::Image object for the
+     specified size.  Perhaps $x and `$y' are too large for memory?
+
+No encoded text found
+     This message from barcode() typically means that there was no text
+     message supplied either during the current method call or in a
+     previous method call on the same object.
+
+No text defined
+     This message from encode() typically means that there was no text
+     message supplied either during the current method call or in a
+     previous method call on the same object.
+
+Unable to find encoding for "$text"
+     Part or all of the message could not be encoded.  This may mean that
+     the message contained characters not encodable in the CODE 128
+     character set, such as a character with an ASCII value higher than 127
+     (except the special control characters defined in this module).
+
+Sanity Check Overflow
+     This is a serious error in encode() that indicates a serious problem
+     attempting to encode the requested message.  This means that an
+     infinite loop was generated.  If you get this error please contact
+     the author.
+
+Unable to switch from "$old_code" to "$new_code"
+     This is a serious error in start() that indicates a serious problem
+     occurred when switching between the codes (A, B, or C) of CODE 128.
+     If you get this error please contact the author.
+
+Unable to start with "$new_code"
+     This is a serious error in start() that indicates a serious problem
+     occurred when starting encoding in one of the codes (A, B, or C) of
+     CODE 128.  If you get this error please contact the author.
+
+Unknown code "$new_code" (should be A, B, or C)
+     This is a serious error in code() that indicates an invalid argument
+     was supplied.  Only the codes (A, B, or C) of CODE 128 may be
+     supplied here.  If you get this error please contact the author.
+
+BUGS
+====
+
+   At least some Web browsers do not seem to handle PNG files with
+transparent backgrounds correctly.  As a result your barcodes may have a
+grey background behind the text version of the message.
+
+AUTHOR
+======
+
+   William R. Ward, wrw@bayview.com
+
+SEE ALSO
+========
+
+   perl(1), GD
+
+
+File: pm.info,  Node: Barcode/Cuecat,  Next: BaseLib,  Prev: Barcode/Code128,  Up: Module List
+
+Perl extension for decoding :CueCat(tm) scans
+*********************************************
+
+NAME
+====
+
+   Barcode::Cuecat - Perl extension for decoding :CueCat(tm) scans
+
+SYNOPSIS
+========
+
+     use Barcode::Cuecat;
+
+     my $bc = new Barcode::Cuecat();
+
+     $bc->scan($garbage);
+     my $type = $bc->type();	# Get the type of barcode
+     my $code = $bc->code();	# The actual number scanned
+     my $serial = $bc->serial();	# The serial of the :CueCat
+
+DESCRIPTION
+===========
+
+   This module is an attempt to ease the adoption of :CueCat(tm) into
+general purpose applications. The term :CueCat(tm) seems to be a trademark
+of a company called Digital Convergence. The code in this module is based
+on code that has been found in numerous sites. I have not found a
+reference to an author, so I cannot give proper credit for it. Some
+references point to Larry Wall, so if this code is actually yours, I hope
+you don't mind some repackaging of it :).
+
+   As for the legality of this code, I received my :CueCat over the mail,
+outside the United States. I had to pay the shipping for this device, even
+when I did not request it. According to the laws of the country where this
+code is being written, I have each and every right to reverse engineer or
+otherwise do whatever I please with this device. This module is one
+example of what can I excercise under my legal rights. This code, of
+course, carries the same warranties and can be used under the same terms
+as Perl itself.
+
+   The functions supported by this module are below:
+
+`->new($string)'
+     Creates a Barcode::Cuecat object. $string is optional. If supplied,
+     this saves you from invoking `->scan()'.
+
+`->scan($string)'
+     Initializes the object with a newly scanned string.
+
+`->type()'
+     Returns the type of barcode decoded. For known :CueCat numbers, this
+     will be ':C1'.
+
+`->code()'
+     Returns the actual number decoded in the barcode. Codes in the
+     proprietary :CueCat format are converted automatically to a sequence
+     of digits.
+
+`->serial()'
+     Returns the serial number of the :CueCat(tm) scanner. Keep in mind
+     that this information is meaningless after declawing the device.
+
+EXPORT
+------
+
+   None by default.
+
+AUTHOR
+======
+
+   Luis E. Munoz <lem@cantv.net>. Thanks to Larry Wall <larry@wall.org>
+for the compact original code. Thanks to Brian Blakley <bblakley@mp5.net>
+for feedback.
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: BaseLib,  Next: Be/Attribute,  Prev: Barcode/Cuecat,  Up: Module List
+
+manipulate @INC dynamically for independent installation path
+*************************************************************
+
+NAME
+====
+
+   BaseLib - manipulate @INC dynamically for independent installation path
+
+SYNOPSIS
+========
+
+     use BaseLib qw(BASEDIR LIBDIR);
+
+   or just,
+
+     use BaseLib;
+
+DESCRIPTION
+===========
+
+   If you have a set of application with certain file structure under a
+base directory, e.g. `pim', and it has a private modules directory called
+`lib-perl', and it's intalled under `/usr/local'. For the application to
+work, the scripts may need to say:
+
+     use lib '/usr/local/pim/lib-perl';
+
+   Someday, you need to move the application to, say,
+`/vhost/www.some.host.com', so you need to change the use statement all
+over the scripts to:
+
+     use lib '/vhost/www.some.host.com/pim/lib-perl';
+
+   If you do this a lot and get tired of changing the line for every
+different installation path, or, you don't want to bother people using
+your application to cange the line to meet their conditions, then you
+might need this module.
+
+   Now your scripts can say:
+
+     use BaseLib qw(pim lib-perl);
+
+   where `pim' and `lib-perl' are the BASEDIR and LIBDIR arguments
+respectively.
+
+   So there's no need to worry about different installation layout,
+wherever the `pim' base directory is put under. The BASEDIR argument is
+required while LIBDIR is optional (defaults to lib).
+
+   As addition, you can use *BaseLib*'s global package variable,
+*$BaseDir* to refer to the full path to `pim'. For example, assuming the
+application is installed under `/usr/local', then
+
+     print "Data dir: $BaseLib::BaseDir/data\n";
+
+   will print,
+
+     Data dir: /usr/local/pim/data
+
+   Yes, you must qualify it with the package name since the variable is not
+exportable. This may change in the future.
+
+NOTE
+====
+
+   Please consider this module, the code and its interface, as in ALPHA
+stage.  Expect any change in the future versions.
+
+CAVEATS
+=======
+
+   I only tested it in the following environment:
+
+     * Perl 5.005_03
+     * Linux
+
+   It's unlikely to work on systems don't recognize / as path separator.
+
+   *BaseLib* will find the last occurence of *BASEDIR* string. If you mean
+the base directory as `/usr/local/myapp', while the script uses the module
+locates in `/usr/local/myapp/bin/sample/myapp/test/script.pl', then the
+full path to the application base directory ends in
+`/usr/local/myapp/bin/sample/myapp'.
+
+   In mod_perl environment there's a high risk for conflict on the
+`$BaseLib::BaseDir' if *BaseLib* is used by more than one application in
+the same host.
+
+   But any improvements/suggestions for wider support are welcome. A simple
+comment on this module will do as well.
+
+AUTHOR
+======
+
+   This module is written by Hasanuddin Tamir <hasant@trabas.com>.
+
+   Copyright (C) 2000 *Trabas*.  All rights reserved.
+
+   This software is freeware.  You may redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   *Note Lib: lib,, *Note FindBin: FindBin,
+
+
+File: pm.info,  Node: Be/Attribute,  Next: Be/Query,  Prev: BaseLib,  Up: Module List
+
+get and set MIME file attributes
+********************************
+
+NAME
+====
+
+   Be::Attribute - get and set MIME file attributes
+
+SYNOPSIS
+========
+
+     use Be::Attribute;
+     $node  = Be::Attribute::GetBNode("/my/file/here");
+     @attrs = Be::Attribute::ListAttrs($node);
+     for $i (@attrs) {
+       print "$i - ", Be::Attribute::ReadAttr($node, $i), "\n";
+     }
+     Be::Attribute::CloseNode($node);
+
+DESCRIPTION
+===========
+
+   Get (or set) MIME file attributes.
+
+USAGE
+=====
+
+   lookit the synopsis. look at example.pl. Look at the .xs code.  Read
+the Node webpage.
+
+AUTHOR
+======
+
+   Tom Spindler, dogcow@globalcenter.net
+
+SEE ALSO
+========
+
+   http://www.be.com/documentation/be_book/The%20Storage%20Kit/Node.html
+
+

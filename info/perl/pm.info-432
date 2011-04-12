@@ -1,0 +1,1666 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: XML/Doctype,  Next: XML/Doctype/AttDef,  Prev: XML/DT,  Up: Module List
+
+A DTD object class
+******************
+
+NAME
+====
+
+   XML::Doctype - A DTD object class
+
+SYNOPSIS
+========
+
+     # To parse an external DTD at compile time, useful when
+     # using XML::ValidWriter
+     use XML::Doctype NAME => 'FooML', SYSTEM_ID => 'FooML.dtd' ;
+     use XML::Doctype NAME => 'FooML', DTD_TEXT  => $dtd ;
+
+     # Parsing at run-time
+     $doctype = XML::Doctype->new( 'FooML', SYSTEM_ID => 'FooML.dtd' ) ;
+
+     # or
+     $doctype = XML::Doctype->new() ;
+     $doctype->parse( 'FooML', 'FooML.dtd' ) ;
+
+     # Saving the parsed object
+     open( PM, ">FooML/DTD/v1_000.pm" ) or die $! ;
+     print PM $doctype->as_pm( 'FooML::DTD::v1_000' ) ;
+
+     # Using a saved parsed DTD
+     use FooML::DTD::v1_000 ;
+
+     $doctype = FooML::DTD::v1_000->new() ;
+
+DESCRIPTION
+===========
+
+   This module parses DTDs and allows them to be saved as .pm files and
+reloaded.  The ability to save and reload is intended to aid in packaging
+parsed DTDs with XML tools so that XML::Parser need not be installed.
+
+STATUS
+======
+
+   This module is alpha code.  It's developed enough to support
+XML::ValidWriter, but need a lot of work.  Some big things that are
+lacking are:
+
+   * methods or objects to build / traverse the DTD
+
+   * XML::Doctype::ELEMENT
+
+   * XML::Doctype::ATTLIST
+
+   * XML::Doctype::ENITITY
+
+METHODS
+=======
+
+new
+          $doctype = XML::Doctype->new() ;
+          $doctype = XML::Doctype->new( 'FooML', DTD_TEXT => $doctype_text ) ;
+          $doctype = XML::Doctype->new( 'FooML', SYSTEM_ID => 'FooML.dtd' ) ;
+
+name
+          $name = $doctype->name() ;
+
+          Sets/gets the name.
+
+parse_dtd
+          $doctype->parse_dtd( $name, $doctype_text ) ;
+          $doctype->parse_dtd( $name, $doctype_text, 'internal' ) ;
+
+     Parses the text of a DTD from a scalar.  $name is used to indicate the
+     name of the DOCTYPE, and thus the root node.
+
+     The DTD is considered to be external unless the third parameter is
+     TRUE.
+
+parse_dtd_file
+          $doctype->parse_dtd_file( $name, $system_id [, $public_id] ) ;
+          $doctype->parse_dtd_file( $name, $system_id [, $public_id], 'internal' ) ;
+
+     Parses a DTD from a file.  Eventually will support full URL syntax.
+
+     $public_id is ignored for now, and $system_id is used to locate the
+     DTD.
+
+     This routine requires XML::Parser.  XML::Parser is not loaded at any
+     other time and is not needed to use the resulting DTD object.
+
+     The DTD is considered to be external unless the fourth parameter is
+     TRUE.
+
+          $doctype->parse_dtd_file( $name, $system_id, $p_id, 'internal' ) ;
+          $doctype->parse_dtd_file( $name, $system_id, undef, 'internal' ) ;
+
+system_id
+          $system_id = $doctype->system_id() ;
+
+          Sets/gets the system ID.
+
+public_id
+          $public_id = $doctype->public_id() ;
+
+          Sets/gets the public_id.
+
+element_decl
+          $elt_decl = $doctype->element_decl( $name ) ;
+
+     Returns the XML::Doctype:Element object associated with $name.  These
+     can be defined by <!ELEMENT> tags or undefined, which can happen if
+     they were just referred-to by <!ELEMENT> or <!ATTLIST> tags.
+
+element_names
+     Returns an unsorted list of element names.  This list includes names
+     that are declared and undeclared (but referred to in element
+     declarations or attribute definitions).
+
+as_pm
+          open( PM, "FooML/DTD/v1_001.pm" )            or die $! ;
+          print PM $doctype->as_pm( 'FooML::DTD::v1_001' ) or die $! ;
+          close PM                                     or die $! ;
+
+     Then, later:
+
+          use FooML::DTD::v1_001 ;   # Do *not* use () as a parameter list!
+
+     Returns string containing the DTD as an independant module, allowing
+     the DTD to be parsed in the development environment and shipped as
+     Perl code, so that the target environment need not have XML::Parser
+     installed.
+
+     This is useful for XML creation-only tools and as an efficiency
+     tuning measure if you will be rereading the same set of DTDs over and
+     over again.
+
+import
+use
+          use XML::Doctype NAME => 'FooML', SYSTEM_ID => 'dtds/FooML.dtd' ;
+
+     import() constructs a default DTD object for the calling package so
+     that XML::ValidWriter's functional interface can use it.
+
+     If XML::Doctype is subclassed, the subclasses' constructor is called
+     with all parameters.
+
+SUBCLASSING
+===========
+
+   This object uses the fields pragma, so you should use base and fields
+for any subclasses.
+
+AUTHOR
+======
+
+   Barrie Slaymaker <barries@slaysys.com>
+
+COPYRIGHT
+=========
+
+   This module is Copyright 2000, Barrie Slaymaker.  All rights reserved.
+
+   This module is licensed under the GPL, version 2.  Please contact me if
+this does not suit your needs.
+
+
+File: pm.info,  Node: XML/Doctype/AttDef,  Next: XML/Doctype/ElementDecl,  Prev: XML/Doctype,  Up: Module List
+
+A class representing a definition in an <!ATTLIST> tag
+******************************************************
+
+NAME
+====
+
+   XML::Doctype::AttDef - A class representing a definition in an
+<!ATTLIST> tag
+
+SYNOPSIS
+========
+
+     $attr = $elt->attribute( $name ) ;
+     $attr->name ;
+
+DESCRIPTION
+===========
+
+   This module is used to represent <!ELEMENT> tags in an XML::Doctype
+object.  It contains <!ATTLIST> tags as well.
+
+STATUS
+======
+
+   This module is alpha code.  It's developed enough to support
+XML::ValidWriter, but need a lot of work.  Some big things that are
+lacking are:
+
+METHODS
+=======
+
+new
+          $dtd = XML::Doctype::AttDef->new( $name, $type, $default ) ;
+
+default
+          ( $spec, $value ) = $attr->default ;
+          $attr->default( '#REQUIRED' ) ;
+          $attr->default( '#IMPLIED' ) ;
+          $attr->default( '', 'foo' ) ;
+          $attr->default( '#FIXED', 'foo' ) ;
+
+     Sets/gets the default value.  This is a
+
+quant
+          $attdef->quant( $q ) ;
+          $q = $attdef->quant ;
+
+     Sets/gets the attribute quantifier: '#REQUIRED', '#FIXED',
+     '#IMPLIED', or ".
+
+name
+          $attdef->name( $name ) ;
+          $name = $attdef->name ;
+
+     Sets/gets this attribute name.  Don't change the name while an
+     attribute is in an element's attlist, since it will then be filed
+     under the wrong name.
+
+default_on_write
+          $attdef->default_on_write( $value ) ;
+          $value = $attdef->default_on_write ;
+
+          $attdef->default_on_write( $attdef->default ) ;
+
+     Sets/gets the value which is automatically output for this attribute
+     if none is supplied to $writer->startTag.  This is typically used to
+     set a document-wide default for #REQUIRED attributes (and perhaps
+     plain attributes) so that the attribute is treated like a #FIXED tag
+     and emitted with a fixed value.
+
+     The default_on_write does not need to be the same as the default
+     unless the quantifier is #FIXED.
+
+SUBCLASSING
+===========
+
+   This object uses the fields pragma, so you should use base and fields
+for any subclasses.
+
+AUTHOR
+======
+
+   Barrie Slaymaker <barries@slaysys.com>
+
+COPYRIGHT
+=========
+
+   This module is Copyright 2000, Barrie Slaymaker.  All rights reserved.
+
+   This module is licensed under the GPL, version 2.  Please contact me if
+this does not suit your needs.
+
+
+File: pm.info,  Node: XML/Doctype/ElementDecl,  Next: XML/Driver/HTML,  Prev: XML/Doctype/AttDef,  Up: Module List
+
+A class representing an <!ELEMENT> tag
+**************************************
+
+NAME
+====
+
+   XML::Doctype::ElementDecl - A class representing an <!ELEMENT> tag
+
+SYNOPSIS
+========
+
+     $elt = $dtd->element( 'foo' ) ;
+     $elt->name() ;
+     $elt->attr( 'foo' ) ;
+
+DESCRIPTION
+===========
+
+   This module is used to represent <!ELEMENT> tags in an XML::Doctype
+object.  It contains <!ATTLIST> tags as well.
+
+STATUS
+======
+
+   This module is alpha code.  It's developed enough to support
+XML::ValidWriter, but need a lot of work.  Some big things that are
+lacking are:
+
+METHODS
+=======
+
+new
+          # Undefined element constructors:
+          $dtd = XML::Doctype::ElementDecl->new( $name ) ;
+          $dtd = XML::Doctype::ElementDecl->new( $name, undef, \@attdefs ) ;
+
+          # Defined element constructors
+          $dtd = XML::Doctype::ElementDecl->new( $name, \@kids, \@attdef ) ;
+          $dtd = XML::Doctype::ElementDecl->new( $name, [], \@attdefs ) ;
+
+add_attdef
+          $elt_decl->add_attdef( $att_def ) ;
+
+attdef
+          $attr = $elt->attdef( $name ) ;
+
+     Returns the XML::Doctype::AttDef named by $name or undef if there is
+     no such attribute.
+
+attdefs
+          $attdefs = $elt->attdefs( $name ) ;
+
+     Returns the list of XML::Doctype::AttDef instances associated with
+     this element.
+
+attribute_names
+     Returns a list of the attdefs' names.
+
+child_names
+          @names = $elt->child_names ;
+
+     Returns a list of names of elements in this element decl's content
+     model.
+
+is_declared
+          if ( $elt_decl->is_declared ) ...
+          $elt_decl->is_declared( 1 ) ;
+
+     Returns TRUE if there is any data defined in the element other than
+     name and attributes or if is_declared has been set by calling
+     is_declared( 1 ) or passing DECLARED => 1 to new().
+
+is_empty
+is_any
+is_mixed
+name
+          $n = $elt_decl->name ;
+
+     Gets the name of the element.
+
+validate_content
+          $v = $elt_decl->validate_content( \@seq ) ;
+
+     Takes an ARRAY ref of tag names (or '#PCDATA') and checks to see if
+     it would be valid content for elements of this type.
+
+     Right now, this must be called only when an element's end tag is
+     emitted.  It can be broadened to be incremental if need be.
+
+SUBCLASSING
+===========
+
+   This object uses the fields pragma, so you should use base and fields
+for any subclasses.
+
+AUTHOR
+======
+
+   Barrie Slaymaker <barries@slaysys.com>
+
+COPYRIGHT
+=========
+
+   This module is Copyright 2000, Barrie Slaymaker.  All rights reserved.
+
+   This module is licensed under the GPL, version 2.  Please contact me if
+this does not suit your needs.
+
+
+File: pm.info,  Node: XML/Driver/HTML,  Next: XML/Dumper,  Prev: XML/Doctype/ElementDecl,  Up: Module List
+
+SAX Driver for non wellformed HTML.
+***********************************
+
+NAME
+====
+
+   XML::Driver::HTML - SAX Driver for non wellformed HTML.
+
+SYNOPSIS
+========
+
+     use XML::Driver::HTML;
+
+     $driver = new XML::Driver::HTML(
+     	'Handler' => $some_sax_filter_or_handler,
+     	'Source' => $some_PerlSAX_like_hash
+     	);
+
+     $driver->parse();
+
+   or
+
+     use XML::Driver::HTML;
+
+     $driver = new XML::Driver::HTML();
+
+     $driver->parse(
+     	'Handler' => $some_sax_filter_or_handler,
+     	'Source' => $some_PerlSAX_like_hash
+     	);
+
+     $driver->parse(
+     	'Handler' => $some_other_sax_filter_or_handler,
+     	'Source' => $some_other_source
+     	);
+     
+     =head1 DESCRIPTION
+
+   XML::Driver::HTML is a SAX Driver for HTML. There is no need for the
+HTML input to be weel formed, as XML::Driver::HTML is generating its SAX
+events by walking a HTML::TreeBuilder object. The simplest kind of use, is
+a filter from HTML to XHTML using XML::Handler::YAWriter as a SAX Handler.
+
+     my $ya = new XML::Handler::YAWriter(
+     	'Output' => new IO::File ( ">-" ),
+     	'Pretty' => {
+     	    'NoWhiteSpace'=>1,
+     	    'NoComments'=>1,
+     	    'AddHiddenNewline'=>1,
+     	    'AddHiddenAttrTab'=>1,
+     	    }
+     	);
+
+     my $html = new XML::Driver::HTML(
+     	'Handler' => $ya,
+     	'Source' => { 'ByteStream' => new IO::File ( "<-" ) }
+     	);
+     
+     $html->parse();
+
+METHODS
+-------
+
+new
+     Creates a new XML::Driver::HTML object. Default options for parsing,
+     described below, are passed as key-value pairs or as a single hash.
+     Options may be changed directly in the object.
+
+parse
+     Parses a document.  Options, described below, are passed as key-value
+     pairs or as a single hash.  Options passed to parse() override the
+     default options in the parser object for the duration of the parse.
+
+OPTIONS
+-------
+
+   The following options are supported by XML::Driver::HTML :
+
+Handler
+     Default SAX Handler to receive events
+
+Source
+     Hash containing the input source for parsing.  The `Source' hash may
+     contain the following parameters:
+
+    ByteStream
+          The raw byte stream (file handle) containing the document.
+
+    String
+          A string containing the document.
+
+    SystemId
+          The system identifier (URI) of the document.
+
+    Encoding
+          A string describing the character encoding.
+
+     If more than one of `ByteStream', `String', or `SystemId', then
+     preference is given first to `ByteStream', then `String', then
+     `SystemId'.
+
+NOTES
+=====
+
+   XML::Driver::HTML requires Perl 5.6 to convert from ISO-8859-1 to UTF-8.
+
+BUGS
+====
+
+   not yet implemented:
+
+     Interpretation of SystemId as being an URI
+     XHTML document type
+
+   other bugs:
+
+     HTML::Parser and HTML::TreeBuilder bugs concerning DOCTYPE and CSS.
+     The NotSoFree License is incompatible to the GNU General Public License.
+
+AUTHOR
+======
+
+     Michael Koehne, Kraehe@Copyleft.De
+     (c) 2000 NotSoFree License
+
+SEE ALSO
+========
+
+   *Note XML/Parser/PerlSAX: XML/Parser/PerlSAX, and *Note
+HTML/TreeBuilder: HTML/TreeBuilder,
+
+
+File: pm.info,  Node: XML/Dumper,  Next: XML/EP,  Prev: XML/Driver/HTML,  Up: Module List
+
+Perl module for dumping Perl objects from/to XML
+************************************************
+
+NAME
+====
+
+   XML::Dumper - Perl module for dumping Perl objects from/to XML
+
+SYNOPSIS
+========
+
+     # Convert Perl code to XML
+     use XML::Dumper;
+     my $dump = new XML::Dumper;
+     $data = [
+              {
+                first => 'Jonathan',
+                last => 'Eisenzopf',
+                email => 'eisen@pobox.com'
+              },
+              {
+                first => 'Larry',
+                last => 'Wall',
+                email => 'larry@wall.org'
+     	  }
+     	 ];
+     $xml =  $dump->pl2xml($perl);
+
+     # Convert XML to Perl code
+     use XML::Dumper;
+     my $dump = new XML::Dumper;
+
+     # some XML
+     my $xml = <<XML;
+     <perldata>
+     <scalar>foo</scalar>
+     </perldata>
+     XML
+
+     # load Perl data structure from dumped XML
+     $data = $dump->xml2pl($Tree);
+
+DESCRIPTION
+===========
+
+   XML::Dumper dumps Perl data to a structured XML format.  XML::Dumper
+can also read XML data that was previously dumped by the module and
+convert it back to Perl.
+
+   This is done via the following 2 methods: XML::Dumper::pl2xml
+XML::Dumper::xml2pl
+
+AUTHOR
+======
+
+   Jonathan Eisenzopf <eisen@pobox.com>
+
+CREDITS
+=======
+
+   Chris Thorman <ct@ignitiondesign.com> L.M.Orchard <deus_x@pobox.com>
+DeWitt Clinton <dewitt@eziba.com>
+
+SEE ALSO
+========
+
+   perl(1), XML::Parser(3).
+
+
+File: pm.info,  Node: XML/EP,  Next: XML/ESISParser,  Prev: XML/Dumper,  Up: Module List
+
+A framework for embedding XML into a web server
+***********************************************
+
+NAME
+====
+
+   XML::EP - A framework for embedding XML into a web server
+
+SYNOPSIS
+========
+
+     # Generate a new XML::EP instance
+     use XML::EP();
+     my $ep = XML::EP->new();
+
+     # Let the instance process an HTTP request
+     $ep->handle($request);
+
+DESCRIPTION
+===========
+
+   XML::EP is an administrative framework for embedding XML into a web
+server. That means that the system allows you to retrieve XML documents
+from external storage (files, a Tamino database engine, or whatever),
+parse them, pipe the parsed XML tree into processors (modules, that change
+the tree, for example the DBI processor will issue SQL queries and insert
+the result as XML elements). Finally the XML tree will be piped into a
+so-called formatter, that converts XML to HTML and prints the result.
+
+   The architecture is as follows:
+
+     +---------------------+
+     |   Control element   |
+     +---------------------+
+                    /          |            \
+                   /           |             \
+        +----------+ XML  +------------+ XML  +-----------+
+        | Producer | ---> | Processors | ---> | Formatter |
+        +----------+      +------------+      +-----------+
+
+   The control element, an instance of XML::EP::Control, will be created
+first. Its purpose is the creation of the other elements, the producer (an
+instance of XML::EP::Producer), one or more processors (instances of
+XML::EP::Processor) and finally a formatter (an instance of
+XML::EP::Formatter).  The producer, processors, formatters are selected
+based on virtual host, location (file part of the URL being requested) and
+in particular depending on the client. For example, an HTML formatter will
+be selected, if the client seems to request HTML, WML formatter will be
+created, if the client appears to be WAP HANDY and so on.
+
+METHOD INTERFACE
+================
+
+   Public available methods are:
+
+Creating a control element
+--------------------------
+
+     my $control = $ep->control();
+
+   (Instance method) This method will create an instance of
+XML::EP::Control. The main task of this instance is its *CreatePipe*
+method, which will then be called for creating an XML tree, a list of
+processors and a formatter.
+
+Getting or setting the processors, formatters
+---------------------------------------------
+
+     my $processors = $self->Processors();
+     $self->Processors($processors);
+     my $formatter = $self->Formatter();
+     $self->Formatter($formatter);
+     my $request = $self->Request();
+     $self->Request($request);
+     my $response = $self->Response();
+     $self->Response($response);
+
+   (Instance methods) These methods are used for querying or modifying the
+list of processors (an array ref) or the formatter. Processors are
+explicitly permitted to use this methods.
+
+   The response object is designed for receiving HTTP headers, cookies,
+etc. that are being sent to the client. Response objects are instances of
+XML::EP::Response.
+
+Handling an HTTP request
+------------------------
+
+     $self->Handle($request);
+
+   (Instance method) This method is called with an request object (an
+instance of XML::EP::Request) as argument. The request object contains all
+information about the client and its request, in particular HTTP headers,
+etc.
+
+   The method implements the HTTP requests full life cycle: A control
+object is created (an instance of XML::EP::Control), the control objects
+*CreatePipe* method is called for creating an XML tree and initializing
+the processor list and the formatter, the processors are called and
+finally the formatter which has to send data to the client.
+
+
+File: pm.info,  Node: XML/ESISParser,  Next: XML/Edifact,  Prev: XML/EP,  Up: Module List
+
+Perl SAX parser using nsgmls
+****************************
+
+NAME
+====
+
+   XML::ESISParser - Perl SAX parser using nsgmls
+
+SYNOPSIS
+========
+
+     use XML::ESISParser;
+
+     $parser = XML::ESISParser->new( [OPTIONS] );
+     $result = $parser->parse( [OPTIONS] );
+
+     $result = $parser->parse($string);
+
+DESCRIPTION
+===========
+
+   `XML::ESISParser' is a Perl SAX parser using the `nsgmls' command of
+James Clark's SGML Parser (SP), a validating XML and SGML parser.  This
+man page summarizes the specific options, handlers, and properties
+supported by `XML::ESISParser'; please refer to the Perl SAX standard in
+``SAX.pod'' for general usage information.
+
+   `XML::ESISParser' defaults to parsing XML and has an option for parsing
+SGML.
+
+   `nsgmls' source, and binaries for some platforms, is available from
+<http://www.jclark.com/>.  `nsgmls' is included in both the SP and Jade
+packages.
+
+METHODS
+=======
+
+new
+     Creates a new parser object.  Default options for parsing, described
+     below, are passed as key-value pairs or as a single hash.  Options may
+     be changed directly in the parser object unless stated otherwise.
+     Options passed to `parse()' override the default options in the
+     parser object for the duration of the parse.
+
+OPTIONS
+=======
+
+   The following options are supported by `XML::ESISParser':
+
+     Handler          default handler to receive events
+     DocumentHandler  handler to receive document events
+     DTDHandler       handler to receive DTD events
+     ErrorHandler     handler to receive error events
+     Source           hash containing the input source for parsing
+     IsSGML           the document to be parsed is in SGML
+
+   If no handlers are provided then all events will be silently ignored.
+
+   If a single string argument is passed to the `parse()' method, it is
+treated as if a `Source' option was given with a `String' parameter.
+
+   The `Source' hash may contain the following parameters:
+
+     ByteStream       The raw byte stream (file handle) containing the
+                      document.
+     String           A string containing the document.
+     SystemId         The system identifier (URI) of the document.
+
+   If more than one of `ByteStream', `String', or `SystemId', then
+preference is given first to `ByteStream', then `String', then `SystemId'.
+
+HANDLERS
+========
+
+   The following handlers and properties are supported by
+`XML::ESISParser':
+
+DocumentHandler methods
+-----------------------
+
+start_document
+     Receive notification of the beginning of a document.
+
+     No properties defined.
+
+end_document
+     Receive notification of the end of a document.
+
+     No properties defined.
+
+start_element
+     Receive notification of the beginning of an element.
+
+          Name             The element type name.
+          Attributes       A hash containing the attributes attached to the
+                           element, if any.
+          IncludedSubelement This element is an included subelement.
+          Empty            This element is declared empty.
+
+     The `Attributes' hash contains only string values.  The `Empty' flag
+     is not set for an element that merely has no content, it is set only
+     if the DTD declares it empty.
+
+     BETA: Attribute values currently do not expand SData entities into
+     entity objects, they are still in the system data notation used by
+     nsgmls (inside `|').  A future version of XML::ESISParser will also
+     convert other types of attributes into their respective objects,
+     currently just their notation or entity names are given.
+
+end_element
+     Receive notification of the end of an element.
+
+          Name             The element type name.
+
+characters
+     Receive notification of character data.
+
+          Data             The characters from the document.
+
+record_end
+     Receive notification of a record end sequence.  XML applications
+     should convert this to a new-line.
+
+processing_instruction
+     Receive notification of a processing instruction.
+
+          Target           The processing instruction target in XML.
+          Data             The processing instruction data, if any.
+
+internal_entity_ref
+     Receive notification of a system data (SData) internal entity
+     reference.
+
+          Name             The name of the internal entity reference.
+
+external_entity_ref
+     Receive notification of a external entity reference.
+
+          Name             The name of the external entity reference.
+
+start_subdoc
+     Receive notification of the start of a sub document.
+
+          Name             The name of the external entity reference.
+
+end_subdoc
+     Receive notification of the end of a sub document.
+
+          Name             The name of the external entity reference.
+
+conforming
+     Receive notification that the document just parsed conforms to it's
+     document type declaration (DTD).
+
+     No properties defined.
+
+DTDHandler methods
+------------------
+
+external_entity_decl
+     Receive notification of an external entity declaration.
+
+          Name             The entity's entity name.
+          Type             The entity's type (CDATA, NDATA, etc.)
+          SystemId         The entity's system identifier.
+          PublicId         The entity's public identifier, if any.
+          GeneratedId      Generated system identifiers, if any.
+
+internal_entity_decl
+     Receive notification of an internal entity declaration.
+
+          Name             The entity's entity name.
+          Type             The entity's type (CDATA, NDATA, etc.)
+          Value            The entity's character value.
+
+notation_decl
+     Receive notification of a notation declaration.
+
+          Name             The notation's name.
+          SystemId         The notation's system identifier.
+          PublicId         The notation's public identifier, if any.
+          GeneratedId      Generated system identifiers, if any.
+
+subdoc_entity_decl
+     Receive notification of a subdocument entity declaration.
+
+          Name             The entity's entity name.
+          SystemId         The entity's system identifier.
+          PublicId         The entity's public identifier, if any.
+          GeneratedId      Generated system identifiers, if any.
+
+external_sgml_entity_decl
+     Receive notification of an external SGML-entity declaration.
+
+          Name             The entity's entity name.
+          SystemId         The entity's system identifier.
+          PublicId         The entity's public identifier, if any.
+          GeneratedId      Generated system identifiers, if any.
+
+AUTHOR
+======
+
+   Ken MacLeod, ken@bitsko.slc.ut.us
+
+SEE ALSO
+========
+
+   perl(1), PerlSAX.pod(3)
+
+     Extensible Markup Language (XML) <http://www.w3c.org/XML/>
+     SAX 1.0: The Simple API for XML <http://www.megginson.com/SAX/>
+     SGML Parser (SP) <http://www.jclark.com/sp/>
+
+
+File: pm.info,  Node: XML/Edifact,  Next: XML/Element,  Prev: XML/ESISParser,  Up: Module List
+
+Perl module to handle XML::Edifact messages.
+********************************************
+
+NAME
+====
+
+   XML::Edifact - Perl module to handle XML::Edifact messages.
+
+SYNOPSIS
+========
+
+   use XML::Edifact;
+
+     &XML::Edifact::open_dbm();
+     &XML::Edifact::read_edi_message($ARGV[0]);
+     print   &XML::Edifact::make_xml_message();
+     &XML::Edifact::close_dbm();
+     0;
+
+   --------------------------------------------------------------
+
+   use XML::Edifact;
+
+     &XML::Edifact::open_dbm();
+     &XML::Edifact::read_xml_message($ARGV[0]);
+     print   &XML::Edifact::make_edi_message();
+     &XML::Edifact::close_dbm();
+     0;
+
+DESCRIPTION
+===========
+
+   XML-Edifact started as Onyx-EDI which was a gawk script.
+XML::Edifact-0.3x still shows its bad ancestry (a2p) in some places.
+
+   The current module is able to generate some SDBM files for the
+directory pointed to by open_dbm, by parsing the original United Nations
+EDIFACT documents during Bootstrap.PL. Those files will be stored during
+make install.
+
+   The first typical usage will read an EDIFACT message into a buffer
+global to the package, and will print this message as XML on STDOUT. The
+second usage will do the opposite.
+
+   Those two files will be installed as edi2xml and xml2edi in your local
+bin directory.
+
+   New to XML::Edifact 0.34 are namespace migration and intend handling -
+take a look at the test.pl for how to use them.  BUT WAIT - An
+object-oriented syntax is planned for the next release! And I'm calling
+this release an interim, because I'm just saving a stable state (I hope)
+before I start to muddle all things around while going on an object(ive)
+raid.
+
+   If you have other EDIFACT files, I would like to include them in the
+next version. I'm also open to any comments; as they say, "everything is
+still in flux" !
+
+AUTHOR
+======
+
+   Michael Koehne, Kraehe@Copyleft.de
+
+SEE ALSO
+========
+
+   perl(1), XML::Parser(3), UN/EDIFACT Draft.
+
+
+File: pm.info,  Node: XML/Element,  Next: XML/Encoding,  Prev: XML/Edifact,  Up: Module List
+
+XML elements with the same interface as HTML::Element
+*****************************************************
+
+NAME
+====
+
+   XML::Element - XML elements with the same interface as HTML::Element
+
+SYNOPSIS
+========
+
+     [See HTML::Element]
+
+DESCRIPTION
+===========
+
+   This is just a subclass of HTML::Element.  It works basically the same
+as HTML::Element, except that tagnames and attribute names aren't forced
+to lowercase, as they are in HTML::Element.
+
+   *Note HTML/Element: HTML/Element, describes everything you can do with
+this class.
+
+CAVEATS
+=======
+
+   Has currently no handling of namespaces.
+
+SEE ALSO
+========
+
+   *Note XML/TreeBuilder: XML/TreeBuilder, for a class that actually
+builds XML::Element structures.
+
+   *Note HTML/Element: HTML/Element, for all documentation.
+
+   *Note XML/DOM: XML/DOM, and *Note XML/Twig: XML/Twig, for other XML
+document tree interfaces.
+
+   *Note XML/Generator: XML/Generator, for more fun.
+
+COPYRIGHT
+=========
+
+   Copyright 2000 Sean M. Burke.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+AUTHOR
+======
+
+   Sean M. Burke, <sburke@cpan.org>
+
+
+File: pm.info,  Node: XML/Encoding,  Next: XML/Filter/DetectWS,  Prev: XML/Element,  Up: Module List
+
+A perl module for parsing XML encoding maps.
+********************************************
+
+NAME
+====
+
+   XML::Encoding - A perl module for parsing XML encoding maps.
+
+SYNOPSIS
+========
+
+     use XML::Encoding;
+     my $em_parser = new XML::Encoding(ErrorContext  => 2,
+                                       ExpatRequired => 1,
+                                       PushPrefixFcn => \&push_prefix,
+                                       PopPrefixFcn  => \&pop_prefix,
+                                       RangeSetFcn   => \&range_set);
+
+     my $encmap_name = $em_parser->parsefile($ARGV[0]);
+
+DESCRIPTION
+===========
+
+   This module, which is built as a subclass of XML::Parser, provides a
+parser for encoding map files, which are XML files. The file
+maps/encmap.dtd in the distribution describes the structure of these
+files. Calling a parse method returns the name of the encoding map
+(obtained from the name attribute of the root element). The contents of
+the map are processed through the callback functions push_prefix,
+pop_prefix, and range_set.
+
+METHODS
+=======
+
+   This module provides no additional methods to those provided by
+XML::Parser, but it does take the following additional options.
+
+   * ExpatRequired
+
+     When this has a true value, then an error occurs unless the encmap
+     "expat" attribute is set to "yes". Whether or not the ExpatRequired
+     option is given, the parser enters expat mode if this attribute is
+     set. In expat mode, the parser checks if the encoding violates expat
+     restrictions.
+
+   * PushPrefixFcn
+
+     The corresponding value should be a code reference to be called when
+     a prefix element starts. The single argument to the callback is an
+     integer which is the byte value of the prefix. An undef value should
+     be returned if successful. If in expat mode, a defined value causes
+     an error and is used as the message string.
+
+   * PopPrefixFcn
+
+     The corresponding value should be a code reference to be called when a
+     prefix element ends. No arguments are passed to this function. An
+     undef value should be returned if successful. If in expat mode, a
+     defined value causes an error and is used as the message string.
+
+   * RangeSetFcn
+
+     The corresponding value should be a code reference to be called when a
+     "range" or "ch" element is seen. The 3 arguments passed to this
+     function are: (byte, unicode_scalar, length) The byte is the starting
+     byte of a range or the byte being mapped by a "ch" element. The
+     unicode_scalar is the Unicode value that this byte (with the current
+     prefix) maps to. The length of the range is the last argument.  This
+     will be 1 for the "ch" element. An undef value should be returned if
+     successful. If in expat mode, a defined value causes an error and is
+     used as the message string.
+
+AUTHOR
+======
+
+   Clark Cooper <`coopercc@netheaven.com'>
+
+SEE ALSO
+========
+
+   XML::Parser
+
+
+File: pm.info,  Node: XML/Filter/DetectWS,  Next: XML/Filter/Digest,  Prev: XML/Encoding,  Up: Module List
+
+A PerlSAX filter that detects ignorable whitespace
+**************************************************
+
+NAME
+====
+
+   XML::Filter::DetectWS - A PerlSAX filter that detects ignorable
+whitespace
+
+SYNOPSIS
+========
+
+     use XML::Filter::DetectWS;
+
+     my $detect = new XML::Filter::DetectWS (Handler => $handler,
+     					 SkipIgnorableWS => 1);
+
+DESCRIPTION
+===========
+
+   This a PerlSAX filter that detects which character data contains
+ignorable whitespace and optionally filters it.
+
+   Note that this is just a first stab at the implementation and it may
+change completely in the near future. Please provide feedback whether you
+like it or not, so I know whether I should change it.
+
+   The XML spec defines ignorable whitespace as the character data found
+in elements that were defined in an <!ELEMENT> declaration with a model of
+'EMPTY' or 'Children' (Children is the rule that does not contain
+'#PCDATA'.)
+
+   In addition, XML::Filter::DetectWS allows the user to define other
+whitespace to be *ignorable*. The ignorable whitespace is passed to the
+PerlSAX Handler with the ignorable_whitespace handler, provided that the
+Handler implements this method. (Otherwise it is passed to the characters
+handler.)  If the *SkipIgnorableWS* is set, the ignorable whitespace is
+simply discarded.
+
+   XML::Filter::DetectWS also takes xml:space attributes into account. See
+below for details.
+
+   CDATA sections are passed in the standard PerlSAX way (i.e. with
+surrounding start_cdata and end_cdata events), unless the Handler does not
+implement these methods. In that case, the CDATA section is simply passed
+to the characters method.
+
+Constructor Options
+===================
+
+   * SkipIgnorableWS (Default: 0)
+
+     When set, detected ignorable whitespace is discarded.
+
+   * Handler
+
+     The PerlSAX handler (or filter) that will receive the PerlSAX events
+     from this filter.
+
+Current Implementation
+======================
+
+   When determining which whitespace is ignorable, it first looks at the
+xml:space attribute of the parent element node (and its ancestors.)  If
+the attribute value is "preserve", then it is *NOT* ignorable.  (If
+someone took the trouble of adding xml:space="preserve", then that is the
+final answer...)
+
+   If xml:space="default", then we look at the <!ELEMENT> definition of
+the parent element. If the model is 'EMPTY' or follows the 'Children' rule
+(i.e. does not contain '#PCDATA') then we know that the whitespace is
+ignorable.  Otherwise we need input from the user somehow.
+
+   The idea is that the API of DetectWS will be extended, so that you can
+specify/override e.g. which elements should behave as if
+xml:space="preserve" were set, and/or which elements should behave as if
+the <!ELEMENT> model was defined a certain way, etc.
+
+   Please send feedback!
+
+   The current implementation also detects whitespace after an
+element-start tag, whitespace before an element-end tag.  It also detects
+whitespace before an element-start and after an element-end tag and before
+or after comments, processing instruction, cdata sections etc., but this
+needs to be reimplemented.  In either case, the detected whitespace is
+split off into its own PerlSAX characters event and an extra property
+'Loc' is added. It can have 4 possible values:
+
+   * 1 (WS_START) - whitespace immediately after element-start tag
+
+   * 2 (WS_END) - whitespace just before element-end tag
+
+   * 3 (WS_ONLY) - both WS_START and WS_END, i.e. it's the only text found
+     between the start and end tag and it's all whitespace
+
+   * 0 (WS_INTER) - none of the above, probably before an element-start
+     tag, after an element-end tag, or before or after a comment, PI,
+     cdata section etc.
+
+   Note that WS_INTER may not be that useful, so this may change.
+
+xml:space attribute
+===================
+
+   The XML spec states that: A special attribute named xml:space may be
+attached to an element to signal an intention that in that element, white
+space should be preserved by applications.  In valid documents, this
+attribute, like any other, must be declared if it is used.  When declared,
+it must be given as an enumerated type whose only possible values are
+"default" and "preserve".  For example:
+
+     <!ATTLIST poem   xml:space (default|preserve) 'preserve'>
+
+   The value "default" signals that applications' default white-space
+processing modes are acceptable for this element; the value "preserve"
+indicates the intent that applications preserve all the white space.  This
+declared intent is considered to apply to all elements within the content
+of the element where it is specified, unless overriden with another
+instance of the xml:space attribute.
+
+   The root element of any document is considered to have signaled no
+intentions as regards application space handling, unless it provides a
+value for this attribute or the attribute is declared with a default value.
+
+   [... end of excerpt ...]
+
+CAVEATS
+=======
+
+   This code is highly experimental!  It has not been tested well and the
+API may change.
+
+   The code that detects of blocks of whitespace at potential indent
+positions may need some work. See
+
+AUTHOR
+======
+
+   Send bug reports, hints, tips, suggestions to Enno Derksen at
+<`enno@att.com'>.
+
+
+File: pm.info,  Node: XML/Filter/Digest,  Next: XML/Filter/Hekeln,  Prev: XML/Filter/DetectWS,  Up: Module List
+
+XML::Filter::Digest
+*******************
+
+NAME
+====
+
+   XML::Filter::Digest
+
+SYNOPSIS
+========
+
+     use strict;
+     use XML::Filter::Digest;
+     use XML::Handler::YAWriter;
+     use IO::File;
+
+     my $digest = new XML::Filter::Digest(
+     	'Handler'=>
+     	    new XML::Handler::YAWriter(
+     	    'Output' => new IO::File( ">-" ),
+     	    'Pretty' => {
+     		'AddHiddenNewLine' => 1
+     		}
+     	    ),
+
+     'Script' =>
+         new XML::Script::Digest(
+         'Source' => { 'SystemId' => $ARGV[0] }
+         )->parse(),
+
+     'Source' => { 'SystemId' => $ARGV[1] }
+     )->parse();
+
+     0;
+
+DESCRIPTION
+===========
+
+   Most XML tools aim to parse some simple XML and to produce some
+formatted output. *XML::Filter::Digest* aims to do the opposite.
+
+   Many formats can now be parsed by a SAX Driver. XPath offers a smart
+way to write queries to XML. XML::Filter::Digest is a PerlSAX Filter to
+query XML and to provide a simpler digest as a result.
+
+   XML::Filter::Digest uses its own script language that can be parsed by
+*XML::Script::Digest* to formulate these digest queries.
+
+   In fact, a digest script is well-formed XML.
+
+   The following script defines that the result XML should have a root
+element called extract, containing several elements called section
+starting from the 4th HTML header. Those section elements contain id,
+title and *intro* elements, which in turn contain the XPath *string-value*
+of their nodes as character data.
+
+     <digest name="extract">
+     <collect
+         name="section"
+         node="//html//h2[position()&gt;3]"
+         >
+         <collect
+             name="id"
+         node="child::a/attribute::name"
+         />
+         <collect
+             name="title"
+         node="."
+         />
+         <collect
+             name="intro"
+         node="following-sibling::p[position()=1]"
+         />
+     </collect>
+     </digest>
+
+   The digest script parser silently ignores anything other than digest
+elements and collect elements. The digest element needs a name attribute
+defining the name of the root element, while the collect element needs an
+additional node attribute defining XPath queries for nested elements.
+
+   Only a single digest element should exist within a script document, but
+there is no need that the digest script be the root element of the
+document. Nested within the digest element should be collect elements.
+They may contain several other collect elements recursivly.
+
+METHODS
+-------
+
+   The XML::Filter::Digest object may act as a Filter to receive SAX
+events, or directly as a Driver if you provide a Source option to the parse
+method. The filter is reusable, if you arrange that the chain of Handlers
+is also reusable to handle multiple documents in batches. The filter
+requires a Handler and a Script option before the start_document method is
+called.
+
+   The XML::Script::Digest object may act as a Handler to receive SAX
+events, or directly if you provide a Source option to the parse method.
+The script object is reusable and a single script object can be used for
+several filter objects.
+
+new
+     Creates a new XML::Driver::HTML object. Default options for parsing,
+     described below, are passed as key-value pairs or as a single hash.
+     Options may be changed directly in the object.
+
+parse
+     Parses a document by embedding XML::Parser::PerlSAX. This allows you
+     to use XML::Filter::Digest directly as a Driver and simplifies
+     generating a ready-to-use XML::Script::Object.
+
+     Options, described below, are passed as key-value pairs or as a
+     single hash.  Options passed to parse() override the default options
+     in the object for the duration of the parse.
+
+start_document
+     Notifies the object about the start of a new document. The object will
+     do its cleanup if it's reused.
+
+end_document
+     Notifies the object about the end of the document.  Return value of
+     XML::Script::Digest is *$self*, to be used as the return value of the
+     parse method.
+
+     XML::Filter::Digest will walk through the script object to generate a
+     stream of SAX events for its Handler. Return value of
+     XML::Filter::Digest is the return value of the end_document method of
+     the Handler object.
+
+OPTIONS
+-------
+
+Script
+     XML::Script::Digest objects can be used for several
+     XML::Filter::Digest objects.
+
+Handler
+     Default SAX Handler to receive events from XML::Filter::Digest
+     objects.
+
+Source
+     XML::Filter::Digest and XML::Script can be used on raw XML directly,
+     by calling the parse() method. To do this, the Source option is
+     required for embedding the PerlSAX parser.
+
+     The `Source' hash may contain the following parameters:
+
+    ByteStream
+          The raw byte stream (file handle) containing the document.
+
+    String
+          A string containing the document.
+
+    SystemId
+          The system identifier (URI) of the document.
+
+    Encoding
+          A string describing the character encoding.
+
+     If more than one of `ByteStream', `String', or `SystemId' are
+     present, preference is given first to `ByteStream', then `String',
+     then `SystemId'.
+
+NOTES
+=====
+
+   The XML::Filter::Digest is not a streaming filter, but a buffering
+filter, as any processing is done by the end_document method. This could
+cause the Perl interpreter to run out of memory on large XML files.
+Ideally, define a *ulimit*, to prevent the system going offline for
+several minutes, till it detects that there is really no memory to seize
+somewhere in the network. Adding network swapspace ad infinitum only make
+things worse, so I have the following line in my *.bashrc*. Other
+operating systems offer similar constraints.
+
+     ulimit -v 98304 -d 98304 -m 98304
+
+   This line is ok on a single user machine with 32M ram and 128MB swap. I
+can raise this value, if I know that I wanna walk the dog.
+
+BUGS
+====
+
+   not yet implemented:
+
+     reuse of XML::Filter::Digest objects.
+
+   XML::XPath::Builder bug:
+
+     XML::Filter::Digest 0.02 has been tested with XML::XPath
+     version 0.51, but XML::XPath needs the patch included within
+     this distribution.
+
+     Version 0.52 is expected to work out of the box.
+
+   other bugs:
+
+     The NotSoFree License is incompatible with the
+     GNU General Public License.
+
+AUTHOR
+======
+
+     Michael Koehne, Kraehe@Copyleft.De
+     (c) 2000 NotSoFree License
+
+SEE ALSO
+========
+
+   *Note XML/Parser/PerlSAX: XML/Parser/PerlSAX, and *Note XML/XPath:
+XML/XPath,
+
+
+File: pm.info,  Node: XML/Filter/Hekeln,  Next: XML/Filter/Reindent,  Prev: XML/Filter/Digest,  Up: Module List
+
+a SAX stream editor
+*******************
+
+NAME
+====
+
+   XML::Filter::Hekeln - a SAX stream editor
+
+SYNOPSIS
+========
+
+     use XML::Filter::Hekeln;
+     
+     my $hander = new SAXHandler( ... );
+     my $hekeln = new XML::Filter::Hekeln(
+     	'Handler' => $handler,
+     	'Script'  => $script
+     	);
+     my $driver = new SAXDriver( ..., 'Handler' => $hekeln );
+
+DESCRIPTION
+===========
+
+   XML::Filter::Hekeln is a sophisticated SAX stream editor.
+
+   Hekeln is a SAX filter. This means that you can use a Hekeln object as
+a Handler to act on events, and to produce SAX events as a driver for the
+next handler in the chain. The name Hekeln sounds like the german word for
+crocheting, whats the best to describe, what Hekeln can do on markup
+language translation.
+
+   The main design goal was to make it as easy for Perl as possible, while
+preserving a human readable form for the translation script.
+
+   Hekeln scripts are event based. Hekeln objects stream events to the
+next in chain. They are therefore useable to handle XML documents larger
+than physical memory, as they do not need to store the entire document in
+a DOM or Grove structure. They will also be faster than any XSL in most
+circumstances.
+
+   To tell you straight, how Hekeln works, I'll start with an example.
+
+   I want to translate XML::Edifact repositories into html. Those
+repositories start with something like this:
+
+     <repository
+     	agency="UN/ECE/TRADE/WP.4"
+     	code="sdsd"
+     	desc="based on UN/EDIFACT D422.TXT"
+     	name="Service Segment Directory"
+     	version="99A"
+     	>
+
+   Here is a sniplet from test.pl :
+
+     start_element:repository
+     !	$self->handle('start_document',{});
+     <	html	>
+     <	body	>
+     <	h1	>
+     	XML-Edifact Repository
+     </	h1	>
+     <	h2	>
+     	~name~
+     </	h2	>
+     <	p	>
+     	Agency: ~agency~
+     <	br	>
+     	Code: ~code~
+     <	br	>
+     	Version: ~version~
+     <	br	>
+     	Description: ~desc~
+     </	p	>
+     <	hr	>
+
+     end_element:repository
+     </	body	>
+     </	html	>
+     !	$self->handle('end_document',{});
+
+   This part is handling start_element and end_element events, that have a
+target called repository. The translation done by Hekeln is done into
+subroutines that are stored in a hash.
+
+   So anything is possible, if you understand the trick. To understand the
+trick, uncomment the "'Debug' => 1" parameter of Hekeln invocation in the
+test.pl script and redirect STDERR to some file.
+
+   This will produce a file starting like :
+
+     $hash->{start_element:repository}=eval "sub {
+     	my ($self,$param) = @_;
+     	my ($hash) = {};
+     	$self->handle('start_document',{});
+     	$hash->{Name}="html"; $self->handle("start_element", $hash);
+     	$hash->{Name}="body"; $self->handle("start_element", $hash);
+     	$hash->{Name}="h1"; $self->handle("start_element", $hash);
+     	$hash->{Data}="XML-Edifact Repository"; $self->handle("characters", $hash);
+     	$hash->{Name}="h1"; $self->handle("end_element", $hash);
+     	$hash->{Name}="h2"; $self->handle("start_element", $hash);
+     	$hash->{Data}="$param->{name}"; $self->handle("characters", $hash);
+     	$hash->{Name}="h2"; $self->handle("end_element", $hash);
+     	$hash->{Name}="p"; $self->handle("start_element", $hash);
+     	$hash->{Data}="Agency: $param->{agency}"; $self->handle("characters", $hash);
+     	$hash->{Name}="br"; $self->handle("start_element", $hash);
+     	$hash->{Data}="Code: $param->{code}"; $self->handle("characters", $hash);
+     	$hash->{Name}="br"; $self->handle("start_element", $hash);
+     	$hash->{Data}="Version: $param->{version}"; $self->handle("characters", $hash);
+     	$hash->{Name}="br"; $self->handle("start_element", $hash);
+     	$hash->{Data}="Description: $param->{desc}"; $self->handle("characters", $hash);
+     	$hash->{Name}="p"; $self->handle("end_element", $hash);
+     	$hash->{Name}="hr"; $self->handle("start_element", $hash);
+     	}";
+
+     $hash->{end_element:repository}=eval "sub {
+     	my ($self,$param) = @_;
+     	my ($hash) = {};
+     	$hash->{Name}="body"; $self->handle("end_element", $hash);
+     	$hash->{Name}="html"; $self->handle("end_element", $hash);
+     	$self->handle('end_document',{});
+     	}";
+
+   As you can imagine ~foobaa~ parts within a script will become expanded
+with the the attributes given in the XML start_element event. Syntax
+itself is a bit tricky as translation of the script into a sub is stupid
+and fast.
+
+   Any event that has to be handled by Hekeln starts with an event_name
+event_target pair and ends with a blank line.
+
+     event_name<DOUBLE_COLON>event_target<NL>
+     left_indicator<TAB>text<TAB>right_indicator<NL>
+     left_indicator<TAB>text<TAB>right_indicator<NL>
+     left_indicator<TAB>text<TAB>right_indicator<NL>
+     <NL>
+
+   Valid as left_indicator are "<", "</", "", "!", "+", "-", "++, "-",
+"?{" and "?}", while the right indicator may be optional execpt for "<".
+
+   The first produce start_element, end_element and character events, to
+make Hekeln scripts look similar to the markup you want to produce.
+
+   The "!" indicator is something special as it will be copied into the
+sub as it is, to be evaluted in the complete context of a script. So its
+possible to code conditionals or even loops with a constructions like
+those :
+
+     !	$self->{Flag}{FooBaa}=1;
+     !	unshift $self->{Stack}, "FooBaa";
+
+   and
+
+     !	$self->{Flag}{FooBaa}=undef;
+     !	shift $self->{Stack} if $self->{Stack}[0] eq "FooBaa";
+
+   and
+
+     !	if ($self->{Flag}{FooBaa}) {
+     <	h1	>
+     	flag FooBaa raised
+     </	h1	>
+     !	}
+
+   It wont be necessary to code exactly this, as this is done by "++", "-",
+"?{" and "?}". "+" and "-" will raise or lower some flag, while "++" and
+"-" not only manage the flags, but also a stack that is needed to process
+character events.
+
+   The default behavior is to throw away any event that does not have a
+subroutine matching the event, target pair. Events that do not have a
+target, will use the top flag on the stack as a target. So if you want to
+process character events, use "++" and "-" when handling the surounding
+start_element and end_element events.
+
+   As a last word: Hekeln is not yet well tested, and badly needs some
+better documentation. I would aplaude anybody for naming bug, or improving
+the POD.
+
+AUTHOR
+======
+
+   Michael Koehne, Kraehe@Copyleft.de
+
+SEE ALSO
+========
+
+   perl(1), XML::Parser, XML::Parser::PerlSAX
+
+

@@ -1,0 +1,1817 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Sybase/Login,  Next: Sybase/ObjectInfo,  Prev: Sx,  Up: Module List
+
+A highly configurable Login widget for Sybperl and Perl/Tk
+**********************************************************
+
+NAME
+====
+
+   Sybase::Login - A highly configurable Login widget for Sybperl and
+Perl/Tk
+
+Change History
+==============
+
+
+     *1.0* - Initial Implementation
+
+     *1.1* - Componentized for perl5.0021bh, handlers fixed
+
+     1.2 - Set up for general distribution, added Version and VERSION.
+     Changed funky menu generation to Optionmenus.
+
+     1.3 - Added presentDBMenu and presentSrvMenu options.
+
+     1.4 - OK, so I had troubles with PAUSE on 1.3
+
+     *Todo:* - Subclass Optionmenu to dynamically set up the Server
+     selections on post (or Buttondown?)
+
+DESCRIPTION
+===========
+
+   Login is a Widget that presents a dialog box to the user so that the
+user may enter his or her login name and password, as well as select the
+appropriate database and server.
+
+USAGE
+=====
+
+   One uses Login by creating a new Login widget, adding at least one
+Database via the addDatabase method, configuring via the configure method,
+and then getting a valid login via the getVerification method.
+
+
+Sample Program
+--------------
+
+
+          #!/usr/local/bin/perl -w
+
+          use Tk;
+          use Sybase::DBlib;
+          use Sybase::Login;
+          use strict;
+
+          my($main) = MainWindow->new;
+          my($Login) = $main->Login;
+
+          $Login->addDatabase('DB',	'SYBSRV1','SYB11');
+          $Login->addDatabase('DBBACK',	'SYBSRV1','SYB11');
+
+          $Login->configure(-User => $ENV{USER},
+          		   -ULabel => 'User Name:',
+          		   -Title => 'Please Login');
+
+          my($msg) = $main->Message(-text => 'Ready to go')->pack;
+          $main->Button(-text => 'kick me!',
+          	       -command => sub {
+          		 my($pwd, $usr, $db, $srv, $mDB);
+          		 if ($Login->getVerification(-Force => 1)) {
+          		   $pwd = $Login->cget(-Password);
+          		   $usr = $Login->cget(-User);
+          		   $db =  $Login->cget(-Database);
+          		   $srv = $Login->cget(-Server);
+          		   print "Results good:\n\tUser:\t\t$usr\n";
+          		   print "\tPassword:\t$pwd\n\tDatabase:\t$db\n";
+          		   print "\tServer:\t\t$srv\n";
+          		   print "Verifying Login...\n";
+          		   $mDB = Sybase::DBlib->dblogin("$usr","$pwd", "$srv");
+          		   $mDB->dbuse($db);
+          		   $mDB->dbclose;
+          		   print "Login worked!!!\n";
+          		 } else {
+          		   print "Login cancelled at User request.\n";
+          		 }
+          	       })->pack;
+
+          $main->Button(-text => 'exit',
+          	       -command => sub {$main->destroy;})->pack;
+
+          MainLoop;
+
+          print "And I'm on my way home!\n";
+
+          exit;
+
+
+Operation
+---------
+
+   The user is presented with a dialog box.  The focus is on the username
+entry if no user name has been configured; otherwise, it is on the
+password entry.  If multiple databases have been configured, the user may
+select the appropriate database from the menu button. If multiple servers
+have been configured for the selected database, the user may select the
+appropriate server from the menu button.
+
+   When the user has finished entering information, she may press the OK
+button to attempt to login, or the cancel button to abort the process.  If
+the user presses the OK button, and the login succeeds, control returns to
+the caller.  If the login fails, an error dialog box is displayed, and the
+user may press retry, or may press cancel, in which case control returns
+to the caller exactly as if the user had pressed cancel at the main login
+screen.
+
+   When control returns to the caller, the return value will be 1 if the
+login was successful, or 0 if not.
+
+Notes
+-----
+
+   A caller may define a message or error handler either before or after
+calling any of the methods of this object. getCurrentVerification will
+restore the handlers extant when invoked.
+
+Methods
+=======
+
+
+getCurrentVerification
+----------------------
+
+   *$Login-*>*getCurrentVerification;*
+
+   *(No parameters)*
+
+   return 1 if the current configuration will result in a valid login, 0
+otherwise.  No GUI is ever displayed.
+
+getVerification
+---------------
+
+   *$Login-*>*getVerification(-Force =* ?);>
+
+   If the current configuration is NOT valid, activate the login frame.
+This will return 1 with a valid configuration, or 0 if the user hit
+cancel.  If the -Force parameter is passed as 't', 'y', or 1, the login
+frame will be activated even if the current configuration is valid.
+
+addDatabase
+-----------
+
+   *$Login-*>*addDatabase(Database, Server List);*
+
+   adds a database/server set.  The first parameter is the name of the
+database, the second is a list of Associated Servers.  See the code above
+for examples.
+
+   Note that the first server in the list is the default server for that
+database.  Further note that adding a database a second time simply alters
+the servers.
+
+clearDatabase
+-------------
+
+   *$Login-*>*clearDatabase([Database[, Database,...]]);*
+
+   Clears the given Database entries, or all databases if if none are
+specified.
+
+Version
+-------
+
+   *$Login-*>Version
+
+   *(No parameters)*
+
+   Returns the current version of Login
+
+Configuration Items
+===================
+
+   Any of the following configuration items may be set via the configure
+method, or retrieved via the cget method.
+
+
+-User
+-----
+
+   Set or get the username.  The default is blank.
+
+-Password
+---------
+
+   Set or get the password.  The default is blank.
+
+-Title
+------
+
+   Set or get the Title of the Login Widget.  The default is 'Database
+Login'
+
+-Database
+---------
+
+   Set or get the default Database.  The default is blank.  The call will
+silently fail if the database is not configured via the AddDatabase
+method.  If the configured server is not a valid server for the given
+database, the server will be set to the default server for the database.
+
+-Server
+-------
+
+   Set or get the default Server.  The default is blank.  The call will
+silently fail if the server is not a valid server for the currently
+configured database.
+
+-OKText
+-------
+
+   Set or get the text for the OK button.  The default is OK.
+
+-CancelText
+-----------
+
+   Set or get the text for the Cancel button.  The default is Cancel.
+
+-ULabel
+-------
+
+   Set or get the label for the User name entry.  The default is 'User:'.
+
+-PLabel
+-------
+
+   Set or get the label for the Password entry.  The default is
+'Password:'.
+
+-DLabel
+-------
+
+   Set or get the label for the Database Menu Button.  The default is
+'Database:'.
+
+-SLabel
+-------
+
+   Set or get the label for the Server Menu Button.  The default is
+'Server:'.
+
+-Labelfont
+----------
+
+   Set or get the font used for the labels.  The default is
+'-Adobe-Courier-Bold-R-Normal-*-120-*'.
+
+-EDlgTitle
+----------
+
+   Set or get the Title for the Error Dialog. The default is 'Database
+Login Error!'.
+
+-EDlgText
+---------
+
+   Set or get the text displayed in the Error Dialog.  The default is
+'Unable to login to $db at $srv'.  $db will be interpreted as the Database
+name, $srv will be interpreted as the Server name, $usr will be
+interpreted as the User name, and $pwd will be interpreted as the password.
+
+-EDlgRetry
+----------
+
+   Set or get the text for the Retry button in the Error Dialog. The
+default is 'Retry'.
+
+-EDlgCancel
+-----------
+
+   Set or get the text for the Cancel button in the Error Dialog. The
+default is 'Cancel'.
+
+-presentDBMenu
+--------------
+
+   If set False, do not display the database menu.  The database will be
+as configured, or default.  Default is True.
+
+-presentSrvMenu
+---------------
+
+   If set False, do not display the server menu.  The Server will be as
+configured, or default for the database. Default is True.
+
+Author
+======
+
+   *Brent B. Powers, B2Pi*
+
+   Currently on-site at Merrill Lynch, powers@ml.com
+
+   This code may be distributed under the same conditions as perl itself.
+
+
+File: pm.info,  Node: Sybase/ObjectInfo,  Next: Sybase/Xfer,  Prev: Sybase/Login,  Up: Module List
+
+Return Sybase Object information
+********************************
+
+NAME
+====
+
+   Sybase::ObjectInfo - Return Sybase Object information
+
+SYNOPSIS
+========
+
+     %info = grab Sybase::ObjectInfo($dbh, $database, \@table_list)
+
+     where:
+        $dbh is a Sybase::DBlib handle
+        $database is the name of the database
+        @table_list is an array containing the tables
+
+     returns a hash for the form:
+        $r = $info{$db_name}->{$table_name}->{$field_name}
+
+     $r->{col_id}          # column order
+       ->{col_type}        # column fundamental datatype
+       ->{col_len}         # column datatype length
+       ->{col_allownulls}  # does the column allow nulls
+       ->{col_usertype}    # column usertype - if applicable
+       ->{col_prec}        # column precision
+
+DEPENDENCIES
+============
+
+     perl version 5.004
+
+     Sybase::DBlib
+
+DESCRIPTION
+===========
+
+   Grabs column information from Sybase system tables for a given list of
+tables. Information includes column number, type, length, allow null
+attribute, usertype, and precision.
+
+     It performs the following SQL:
+        select
+           col_name    = c.name,
+           type_name   = t.name,
+           col_len     = c.length,
+           col_order   = c.colid,
+           ctype       = c.type,
+           utype       = t.usertype,
+           allownulls  = t.allownulls
+        from
+           $db_name..syscolumns c,
+           $db_name..systypes t
+        where
+           c.id = object_id('$db_name..$tab_name')
+           and c.usertype *= t.usertype
+        order
+           by c.colid
+
+   followed by this for each field where utype > 100  to get the
+underlying datatype for usertypes
+
+     select
+        name
+     from
+        $db_name..systypes
+     where
+        usertype < 100
+        and type=$col->{ctype}
+        and name not in ("sysname", "nchar", "nvarchar")
+
+MISC
+====
+
+   When supplying the parameters to grab, $database can  be  null.  If  so,
+then tables must be of the form  "database.owner.table"  (owner  can  be
+null)
+
+   If only  one  table  is  specified  then  table_list  can  be  a  scalar
+containing the name of the table.
+
+WISH LIST
+=========
+
+   I should convert this to use DBI/DBD at  some  point.  And  if  I'm  not
+mistaken these kind of attributes are already  built  into  that  system
+(thereby rendering this module close to obsolete if DBI is installed)
+
+CONTACTS
+========
+
+   stephen.sprague@msdw.com
+
+VERSION
+=======
+
+   version 0.1, 01-OCT-2000 version 0.2, 10-FEB-2000
+
+
+File: pm.info,  Node: Sybase/Xfer,  Next: Symbol,  Prev: Sybase/ObjectInfo,  Up: Module List
+
+transfer data between Sybase servers via bcp.
+*********************************************
+
+NAME
+====
+
+     Sybase::Xfer - transfer data between Sybase servers via bcp.
+
+SYNOPSIS
+========
+
+     #!/usr/bin/perl5.005
+     #the perl version
+        use Sybase::Xfer;
+        $h = new Sybase::Xfer( %switches );
+        $h->xfer();
+        $h->done();
+
+     #!/bin/ksh
+     #the bin version
+        sybxfer <switches>
+
+DEPENDENCIES
+============
+
+     requires at least perl version 5.005
+
+     Sybase::DBlib
+     Sybase::ObjectInfo (this comes packaged with Sybase::Xfer)
+     Getopt::Long
+     Tie::IxHash
+
+DESCRIPTION
+===========
+
+   If you're in an environment with multiple servers and you don't want to
+use cross-server joins then this module may be worth a gander. It
+transfers data from one server to another server row-by-row in memory w/o
+using an intermediate file.
+
+   To juice things up it can take data from any set of sql commands as
+long as the output of the sql matches the definition of the target table.
+And it can take data from a perl subroutine if you're into that.
+
+   It also has some smarts to delete rows in the target table before the
+data is transferred by several methods. See the -truncate_flag,
+-delete_flag and -auto_delete switches.
+
+   Everything is controlled by switch settings sent as a hash to the
+module.  In essence  one describes the *from source* and the *to source*
+and the module takes it from there.
+
+   Error handling:
+
+   An attempt was made to build in hooks for robust error reporting via
+perl callbacks. By default, it will print to stderr the data, the column
+names, and their datatypes upon error.  This is especially useful when
+sybase reports *attempt to load an oversized row* warning message.
+
+   Auto delete:
+
+   More recently the code has been tweaked to handle the condition where
+data is bcp'ed into a table but the row already exists and the desired
+result to replace the row. Originally, the -delete_flag option was meant
+for this condition. ie. clean out the table via the -where_clause before
+the bcp in was to occur. If this is action is too drastic, however, by
+using the -auto_delete option one can be more precise and force only those
+rows about to be inserted to be deleted before the bcp in begins. It will
+bcp the 'key' information to a temp table, run a delete (in a loop so as
+not to blow any log space) via a join between the temp table and target
+table and then begin the bcp in. It's weird but in the right situation it
+may be exactly what you want.  Typically used to manually replicate a
+table.
+
+OPTIONS SUMMARY
+===============
+
+HELP
+----
+
+-help | -h
+     this help
+
+FROM INFO
+---------
+
+-from_server | -fs        (string)
+     from server name
+
+-from_database | -fd     (string)
+     from database name
+
+-from_user | -fu         (string)
+     from username
+
+-from_password | -fp    (string)
+     from username password
+
+FROM SOURCES
+------------
+
+-from_table | -ft      (string)
+     from table name
+
+-from_sql (string)
+     string is the sql to run against the from server
+
+-from_script (string)
+     string is the filename containing sql to run
+
+-from_perl (coderef)
+     coderef is perl sub to call to get data
+
+-from_file | -ff (filename)
+     name of file to read data from.
+
+-from_file_delimiter | -ffd (delimiter)
+     the delimiter used to separate fields. Used in conjunction with
+     -from_file only.
+
+TO INFO
+-------
+
+-to_server | -ts (string)
+     to server name
+
+-to_table | -tt (string)
+     to table name
+
+-to_user | -tu (string)
+     to username
+
+-to_password | -tp (string)
+     to username password
+
+FROM & TO INFO
+--------------
+
+-server | -S (string)
+     set from_server and to_server
+
+-database | -D (string)
+     set from_database
+
+-table | -T (string)
+     set from_table and to_table
+
+-user | -U (string)
+     set from_user and to_user
+
+-password | -P (string)
+     set from_password and to_password
+
+MISC
+----
+
+-batchsize | -bs (int)
+     bcp batch size. Default=1000
+
+-where_clause | -wc (string)
+     append string when using -from_table to sql select statement
+
+-truncate_flag | -tf
+     truncate to_table
+
+-delete_flag | -df
+     delete *to_table* [where *where_clause*]
+
+-app_name | -an (string)
+     application name
+
+-holdlock | -hl
+     adds *holdlock* after the *from_table*
+
+-trim_whitespace | -tw
+     strips trailing whitespace
+
+AUTO DELETE
+-----------
+
+-auto_delete [*c1,c2...*]
+     *c1,c2...* are *to_table* column keys
+
+-auto_delete_batchsize  (int)
+     auto_delete batchsize
+
+-scratch_db  (string)
+     scratch database used by auto_delete
+
+CALLBACKS
+---------
+
+-callback_pre_send (coderef)
+     before row is sent callback
+
+-callback_err_send (coderef)
+     error on bcp_sendrow callback
+
+-callback_err_batch (coderef)
+     error on bcp_batch callback
+
+-callback_print (coderef)
+     any output that normally goes to stdout callback
+
+ERROR HANDLING
+--------------
+
+-error_handling| -eh (string)
+     string is abort, continue, or retry. Default is abort.
+
+-error_data_file | -edf (filename)
+     name of file to write the failed records into
+
+-retry_max n
+     number of times to retry an bcp_batch error
+
+-retry_deadlock_sleep
+     sleep time between calls to bcp_batch if deadlock error detected
+
+FLAGS
+-----
+
+-echo
+     echo sql commands
+
+-silent
+     don't print begin & end/summary messages
+
+-progress_log
+     print progess message on every bcp_batch
+
+-debug
+     programmer debug mode
+
+OPTION DETAILS
+==============
+
+from sources
+------------
+
+     -from_table | -ft  <table_name>
+
+   from table name. Use a fully qualified path to be safe. For example,
+pubs..titles. This removes the dependency on the default database for the
+-from_user value.
+
+     -from_sql  <string>
+
+   send sql in <string> to -from_server and xfer results to -to_table.
+For example, 'select author_id, lname from pubs..authors' This implies the
+-to_table has two columns of compatible type to store author_id and lname
+in it.
+
+     -from_script <file>
+
+   send sql in <file> to from_server and xfer results to to_table.
+Essentially the same as -from_sql except that it opens a file and gets the
+sql from there.
+
+     -from_perl <code-ref>
+
+   call code reference repetitively for data. Call the code-ref for data
+to send to -to_table.  user routine must return the following array:
+($status, $array_ref)  where $status is true to call it again or false to
+end the transfer. $arrary_ref is an array refernce to the row to send.
+This switch is only available from the API for obvious reasons.
+
+     -from_file <file>
+
+   the file to read the actual data from. It must be a delimited file.
+Using this option it behaves simliar to Sybase::BCP (in) and Sybase's own
+bcp. I've attempted to make the error handling richer.
+
+     -from_file_delimiter <regex>
+
+   the delimiter to use to split each record in -from_file. Can be a
+regular expression.
+
+from information
+----------------
+
+     -from_server | -fs  <server_name>
+     
+     The name of the server get the data from. Also see switch -server.
+
+     -from_database | -fd  <database_name>
+
+   The name of the from database. Optional. Will execute a dbuse on the
+from server. Also see switch -database.
+
+     -from_user | -fu  <user_name>
+
+   username to use on the from server. Also see switch -user.
+
+     -from_password | -fp  <password>
+
+   password to use on the from user. Also see switch -password.
+
+to information
+--------------
+
+     -to_server | -ts <server_name>
+
+   name of the to server. Also see switch -server.
+
+     -to_table | -tt  <table_name>
+
+   name of the to table. USE A FULLY QUALIFIED PATH. Eg. pubs..titles.
+This removes the dependency on the the login default database. Also see
+switch -table.
+
+     -to_user | -tu <user_name>
+
+   to user name. Also see switch -user.
+
+     -to_password | -tp <password>
+
+   to user password. Also see switch -password.
+
+from and to short cuts
+----------------------
+
+   many times the from and to user/pw pair are the same. Or the table
+names are the same on the two servers. These options are just a way to set
+both the from and to options above with one switch.
+
+     -server | -S <server>
+
+   set from_server & to_server to this value. Also see switches
+-from_server and -to_server.
+
+     -database | -D  <database>
+
+   set from_database only. The to_database name is set using a fully
+qualified table name. This this the way bcp works. I'd change it if I
+could. Also see switches -from_database and -to_database.
+
+     -table | -T  <table>
+
+   set the from_table & to_table to this value. Also see switches
+-from_table and -to_table.
+
+     -user | -U  <user_name>
+
+   set from_user & to_user to this value. Also see switches -from_user and
+-to_user.
+
+     -password | -P  <password>
+
+   set from_password & to_password to this value. Also see switches
+-from_password and -to_password
+
+other qualifiers
+----------------
+
+     -batchsize | -bs  <number>
+
+   bcp batch size into the to_table. Default=1000.
+
+     -where_clause | -wc <where_clause>
+
+   send 'select * from *from_table* where *where_clause*' to the
+*from_server*. The default is to use no where clause thereby just sending
+'select * from *from_table*'.  This is only used when the *from_source* is
+a table.  Also see -delete_flag.
+
+     -truncate_flag | -tf
+
+   send 'truncate table *to_table*' to the *to_server* before the transfer
+begins.  This requires dbo privilege, remember. If you don't have dbo
+privilege and you want to remove all the rows from the target table you
+have two options. Use the -delete_flag with no -where_clause or truncate
+the table via an alternate method (eg.  under a different user name)
+before you run the transfer. Default is false.
+
+     -delete_flag | -df
+
+   send 'delete *to_table* [where *where_clause*]' to the *to_server*
+before the transfer begins. Also see -where_clause. Default is false.  The
+delete will be performed in batches in  the size given by -batch_size.
+
+     -app_name | -an <val>
+
+   name of program. Will append '_F' and '_T' to differentiate between the
+from and to connections. This string appears in the field program_name in
+the table master..sysprocesses.  Will truncate to 14 characters if longer.
+Default is basename($0).
+
+     -holdlock | hl
+
+   if using *from_table* then this switch will add an additional
+*holdlock* after the table. This is especially useful if the *from_table*
+has the potential to be updated at the same time the transfer is taking
+place. The default is noholdlock.
+
+     -trim_whitespace | tw
+
+   Will set *nsql*'s $Sybase::DBlib::nsql_strip_whitespace to true which
+trims trailing whitespace before bcp'ing the data into target table. If a
+field is all whitepace on the from table then the result of trimming
+whitespace will be null. Therefore, the corresponding column on the to
+table needs to permit nulls. Default is false.
+
+auto delete
+-----------
+
+   The -auto_delete switch indicates that it should be ensured that any
+rows selected from the *from_table* first be removed from the *to_table*.
+This differs from the -delete_flag and -where_clause combination that
+makes sweeping deletes. -auto_delete was added for the sole purpose of
+keeping the -to_table up-to-date by transferring only 'changed' records
+from the -from_table and not knowing just which records changed apriori.
+
+     -auto_delete [c1,c2...]
+
+   c1, c2, ... are the *unique key column names* into *to_table*. When
+this switch is in effect the module will create a table in -scratch_db
+named sybxfer$$, $$ being the current process number, with the columns c1,
+c2, ...  Then it will bcp only those columns to this temp table. After
+that bcp is complete it will perform a delete (in a loop of the
+-auto_delete_batchsize) via a join by these columns in the temp table to
+the *to_table* so as to remove the rows, if any. After the delete is
+complete the temp table is dropped and all the columns specified will be
+bcp'ed to the *to_table*.
+
+   In essence, a simplisitic view is that the following is effectively
+done.  'delete *to_table* where c1='cval1' and c2='cval2' ...' for every
+row in the *from_table* for values c1, c2, ... I mention this only in this
+way because the explanation above seems either too convoluted (or I can't
+explain it clearly enough.)
+
+     -auto_delete_batchsize | adb [i]
+
+   batchsize to use when auto-deleting rows. 3000 is the default. See
+-auto_delete.
+
+     -scratch_db  [db]
+
+   scratch database used by auto_delete. tempdb is the default. See
+-auto_delete.
+
+callbacks (also see error handling)
+-----------------------------------
+
+   callback switches are only valid from the API. ie. not from the script
+*sybxfer*
+
+     -callback_pre_send <code_ref>
+
+   sub to call before sending row to *to_server*. first and only arg is
+ref to the array of the data. cb routine returns ($status, \@row).
+$status true means continue, $status false means abort.
+
+   It's called like this:        ($status_cb_pre, $r_user_row) =
+$opt->{callback_pre_send}->(\@row);
+
+   It must return this:  return ($status, \@row)
+
+     -callback_print <code_ref>
+
+   sub to call if the catching of log messages desired. No return status
+necessary.
+
+   It's called like this: $opt->{callback_print}->($message)
+
+
+error handling
+--------------
+
+   What to do upon encountering an error on bcp_sendrow or bcp_batch?
+
+     -error_handling | -eh  <value>
+
+   Value can be abort, continue or retry. I should probably have a
+threshold number but I'll leave that until a later time.  When set to
+continue the transfer will proceed and call any error callbacks that are
+defined (see below) and examine the return status of those to decide what
+to do next. If no error callbacks are defined and -error_handling set to
+continue the module will print the offending record by describing the row
+by record number, column-types and data values and continue to the next
+record. If -error_handling is set to abort, the same is printed and the
+xfer sub exits with a non-zero return code.
+
+   When value is retry it attempts to behave like Sybase::BCP on error in
+bcp_batch. These are where server errors are detected, like duplicate key
+or deadlock error.
+
+   By default, when -error_handling = retry
+
+   * if a deadlock error is detected on the bcp_batch the program will
+     sleep for -retry_deadlock_sleep seconds and rerun bcp_sendrow for all
+     the rows in the batch and rerun bcp_batch once and repeat until no
+     deadlock error or max tries.
+
+   * if a non-deadlock error is detected on the bcp_batch the program will
+     attempt to behave like Sybase::BCP by bcp_sendrow'ing and
+     bcp_batch'ing every record. Those in error are written to the
+     -error_data_file.
+
+   The default is abort.
+
+   Here's a deliberate example of a syntax type error and an example of
+the output from the error_handler. Note This is detected on bcp_sendrow.
+See below for bcp_batch error trace.
+
+     #------
+     #SAMPLE BCP_SENDROW ERROR FORMAT
+     #------
+
+     row #1
+         1: ID                       char(10)        <bababooey >
+         2: TICKER                   char(8)         <>
+         3: CPN                      float(8)        <>
+         4: MATURITY                 datetime(8)     <>
+         5: SERIES                   char(6)         <JUNK>
+         6: NAME                     varchar(30)     <>
+         7: SHORT_NAME               varchar(20)     <>
+         8: ISSUER_INDUSTRY          varchar(16)     <>
+         9: MARKET_SECTOR_DES        char(6)         <>
+        10: CPN_FREQ                 tinyint(1)      <>
+        11: CPN_TYP                  varchar(24)     <>
+        12: MTY_TYP                  varchar(18)     <>
+        13: CALC_TYP_DES             varchar(18)     <>
+        14: DAY_CNT                  int(4)          <>
+        15: MARKET_ISSUE             varchar(25)     <bo_fixed_euro_agency_px>
+     Column #16 actual length [26] > declared length [4]
+        16: COUNTRY                  char(4)         <Sep 29 2000 12:00:00:000AM>
+     Column #17 actual length [6] > declared length [4]
+        17: CRNCY                    char(4)         <EMISCH>
+        18: COLLAT_TYP               varchar(18)     <EBS (SWISS)>
+        19: AMT_ISSUED               float(8)        <Govt>
+        20: AMT_OUTSTANDING          float(8)        <CH>
+        21: MIN_PIECE                float(8)        <>
+        22: MIN_INCREMENT            float(8)        <CLEAN>
+     Sybase error: Attempt to convert data stopped by syntax error in source field.
+     
+     Aborting on error.
+       error_handling = abort
+     1 rows read before abort
+
+     #------
+     #SAMPLE BCP_BATCH ERROR_FILE
+     #------
+     if B<-error_handling> = I<retry> and an error occurs on the bcp_batch then the -error_data_file will
+     have this format.
+
+     #recnum=1, reason=2601 Attempt to insert duplicate key row in object 'sjs_junk1' with unique index 'a'
+     mwd|20010128|10.125
+     #recnum=2, reason=2601 Attempt to insert duplicate key row in object 'sjs_junk1' with unique index 'a'
+     lnux|20010128|2.875
+     #recnum=3, reason=2601 Attempt to insert duplicate key row in object 'sjs_junk1' with unique index 'a'
+     scmr|20010128|25.500
+     #recnum=4, reason=2601 Attempt to insert duplicate key row in object 'sjs_junk1' with unique index 'a'
+     qcom|20010128|84.625
+
+     -retry_max <n>
+
+   n is the number of times to retry a bcp_batch when an error is
+detected. default is 3.
+
+     -retry_deadlock_sleep <n>
+
+   n is the number of secords to sleep between re-running a bcp_batch when
+a deadlock error is detected.
+
+     -callback_err_send <code_ref | hash_ref>
+
+   sub to call if error detected on bcp sendrow. The module passes a hash
+as seen below. It expects a 2 element array in return  ie. ($status,
+\@row).  $status true means continue, $status false means abort.  Can also
+be a hash_ref meaning to store the error rows keyed by row number.
+
+   It's called like this if *code_ref*.  @row is the array of data:
+
+     your_err_sendrow_cb(DB_ERROR => $DB_ERROR,
+                         row_num  => $row_rum,
+                         row_ptr  => \@row );
+
+   It must return this:
+
+     return ($status, \@row);
+
+   It stores the error like this if *hash_ref*:
+
+     $your_hash{ $row_num }->{msg} = $DB_ERROR;
+     $your_hash{ $row_num }->{row} = \@row;
+
+     -callback_err_batch <coderef>
+
+   sub to call if an error detected on bcp_batch. The module passes a hash
+as seen below. It expects a 2 element array in return. ie. ($status,
+\@row).
+
+   $status == 0 indicates to abort the batch.
+
+   $status == 1 indicates to resend and batch a row at a time and report
+errors to -error_data_file.
+
+   $status > 1 indicates not to do a record by record send and batch but
+to resend and batch once.
+
+   It's called like this:
+
+     your_err_batch_cb(DB_ERROR  => $DB_ERROR,
+                       row_num   => $row_num,
+                       rows      => \@row)
+
+   It must return this:
+
+     return ($status, \@row);
+
+   A word about @row above. It's got a tad more info in it.  @row is a
+array of hash refs. where:
+
+     $row[$i]->{rn}  == row number in input file,
+     $row[$i]->{row} == the actual array of data
+
+miscellaneous boolean flags
+---------------------------
+
+     -echo
+
+   echo sql commands running under the covers. Default is false.
+
+     -silent
+
+   don't print begin & end/summary messages. Default is false.
+
+     -progress_log
+
+   print progess message on every bcp_sendbatch. Default is true.
+
+     -debug
+
+   programmer debug mode. Default is false.
+
+EXAMPLES
+========
+
+EXAMPLE #1  - simple table transfer
+-----------------------------------
+
+     my %opts = (
+                  -from_server   => 'EARTH',
+                  -to_server     => 'MARS',
+                  -U             => 'steve',          #user 'steve' is valid on both servers/dbs
+                  -P             => 'BobDobbs',       #same pw for both
+                  -T             => 'lamr..cities',   #same db and table on both servers
+
+     -truncate_flag => 1,                #issue a 'truncate table lamr..cities' on to server
+     -batchsize     => 2000,
+                   );
+
+     my $h = new Sybase::Xfer(%opts);
+     my $rs = $h->xfer();
+     $rs && die 'xfer aborted';
+
+EXAMPLE #2  - using 'from_sql'
+------------------------------
+
+     my %opts = (
+                  -from_server    => 'NYP_FID_RATINGS',
+                  -from_user      => 'rateuser',
+                  -from_password  => 'grack',
+                  -from_database  => 'fid_ratings',
+                  -from_sql       => 'select id, name, rating from rating where name like "A%"',
+
+     -to_server      => 'NYP_FID_DATAMART',
+     -to_user        => 'fiduser',
+     -to_password    => 'glorp',
+     -to_table       => 'fid_datamart..ratings_sap',  #NOTE FULLY QUALIFIED NAME
+
+     -batchsize      => 500,
+     -error_handling => 'abort',
+                    );
+
+     my $h = new Sybase::Xfer(%opts);
+     my $rs = $h->xfer();
+     $rs && die 'xfer aborted';
+
+EXAMPLE #3  - using all three callbacks
+---------------------------------------
+
+     my %opts = (
+                  -from_server        => 'MOTO',
+                  -from_user          => 'guest',
+                  -from_password      => 'guest',
+                  -from_database      => 'parts',
+                  -from_sql           => "select partno, desc, price from elec\n" .
+                                         "UNION\n" .
+                                         "select partno, name, px from m777\n",
+
+     -to_server          => 'MASTERMOTO',
+     -to_user            => 'kingfish',
+     -to_password        => 'shirley',
+     -to_table           => 'summary..elec_contents',
+
+     -callback_pre_send  => \&pre_send,
+     -callback_err_send  => \&err_on_send,
+     -callback_err_batch => \&err_batch,
+
+     -batchsize          => 100,
+                    );
+
+     #-----
+     #pre send callback. Adds 10000 to partno effectively between the time it
+     #was pulled from the source and the time it gets pushed into the target table.
+     #-----
+        sub pre_send {
+          my @row = @{ +shift };    #array reference to the row about to be sent to the 'to' server
+          $row[0] += 10000;         #manipulate @row all you want
+          my $status = 1;           #status true means continue, false means abort
+          return ($status, \@row);  #mandatory return args
+        }
+
+     #----
+     #error on 'send row' callback - fix a syntax error by nulling out offending value.
+     #----
+        sub err_on_send {
+
+     my %err_data = @_;
+     
+      #just to be explicit about it
+     my $err_message = $err_data{DB_ERROR};  #key #1 = 'DB_ERROR'
+     my $err_row_num = $err_data{row_num};   #key #2 = 'row_num' : last row sent to server
+     my @row =  @{ $err_data{row_ptr} };     #key #3 = 'row_ptr' : reference to the array of
+
+     #nb.
+     #for example purposes I'm hardwiring this. I real life you'd create closure and send
+     #it via that to this routine has a parameter.
+     #
+     #list of datatypes of the columns
+            my $p_datatypes->{part_no}->{col_id} = 1;
+            my $p_datatypes->{part_no}->{col_type} = 'int';
+            my $p_datatypes->{descr}->{col_id} = 2;
+            my $p_datatypes->{descr}->{col_type} = 'varchar(30)';
+            my $p_datatypes->{price}->{col_id} = 3;
+            my $p_datatypes->{price}->{col_type} = 'float';
+     
+            my (@col_names, @col_types, $retry_status) = ();
+     
+     #get column names in column order
+            my @col_names =  sort { $p_datatypes->{$a}->{col_id}
+                             <=> $p_datatypes->{$b}->{col_id} }
+                             keys %{ $p_datatypes };
+     
+     #get column types
+            for my $col (@col_names) { push @col_types, $p_datatypes->{$col}->{col_type} }
+     
+     #for syntax errors compare data to data type
+            my @row = ();
+            if ($err_data{DB_ERROR} =~ /syntax/i ) {
+               @row = @{ $err_data{row_ptr} };
+     
+     #check for character data in 'int' field
+               for( my $i=0; $i<@row; $i++) {
+                  if($col_types[$i] =~ /int/ && $row[$i] =~ /\D/ ) {
+                     $row[$i] = undef;
+                     $retry_status = 1;
+                  }
+               }
+            }
+     
+     
+     #if not a retry candidate then bail out
+            unless ($retry_status) {
+               cmp_print("row failed ($err_data{DB_ERROR})\n");
+               for( my $i=0; $i<@row; $i++) { cmp_print("\t$i : $row[$i]\n") }
+               cmp_error("xfer aborted");
+            }
+     
+            return ($retry_status,\@row);
+       }
+
+     #----
+     #error on 'send batch' callback
+     #----
+        sub err_batch {
+          my %info = @_;                      #arg is a two keyed hash
+          my $err_message = $info{DB_ERRROR}; #key #1 = 'DB_ERROR'
+          my $err_row_num = $info{row_num};   #key #2 = 'row_num', last row sent to server
+          my $status = 1;                     #status true means continue, false means abort
+          return $status;                     #mandatory return arg
+        }
+
+EXAMPLE #4 - Using auto_delete
+------------------------------
+
+     my %opts = (
+                  -user           => 'smoggy',
+                  -password       => 'smoggy',
+                  -table          => 'fx_rates..asia_geo_region',
+
+     -from_server    => 'TEST',
+     -to_server      => 'PROD',
+     
+     -auto_delete    => 'country_iso, id',   #unique key in table
+     -auto_delete_batchsize => 10000,        #change the default
+     -scratch_db     => 'tempdb',            #just to be explicit about it
+
+     -batchsize      => 50000,
+     -error_handling => 'abort',
+                    );
+
+     my $h = new Sybase::Xfer(%opts);
+     my $rs = $h->xfer();
+        $rs && die 'xfer aborted';>
+
+WISH LIST
+=========
+
+   * Would like to convert from Sybase:: to DBI:: and ultimately be able
+     to transfer data between different server makes and models.
+
+   * Create the -to_table on the fly if it doesn't exist.
+
+   * Incorporate logic to do the right thing when transferring data
+     between Unicode and ISO versions of the Sybase server.
+
+   * Allow DBlib handle to be passed in lieu of
+     from_user/from_pwd/from_server
+
+   * add option to drop indices before bcp and re-create indices after bcp.
+
+BUGS
+====
+
+   * Deadlock retry features need to more thoroughly tested.
+
+CONTACTS
+========
+
+Author's e-mail
+     stephen.sprague@msdw.com
+
+Michael Peppler's homepage
+     http://www.mbay.net/~mpeppler/ for all things perl and Sybase
+     including Sybase::DBLib, Sybase::BCP and a ton other goodies.
+     Definitely a must see.
+
+Sybperl mail-list
+     This a good place to ask questions specifically about Sybase and Perl.
+     I pulled these instructions from Michael's page:
+
+     Send a message to listproc@list.cren.net with subscribe Sybperl-L
+     *your-name* in the body to subscribe. The mailing list is archived
+     and searchable at http://www.cren.net:8080/
+
+Original idea
+     Sybase::Xfer idea inspired by Mikhail Kopchenov.
+
+VERSION
+=======
+
+   Version 0.31, 12-FEB-2000 Version 0.30, 10-FEB-2000 Version 0.20,
+12-DEC-2000
+
+
+File: pm.info,  Node: Symbol,  Next: Symbol/Approx/Sub,  Prev: Sybase/Xfer,  Up: Module List
+
+manipulate Perl symbols and their names
+***************************************
+
+NAME
+====
+
+   Symbol - manipulate Perl symbols and their names
+
+SYNOPSIS
+========
+
+     use Symbol;
+
+     $sym = gensym;
+     open($sym, "filename");
+     $_ = <$sym>;
+     # etc.
+
+     ungensym $sym;      # no effect
+
+     print qualify("x"), "\n";              # "Test::x"
+     print qualify("x", "FOO"), "\n"        # "FOO::x"
+     print qualify("BAR::x"), "\n";         # "BAR::x"
+     print qualify("BAR::x", "FOO"), "\n";  # "BAR::x"
+     print qualify("STDOUT", "FOO"), "\n";  # "main::STDOUT" (global)
+     print qualify(\*x), "\n";              # returns \*x
+     print qualify(\*x, "FOO"), "\n";       # returns \*x
+
+     use strict refs;
+     print { qualify_to_ref $fh } "foo!\n";
+     $ref = qualify_to_ref $name, $pkg;
+
+     use Symbol qw(delete_package);
+     delete_package('Foo::Bar');
+     print "deleted\n" unless exists $Foo::{'Bar::'};
+
+DESCRIPTION
+===========
+
+   `Symbol::gensym' creates an anonymous glob and returns a reference to
+it.  Such a glob reference can be used as a file or directory handle.
+
+   For backward compatibility with older implementations that didn't
+support anonymous globs, `Symbol::ungensym' is also provided.  But it
+doesn't do anything.
+
+   `Symbol::qualify' turns unqualified symbol names into qualified
+variable names (e.g. "myvar" -> "MyPackage::myvar").  If it is given a
+second parameter, qualify uses it as the default package; otherwise, it
+uses the package of its caller.  Regardless, global variable names (e.g.
+"STDOUT", "ENV", "SIG") are always qualified with "main::".
+
+   Qualification applies only to symbol names (strings).  References are
+left unchanged under the assumption that they are glob references, which
+are qualified by their nature.
+
+   `Symbol::qualify_to_ref' is just like `Symbol::qualify' except that it
+returns a glob ref rather than a symbol name, so you can use the result
+even if `use strict 'refs'' is in effect.
+
+   `Symbol::delete_package' wipes out a whole package namespace.  Note
+this routine is not exported by default-you may want to import it
+explicitly.
+
+
+File: pm.info,  Node: Symbol/Approx/Sub,  Next: Symphero/Data,  Prev: Symbol,  Up: Module List
+
+Perl module for calling subroutines by approximate names!
+*********************************************************
+
+NAME
+====
+
+   Symbol::Approx::Sub - Perl module for calling subroutines by
+approximate names!
+
+SYNOPSIS
+========
+
+     use Symbol::Approx::Sub;
+     
+     sub a {
+       # blah...
+     }
+
+     &aa; # executes &a if &aa doesn't exist.
+
+     use Symbol::Approx::Sub (match => 'text_metaphone');
+     use Symbol::Approx::Sub (match => 'string_approx');
+     use Symbol::Approx::Sub (match => 'text_soundex');
+     use Symbol::Approx::Sub (match => \&my_matcher);
+     use Symbol::Approx::Sub (match => \&my_matcher, choose => \&my_chooser);
+
+DESCRIPTION
+===========
+
+   This is _really_ stupid. This module allows you to call subroutines by
+_approximate_ names. Why you would ever want to do this is a complete
+mystery to me. It was written as an experiment to see how well I
+understood typeglobs and AUTOLOADing.
+
+   To use it, simply include the line:
+
+     use Symbol::Approx::Sub;
+
+   somewhere in your program. Then each time you call a subroutine that
+doesn't exist in the the current package Perl will search for a subroutine
+with approximately the same name. The meaning of 'approximately the same'
+is configurable. The default is to find subroutines with the same Soundex
+value (as defined by Text::Soundex) as the missing subroutine. There are
+two other built-in matching styles using Text::MetaPhone and
+String::Approx. To use either of these use:
+
+     use Symbol::Approx::Sub (match => 'text_metaphone');
+
+   or
+
+     use Symbol::Approx::Sub (match => 'string_approx');
+
+   when using Symbol::Approx::Sub.
+
+   You can also use your own subroutine to do the matching. Your subroutine
+should expect to receive the name of the missing subroutine followed by a
+list containing all valid subroutine names and should return a list of all
+matching subroutines. For example:
+
+     sub my_matcher {
+       my $sub_wanted = shift;
+
+     my @subs = @_;
+
+     return @subs;
+     }
+
+   This example isn't particularly useful as it says that all subroutine
+names are an equally good match. To use this match subroutine in place of
+the standard ones, give Symbol::Approx::Sub a reference to the subroutine
+like this:
+
+     use Symbol::Approx::Sub (match => \&my_matcher);
+
+   Having retrieved a list of matches, we need to select one of them to
+run. The default behaviour is to pick one at random, but again you can
+configure this behaviour by writing a subroutine. This subroutine will be
+passed a list of matching subroutine names and should return the name of
+the subroutine to run. For example:
+
+     sub my_chooser {
+       return shift;
+     }
+
+   which will return the first subroutine name in the list. To make
+Symbol::Approx::Sub use this subroutine in place of the standard one, give
+Symbol::Approx::Sub a reference to the subroutine like this:
+
+     use Symbol::Approx::Sub (choose => \&my_chooser);
+
+   You can, of course, define both a matcher and a chooser like this:
+
+     use Symbol::Approx::Sub (match => \&my_matcher, choose => \&my_chooser);
+
+   or use you own chooser in conjunction with a standard matcher like this:
+
+     use Symbol::Approx::Sub (match => 'text_metaphone',
+                              choose => \&my_chooser);
+
+CAVEAT
+======
+
+   I can't stress too strongly that this will make your code completely
+unmaintainable and you really shouldn't use this module unless you're
+doing something very stupid.
+
+ACKNOWLEDGEMENTS
+================
+
+   This idea came to me whilst sitting in Mark-Jason Dominus' "Tricks of
+the Wizards" tutorial. In order to protect his reputation I should
+probably point out that just as the idea was forming in my head he clearly
+said that this kind of thing was a very bad idea.
+
+   Leon Brocard is clearly as mad as me as he pointed out some important
+bugs and helped massively with the 'fuzzy-configurability'.
+
+   Matt Freake helped by pointing out that Perl generally does what you
+mean, not what you think it should do.
+
+   Robin Houston spotted some nasty problems and (more importantly)
+supplied patches.
+
+AUTHOR
+======
+
+   Dave Cross <dave@dave.org.uk>
+
+   With lots of help from Leon Brocard <leon@astray.com>
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: Symphero/Data,  Next: Symphero/MultiValueDB,  Prev: Symbol/Approx/Sub,  Up: Module List
+
+low-level data manipulation modules for Symphero E-Commerce suite.
+******************************************************************
+
+NAME
+====
+
+   Symphero::Data - low-level data manipulation modules for Symphero
+E-Commerce suite.
+
+SYNOPSIS
+========
+
+   None, see individual manpages.
+
+DESCRIPTION
+===========
+
+   Symphero::Data is actually a dummy package that includes the following
+actual modules:
+
+   * Symphero::MultiValueDB
+
+   * Symphero::MultiValueHash
+
+   * Symphero::SimpleHash
+
+   * Symphero::Utils
+
+EXPORTS
+=======
+
+   Nothing.
+
+AUTHOR
+======
+
+   Brave New Worlds, Andrew Maltsev <amaltsev@xao.com>
+
+SEE ALSO
+========
+
+   Suggested reading: *Note Symphero/MultiValueDB: Symphero/MultiValueDB,,
+*Note Symphero/MultiValueHash: Symphero/MultiValueHash,, *Note
+Symphero/SimpleHash: Symphero/SimpleHash,, *Note Symphero/Utils:
+Symphero/Utils,.
+
+
+File: pm.info,  Node: Symphero/MultiValueDB,  Next: Symphero/MultiValueHash,  Prev: Symphero/Data,  Up: Module List
+
+3D database storage
+*******************
+
+NAME
+====
+
+   Symphero::MultiValueDB - 3D database storage
+
+SYNOPSIS
+========
+
+     use Symphero::MultiValueDB;
+
+     my $db=Symphero::MultiValueDB->new(dbh => $dbh, table => 'Users');
+
+     $db->setid('username');
+
+     my $password=$db->get('password');
+
+     $db->put(a => 123, b => 234);
+
+DESCRIPTION
+===========
+
+   Database support for Symphero::MultiValueHash class. Each accessing and
+mutating method of SimpleHash and MultiValueHash actually goes into
+underlying SQL database. No caching is performed (though database may
+cache data itself).
+
+   Database has the following structure (all fields may be BLOBS or have
+different sizes, no checks of size limitations performed):
+
+   * id
+
+     Data hash ID (customer ID, shopping cart ID or something similar).
+
+   * name
+
+     Parameter name.
+
+   * subname
+
+     Parameter subname, used for multi-value parameters. Will be empty, but
+     not NULL for single value parameters.
+
+   * value
+
+     Parameter value.
+
+   It is recommended to make index on `id' and `name' fields together and
+make primary key of `id', `name' and `subname' together. An example of SQL
+clause to create table might look like:
+
+   CREATE TABLE ShoppingCarts (    id char(20) DEFAULT " NOT NULL,    name
+char(40) DEFAULT " NOT NULL,    subname char(40) DEFAULT " NOT NULL,
+value char(200),    PRIMARY KEY (id,name,subname),    KEY idname (id,name)
+);
+
+METHODS
+=======
+
+   All methods of *Note Symphero/MultiValueHash: Symphero/MultiValueHash,
+are available with the following changes and additions:
+
+   * new ($@)
+
+     Instead of accepting default values for the hash itself it requires
+     the following parameters:
+
+    -
+          dbh
+
+          DBI handler to SQL database.
+
+    -
+          table
+
+          Name of the table in that database
+
+    -
+          id (optional)
+
+          ID of data block inside the table - shopping cart ID, session
+          ID, user ID or something similar.
+
+          This parameter is optional in new() method, but required to
+          store and retrieve data.
+
+   * getref ($$), getsubref ($$)
+
+     Disabled - always produce warning and return undef. We cannot easily
+     trace if the values reference to which we return would be modified.
+
+   * setid ($$)
+
+     Switches the object to use new data block ID. Must be called if you
+     did not pass "id" into new() method.
+
+   * listids ($$$)
+
+     Return a list of data block IDs for which condition is met. Condition
+     is represented by name-value pair. The following example will return
+     the list of shopping cart IDs for given user:
+
+     use Symphero::MultiValueDB;
+
+     my $sdb = Symphero::MultiValueDB->new(...);
+
+     my @ids = $sdb->listids(logname => "testuser");
+
+     print join(",",@ids),"\n";
+
+EXPORTS
+=======
+
+   Nothing.
+
+AUTHOR
+======
+
+   Andrew Maltsev, <am@xao.com>
+
+SEE ALSO
+========
+
+
+File: pm.info,  Node: Symphero/MultiValueHash,  Next: Symphero/SimpleHash,  Prev: Symphero/MultiValueDB,  Up: Module List
+
+3D extension of Symphero::SimpleHash
+************************************
+
+NAME
+====
+
+   Symphero::MultiValueHash - 3D extension of Symphero::SimpleHash
+
+SYNOPSIS
+========
+
+     use Symphero::MultiValueHash;
+
+DESCRIPTION
+===========
+
+   Provides API for manipulating data in a 3D hash. 3D means that any
+element in such a hash can be accessed using three `coordinates' - `id',
+`name' and `subname'.
+
+   Based on Symphero::SimpleHash and adds the following methods:
+
+getsub ($$)
+getsubref ($$)
+putsub ($$)
+delsub ($$)
+EXPORTS
+=======
+
+   Nothing.
+
+AUTHOR
+======
+
+   Andrew Maltsev, <am@xao.com>
+
+SEE ALSO
+========
+
+
+File: pm.info,  Node: Symphero/SimpleHash,  Next: Symphero/Utils,  Prev: Symphero/MultiValueHash,  Up: Module List
+
+Simple 2D hash manipulations
+****************************
+
+NAME
+====
+
+   Symphero::SimpleHash - Simple 2D hash manipulations
+
+SYNOPSIS
+========
+
+     use Symphero::SimpleHash;
+
+     my $h=new Symphero::SimpleHash a => 11, b => 12, c => 13;
+
+     $h->put(d => 14);
+
+     $h->fill(\%config);
+
+     my @keys=$h->keys;
+
+DESCRIPTION
+===========
+
+   Base object from which various hash-like containers are derived.
+
+   Methods are (alphabetical order, PERL API):
+
+   * sub contains ($$)
+
+     Returns key of the element, containing given text. Case is
+     insignificant in comparision.
+
+     If no value found `undef' is returned.
+
+   * sub defined ($$)
+
+     Boolean method to check if element with given key defined or not.
+     Exactly the same as `defined ($hash->get($key))'.
+
+   * sub delete ($$)
+
+     Deletes given key from the hash.
+
+   * sub exists ($$)
+
+     Checks if given key exists in the hash or not (regardless of value,
+     which can be undef).
+
+   * sub fill ($@)
+
+     Allows to fill hash with multiple values. Supports variety of argument
+     formats:
+
+     $hash->fill(key1 => value1, key2 => value2, ...);
+
+     $hash->fill({ key1 => value1, key2 => value2, ... });
+
+     $hash->fill([ key1 => value1 ], [ key2 => value2 ], ...);
+
+   * sub get ($$)
+
+     Returns element by given key.
+
+   * sub getref ($$)
+
+     Return reference to the element by given key or `undef' if such
+     element does not exist.
+
+   * sub keys ($)
+
+     Returns array of keys.
+
+   * sub new ($;@)
+
+     Creates new hash and pre-fills it with given values. Values are in the
+     same format as in fill().
+
+   * sub put ($$$)
+
+     Puts single key-value pair into hash. Usually called as:
+
+     $hash->put(key => value);
+
+   * sub value ($)
+
+     Pure virtual method which is supposed to be overriden in all derived
+     classes. Should return the value an object as a whole.
+
+   * sub values ($)
+
+     Returns array of values in the same order as $hash->keys returns keys
+     (on non-modified hash).
+
+JAVA STYLE API
+==============
+
+   In addition to normal Perl style API outlined above Symphero::SimpleHash
+allows developer to use Java style API. Here is the mapping between Perl
+API and Java API:
+
+     isSet          --  defined
+     containsKey    --  exists
+     elements       --  values
+     remove         --  delete
+     containsValue  --  contains
+
+EXPORTS
+=======
+
+   Nothing.
+
+AUTHORS
+=======
+
+   Brave New Worlds: Bil Drury <bild@xao.com>, Andrew Maltsev <am@xao.com>.
+
+SEE ALSO
+========
+
+

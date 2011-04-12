@@ -1,0 +1,1964 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: OurNet,  Next: OurNet/BBS,  Prev: OpenInteract/Startup,  Up: Module List
+
+Interface to BBS-based groupware platforms
+******************************************
+
+NAME
+====
+
+   OurNet - Interface to BBS-based groupware platforms
+
+MODULES
+=======
+
+     ::BBS        bmpO    Component Object Model for BBS systems
+     ::BBSAgent   RmpO    Scriptable telnet-based virtual users
+     ::Cell       ampO    Interface-based RPC with Relay & Locating
+     ::ChatBot    RmpO    Context-free interactive Q&A engine
+     ::FuzzyIndex RmcO    Inverted index for double-byte charsets
+     ::Query      RmpO    Perform scriptable queries via LWP
+     ::Site       RmpO    Extract web pages via templates
+     ::Template   ampO    Template extraction and generation
+     ::WebBuilder RmpO    HTML rendering for BBS-based services
+
+DESCRIPTION
+===========
+
+   The OurNet:* modules are interfaces to BBS-based groupware projects,
+whose platform was used in Hong Kong, China and Taiwan by est. 1 million
+users. Used collaboratively, they glue BBSes together to form a
+distributed service network, called 'OurNet'.
+
+   Please refer to each individual modules' documentation for usage
+information.
+
+AUTHORS
+=======
+
+   Autrijus Tang <autrijus@autrijus.org>
+
+COPYRIGHT
+=========
+
+   Copyright 2001 by Autrijus Tang <autrijus@autrijus.org>.
+
+   All rights reserved.  You can redistribute and/or modify this module
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: OurNet/BBS,  Next: OurNet/BBSAgent,  Prev: OurNet,  Up: Module List
+
+Component Object Model for BBS systems
+**************************************
+
+NAME
+====
+
+   OurNet::BBS - Component Object Model for BBS systems
+
+SYNOPSIS
+========
+
+     use strict;
+     use OurNet::BBS;
+     
+     my $backend = 'CVIC'; # same as 'OurNet::BBS::CVIC'
+     my $bbsroot = '/srv/bbs/cvic';
+     my $board   = 'sysop';
+     my $BBS     = OurNet::BBS->new($backend, $bbsroot);
+     my $brd     = $BBS->{boards}{$board};
+     my $mtime;
+     
+     printf (
+         "This BBS has %d boards, %d groups.\n",
+         scalar keys(%{$BBS->{boards}}),
+         scalar keys(%{$BBS->{groups}}),
+     );
+     
+     eval { $mtime = $brd->{articles}->mtime };
+     die "Error: cannot read board $board -- $@\n" if $@;
+     
+     printf (
+         "The $board board has %d articles, %d toplevel archive entries.\n",
+         $#{$brd->{articles}}, $#{$brd->{archives}},
+     );
+     
+     # A simple Sysop board article monitor
+     print "Watching for new articles...\n";
+     
+     while (1) {
+         print "=== wait here ($mtime) ===\n";
+         sleep 5 until ($brd->{articles}->refresh);
+     
+         foreach my $article (@{$brd->{articles}}[1..$#{$brd->{articles}}]) {
+         	print "Found article: $article->{title}\n" if $article->btime > $mtime;
+         }
+     
+         $mtime = $brd->{articles}->mtime;
+     }
+
+DESCRIPTION
+===========
+
+   OurNet::BBS implements a flexible object model for different BBS
+backends.
+
+   More detailed document is expected to appear soon.
+
+AUTHORS
+=======
+
+   Chia-Liang Kao <clkao@clkao.org> Autrijus Tang <autrijus@autrijus.org>
+
+COPYRIGHT
+=========
+
+   Copyright 2001 by Autrijus Tang <autrijus@autrijus.org>,
+  Chia-Liang Kao <clkao@clkao.org>.
+
+   All rights reserved.  You can redistribute and/or modify this module
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: OurNet/BBSAgent,  Next: OurNet/Cell,  Prev: OurNet/BBS,  Up: Module List
+
+Scriptable telnet-based virtual users
+*************************************
+
+NAME
+====
+
+   OurNet::BBSAgent - Scriptable telnet-based virtual users
+
+SYNOPSIS
+========
+
+     # To run it, make sure you have a 'cvic.bbs' file in the same
+     # directory. Its contents is listed just below this section.
+
+     use OurNet::BBSAgent;
+
+     my $cvic = new OurNet::BBSAgent('cvic.bbs', undef, 'testlog');
+
+     # $cvic->{'debug'} = 1; # Turn on for debugging
+
+     $cvic->login($ARGV[0] || 'guest', $ARGV[1]);
+     print "now at $cvic->{'state'}";
+     $cvic->Hook('balloon', \&callback);
+     $cvic->Loop;
+
+     sub callback {
+         ($caller, $message) = @_;
+         print "Received: $message\n";
+         exit if $message eq '!quit';
+         $cvic->balloon_reply("$caller, I've got your message!");
+     }
+
+DESCRIPTION
+===========
+
+   OurNet::BBSAgent provides an object-oriented interface to TCP/IP-based
+interactive services (e.g. BBS, IRC, ICQ and Telnet), by simulating as a
+"virtual user" with action defined by a script language. The developer
+could then use the same methods to access different services, to easily
+implement interactive robots, spiders, or other cross-service agents.
+
+Site Description File
+---------------------
+
+   This module has its own scripting language, which looks like this in a
+site description file:
+
+     CVIC BBS
+     cvic.org:23
+
+     =login
+     wait 註冊
+       or 使用者
+     send $[username]\n
+     doif $[password]
+         wait 密碼
+         send $[password]\n\n
+     endo
+     send \n\n\n
+     goto main
+
+     =main
+     send eeeeeeee
+     wait 主功能表
+     till Call機
+
+     =balloon
+     wait \e[1;33;46m★
+     till \e[37;45m\x20
+     till \x20\e[0m
+     exit
+
+     =balloon_reply
+     send \x12
+     wait 回去：
+     send $[message]\n
+     wait [Y]
+     send \n
+     wait \e[m
+     exit
+
+   The first two lines describes the service's title, its IP address and
+port number. Any number of 'procedures' then begins with `=procname',
+which could be called like `$object-'procname([arguments])> in the
+program. Each procedure is made by any number of following directives:
+
+wait STRING =item till STRING =item   or STRING
+     Tells the agent to wait until STRING is sent by remote host. Might
+     time out after `$self-'{'timeout'}> seconds. Any trailing or
+     directives specifies an alternative string to match.
+
+     Additionally, `till' puts anything between the last wait or `till'
+     and STRING into the return list.
+
+send STRING
+     Sends STRING to remote host.
+
+doif CONDITION =item else CONDITION =item endo
+     The usual flow control directives. Nested `doif...endo's is supported.
+
+goto PROCEDURE =item call PROCEDURE
+     Executes another procedure in the site description file. goto never
+     returns, while call always will. Also, a call will not occur if the
+     destination was the last executed procedure that does not end with
+     exit.
+
+exit
+     Marks the termination of a procedure; also means this procedure is not
+     a 'state' - that is, multiple calls to it will all be executed.
+
+back
+Event Hooks
+-----------
+
+   In addition to call the procedures one-by-one, you can 'hook' those
+that begins with 'wait' (or 'call' and 'wait') so whenever the strings
+they expected are received, the responsible procedure is immediately
+called. You can also supply a call-back function to handle its results.
+
+   For example, the code in `' in this node above 'hooks' a callback
+function to procedure 'balloon', then enters a event loop by calling Loop,
+which never terminates except when the agent receives '!quit' via the
+balloon procedure.
+
+   The internal hook table could be accessed by $obj->{'hook'}. It is
+implemented via a hash of hash of hash of lists - Kids, don't try this at
+home!
+
+AUTHORS
+=======
+
+   Autrijus Tang <autrijus@autrijus.org>
+
+COPYRIGHT
+=========
+
+   Copyright 2001 by Autrijus Tang <autrijus@autrijus.org>.
+
+   All rights reserved.  You can redistribute and/or modify this module
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: OurNet/Cell,  Next: OurNet/ChatBot,  Prev: OurNet/BBSAgent,  Up: Module List
+
+Interface-based RPC with relay & locating
+*****************************************
+
+NAME
+====
+
+   OurNet::Cell - Interface-based RPC with relay & locating
+
+SYNOPSIS
+========
+
+     #!/usr/bin/perl -w
+
+     use OurNet::Cell;
+
+     $OurNet::Cell::Debug = 1;
+
+     my $daemon = OurNet::Cell->new('Daemon', 1);
+     $daemon->daemonize();
+
+     my $storage = OurNet::Cell->new('Storage', 1);
+
+     $storage->hook('READ.DATA', sub {$_[0]->unicast($_[1], 'WRITE.DATA',
+                                      $_[2], $_[0]->{'var'}{$_[1]}{$_[2]})});
+     $storage->hook('WRITE.DATA', sub {$_[0]->{'var'}{$_[1]}{$_[2]} = $_[3]});
+     $storage->contact(undef, 'localhost') or die;
+
+     my $fetch = OurNet::Cell->new('Fetch', 1);
+     $fetch->hook('WRITE.DATA', sub {print "\n$_[2] is $_[3].\n"});
+     $fetch->contact(undef, 'localhost') or die;
+     $remote = 'Storage';
+     $fetch->contact($remote) or die;
+     $fetch->unicast($remote, 'WRITE.DATA', 'Test', 'successful');
+     RunCells 1;
+     $fetch->unicast($remote, 'READ.DATA', 'Test');
+     RunCells 1;
+
+     EndCells;
+
+DESCRIPTION
+===========
+
+   OurNet::Cell provides a cross-platform, socket-based approach to built
+a real-time, state-based, free-form inter-net information-sharing
+object-model. (please-insert random-hype right-here).
+
+   Prior to v0.1, this is highly experimental and unstable. Comments are
+intentionally lacking - you shouldn't bother with this module unless
+you're 1) interested in concurrent mobile agent development, 2) a perl
+guru, and 3) having a lot of time to spare.
+
+TODO
+====
+
+Cross-protocol support
+     UDP and HTTP support (at least) should be in contact() and
+     daemonize().
+
+Multicast
+     A multicast routing algorithm is under testing.
+
+Findhook and Installhook
+     These two are crucial to its emulation to true 'cell' behaviour.
+
+Spawn
+     Spawning-on-demanded is expected to function well, but need closer
+     inspection as to how it affects smart load-balancing.
+
+AUTHORS
+=======
+
+   Autrijus Tang <autrijus@autrijus.org>
+
+COPYRIGHT
+=========
+
+   Copyright 2001 by Autrijus Tang <autrijus@autrijus.org>.
+
+   All rights reserved.  You can redistribute and/or modify this module
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: OurNet/ChatBot,  Next: OurNet/FuzzyIndex,  Prev: OurNet/Cell,  Up: Module List
+
+Context-free interactive Q&A engine
+***********************************
+
+NAME
+====
+
+   OurNet::ChatBot - Context-free interactive Q&A engine
+
+SYNOPSIS
+========
+
+     use OurNet::ChatBot;
+
+     $mybot = OurNet::ChatBot->new('Amber', 'Amber.bot', 0);
+
+     while (1) {
+         print 'User: ';
+         print 'Amber Bot: '.$mybot->input(<STDIN>)."\n";
+     }
+
+DESCRIPTION
+===========
+
+   The ChatBot module simulates a general-purpose, context-free,
+interactive Chat Bot using the OurBot(tm) engine. It reads the file stored
+in ChatBot/ directory, parses synonyms and random output settings, then
+return answers via the input() method.
+
+   The lastone property is used to return/set the id of the bot's last
+sentence. In conjunction of directly manipulating the CHUNKS array (which
+contains all possible return values for input()), the front-end program
+could prevent duplicate responses.
+
+CAVEATS
+=======
+
+   The nextone flag-property is badly implemented.
+
+SEE ALSO
+========
+
+   *Note OurNet/FuzzyIndex: OurNet/FuzzyIndex,
+
+AUTHORS
+=======
+
+   Autrijus Tang <autrijus@autrijus.org>
+
+COPYRIGHT
+=========
+
+   Copyright 2001 by Autrijus Tang <autrijus@autrijus.org>.
+
+   All rights reserved.  You can redistribute and/or modify this module
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: OurNet/FuzzyIndex,  Next: OurNet/Query,  Prev: OurNet/ChatBot,  Up: Module List
+
+Inverted index for double-byte characters
+*****************************************
+
+NAME
+====
+
+   OurNet::FuzzyIndex - Inverted index for double-byte characters
+
+SYNOPSIS
+========
+
+     use OurNet::FuzzyIndex;
+
+     my $idxfile  = 'test.idx'; # Name of the database file
+     my $pagesize = undef;      # Page size (twice of an average record)
+     my $cache    = undef;      # Cache size (undef to use default)
+     my $subdbs   = 0;          # Number of child dbs; 0 for none
+
+     # Initiate the DB from scratch
+     unlink $idxfile if -e $idxfile;
+     my $db = OurNet::FuzzyIndex->new($idxfile, $pagesize, $cache, $subdbs);
+
+     # Index a record: key = 'Doc1', content = 'Some text here'
+     $db->insert('Doc1', 'Some text here');
+
+     # Alternatively, parse the content first with different weights
+     my %words = $db->parse("Some other text here", 5);
+     %words = $db->parse_xs("Some more texts here", 2, \%words);
+
+     # Then index the resulting hash with 'Doc2' as its key
+     $db->insert('Doc2', %words);
+
+     # Perform a query: the 2nd argument is the 'exact match' flag
+     my %result = $db->query('search for some text', $MATCH_FUZZY);
+
+     # Combine the result with another query
+     %result = $db->query('more please', $MATCH_NOT, \%result);
+
+     # Dump the results; note you have to call $db->getkey each time
+     foreach my $idx (sort {$result{$b} <=> $result{$a}} keys(%result)) {
+         $val = $result{$idx};
+         print "Matched: ".$db->getkey($idx)." (score $val)\n";
+     }
+
+     # Set database variables
+     $db->setvar('variable', "fetch success!\n");
+     print $db->getvar('variable');
+
+     # Get all records: the optional 0 says we want an array of keys
+     print "These records are indexed:\n";
+     print join(',', $db->getkeys(0));
+
+     # Alternatively, get it with its internal index number
+     my %allkeys = $db->getkeys(1);
+
+DESCRIPTION
+===========
+
+   OurNet::FuzzyIndex implements a simple consecutive-letter indexing
+mechanism specifically designed for multi-byte encoding maps, e.g.  big-5
+or utf8.
+
+   It uses DB_File to create an associative mapping from each character to
+its consecutive one, utilizing DB_BTREE's duplicate key feature to speed
+up the query time. Its scoring algorithm is also geared to reduce
+redundant word's impact on the query's result.
+
+   Although this module currently only supports big-5 and latin-1 encodings
+internally, you could override the `parse.c' module for extensions, or add
+your own translation maps.
+
+KNOWN ISSUES
+============
+
+   The query() function uses a time-consuming callback function _parse_q
+to parse the query string; it is expected to be changed to a simple
+function that returns the whole processed list. (Fortunately, most query
+strings won't be long enough to cause significant difference.)
+
+   The MATCH_EXACT flag is misleading; FuzzyIndex couldn't tell if a query
+matches the conetnt exactly from the info stored in the index file alone.
+You are encouraged to write your own grep-like post filter.
+
+TODO
+====
+
+   * Internal handling of locale/unicode mappings * Boolean / selective
+search using combined MATCH_* flags * Fix bugs concerning sub_dbs
+
+AUTHORS
+=======
+
+   Autrijus Tang <autrijus@autrijus.org>
+
+COPYRIGHT
+=========
+
+   Copyright 2001 by Autrijus Tang <autrijus@autrijus.org>.
+
+   All rights reserved.  You can redistribute and/or modify this module
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: OurNet/Query,  Next: OurNet/Site,  Prev: OurNet/FuzzyIndex,  Up: Module List
+
+Perform scriptable queries via LWP
+**********************************
+
+NAME
+====
+
+   OurNet::Query - Perform scriptable queries via LWP
+
+SYNOPSIS
+========
+
+     use OurNet::Query;
+
+     # Set query parameters
+     my ($query, $hits) = ('autrijus', 10);
+     my @sites = ('Altavista', 'InfoSeek', 'Yahoo', 'Excite');
+     my %found;
+
+     # Generate a new Query object
+     my $bot = OurNet::Query->new($query, $hits, @sites);
+
+     # Perform a query
+     my $found = $bot->begin(\&callback, 30); # Timeout after 30 seconds
+
+     print '*** ' . ($found ? $found : 'No') . ' match(es) found.';
+
+     sub callback {
+         my %entry = @_;
+         my $entry = \%entry;
+
+     unless ($found{$entry{'url'}}) {
+         print "*** [$entry->{'title'}]" .
+                  " ($entry->{'score'})" .
+                " - [$entry->{'id'}]\n"  .
+          "    URL: [$entry->{'url'}]\n";
+     }
+
+     $found{$entry{'url'}}++;
+         }
+
+DESCRIPTION
+===========
+
+   OurNet::Query provides an easy interface to perform multiple queries to
+internet services, and "wrap" them into your own format at once.  The
+results are processed on-the-fly and are returned via callback functions.
+
+SEE ALSO
+========
+
+   *Note OurNet/Site: OurNet/Site,
+
+AUTHORS
+=======
+
+   Autrijus Tang <autrijus@autrijus.org>
+
+COPYRIGHT
+=========
+
+   Copyright 2001 by Autrijus Tang <autrijus@autrijus.org>.
+
+   All rights reserved.  You can redistribute and/or modify this module
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: OurNet/Site,  Next: OurNet/WebBuilder,  Prev: OurNet/Query,  Up: Module List
+
+Extract web pages via templates
+*******************************
+
+NAME
+====
+
+   OurNet::Site - Extract web pages via templates
+
+SYNOPSIS
+========
+
+     use LWP::Simple;
+     use OurNet::Site;
+
+     my ($query, $hits) = ('autrijus', 10);
+     my $found;
+
+     # Create a bot
+     $bot = OurNet::Site->new('Altavista');
+
+     # Parse the result got from LWP::Simple
+     $bot->callme($self, 0, get($bot->geturl($query, $hits)), \&callmeback);
+
+     print '*** ' . ($found ? $found : 'No') . ' match(es) found.';
+
+     # Callback routine
+     sub callmeback {
+         my ($self, $himself) = @_;
+
+     foreach my $entry (@{$himself->{'response'}}) {
+         if ($entry->{'url'}) {
+             print "*** [$entry->{'title'}]" .
+                      " ($entry->{'score'})" .
+                    " - [$entry->{'id'}]\n"  .
+              "    URL: [$entry->{'url'}]\n" .
+                    "    $entry->{'preview'}\n";
+             $found++;
+             delete($entry->{'url'});
+         }
+     }
+         }
+
+DESCRIPTION
+===========
+
+   This module emulates a typical search engine by reading a XML script
+defining its aspects, and parses results on-the-fly accordingly.
+
+   Note that it also takes Inforia Quest .fmt scripts, available at
+http://www.inforian.com/. The author of course cannot support this usage.
+
+BUGS
+====
+
+   Probably lots. Most notably the 'More' facilities is lacking. Also
+there is no template-generating abilities. This is a must, but I couldn't
+find enough motivation to do it. Maybe you could.
+
+SEE ALSO
+========
+
+   *Note OurNet/Query: OurNet/Query,
+
+AUTHORS
+=======
+
+   Autrijus Tang <autrijus@autrijus.org>
+
+COPYRIGHT
+=========
+
+   Copyright 2001 by Autrijus Tang <autrijus@autrijus.org>.
+
+   All rights reserved.  You can redistribute and/or modify this module
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: OurNet/WebBuilder,  Next: P4/Client,  Prev: OurNet/Site,  Up: Module List
+
+Web rendering for BBS-based services
+************************************
+
+NAME
+====
+
+   OurNet::WebBuilder - Web rendering for BBS-based services
+
+SYNOPSIS
+========
+
+     use OurNet::WebBuilder;
+
+     my $tmpl = {
+         dir     => \%dir,
+         article => \%article,
+         cgi_url => CGI->url
+     };
+
+     my $opref = {
+     	'' => sub {
+     	    return '!view';
+     	},
+
+     'view' => sub {
+         $tmpl->{'menu'} ||= param('curdir') || $dir{'oin'}[0]{id};
+      	    $tmpl->{'curdir'} ||= param('curdir') || $dir{'oin'}[0]{id};
+         loadboard($tmpl->{'curdir'});
+
+     loadarticle($_->{'id'},
+     			($tmpl->{'curdir'} eq 'bbs' ? $bbs : ($oin, $tmpl->{'curdir'})))
+     		foreach @{$dir{$tmpl->{'curdir'}}};
+
+     return 'view';
+     	}
+         };
+
+     OurNet::WebBuilder::Display($tmpl, $opref);
+
+DESCRIPTION
+===========
+
+   the method Display takes $tmpl, which is a variable pool, and $opref,
+which is hash of mapping from 'op' to the subroutine for that 'op'.
+
+   The op routine fill in the $tmpl with the varialbes it would like the
+variable pool to have, and returns the name of the template file that
+would be used. or if the return value begins with '!', the variable pool
+will be transit to the specified op again.
+
+AUTHORS
+=======
+
+   Autrijus Tang <autrijus@autrijus.org>
+
+COPYRIGHT
+=========
+
+   Copyright 2000 by Autrijus Tang <autrijus@autrijus.org>.
+
+   All rights reserved.  You can redistribute and/or modify this module
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: P4/Client,  Next: P4/UI,  Prev: OurNet/WebBuilder,  Up: Module List
+
+Perl extension for the Perforce API
+***********************************
+
+NAME
+====
+
+   P4::Client - Perl extension for the Perforce API
+
+SYNOPSIS
+========
+
+     use P4::Client;
+     use P4::UI;
+
+     my $client = new P4::Client;
+     my $ui = new P4::UI;
+
+     $client->SetClient( $clientname );
+     $client->SetPort ( $p4port );
+     $client->SetPassword( $p4password );
+     $client->Init() or die( "Failed to connect to Perforce Server" );
+     $client->Run( $ui, "info" );
+     $client->Run( $ui, "edit", "file.txt" );
+
+     # OR, using Autoloaded methods instead of Client::Run().
+     $client->Users( $ui );
+     $client->Resolve( $ui, "-ay" );
+     $client->Submit( $ui );
+
+     $client->Final();
+
+DESCRIPTION
+===========
+
+   This module provides a Perl interface to the Perforce API allowing you
+to write Perl scripts which communicate directly with a Perforce server.
+
+   P4::Client is the main interface through which all commands are issued.
+The Perforce API is callback based though, and all interaction with the
+user interface takes place through callbacks to methods of the P4::UI
+object passed to the Run() method.
+
+   To customise the behaviour of the Perforce client, you should derive
+your own class from P4::UI and override the relevant methods therein.
+
+METHODS
+=======
+
+   The following paragraphs define the methods of a P4::Client object.
+Note that due to the magic of the Autoloader, the Perforce commands (
+submit, client, filelog etc. ) are also available as methods ( case
+insensitive ) as well as through the Run() method.
+
+`Client::new()'
+     Construct a new Client object.
+
+`Client::Dropped()'
+     Returns true if the TCP/IP connection between client and server has
+     been dropped.
+
+`Client::Final()'
+     Terminate the connection and clean up. Should be called before exiting
+     to cleanly disconnect.
+
+`Client::GetClient()'
+     Returns the current Perforce client name. This may have previously
+     been set by SetClient(), or may be taken from the environment or
+     P4CONFIG file if any. If all that fails, it will be your hostname.
+
+`Client::GetCwd()'
+     Returns the current working directory as your Perforce client sees it.
+
+`Client::GetHost()'
+     Returns the client hostname. Defaults to your hostname, but can be
+     overridden with SetHost()
+
+`Client::GetPassword()'
+     Returns your Perforce password - in plain text if that's how it's
+     stored and currently on all except Windows platforms, that's the way
+     it's done.  Taken from a previous call to SetPassword() or extracted
+     from the environment ( $ENV{P4PASSWD} ), or a P4CONFIG file.
+
+     Note that the password is not transmitted in clear text.
+
+`Client::GetPort()'
+     Returns the current address for your Perforce server. Taken from a
+     previous call to SetPort(), or from $ENV{P4PORT} or a P4CONFIG file.
+
+`Client::Init()'
+     Initializes the Perforce client and connects to the server.  Returns
+     false on failure and true on success.
+
+`Client::Run( $ui, $cmd, [$arg...] )'
+     Run a Perforce command. The first argument must be a reference to a
+     P4::UI object or a reference to an object derived from P4::UI. The
+     methods of that object will be used to interact with the user. The
+     subsequent arguments are the command you wish to run, and the
+     arguments you want to pass to it. At this time, only strings and
+     numbers are valid argument types although through the magic of Perl
+     you can pass arrays or hashes but not references.
+
+`Client::SetClient( $client )'
+     Sets the name of your Perforce client. If you don't call this method,
+     then the clientname will default according to the normal Perforce
+     conventions. i.e.
+
+       1. Value from file specified by P4CONFIG
+
+       2. Value from `$ENV{P4CLIENT}'
+
+       3. Hostname
+
+`Client::SetCwd( $path )'
+     Sets the current working directory for the client. This should be
+     called after the Init() and before the Run().
+
+`Client::SetPassword( $password )'
+     Set the password for the Perforce user, overriding all defaults.
+
+`Client::SetPort( [$host:]$port )'
+     Set the port on which your Perforce server is listening. Defaults to:
+
+       1. Value from file specified by P4CONFIG
+
+       2. Value from `$ENV{P4PORT}'
+
+       3. perforce:1666
+
+`Client::SetProtocol( $protflag, $value )'
+     Set protocol options for this session. The most common protocol
+     option is the "tag" option which requests tagged output format for
+     commands which would otherwise get formatted output. In API terms,
+     this means the output comes through the P4::UI::OutputStat()
+     interface, instead of P4::UI::OutputInfo().
+
+     For example:
+
+     `< $client-'SetProtocol(tag',") >>
+
+`Client::SetUser( $username )'
+     Set your Perforce username. Defaults to:
+
+       1. Value from file specified by P4CONFIG
+
+       2. Value from `$ENV{P4USER}'
+
+       3. OS username
+
+API Versions
+============
+
+   This extension has been built and tested on the Perforce 2000.2 API,
+but should work with any recent version, certainly any release later than
+and including 99.2.
+
+LICENCE
+=======
+
+   Copyright (c) 1997-2001, Perforce Software, Inc.  All rights reserved.
+
+   Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+   1.  Redistributions of source code must retain the     above copyright
+notice, this list of conditions     and the following disclaimer.
+
+   2.  Redistributions in binary form must reproduce     the above
+copyright notice, this list of conditions     and the following disclaimer
+in the documentation     and/or other materials provided with the
+distribution.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL PERFORCE SOFTWARE, INC. BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+AUTHOR
+======
+
+   Tony Smith, Perforce Software ( tony@perforce.com )
+
+SEE ALSO
+========
+
+   perl(1), P4::UI(3), Perforce API documentation.
+
+
+File: pm.info,  Node: P4/UI,  Next: PApp/SQL,  Prev: P4/Client,  Up: Module List
+
+User interface object for Perforce API
+**************************************
+
+NAME
+====
+
+   P4::UI - User interface object for Perforce API
+
+SYNOPSIS
+========
+
+     use P4::Client;
+     use P4::UI;
+
+     my $client = new P4::Client;
+     my $ui = new P4::UI;
+
+     $client->SetClient( $clientname );
+     $client->SetPort ( $p4port );
+     $client->SetPassword( $p4password );
+     $client->Init() or die( "Failed to connect to Perforce Server" );
+     $client->Run( $ui, "info" );
+     $client->Run( $ui, "edit", "file.txt" );
+     $client->Final();
+
+DESCRIPTION
+===========
+
+   This module provides a skeleton user interface for Perforce commands.
+The output from the Perforce server is simply written to stdout, and input
+comes from stdin. In order to do anything clever, you will need to derive
+a subclass from P4::UI and override the appropriate methods.
+
+EXPORTS
+-------
+
+     UI::new()	- Create a new user interface object
+
+METHODS
+=======
+
+`UI::new()'
+          Constructor. The only method of this class you call
+          directly.
+
+LICENCE
+=======
+
+   Copyright (c) 1997-2001, Perforce Software, Inc.  All rights reserved.
+
+   Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+   1.  Redistributions of source code must retain the     above copyright
+notice, this list of conditions     and the following disclaimer.
+
+   2.  Redistributions in binary form must reproduce     the above
+copyright notice, this list of conditions     and the following disclaimer
+in the documentation     and/or other materials provided with the
+distribution.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL PERFORCE SOFTWARE, INC. BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+AUTHOR
+======
+
+   Tony Smith, Perforce Software ( tony@perforce.com )
+
+SEE ALSO
+========
+
+   perl(1), P4::Client(3), Perforce API documentation.
+
+
+File: pm.info,  Node: PApp/SQL,  Next: PDF,  Prev: P4/UI,  Up: Module List
+
+absolutely easy yet fast and powerful sql access
+************************************************
+
+NAME
+====
+
+   PApp::SQL - absolutely easy yet fast and powerful sql access
+
+SYNOPSIS
+========
+
+     use PApp::SQL;
+
+     my $st = sql_exec $DBH, "select ... where a = ?", $a;
+
+     local $DBH = <database handle>;
+     my $st = sql_exec \my($bind_a, $bind_b), "select a,b ...";
+     my $st = sql_insertid
+                 sql_exec "insert into ... values (?, ?)", $v1, $v2;
+     my $a = sql_fetch "select a from ...";
+     sql_fetch \my($a, $b), "select a,b ...";
+
+     sql_exists "name from table where name like 'a%'"
+        or die "a* required but not existent";
+
+     my $db = new PApp::SQL::Database "", "DBI:mysql:test", "user", "pass";
+     local $PApp::SQL::DBH = $db->checked_dbh; # does 'ping'
+
+     sql_exec $db->dbh, "select ...";
+
+DESCRIPTION
+===========
+
+   This module provides you with easy-to-use functions to execute sql
+commands (using DBI). Despite being easy to use, they are also quite
+efficient and allow you to write faster programs in less lines of code. It
+should work with anything from perl-5.004_01 onwards, but I only support
+5.005+.
+
+   If the descriptions here seem terse or if you always wanted to know
+what PApp is then have a look at the PApp module which uses this module
+extensively but also provides you with a lot more gimmicks to play around
+with to help you create cool applications ;)
+
+GLOBAL VARIABLES
+----------------
+
+$sql_exec
+     Since the `sql_exec' family of functions return a statement handle
+     there must eb another way to test the return value of the execute
+     call. This global variable contains the result of the most recent
+     call to execute done by this module.
+
+$PApp::SQL::DBH
+     The default database handle used by this module if no `$DBH' was
+     specified as argument and no `$DBH' is found in the current package.
+     See `sql_exec' for a discussion.
+
+$PApp::SQL::Database
+     The current default `PApp::SQL::Database'-object. Future versions
+     might automatically fall back on this database and create database
+     handles from it if neccessary. At the moment this is not used by this
+     module but might be nice as a placeholder for the database object
+     that corresponds to $PApp::SQL::DBH.
+
+FUNCTIONS
+---------
+
+$dbh = connect_cached $id, $dsn, $user, $pass, $flags, $connect
+     (not exported by by default)
+
+     Connect to the database given by `($dsn,$user,$pass)', while using the
+     flags from $flags. These are just the same arguments as given to
+     `DBI-'connect>.
+
+     The database handle will be cached under the unique id
+     `$id|$dsn|$user|$pass'. If the same id is requested later, the cached
+     handle will be checked (using ping), and the connection will be
+     re-established if necessary (be sure to prefix your application or
+     module name to the id to make it "more" unique. Things like
+     __PACKAGE__ .  __LINE__ work fine as well).
+
+     The reason $id is necessary is that you might specify special connect
+     arguments or special flags, or you might want to configure your $DBH
+     differently than maybe other applications requesting the same database
+     connection. If none of this is becessary for your application you can
+     leave $id empty (i.e. "").
+
+     If specified, `$connect' is a callback (e.g. a coderef) that will be
+     called each time a new connection is being established, with the new
+     $dbh as first argument.
+
+     Examples:
+
+          # try your luck opening the papp database without access info
+          $dbh = connect_cached __FILE__, "DBI:mysql:papp";
+
+$sth = sql_exec [dbh,] [bind-vals...,] "sql-statement", [arguments...]
+     `sql_exec' is the most important and most-used function in this
+     module.
+
+     Runs the given sql command with the given parameters and returns the
+     statement handle. The command and the statement handle will be cached
+     (with the database handle and the sql string as key), so prepare will
+     be called only once for each distinct sql call (please keep in mind
+     that the returned statement will always be the same, so, if you call
+     `sql_exec' with the same dbh and sql-statement twice (e.g. in a
+     subroutine you called), the statement handle for the first call
+     mustn't be used.
+
+     The database handle (the first argument) is optional. If it is
+     missing, `sql_exec' first tries to use the variable `$DBH' in the
+     current (= calling) package and, if that fails, it tries to use
+     database handle in $PApp::SQL::DBH, which you can set before calling
+     these functions.
+
+     The actual return value from the `$sth-'execute> call is stored in the
+     package-global (and exported) variable $sql_exec.
+
+     If any error occurs `sql_exec' will throw an exception.
+
+     Examples:
+
+          # easy one
+          my $st = sql_exec "select name, id from table where id = ?", $id;
+          while (my ($name, $id) = $st->fetchrow_array) { ... };
+
+          # the fastest way to use dbi, using bind_columns
+          my $st = sql_exec \my($name, $id),
+                            "select name, id from table where id = ?",
+                            $id;
+          while ($st->fetch) { ...}
+
+          # now use a different dastabase:
+          sql_exec $dbh, "update file set name = ?", "oops.txt";
+
+sql_fetch <see sql_exec>
+     Execute a sql-statement and fetch the first row of results. Depending
+     on the caller context the row will be returned as a list (array
+     context), or just the first columns. In table form:
+
+          CONTEXT	RESULT
+          void		()
+          scalar		first column
+          list		array
+
+     sql_fetch is quite efficient in conjunction with bind variables:
+
+          sql_fetch \my($name, $amount),
+                    "select name, amount from table where id name  = ?",
+                    "Toytest";
+
+     But of course the normal way to call it is simply:
+
+          my($name, $amount) = sql_fetch "select ...", args...
+
+     ... and it's still quite fast unless you fetch large amounts of data.
+
+sql_fetchall <see sql_exec>
+     Similarly to sql_fetch, but all result rows will be fetched (this is
+     of course inefficient for large results!). The context is ignored
+     (only list context makes sense), but the result still depends on the
+     number of columns in the result:
+
+          COLUMNS	RESULT
+          0		()
+          1		(row1, row2, row3...)
+          many		([row1], [row2], [row3]...)
+
+     Examples (all of which are inefficient):
+
+          for (sql_fetchall "select id from table") { ... }
+
+          my @names = sql_fetchall "select name from user";
+
+          for (sql_fetchall "select name, age, place from user") {
+             my ($name, $age, $place) = @$_;
+          }
+
+sql_exists "<table> where ...", args...
+     Check wether the result of the sql-statement "select xxx from
+     $first_argument" would be empty or not (that is, imagine the string
+     "select from" were prepended to your statement (it isn't)). Should
+     work with every database but can be quite slow, except on mysql,
+     where this should be quite fast.
+
+     Examples:
+
+          print "user 7 exists!\n"
+             if sql_exists "user where id = ?", 7;
+          
+          die "duplicate key"
+             if sql_exists "user where name = ? and pass = ?", "stefan", "geheim";
+
+$lastid = sql_insertid $sth
+     Returns the last automatically created key value. It must be executed
+     directly after executing the insert statement that created it. This is
+     what is actually returned for various databases. If your database is
+     missing, please send me an e-mail on how to implement this ;)
+
+          mysql:    first C<AUTO_INCREMENT> column set to NULL
+          postgres: C<oid> column (is there a way to get the last SERIAL?)
+          sybase:   C<IDENTITY> column of the last insert (slow)
+          informix: C<SERIAL> or C<SERIAL8> column of the last insert
+
+     Except for sybase, this does not require a server access.
+
+[old-size] = cachesize [new-size]
+     Returns (and possibly changes) the LRU cache size used by `sql_exec'.
+     The default is somewhere around 50 (= the 50 last recently used
+     statements will be cached). It shouldn't be too large, since a simple
+     linear listed is used for the cache at the moment (which, for small
+     (<100) cache sizes is actually quite fast).
+
+     The function always returns the cache size in effect before the call,
+     so, to nuke the cache (for example, when a database connection has
+     died or you want to garbage collect old database/statement handles),
+     this construct can be used:
+
+          PApp::SQL::cachesize PApp::SQL::cachesize 0;
+
+reinitialize [not exported]
+     Clears any internal caches (statement cache, database handle cache).
+     Should be called after fork and other accidents that invalidate
+     database handles.
+
+THE DATABASE CLASS
+------------------
+
+   Again (sigh) the problem of persistency. What do you do when you have
+to serialize on object that contains (or should contain) a database
+handle? Short answer: you don't. Long answer: you can embed the necessary
+information to recreate the dbh when needed.
+
+   The `PApp::SQL::Database' class does that, in a relatively efficient
+fashion: the overhead is currently a single method call per access (you
+can cache the real dbh if you want).
+
+$db = new <same arguments as `connect_cached'>
+     The new call takes the same arguments as `connect_cached' (obviously,
+     if you supply a connect callback it better is serializable, see
+     `PApp::Callback' in this node!) and returns a serializable database
+     class. No database handle is actually being created.
+
+$db->dbh
+     Return the database handle as fast as possible (usually just a hash
+     lookup).
+
+$db->checked_dbh
+     Return the database handle, but first check that the database is still
+     available and re-open the connection if necessary.
+
+$db->dsn
+     Return the DSN (`DBI' in this node) fo the database object (e.g. for
+     error messages).
+
+SEE ALSO
+========
+
+   `PApp' in this node.
+
+AUTHOR
+======
+
+     Marc Lehmann <pcg@goof.com>
+     http://www.goof.com/pcg/marc/
+
+
+File: pm.info,  Node: PDF,  Next: PDF/Core,  Prev: PApp/SQL,  Up: Module List
+
+Library for PDF access and manipulation in Perl
+***********************************************
+
+NAME
+====
+
+   PDF - Library for PDF access and manipulation in Perl
+
+SYNOPSIS
+========
+
+     use PDF;
+
+     $pdf=PDF->new ;
+     $pdf=PDF->new(filename);
+
+     $result=$pdf->TargetFile( filename );
+
+     print "is a pdf file\n" if ( $pdf->IsaPDF ) ;
+     print "Has ",$pdf->Pages," Pages \n";
+     print "Use a PDF Version  ",$pdf->Version ," \n";
+     print "and it is crypted  " if ( $pdf->IscryptedPDF) ;
+
+     print "filename with title",$pdf->GetInfo("Title"),"\n";
+     print "and with subject ",$pdf->GetInfo("Subject"),"\n";
+     print "was written by ",$pdf->GetInfo("Author"),"\n";
+     print "in date ",$pdf->GetInfo("CreationDate"),"\n";
+     print "using ",$pdf->GetInfo("Creator"),"\n";
+     print "and converted with ",$pdf->GetInfo("Producer"),"\n";
+     print "The last modification occurred ",$pdf->GetInfo("ModDate"),"\n";
+     print "The associated keywords are ",$pdf->GetInfo("Keywords"),"\n";
+
+     my (startx,starty, endx,endy) = $pdf->PageSize ($page) ;
+
+DESCRIPTION
+===========
+
+   The main purpose of the PDF library is to provide classes and functions
+that allow to read and manipulate PDF files with perl. PDF stands for
+Portable Document Format and is a format proposed by Adobe.  A full
+description of this format can be found in the *Portable Document
+Reference Manual* by *Adobe Systems Inc.*. For more details about PDF,
+refer to:
+
+   *http://www.adobe.com/*
+
+   The main idea is to provide some "basic" modules for access the
+information contained in a PDF file. Even if at this moment is in an early
+development stage, the scripts in the example directory show that it is
+usable.
+
+   *is_pdf* script test a list of files in order divide the PDF file from
+the non PDF using the info provided by the files themselves. It doesn't
+use the *.pdf* extension, it uses the information contained in the file.
+
+   *pdf_version* returns the PDF level used for writing a file.
+
+   *pdf_pages* gives the number of pages of a PDF file.
+
+   *pagedump.pl* prints some information about individual pages in a
+PDF-file. Although the information as such are not very useful, it
+demontrates well some more complex aspects of the library. Check the
+function *doprint* in this program on how to handle all possible data
+occuring in a PDF.
+
+   The library is now splitted in 2 section :
+
+   *PDF::Core* that contains the data structure, the constructor and low
+level access fuctions;
+
+   *PDF::Parse* all kind of functions to parse the PDF-files and provide
+information about the content.
+
+   Check the help-files of these modules for more details.
+
+Variables
+=========
+
+   There are 2 variables that can be accessed:
+
+$PDF::VERSION
+     Contain the version of the library installed.
+
+$PDF::Verbose
+     This variable is false by default. Change the value if you want more
+     verbose output messages from library.
+
+Copyright
+=========
+
+     Copyright (c) 1998 - 2000 Antonio Rosella Italy antro@tiscalinet.it, Johannes Blach dw235@yahoo.com
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+Availability
+============
+
+   The latest version of this library is likely to be available from:
+
+   http://www.geocities.com/CapeCanaveral/Hangar/4794/
+
+   and at any CPAN mirror
+
+Greetings
+=========
+
+   Fabrizio Pivari ( pivari@geocities.com ) for all the suggestions about
+life, the universe and everything.  Brad Appleton ( bradapp@enteract.com )
+for his suggestions about the module organization.  Thomas Drillich for
+the iso latin1 support Ross Moore ( ross@ics.mq.edu.au ) for ReadInfo fix
+
+
+File: pm.info,  Node: PDF/Core,  Next: PDF/Create,  Prev: PDF,  Up: Module List
+
+Core Library for PDF library
+****************************
+
+NAME
+====
+
+   PDF::Core - Core Library for PDF library
+
+SYNOPSIS
+========
+
+     use PDF::Core;
+
+     $pdf=PDF::Core->new ;
+     $pdf=PDF->new(filename);
+
+     $res= $pdf->GetObject($ref);
+
+     $name = UnQuoteName($pdfname);
+     $string = UnQuoteString($pdfstring);
+
+     $pdfname = QuoteName($name);
+     $pdfhexstring = QuoteHexString($string);
+     $pdfstring = QuoteString($string);
+
+     $obj = PDFGetPrimitive (filehandle, \$offset);
+     $line = PDFGetLine (filehandle, \$offset);
+
+DESCRIPTION
+===========
+
+   The main purpose of the PDF::Core library is to provide the data
+structure and the constructor for the more general PDF library.
+
+Helper functions
+================
+
+   This functions are not part of the class, but perform useful services.
+
+UnQuoteName ( string )
+----------------------
+
+   This function processes quoted characters in a PDF-name. PDF-names
+returned by *GetObject* are already processed by this function.
+
+   Returns a string.
+
+UnQuoteString ( string )
+------------------------
+
+   This function extracts the text from PDF-strings and PDF-hexstrings.
+It will process all quoted characters and remove the enclosing braces.
+
+   WARNING: The current version doesn't handle unicode strings properly.
+
+   Returns a string.
+
+QuoteName ( string )
+--------------------
+
+   This function quotes problematic characters in a PDF-name. This
+function should be used before writing a PDF-name back to a PDF-file.
+
+   Returns a string.
+
+QuoteHexString ( string )
+-------------------------
+
+   This function translates a string into a PDF-hexstring.
+
+   Returns a string.
+
+QuoteString ( string )
+----------------------
+
+   This function translates a string into a PDF-string. Problematic
+character will be quoted.
+
+   WARNING: The current version doesn't handle unicode strings properly.
+
+   Returns a string.
+
+PDFGetPrimitive ( filehandle, offset )
+--------------------------------------
+
+   This internal function is used while parsing a PDF-file. If you are not
+writing extentions for this library and are parsing some special parts of
+the PDF-file, stay away and use *GetObject* instead.
+
+   This function has many quirks and limitations. Check the source for
+details.
+
+PDFGetline ( filehandle, offset )
+---------------------------------
+
+   This internal function was used to read a line from a PDF-file. It has
+many limitations and you should stay away from it, if you don't know what
+you are doing. Use *GetObject* or *PDFGetPrimitive* instead.
+
+Constructor
+===========
+
+new ( [ filename ] )
+--------------------
+
+   This is the constructor of a new PDF object. If the filename is
+missing, it returns an empty PDF descriptor ( can be filled with
+$pdf->TargetFile). Otherwise, It acts as the *PDF::Parse::TargetFile*
+method.
+
+Methods
+=======
+
+   The available methods are:
+
+GetObject (reference)
+---------------------
+
+   This methods returns the PDF-object for reference. The string reference
+must match the regular expression /^\d+ \d+ R$/, where the first number is
+the object number, the second number the generation number.
+
+   The return value is a PDF-primitive, the type depends on the content of
+the object:
+
+undef
+     The object could not be found or an error. Not all referenced objects
+     need to be present in a PDF-file. This value can be ignored.
+
+*Hash Reference*
+     If (UNIVERSAL::isa ($retval, "HASH") is true, the object is a
+     PDF-dictionary. The keys of the hash should be either a PDF name (eg:
+     /MediaBox) or a generated value like Stream_Offset. Everything else is
+     an error.
+
+     The values of the hash can be any PDF-primitive, including PDF-arrays
+     and other dictionaries.
+
+     This is the most common value returned by GetObject. If the key
+     Stream_Offset exists, the dictionary is followed by stream data,
+     starting at the file offeset indicated by this value.
+
+*Array Reference*
+     If (UNIVERSAL::isa ($retval, "ARRAY") is true, the object is a
+     PDF-array. Each element may be of a different type, and may contain
+     further references to arrays or any other PDF-primitive.
+
+*String matching /^\d+ \d+ R$/*
+     This is a reference to another PDF-Object. This value can be passed to
+     GetObject. This kind of value may appear instead of most other types.
+     Some PDF-writing programs seem to have special fun writing references
+     when a simple number is expected. If the final number is need, use
+     code like this to resolve references:
+
+     while ($len =~ m/^\d+ \d+ R$/) {$len = $self->GetObject ($len);	}
+
+     Example: 22 0 R
+
+*String matching /^\//*
+     This is a Name in a PDF dictionary. This string is already processed
+     by *UnQuotName* and may differ from the value in the PDF-file. In
+     some very old andstrange non-standard PDF-files, this may lead to
+     confusion.
+
+     Example: /MediaBox
+
+*String matching /^\(.*\)$/*
+     This is a string. It may contain newlines, quoted characters und other
+     strange stuff. Use PDF::UnQuoteString to extract the text.
+
+     Example: (This is\na string with two \(2\) lines.)
+
+*String matching /^<.*>$/*
+     This is a hex encoded string. Use PDF::UnQuoteString to extract the
+     text.
+
+     Example: <48 45 4c4C4 F1c>
+
+*String matching /^[\d.\+\-]+$/*
+     This is probably a number.
+
+     Example: 611
+
+*String matching none of the above*
+     this is either a PDF bareword (eg. true, false, ...) or a value
+     generated by this method like Stream_Offset.
+
+     Example: true
+
+   To improve performance GetObject uses an internal cache for objects.
+Repeated requests for the same objects are not read form the file but
+satisfied from the cache. With the Variable $PDF::Core::UseObjectCache,
+the caching mechanism can be turned off.
+
+   WARNING
+
+   Special care must be taken, when returned objects are modified. If the
+object contains sub-objects, the sub-objects are not duplicated and all
+changes affect all other copies of this object. Use your own copy, if you
+need to modify those values.
+
+Variables
+=========
+
+   Available variables are:
+
+$PDF::Core::VERSION
+     Contains the version of the library installed
+
+$PDF::Core::UseObjectCache
+     If this variable is true, all processed objects will be added to the
+     object cache. If only header information of a PDF are read or very big
+     PDF are processed, turning off the cache reduces the memory usage.
+
+Copyright
+=========
+
+     Copyright (c) 1998 - 2000 Antonio Rosella Italy antro@tiscalinet.it, Johannes Blach dw235@yahoo.com
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+Availability
+============
+
+   The latest version of this library is likely to be available from:
+
+   http://www.geocities.com/CapeCanaveral/Hangar/4794/
+
+
+File: pm.info,  Node: PDF/Create,  Next: PDF/Labels,  Prev: PDF/Core,  Up: Module List
+
+create PDF files
+****************
+
+NAME
+====
+
+   PDF::Create - create PDF files
+
+SYNOPSIS
+========
+
+     use PDF::Create;
+
+     my $pdf = new PDF::Create('filename' => 'mypdf.pdf',
+     			      'Version'  => 1.2,
+     			      'PageMode' => 'UseOutlines',
+     			      'Author'   => 'Fabien Tassin',
+     			      'Title'    => 'My title',
+     			 );
+     my $root = $pdf->new_page('MediaBox' => [ 0, 0, 612, 792 ]);
+
+     # Add a page which inherits its attributes from $root
+     my $page = $root->new_page;
+
+     # Prepare 2 fonts
+     my $f1 = $pdf->font('Subtype'  => 'Type1',
+      	   	        'Encoding' => 'WinAnsiEncoding',
+      		        'BaseFont' => 'Helvetica');
+     my $f2 = $pdf->font('Subtype'  => 'Type1',
+      		        'Encoding' => 'WinAnsiEncoding',
+      		        'BaseFont' => 'Helvetica-Bold');
+
+     # Prepare a Table of Content
+     my $toc = $pdf->new_outline('Title' => 'Document',
+                                 'Destination' => $page);
+     $toc->new_outline('Title' => 'Section 1');
+     my $s2 = $toc->new_outline('Title' => 'Section 2',
+                                'Status' => 'closed');
+     $s2->new_outline('Title' => 'Subsection 1');
+
+     $page->stringc($f2, 40, 306, 426, "PDF::Create");
+     $page->stringc($f1, 20, 306, 396, "version $PDF::Create::VERSION");
+
+     # Add another page
+     my $page2 = $root->new_page;
+     $page2->line(0, 0, 612, 792);
+     $page2->line(0, 792, 612, 0);
+
+     $toc->new_outline('Title' => 'Section 3');
+     $pdf->new_outline('Title' => 'Summary');
+
+     # Add something to the first page
+     $page->stringc($f1, 20, 306, 300,
+                    'by Fabien Tassin <fta@oleane.net>');
+
+     # Add the missing PDF objects and a the footer then close the file
+     $pdf->close;
+
+DESCRIPTION
+===========
+
+   PDF::Create allows you to create PDF documents using a large number of
+primitives, and emit the result as a PDF file or stream.  PDF stands for
+Portable Document Format.
+
+   Documents can have several pages, a table of content, an information
+section and many other PDF elements. More functionnalities will be added
+as needs arise.
+
+   Documents are constructed on the fly so the memory footprint is not
+tied to the size of the pages but only to their number.
+
+Methods
+=======
+
+new
+     To create a new PDF, send a new() message to the PDF::Create class.
+     For example:
+
+          my $pdf = new PDF::Create;
+
+     This will create an empty PDF structure. A lot of attributes can be
+     used:
+
+          - filename: destination file that will contain the resulting
+            PDF or ...
+
+          - fh: ... an already opened filehandle
+
+          - Version: can be 1.0 to 1.3 (default: 1.2)
+
+          - PageMode: how the document should appear when opened.
+            Allowed values are:
+
+          - UseNone: Open document with neither outline nor thumbnails
+            visible. This is the default value.
+
+          - UseOutlines: Open document with outline visible.
+
+          - UseThumbs: Open document with thumbnails visible.
+
+          - FullScreen: Open document in full-screen mode. In
+            full-screen mode, there is no menu bar, window controls,
+            nor any other window present.
+
+          - Author: the name of the person who created this document
+
+          - Creator: if the document was converted into a PDF document
+            from another form, this is the name of the application that
+            created the original document.
+
+          - Title: the title of the document
+
+          - Subject: the subject of the document
+
+          - Keywords: keywords associated with the document
+
+     Example:
+
+          my $pdf = new PDF::Create('filename' => 'mypdf.pdf',
+                                    'Version'  => 1.2,
+                                    'PageMode' => 'UseOutlines',
+                                    'Author'   => 'Fabien Tassin',
+                                    'Title'    => 'My title',
+                               );
+
+     The created object is returned.
+
+close
+     Add the missing sections needed to obtain a complete and valid PDF
+     document then close the file if needed.
+
+`add_comment [string]'
+     Add a comment to the document.
+
+`new_outline [parameters]'
+     Add an outline to the document using the given parameters.  Return
+     the newly created outline.
+
+     Parameters can be:
+
+     - Title: the title of the outline. Mandatory.
+
+     - Destination: the destination of this outline. In this version, it is
+     only possible to give a page as destination. The default destination
+     is the current page.
+
+     - Parent: the parent of this outline in the outlines tree. This is an
+     outline object.
+
+     Example:
+
+          my $outline = $pdf->new_outline('Title' => 'Item 1',
+                                          'Destination' => $page);
+          $outline->new_outline('Title' => 'Item 1.1');
+          $pdf->new_outline('Title' => 'Item 1.2',
+                            'Parent' => $outline);
+          $pdf->new_outline('Title' => 'Item 2');
+
+`new_page'
+     Add a page to the document using the given parameters.  Return the
+     newly created page.
+
+     Parameters can be:
+
+     - Parent: the parent of this page in the pages tree. This is a page
+     object.
+
+     - Resources: Resources required by this page.
+
+     - MediaBox: Rectangle specifying the natural size of the page, for
+     example the dimensions of an A4 sheet of paper. The coordinates are
+     measured in default user space units. It must be the reference of a 4
+     values array.
+
+     - CropBox: Rectangle specifying the default clipping region for the
+     page when displayed or printed. The default is the value of the
+     MediaBox.
+
+     - ArtBox: Rectangle specifying an area of the page to be used when
+     placing PDF content into another application. The default is the value
+     of the CropBox. [PDF 1.3]
+
+     - TrimBox: Rectangle specifying the intended finished size of the
+     page (for example, the dimensions of an A4 sheet of paper).  In some
+     cases, the MediaBox will be a larger rectangle, which includes
+     printing instructions, cut marks, or other content. The default is
+     the value of the CropBox. [PDF 1.3].
+
+     - BleedBox: Rectangle specifying the region to which all page content
+     should be clipped if the page is being output in a production
+     environment. In such environments, a bleed area is desired, to
+     accommodate physical limitations of cutting, folding, and trimming
+     equipment. The actual printed page may include printer's marks that
+     fall outside the bleed box. The default is the value of the CropBox.
+     [PDF 1.3]
+
+     - Rotate: Specifies the number of degrees the page should be rotated
+     clockwise when it is displayed or printed. This value must be zero
+     (the default) or a multiple of 90.
+
+font
+     Prepare a font using the given arguments. This font will be added to
+     the document only if it is used at least once before the close method
+     is called.
+
+     Parameters can be:
+
+     - Subtype: Type of font. PDF defines some types of fonts. It must be
+     one of the predefined type Type1, Type3, TrueType or Type0.
+
+     In this version, only Type1 is supported. This is the default value.
+
+     - Encoding: Specifies the encoding from which the new encoding
+     differs.  It must be one of the predefined encodings MacRomanEncoding,
+     MacExpertEncoding or WinAnsiEncoding.
+
+     In this version, only WinAnsiEncoding is supported. This is the
+     default value.
+
+     - BaseFont: The PostScript name of the font. It can be one of the
+     following base font: Courier, Courier-Bold, Courier-BoldOblique,
+     Courier-Oblique, Helvetica, Helvetica-Bold, Helvetica-BoldOblique,
+     Helvetica-Oblique, Times-Roman, Times-Bold, Times-Italic,
+     Times-BoldItalic, Symbol or ZapfDingbats. All of them are supported
+     in this version except the last two ones.
+
+     The default value is Helvetica.
+
+Page methods
+------------
+
+   This section describes the methods that can be used by a
+PDF::Create::Page object.
+
+   In its current form, this class is divided into two main parts, one for
+drawing (using PostScript like paths) and one for writing.
+
+   Some methods are not described here because they must not be called
+directly (e.g. new and add).
+
+`new_page params'
+     Add a sub-page to the current page.
+
+     See `PDF::Create::new_page'
+
+`string font size x y text'
+     Add text to the current page using the font object at the given size
+     and position. The point (x, y) is the bottom left corner of the
+     rectangle containing the text.
+
+     Example :
+
+          my $f1 = $pdf->font('Subtype'  => 'Type1',
+           	   	        'Encoding' => 'WinAnsiEncoding',
+           		        'BaseFont' => 'Helvetica');
+          $page->string($f1, 20, 306, 396, "some text");
+
+`stringl font size x y text'
+     Same as string.
+
+`stringr font size x y text'
+     Same as string but right aligned.
+
+`stringc font size x y text'
+     Same as string but centered.
+
+`string_width font text'
+     Return the size of the text using the given font in default user
+     space units.  This does not contain the size of the font yet.
+
+`line x1 y1 x2 y2'
+     Draw a line between (x1, y1) and (x2, y2).
+
+Low level drawing methods
+-------------------------
+
+`moveto x y'
+     Moves the current point to (x, y), omitting any connecting line
+     segment.
+
+`lineto x y'
+     Appends a straight line segment from the current point to (x, y).
+     The current point is (x, y).
+
+`curveto x1 y1 x2 y2 x3 y3'
+     Appends a Bezier curve to the path. The curve extends from the current
+     point to (x3 ,y3) using (x1 ,y1) and (x2 ,y2) as the Bezier control
+     points. The new current point is (x3 ,y3).
+
+`rectangle x y w h'
+     Adds a rectangle to the current path.
+
+`closepath'
+     Closes the current subpath by appending a straight line segment from
+     the current point to the starting point of the subpath.
+
+`newpath'
+     Ends the path without filling or stroking it.
+
+`stroke'
+     Strokes the path.
+
+`closestroke'
+     Closes and strokes the path.
+
+fill
+     Fills the path using the non-zero winding number rule.
+
+`fill2'
+     Fills the path using the even-odd rule
+
+SEE ALSO
+========
+
+   `PDF::Create::Page(3)' in this node, `perl(1)' in this node
+
+AUTHOR
+======
+
+   Fabien Tassin (fta@oleane.net)
+
+COPYRIGHT
+=========
+
+   Copyright 1999, Fabien Tassin. All rights reserved.  It may be used and
+modified freely, but I do request that this copyright notice remain
+attached to the file. You may modify this module as you wish, but if you
+redistribute a modified version, please attach a note listing the
+modifications you have made.
+
+

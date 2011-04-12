@@ -1,0 +1,1759 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: AddressBook/DB/PDB,  Next: AddressBook/DB/Text,  Prev: AddressBook/DB/LDIF,  Up: Module List
+
+Backend for AddressBook to use PDB (PalmOS) Databases.
+******************************************************
+
+NAME
+====
+
+   AddressBook::DB::PDB - Backend for AddressBook to use PDB (PalmOS)
+Databases.
+
+SYNOPSIS
+========
+
+     use AddressBook;
+     $a = AddressBook->new(source => "PDB",port=>"/dev/pilot");
+     $b = AddressBook->new(source => "PDB",pdb=>$pdb);
+     $c = AddressBook->new(source => "PDB",dlp=>$dlp);
+
+DESCRIPTION
+===========
+
+   The PDA::Pilot library module is required in order to use this package.
+PDA::Pilot is available as part of the pilot-link distribution, which is
+available at http://www.gnu-designs.com/pilot-link
+
+   AddressBook::DB::PDB supports sequential backend database methods.
+AddressBook::DB::PDB behavior can be modified using the following options:
+
+key_fields
+     A list of PDB field names (not cannonical names) which can be used to
+     uniquely identify a database record.  Ideally the "id" field of PDB
+     records would be used here, but currently it is not.  "Name,First
+     name" is recommended.
+
+phone_display
+     A perl statment which, when eval'd, returns a comma-delimited list of
+     "phone labels".  Valid phone labels are:
+     Work,Home,Fax,Other,E-Mail,Main,Pager,Mobile.  The result of the
+     eval'd phone_display will be used to determine which phone label is
+     default shown in the PalmOS address list.  The first label in the
+     comma-delimited list is used unless the record has no value for that
+     label, in which case the second label is used unless it also has no
+     value, in which case the third is used, and so on....
+
+     In the phone_display string, other attributes may be referenced as
+     "$<attr>".
+
+     For example, if you want the priority of default phone lables to be
+     "Work,Home,E-Mail" for all records in the "Business" category, and
+     the priority to be "Home,Work,E-Mail" for all records in all other
+     categories, you could use the following:
+
+          phone_display = "($category eq 'Business')
+                           ? 'Work,Home,E-Mail'
+                           : 'Home,Work,E-Mail'"
+
+intra_attr_sep_char
+     The character to use when joining multi-valued fields.  The default
+     is ' & '.
+
+   Any of these options can be specified in the constructor, or in the
+configuration file.
+
+new
+---
+
+     $a = AddressBook->new(source => "PDB");
+     $a = AddressBook->new(source => "PDB",
+                           port => "/dev/pilot");
+
+   If a "pdb" parameter is supplied, it will be used as a reference to an
+already created PDA::Pilot::DLP::DBPtr object.  Otherwise, if a "port" is
+supplied, the user will be prompted to press the hotsync button to
+establish the connection.
+
+Timestamps
+----------
+
+   For syncronization purposes, all records which have the "modified" flag
+set are timestamped with the current time.  All records with have the
+"modified" flag unset are timestamped with "0" (very, very old).
+
+Deleted Records
+===============
+
+   PDB records which have the "deleted" flag set are removed as part of
+the initialization process.  The "archive" flag is ignored.
+
+Categories
+==========
+
+   For convienience, a record's category is treated like any other
+attribute.  New categories are created as necessary.  Moving a record to a
+new category will achieve the expected result during synchronization.
+However, because renaming a category does not cause affected records to be
+marked as "modified", category renaming operations will be lost during
+synchronization.
+
+AUTHOR
+======
+
+   David L. Leigh, <dleigh@sameasiteverwas.net>
+
+SEE ALSO
+========
+
+   *Note AddressBook: AddressBook,, *Note AddressBook/Config:
+AddressBook/Config,, *Note AddressBook/Entry: AddressBook/Entry,.
+
+   PDA::Pilot
+
+
+File: pm.info,  Node: AddressBook/DB/Text,  Next: AddressBook/Entry,  Prev: AddressBook/DB/PDB,  Up: Module List
+
+Backend for AddressBook to print entries in a simple text format
+****************************************************************
+
+NAME
+====
+
+   AddressBook::DB::Text - Backend for AddressBook to print entries in a
+simple text format
+
+SYNOPSIS
+========
+
+     use AddressBook;
+     $a = AddressBook->new(source => "Text",filename=>"/tmp/abook.text");
+     $a->write($entry);
+
+DESCRIPTION
+===========
+
+   AddressBook::DB::Text currently supports only the sequential write
+method.
+
+new
+---
+
+     $a = AddressBook->new(source => "Text");
+     $a = AddressBook->new(source => "Text",filename => "/tmp/abook.text");
+
+   If no filename parameter is specified in the constructor, or in the
+configuration file, STDOUT is used.
+
+AUTHOR
+======
+
+   Mark A. Hershberger, <mah@everybody.org> David L. Leigh,
+<dleigh@sameasiteverwas.net>
+
+SEE ALSO
+========
+
+   *Note AddressBook: AddressBook,, *Note AddressBook/Config:
+AddressBook/Config,, *Note AddressBook/Entry: AddressBook/Entry,.
+
+
+File: pm.info,  Node: AddressBook/Entry,  Next: Affix/Infix2Postfix,  Prev: AddressBook/DB/Text,  Up: Module List
+
+An entry in the AddressBook
+***************************
+
+NAME
+====
+
+   AddressBook::Entry - An entry in the AddressBook
+
+SYNOPSIS
+========
+
+   An AddressBook::Entry object contains an addressbook entry's attributes,
+attribute metadata, and information about how to translate the attributes
+between different backend databases.  An Entry's attributes can be
+accessed  using either cannonical attribute names, or database-specific
+names.
+
+DESCRIPTION
+===========
+
+   The following examples assume  a configuration file which maps the
+cannonical attribute named "lastname" to the ldap attribute named "sn" and
+the cannonical attribute named "firstname" to the ldap attribute named
+"givenname".  For example,
+
+     <field name="lastname">
+       <db type="LDAP" name="sn">
+     </field>
+     <field name="firstname">
+       <db type="LDAP" name="givenname">
+     </field>
+
+   Each of the following pairs of commands will give the same result:
+
+   $entry=AddressBook::Entry->new(attr=> {
+  lastname=>Doe,                                    firstname => John
+                                   });
+$entry=AddressBook::Entry->new(db=>LDAP, 				 attr=>{
+                 sn=>Doe,                                    givenname =>
+John                                         });
+
+     $entry->add(attr=>{lastname=>Doe,firstname=>John})
+     $entry->add(attr=>{sn=Doe,givenname=John},db=>LDAP)
+
+     $entry->replace(attr=>{firstname=>Jane})
+     $entry->replace(attr=>{givenname=>Jane},db=>LDAP)
+
+     $entry->delete(attrs=>[firstname,lastname])
+     $entry->delete(attrs=>[givenname,sn],db=>LDAP)
+
+   Reading and writing an entry from a backend database:
+
+     $db = AddressBook->new(source=>LDAP);
+     $entry = $db->read;
+     $db->write($entry);
+
+   Generating values in calculated fields:
+
+   $entry->calculate;
+
+   Comparing entries:
+
+     AddressBook::Entry::Compare($entry1,$entry2);
+
+   Dumping an entry:
+
+     $entry->dump;
+
+   Note: Each attribute contains a reference to an array of values.
+
+new
+---
+
+     $entry=AddressBook->new();
+     $entry=AddressBook::Entry->new(attr=>\%attr);
+     $entry=AddressBook::Entry->new(attr=>\%attr,db=>$db)
+
+   Create and optionally load an entry object.
+
+   All of the following parameters are optional:
+
+%attr
+     An optional hash containing the attributes to add to the entry.  The
+     attribute values may be scalars or array references.
+
+$config
+     An AddressBook::Config reference.  If supplied, this configuration
+     will be used and any  $config_file paramater is ignored.
+
+$config_file
+     The configuration file to use instead of the default
+     (/etc/AddressBook.conf).
+
+$db
+     Can be used to specify that the keys of %attr are those for a
+     specific backend.
+
+add
+---
+
+     $entry->add(attr=>\%attr);
+     $entry->add(attr=>\%attr,db=>$db);
+
+   Adds attributes to the entry object.  New data is added to attributes
+which already exist
+
+%attr
+     Required hash containing the attributes to add to the entry.  The
+     attribute values may be specified as scalars or array references.
+
+$db
+     Can be used to specify that the keys of %attr are those for a
+     specific backend.
+
+replace
+-------
+
+     $entry->replace(attr=>\%attr);
+     $entry->replace(attr=>\%attr,db=>$db);
+
+   Adds attributes to the entry object.  New data is added to attributes
+which already exist
+
+%attr
+     Required hash containing the attributes to add to the entry.  The
+     attribute values may be specified as scalars or array references.
+
+$db
+     Can be used to specify that the keys of %attr are those for a
+     specific backend.
+
+delete
+------
+
+     $entry->delete(attrs=>\@attrs)
+     $entry->delete(attrs=>\@attrs,db=>$db)
+
+   Remove attributes from the Entry.
+
+@attrs
+     Required array containing the attributes to delete from the entry.
+
+$db
+     Can be used to specify that the keys of %attr are those for a
+     specific backend.
+
+get
+---
+
+     $attr_ref = $entry->get();
+     $attr_ref = $entry->get(db=>$db);
+     $attr_ref = $entry->get(db=>$db,values_only=>1);
+
+   Get attributes from the Entry.  Returns a hash with cannonical
+attribute names as keys.
+
+$values_only
+     Unless "values_only" is specified, each value in the result is a hash
+     with a "value" key pointing to the attribute value array, and a
+     "meta" key pointing to the attribute metadata hash.  If "values_only"
+     is specified, each value in the result points to the attribute value
+     array.
+
+$db
+     Can be used to specify that the keys of %attr are those for a
+     specific backend.
+
+calculate
+---------
+
+     $entry->calculate
+
+   Computes all calculated attributes.  Does so in the order specified by
+the calc_order attribute metadata value.
+
+compare
+-------
+
+     AddressBook::Entry::compare($entry1,$entry2)
+
+   Returns true if all attributes in both entries match, false otherwise.
+
+fill
+----
+
+     $entry->fill(db=>$db);
+     $entry->fill(db=>$db,defaults=>1);
+
+   Ensures that the Entry includes all attributes for a specific backend
+database.  New attributes are added with null values.  If the "defaults"
+parameter is specified, new attributes are added with values as specified
+by the attribute "default" metadata specified in the config file.
+
+chop
+----
+
+     $entry->chop
+
+   Removes null valued attributes from an Entry.
+
+dump
+----
+
+     print $entry->dump
+
+   Returns the (cannonical) attribute names and values.  Primarily used for
+debugging purposes.
+
+AUTHOR
+======
+
+   Mark A. Hershberger, <mah@everybody.org> David L. Leigh,
+<dleigh@sameasiteverwas.net>
+
+SEE ALSO
+========
+
+   *Note AddressBook: AddressBook, *Note AddressBook/Config:
+AddressBook/Config,
+
+
+File: pm.info,  Node: Affix/Infix2Postfix,  Next: Agent,  Prev: AddressBook/Entry,  Up: Module List
+
+Perl extension for converting from infix notation to postfix notation.
+**********************************************************************
+
+NAME
+====
+
+   Affix::Infix2Postfix - Perl extension for converting from infix
+notation to postfix notation.
+
+SYNOPSIS
+========
+
+     use Affix::Infix2Postfix;
+
+     $inst=Affix::Infix2Postfix->new(
+       'ops'=>[
+     	  {op=>'+'},
+     	  {op=>'-'},
+     	  {op=>'*'},
+     	  {op=>'/'},
+     	  {op=>'-',type=>'unary',trans=>'u-'},
+     	  {op=>'func',type=>'unary'},
+     	 ],
+     	  'grouping'=>[qw( \( \) )],
+     	  'func'=>[qw( sin cos exp log )],
+     	  'vars'=>[qw( x y z)]
+     	 );
+     $rc=$inst->translate($str)
+     || die "Error in '$str': ".$inst->{ERRSTR}."\n";
+
+DESCRIPTION
+===========
+
+   Infix2Postfix as the name suggests converts from infix to postfix
+notation. The reason why someone would like to do this is that postfix
+notation is generally much easier to do in computers. For example take an
+expression like: a+b+c*d. For us humans it's pretty easy to do that
+calculation.  But it's actually much better for computers to get a string
+of operations such as: a b + c d * +, where the variable names mean put
+variable on stack.
+
+AUTHOR
+======
+
+   addi@umich.edu
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: Agent,  Next: Agent/Message,  Prev: Affix/Infix2Postfix,  Up: Module List
+
+the Transportable Agent Perl module
+***********************************
+
+NAME
+====
+
+   Agent - the Transportable Agent Perl module
+
+SYNOPSIS
+========
+
+     use Agent;
+
+     my $a = new Agent( Name => 'path_to_agent.pa', %args );
+
+     $a->run();
+
+DESCRIPTION
+===========
+
+   Agent Perl is meant to be a multi-platform interface for writing and
+using transportable perl agents.
+
+A Perl Agent
+     Is any chunk of Perl code that can accomplish some user-defined
+     objective by communicating with other agents, and manipulating any
+     data it obtains.
+
+     A Perl Agent consists of a knowledge base (variables), a reasoning
+     procedure (code), and access to one or more languages coupled with
+     methods of communication.  These languages remain largely undefined,
+     or rather, user-defined; support for KQML/KIF is under development.
+
+Developing An Agent
+     Note that the developer must devise the reasoning procedure and
+     knowledge base described above.  Agent Perl does not place any
+     restrictions on what you may do; it only tries to make the 'doing'
+     part easier.
+
+     An agent is written as an inheriting sub-class of *Agent*.  Each
+     agent's class should be stored in a '.pa' file (perl agent), and must
+     contain an `agent_main()' method.  All agents are objects.  See the
+     examples for more details, and learn how Agent.pm works so you won't
+     step on its toes!
+
+CONVENTIONS
+===========
+
+   Arguments to subroutines are passed in hashes unless otherwise noted.
+
+   Capital-a *Agent* refers to `Agent.pm' unless the context is obvious.
+Lowercase *agent* refers to an agent.
+
+CONSTRUCTOR
+===========
+
+new()
+     Creates a new agent object.  You must tell new() where to get the
+     agent by passing in one of the following arguments (in a hash):
+
+     *Stored*: The agent stored in a Tom object.
+
+     File: An IO::Handle (or any subclass) file handle from which the
+     agent can be read.
+
+     Name: The agent's name.  This prompts new to search @INC and './' for
+     the agent's '.pa' source file.
+
+     Code: The agent's source code.
+
+     These are listed in order of precedence.  To handle security issues,
+     new() also groks this argument:
+
+     *Compartment*: A Safe Compartment within which the agent will be
+     registered, and later executed.  See the Safe pod for details.
+
+     Developers should note that these keywords are reserved.  Any
+     additional arguments are passed to the agent being created.
+
+METHODS
+=======
+
+store()
+     Returns the agent object in stringified form, suitable for network
+     transfer or storage.
+
+run()
+     Executes the agent.  If the Thread argument is passed and your system
+     has Thread.pm, run() tries to execute the agent in an asynchronous
+     thread via Thread's async() command (see the Thread pod for more
+     details).  Additional arguments are passed to the agent being run.
+
+identity()
+     Returns a unique string identifying the agent *in its present state*.
+
+SEE ALSO
+========
+
+   `Agent::Message' and `Agent::Transport' for agent developers.
+
+AUTHOR
+======
+
+   Steve Purkis <`spurkis@engsoc.carleton.ca'>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997, 1998 Steve Purkis.  All rights reserved.  This
+package is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+THANKS
+======
+
+   James Duncan for the Tom module and *many* ideas; the people of the
+Perl5-Agents mailing list for their support.
+
+
+File: pm.info,  Node: Agent/Message,  Next: Agent/Transport,  Prev: Agent,  Up: Module List
+
+the Transportable Agent Perl module
+***********************************
+
+NAME
+====
+
+   Agent::Message - the Transportable Agent Perl module
+
+SYNOPSIS
+========
+
+     use Agent;
+
+     my $msg = new Agent::Message(
+     	Body      => [ 'foo bar', 'baz' ],
+     	Transport => TCP,
+     	Address   => '127.0.0.1:24368'
+     );
+
+     $msg->send;
+
+DESCRIPTION
+===========
+
+   This module is meant to standardize agent communications over a number
+of different transport mediums (see *Agent::Transport*).
+
+CONSTRUCTOR
+===========
+
+new( [%args] )
+     new makes a nice new Message object with all the arguments you pass
+     it.  It understands the following parameters:
+
+          Body => $body,
+               [  Transport => $medium,
+          Address => $destination,
+          SendNow => $true_false   ]
+
+     This instantiates the class with only one destination (multiple
+     destinations are possible - see below).  If SendNow is true, the
+     message is dispatched ASAP.
+
+METHODS
+=======
+
+$msg->body( [@value] )
+     Sets/gets the body of the message.
+
+$msg->add_dest( $transport, $addr1 [, $addr2 ...] )
+     Adds the destination address to the list of destinations within said
+     medium; adds the medium if need be.
+
+$msg->del_dest( $transport, $addr1 [, $addr2 ...] )
+     Removes the destination address from the list of destinations within
+     said medium.  If last destination in medium, removes medium also.
+
+$msg->del_transport( $transport )
+     Removes the specified transport medium and all of its destinations.
+
+$msg->send( %args )
+     Sends the message body in all transport mediums.  Passes `\%args' to
+     all transport mediums when sending.  Returns an array of results
+     returned by each transport medium the message was sent in.
+
+BUGS
+====
+
+   $msg->del_dest and $msg->del_transport don't work; I'm too lazy.
+
+SEE ALSO
+========
+
+   `Agent', `Agent::Transport', the example agents.
+
+AUTHOR
+======
+
+   Steve Purkis <`spurkis@engsoc.carleton.ca'>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1998 Steve Purkis. All rights reserved. This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+THANKS
+======
+
+   Whoever invented mail.
+
+
+File: pm.info,  Node: Agent/Transport,  Next: Agent/Transport/TCP,  Prev: Agent/Message,  Up: Module List
+
+the Transportable Agent Perl module
+***********************************
+
+NAME
+====
+
+   Agent::Transport - the Transportable Agent Perl module
+
+SYNOPSIS
+========
+
+     use Agent;
+
+     my $t = new Agent::Transport(
+     	Medium => $name,
+     	Address => $addr
+     	...
+     );
+     ...
+     my $data = $t->recv( [%args] );
+
+DESCRIPTION
+===========
+
+   This package provides a standard interface to different transport
+mediums.  `Agent::Transport' does not contain any transport code itself;
+it contains a constructor, and code that autoloads the appropriate
+transport methods.
+
+CONSTRUCTOR
+===========
+
+new( %args )
+     new() must be passed at least a *Medium*.  The *Address* argument is
+     strongly recomended (and should be required in most cases), as it's
+     best not to let the system make assumptions.  new() decides which
+     Transport package to use base upon the `Medium' specified.  `Address'
+     is the destination in that medium.  Any other arguments will be
+     documented in the Agent::Transport subclasses (such as
+     Agent::Transport::TCP).
+
+STANDARD API METHODS
+====================
+
+   These methods are implemented in all transport subclasses.
+
+$t->recv()
+     recv attempts to retrieve a message (from said address, over said
+     transport medium).  Returns the data if called in a scalar context,
+     or a list containing ($data, $from_address) if called in an array
+     context.  Returns nothing (i.e. sv_null or an empty list) if
+     unsuccessful.
+
+$t->transport()
+     Returns the transport medium over which the object communicates.
+
+$t->address()
+     Returns the primary address at which the object can be reached.
+
+$t->aliases()
+     Returns a list of addresses at which the object can be reached.
+
+STANDARD SUBROUTINES
+====================
+
+send( %args )
+     send too must be passed a *Medium* and an *Address*.  In addition, it
+     also needs a Message as either an anonymous array or a reference to an
+     array.
+
+valid_address( %args )
+     This checks to see if the *Address* provided is valid within the
+     *Medium* specified by checking the syntax of the address.  It does
+     not check to see whether or not said address exists.  Returns the
+     address if successful, or nothing otherwise.
+
+SEE ALSO
+========
+
+   *Note Agent: Agent,, `Agent::Transport::*' in this node
+
+AUTHOR
+======
+
+   Steve Purkis <`spurkis@engsoc.carleton.ca'>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1998 Steve Purkis. All rights reserved. This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+THANKS
+======
+
+   The perl5-agents mailing list.
+
+
+File: pm.info,  Node: Agent/Transport/TCP,  Next: Algorithm/Diff,  Prev: Agent/Transport,  Up: Module List
+
+the Transportable Agent Perl module
+***********************************
+
+NAME
+====
+
+   Agent::Transport - the Transportable Agent Perl module
+
+SYNOPSIS
+========
+
+     use Agent::Transport;
+
+     # for receiving messages:
+     $tcp = new Agent::Transport(
+     	Medium => 'TCP',
+     	Address => '1.2.3.4:1234'
+     );
+     
+     # for sending:
+     use Agent::Message;
+     
+     $msg = new Agent::Message(
+     	Medium => 'TCP',
+     	Body => [ @body ],
+     	Address => '1.2.3.4:1234'
+     );
+     $msg->send;
+
+DESCRIPTION
+===========
+
+   This package provides an interface to the TCP[/IP] transport medium for
+agent developers to make use of.
+
+ADDRESS FORMAT
+==============
+
+This package groks the following standard tcp/ip formats:
+          aaa.bbb.ccc.ddd:port
+          host.domain:port
+
+CONSTRUCTOR
+===========
+
+new( %args )
+     If the *Cycle* argument is passed and if new() cannot capture the port
+     specified, it will cycle through port numbers until a free port is
+     found.  If new is not passed an *Address* at all, it assumes
+     '127.0.0.1:24368', and sets *Cycle* to 1.
+
+METHODS & SUBS
+==============
+
+   This module contains all of the Agent::Transport standard methods.  Some
+non-standard features have also been introduced:
+
+$self->accept( %args )
+     This method is analagous to the accept() function call and is
+     introduced to allow agent programmers to make full use of
+     bi-directional sockets.  It simply opens an incoming connection and
+     returns that object, thus allowing you to use a single connection for
+     multiple messages (see IO::Socket for details).  Unfortunately,
+     you'll have to design your own protocol.
+
+     Passing a 'From' argument as a referenced scalar, causes accept() to
+     put *what it thinks* the remote address is into this variable.
+
+$self->alias()
+     Returns $self->address() only.  It should really do hostname lookups.
+
+$self->recv( %args )
+     Passing a 'From' argument as a referenced scalar, causes recv() to put
+     *what it thinks* the remote address is into this variable.  Otherwise,
+     recv() functions as described in *Agent::Transport*.
+
+send( %args )
+     If you pass send() a 'KeepAlive' argument containing a reference to a
+     scalar, it will set this scalar to the remote *socket filehandle*.
+     This is meant to be used in conjunction with accept(), and is useful
+     if you would like to have an extended conversation with the remote
+     host.
+
+NOTES
+=====
+
+   This module only binds to a specified address.  If you have multiple
+interface addresses (ie: eth0 & eth1), and you want to listen on more than
+one, you have to bind each seperately.
+
+SEE ALSO
+========
+
+   `Agent' `Agent::Transport'
+
+AUTHOR
+======
+
+   Steve Purkis <`spurkis@engsoc.carleton.ca'>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1998 Steve Purkis. All rights reserved. This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+THANKS
+======
+
+   Various people from the perl5-agents mailing list.
+
+
+File: pm.info,  Node: Algorithm/Diff,  Next: Algorithm/DiffOld,  Prev: Agent/Transport/TCP,  Up: Module List
+
+Compute `intelligent' differences between two files / lists
+***********************************************************
+
+NAME
+====
+
+   Algorithm::Diff - Compute `intelligent' differences between two files /
+lists
+
+SYNOPSIS
+========
+
+     use Algorithm::Diff qw(diff LCS traverse_sequences);
+
+     @lcs    = LCS( \@seq1, \@seq2 );
+
+     @lcs    = LCS( \@seq1, \@seq2, $key_generation_function );
+
+     $lcsref = LCS( \@seq1, \@seq2 );
+
+     $lcsref = LCS( \@seq1, \@seq2, $key_generation_function );
+
+     @diffs = diff( \@seq1, \@seq2 );
+
+     @diffs = diff( \@seq1, \@seq2, $key_generation_function );
+     
+     traverse_sequences( \@seq1, \@seq2,
+                        { MATCH => $callback,
+                          DISCARD_A => $callback,
+                          DISCARD_B => $callback,
+                        } );
+
+     traverse_sequences( \@seq1, \@seq2,
+                        { MATCH => $callback,
+                          DISCARD_A => $callback,
+                          DISCARD_B => $callback,
+                        },
+                        $key_generation_function );
+
+INTRODUCTION
+============
+
+   (by Mark-Jason Dominus)
+
+   I once read an article written by the authors of diff; they said that
+they hard worked very hard on the algorithm until they found the right one.
+
+   I think what they ended up using (and I hope someone will correct me,
+because I am not very confident about this) was the `longest common
+subsequence' method.  in the LCS problem, you have two sequences of items:
+
+     a b c d f g h j q z
+
+     a b c d e f g i j k r x y z
+
+   and you want to find the longest sequence of items that is present in
+both original sequences in the same order.  That is, you want to find a
+new sequence S which can be obtained from the first sequence by deleting
+some items, and from the secend sequence by deleting other items.  You
+also want S to be as long as possible.  In this case S is
+
+     a b c d f g j z
+
+   From there it's only a small step to get diff-like output:
+
+     e   h i   k   q r x y
+     +   - +   +   - + + +
+
+   This module solves the LCS problem.  It also includes a canned function
+to generate diff-like output.
+
+   It might seem from the example above that the LCS of two sequences is
+always pretty obvious, but that's not always the case, especially when the
+two sequences have many repeated elements.  For example, consider
+
+     a x b y c z p d q
+     a b c a x b y c z
+
+   A naive approach might start by matching up the a and b that appear at
+the beginning of each sequence, like this:
+
+     a x b y c         z p d q
+     a   b   c a b y c z
+
+   This finds the common subsequence `a b c z'.  But actually, the LCS is
+`a x b y c z':
+
+     a x b y c z p d q
+     	a b c a x b y c z
+
+USAGE
+=====
+
+   This module provides three exportable functions, which we'll deal with
+in ascending order of difficulty: `LCS', diff, and `traverse_sequences'.
+
+`LCS'
+-----
+
+   Given references to two lists of items, LCS returns an array containing
+their longest common subsequence.  In scalar context, it returns a
+reference to such a list.
+
+     @lcs    = LCS( \@seq1, \@seq2 );
+     $lcsref = LCS( \@seq1, \@seq2 );
+
+   `LCS' may be passed an optional third parameter; this is a CODE
+reference to a key generation function.  See `' in this node.
+
+     @lcs    = LCS( \@seq1, \@seq2, $keyGen );
+     $lcsref = LCS( \@seq1, \@seq2, $keyGen );
+
+   Additional parameters, if any, will be passed to the key generation
+routine.
+
+diff
+----
+
+     @diffs     = diff( \@seq1, \@seq2 );
+     $diffs_ref = diff( \@seq1, \@seq2 );
+
+   diff computes the smallest set of additions and deletions necessary to
+turn the first sequence into the second, and returns a description of
+these changes.  The description is a list of *hunks*; each hunk represents
+a contiguous section of items which should be added, deleted, or replaced.
+The return value of diff is a list of hunks, or, in scalar context, a
+reference to such a list.
+
+   Here is an example:  The diff of the following two sequences:
+
+     a b c e h j l m n p
+     b c d e f j k l m r s t
+
+   Result:
+
+     [
+       [ [ '-', 0, 'a' ] ],
+
+     [ [ '+', 2, 'd' ] ],
+
+     [ [ '-', 4, 'h' ] ,
+       [ '+', 4, 'f' ] ],
+
+     [ [ '+', 6, 'k' ] ],
+
+     [ [ '-', 8, 'n' ],
+       [ '-', 9, 'p' ],
+       [ '+', 9, 'r' ],
+       [ '+', 10, 's' ],
+       [ '+', 11, 't' ],
+     ]
+      ]
+
+   There are five hunks here.  The first hunk says that the a at position
+0 of the first sequence should be deleted (-).  The second hunk says that
+the d at position 2 of the second sequence should be inserted (+).  The
+third hunk says that the h at position 4 of the first sequence should be
+removed and replaced with the f from position 4 of the second sequence.
+The other two hunks similarly.
+
+   diff may be passed an optional third parameter; this is a CODE
+reference to a key generation function.  See `' in this node.
+
+   Additional parameters, if any, will be passed to the key generation
+routine.
+
+`traverse_sequences'
+--------------------
+
+   `traverse_sequences' is the most general facility provided by this
+module; diff and `LCS' are implemented as calls to it.
+
+   Imagine that there are two arrows.  Arrow A points to an element of
+sequence A, and arrow B points to an element of the sequence B.
+Initially, the arrows point to the first elements of the respective
+sequences.  `traverse_sequences' will advance the arrows through the
+sequences one element at a time, calling an appropriate user-specified
+callback function before each advance.  It willadvance the arrows in such
+a way that if there are equal elements `$A[$i]' and `$B[$j]' which are
+equal and which are part of the LCS, there will be some moment during the
+execution of `traverse_sequences' when arrow A is pointing to `$A[$i]' and
+arrow B is pointing to `$B[$j]'.  When this happens, `traverse_sequences'
+will call the MATCH callback function and then it will advance both arrows.
+
+   Otherwise, one of the arrows is pointing to an element of its sequence
+that is not part of the LCS.  `traverse_sequences' will advance that arrow
+and will call the `DISCARD_A' or the `DISCARD_B' callback, depending on
+which arrow it advanced.  If both arrows point to elements that are not
+part of the LCS, then `traverse_sequences' will advance one of them and
+call the appropriate callback, but it is not specified which it will call.
+
+   The arguments to `traverse_sequences' are the two sequences to
+traverse, and a callback which specifies the callback functions, like this:
+
+     traverse_sequences( \@seq1, \@seq2,
+                        { MATCH => $callback_1,
+                          DISCARD_A => $callback_2,
+                          DISCARD_B => $callback_3,
+                        } );
+
+   Callbacks are invoked with at least the indices of the two arrows as
+their arguments.  They are not expected to return any values.  If a
+callback is omitted from the table, it is not called.
+
+   If arrow A reaches the end of its sequence, before arrow B does,
+`traverse_sequences' will call the `A_FINISHED' callback when it advances
+arrow B, if there is such a function; if not it will call `DISCARD_B'
+instead.  Similarly if arrow B finishes first.  `traverse_sequences'
+returns when both arrows are at the ends of their respective sequences.
+It returns true on success and false on failure.  At present there is no
+way to fail.
+
+   `traverse_sequences' may be passed an optional fourth parameter; this
+is a CODE reference to a key generation function.  See `' in this node.
+
+   Additional parameters, if any, will be passed to the key generation
+function.
+
+KEY GENERATION FUNCTIONS
+========================
+
+   diff, `LCS', and `traverse_sequences' accept an optional last parameter.
+This is a CODE reference to a key generating (hashing) function that should
+return a string that uniquely identifies a given element.  It should be
+the case that if two elements are to be considered equal, their keys
+should be the same (and the other way around).  If no key generation
+function is provided, the key will be the element as a string.
+
+   By default, comparisons will use "eq" and elements will be turned into
+keys using the default stringizing operator '""'.
+
+   Where this is important is when you're comparing something other than
+strings. If it is the case that you have multiple different objects that
+should be considered to be equal, you should supply a key generation
+function. Otherwise, you have to make sure that your arrays contain unique
+references.
+
+   For instance, consider this example:
+
+     package Person;
+
+     sub new
+     {
+       my $package = shift;
+       return bless { name => '', ssn => '', @_ }, $package;
+     }
+
+     sub clone
+     {
+       my $old = shift;
+       my $new = bless { %$old }, ref($old);
+     }
+
+     sub hash
+     {
+       return shift()->{'ssn'};
+     }
+
+     my $person1 = Person->new( name => 'Joe', ssn => '123-45-6789' );
+     my $person2 = Person->new( name => 'Mary', ssn => '123-47-0000' );
+     my $person3 = Person->new( name => 'Pete', ssn => '999-45-2222' );
+     my $person4 = Person->new( name => 'Peggy', ssn => '123-45-9999' );
+     my $person5 = Person->new( name => 'Frank', ssn => '000-45-9999' );
+
+   If you did this:
+
+     my $array1 = [ $person1, $person2, $person4 ];
+     my $array2 = [ $person1, $person3, $person4, $person5 ];
+     Algorithm::Diff::diff( $array1, $array2 );
+
+   everything would work out OK (each of the objects would be converted
+into a string like "Person=HASH(0x82425b0)" for comparison).
+
+   But if you did this:
+
+     my $array1 = [ $person1, $person2, $person4 ];
+     my $array2 = [ $person1, $person3, $person4->clone(), $person5 ];
+     Algorithm::Diff::diff( $array1, $array2 );
+
+   $person4 and $person4->clone() (which have the same name and SSN) would
+be seen as different objects. If you wanted them to be considered
+equivalent, you would have to pass in a key generation function:
+
+     my $array1 = [ $person1, $person2, $person4 ];
+     my $array2 = [ $person1, $person3, $person4->clone(), $person5 ];
+     Algorithm::Diff::diff( $array1, $array2, \&Person::hash );
+
+   This would use the 'ssn' field in each Person as a comparison key, and
+so would consider $person4 and $person4->clone() as equal.
+
+   You may also pass additional parameters to the key generation function
+if you wish.
+
+AUTHOR
+======
+
+   This version by Ned Konz, perl@bike-nomad.com
+
+CREDITS
+=======
+
+   Versions through 0.59 (and much of this documentation) were written by:
+
+   Mark-Jason Dominus, mjd-perl-diff@plover.com
+
+   This version borrows the documentation and names of the routines from
+Mark-Jason's, but has all new code in Diff.pm.
+
+   This code was adapted from the Smalltalk code of Mario Wolczko
+<mario@wolczko.com>, which is available at
+ftp://st.cs.uiuc.edu/pub/Smalltalk/MANCHESTER/manchester/4.0/diff.st
+
+   The algorithm is that described in *A Fast Algorithm for Computing
+Longest Common Subsequences*, CACM, vol.20, no.5, pp.350-353, May 1977,
+with a few minor improvements to improve the speed.
+
+
+File: pm.info,  Node: Algorithm/DiffOld,  Next: Algorithm/Graphs/TransitiveClosure,  Prev: Algorithm/Diff,  Up: Module List
+
+Compute `intelligent' differences between two files / lists but use the old (<=0.59) interface.
+***********************************************************************************************
+
+NAME
+====
+
+   Algorithm::DiffOld - Compute `intelligent' differences between two
+files / lists but use the old (<=0.59) interface.
+
+NOTE
+====
+
+   This has been provided as part of the Algorithm::Diff package by Ned
+Konz.  This particular module is *ONLY* for people who *HAVE* to have the
+old interface, which uses a comparison function rather than a key
+generating function.
+
+   Because each of the lines in one array have to be compared with each of
+the lines in the other array, this does M*N comparisions. This can be very
+slow. I clocked it at taking 18 times as long as the stock version of
+Algorithm::Diff for a 4000-line file. It will get worse quadratically as
+array sizes increase.
+
+SYNOPSIS
+========
+
+     use Algorithm::DiffOld qw(diff LCS traverse_sequences);
+
+     @lcs    = LCS( \@seq1, \@seq2, $comparison_function );
+
+     $lcsref = LCS( \@seq1, \@seq2, $comparison_function );
+
+     @diffs = diff( \@seq1, \@seq2, $comparison_function );
+     
+     traverse_sequences( \@seq1, \@seq2,
+                        { MATCH => $callback,
+                          DISCARD_A => $callback,
+                          DISCARD_B => $callback,
+                        },
+                        $comparison_function );
+
+COMPARISON FUNCTIONS
+====================
+
+   Each of the main routines should be passed a comparison function. If you
+aren't passing one in, *use Algorithm::Diff instead*.
+
+   These functions should return a true value when two items should compare
+as equal.
+
+   For instance,
+
+     @lcs    = LCS( \@seq1, \@seq2, sub { my ($a, $b) = @_; $a eq $b } );
+
+   but if that is all you're doing with your comparison function, just use
+Algorithm::Diff and let it do this (this is its default).
+
+   Or:
+
+     sub someFunkyComparisonFunction
+     {
+     	my ($a, $b) = @_;
+     	$a =~ m{$b};
+     }
+
+     @diffs = diff( \@lines, \@patterns, \&someFunkyComparisonFunction );
+
+   which would allow you to diff an array @lines which consists of text
+lines with an array @patterns which consists of regular expressions.
+
+   This is actually the reason I wrote this version - there is no way to
+do this with a key generation function as in the stock Algorithm::Diff.
+
+
+File: pm.info,  Node: Algorithm/Graphs/TransitiveClosure,  Next: Algorithm/MDiff,  Prev: Algorithm/DiffOld,  Up: Module List
+
+Calculate the transitive closure.
+*********************************
+
+NAME
+====
+
+   Algorithms::Graphs::TransitiveClosure - Calculate the transitive
+closure.
+
+SYNOPSIS
+========
+
+     use Algorithms::Graphs::TransitiveClosure qw /floyd_warshall/;
+
+     my $graph = [[1, 0, 0, 0], [0, 1, 1, 1], [0, 1, 1, 0], [1, 0, 1, 1]];
+     floyd_warshall $graph;
+     print "There is a path from 2 to 0.\n" if $graph -> [2] -> [0];
+
+     my $graph2 = {one   => {one => 1},
+                   two   => {two => 1, three => 1, four => 1},
+                   three => {two => 1, three => 1},
+                   four  => {one => 1, four  => 1}};
+     floyd_warshall $graph2;
+     print "There is a path from three to one.\n" if
+         $graph2 -> {three} -> {one};
+
+DESCRIPTION
+===========
+
+   This is an implementation of the well known *Floyd-Warshall* algorithm.
+[1,2]
+
+   The subroutine floyd_warshall takes a directed graph, and calculates
+its transitive closure, which will be returned. The given graph is
+actually modified, so be sure to pass a copy of the graph to the routine
+if you need to keep the original graph.
+
+   The subroutine takes graphs in one of the two following formats:
+
+floyd_warshall ARRAYREF
+     The graph *G = (V, E)* is described with a list of lists, `$graph',
+     representing *V x V*. If there is an edge between vertices $i and $j
+     (or if `$i == $j'), then `$graph -> [$i] -> [$j] == 1'. For all other
+     pairs `($k, $l)' from *V x V*, `$graph -> [$k] -> [$l] == 0'.
+
+     The resulting `$graph' will have `$graph -> [$i] -> [$j] == 1' iff
+     `$i == $j' or there is a path in G from $i to $j, and `$graph -> [$i]
+     -> [$j] == 0' otherwise.
+
+floyd_warshall HASHREF
+     The graph *G = (V, E)*, with labeled vertices, is described with a
+     hash of hashes, `$graph', representing *V x V*. If there is an edge
+     between vertices `$label1' and `$label2' (or if `$label1 eq $label2'),
+     then `$graph -> {$label1} -> {$label2} == 1'. For all other pairs
+     `($label3, $label4)' from *V x V*, `$graph -> {$label3} -> {$label4}'
+     does not exist.
+
+     The resulting `$graph' will have `$graph -> {$label1} -> {$label2} ==
+     1' iff `$label1 eq $label2' or there is a path in G from `$label1' to
+     `$label2', and `$graph -> {$label1} -> {$label2}' does not exist
+     otherwise.
+
+EXAMPLES
+========
+
+     my $graph = [[1, 0, 0, 0],
+                  [0, 1, 1, 1],
+                  [0, 1, 1, 0],
+                  [1, 0, 1, 1]];
+     floyd_warshall $graph;
+     foreach my $row (@$graph) {print "@$row\n"}
+
+     1 0 0 0
+     1 1 1 1
+     1 1 1 1
+     1 1 1 1
+
+     my $graph = {one   => {one => 1},
+                  two   => {two => 1, three => 1, four => 1},
+                  three => {two => 1, three => 1},
+                  four  => {one => 1, three => 1, four => 1}};
+     floyd_warshall $graph;
+     foreach my $l1 (qw /one two three four/) {
+         print "$l1: ";
+         foreach my $l2 (qw /one two three four/) {
+             next if $l1 eq $l2;
+             print "$l2 " if $graph -> {$l1} -> {$l2};
+         }
+         print "\n";
+     }
+
+     one:
+     two: one three four
+     three: one two four
+     four: one two three
+
+COMPLEXITY
+==========
+
+   The running time of the algorithm is cubed in the number of vertices of
+the graph. The author of this package is not aware of any faster
+algorithms, nor of a proof if this is optimal. Note than in specific
+cases, when the graph can be embedded on surfaces of bounded genus, or in
+the case of sparse connection matrices, faster algorithms than cubed in
+the number of vertices exist.
+
+   The space used by this algorithm is at most quadratic in the number of
+vertices, which is optimal as the resulting transitive closure can have a
+quadratic number of edges. In case when the graph is represented as a list
+of lists, the quadratic bound will always be achieved, as the list of
+lists already has that size. The hash of hashes however will use space
+linear to the size of the resulting transitive closure.
+
+LITERATURE
+==========
+
+   The Floyd-Warshall algorithm is due to Floyd [2], and based on a
+theorem of Warshall [3]. The implemation of this package is based on an
+implementation of Floyd-Warshall found in Cormen, Leiserson and Rivest [1].
+
+REFERENCES
+==========
+
+[1]
+     Thomas H. Cormen, Charles E. Leiserson and Ronald L. Rivest:
+     *Introduction to Algorithms*. Cambridge: MIT Press, *1990*.  ISBN
+     0-262-03141-8.
+
+[2]
+     Robert W. Floyd: "Algorithm 97 (SHORTEST PATH)".  *Communications of
+     the ACM*, 5(6):345, *1962*.
+
+[3]
+     Stephan Warshall: "A theorem on boolean matrices."  *Journal of the
+     ACM*, 9(1):11-12, *1962*.
+
+HISTORY
+=======
+
+     $Date: 1999/03/01 19:51:11 $
+
+     $Log: TransitiveClosure.pm,v $
+     Revision 1.3  1999/03/01 19:51:11  abigail
+     Renamed primary namespace to Algorithm::
+
+     Revision 1.2  1998/03/23 04:00:37  abigail
+     Fixed order of loop variables in the ARRAYREF case.
+     It's k, i, j, not i, j, k.
+
+     Revision 1.1  1998/03/22 06:54:42  abigail
+     Initial revision
+
+AUTHOR
+======
+
+   This package was written by Abigail.
+
+COPYRIGHT
+=========
+
+   Copyright 1998 by Abigail.
+
+LICENSE
+=======
+
+   This package is free and open software.
+
+   You may use, copy, modify, distribute and sell this package or any
+modifications there of in any form you wish, provided you do not do any of
+the following:
+
+     - claim that any of the original code was written by someone
+       else than the original author(s).
+     - restrict someone in using, copying, modifying, distributing or
+       selling this program or module or any modifications of it.
+
+   THIS PACKAGE IS PROVIDED "AS IS" AND WITHOUT ANY EXPRESS OR IMPLIED
+WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
+MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+
+
+File: pm.info,  Node: Algorithm/MDiff,  Next: Algorithm/MarkovChain,  Prev: Algorithm/Graphs/TransitiveClosure,  Up: Module List
+
+Perl extension for m-differece detection.
+*****************************************
+
+NAME
+====
+
+   MDiff - Perl extension for m-differece detection.
+
+SYNOPSIS
+========
+
+     use Algorithm::MDiff;
+
+DESCRIPTION
+===========
+
+   m-difference is a comparason I designed myself-with the help of the
+monks at http://www.perlmonks.org.  I'm sure the idea has been around, but
+_I_ decided to call it m-difference.  :)
+
+   Two strings are m-different if at least m of the characters in the
+strings differ; that is, if m=3, then there are at least 3 indicies (i, j,
+k) such that str1[i] != str2[i], str1[j] != str2[j] and str1[k] != str2[k].
+
+EXPORTED FUNCTION
+=================
+
+     is_mdiff($m, $str1, $str2);  # returns a 0 or a 1
+
+AUTHOR
+======
+
+   Jettero Heller <jettero@voltar.org>
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: Algorithm/MarkovChain,  Next: Algorithm/Numerical/Sample,  Prev: Algorithm/MDiff,  Up: Module List
+
+Object oriented Markov chain generator
+**************************************
+
+NAME
+====
+
+   Algorithm::MarkovChain - Object oriented Markov chain generator
+
+SYNOPSIS
+========
+
+     use Algorithm::MarkovChain;
+
+     my $chain = Algorithm::MarkovChain::->new();
+
+     # learn about things from @symbols
+     $chain->seed(symbols => \@symbols,
+                  longest => 6);
+
+     # attempt to tell me something about the sky
+     my @newness = $chain->spew(length   => 20,
+                                complete => [ qw( the sky is ) ]);
+
+DESCRIPTION
+===========
+
+   Algorithm::MarkovChain is an implementation of the Markov Chain
+algorithm within an object container.
+
+METHODS
+=======
+
+Algorithm::MarkovChain::->new() or $obj->new()
+----------------------------------------------
+
+   Creates a new instance of the Algorithm::MarkovChain class.
+
+   Takes one optional parameter: `recover_symbols'
+
+   `recover_symbols' has meaning if your symbols differ from their true
+values when stringifyed.  With this option enabled steps are taken to
+ensure that the original values for symbols are returned by the *spew*
+method.
+
+$obj->seed()
+------------
+
+   Seeds the markov chains from an example symbol stream.
+
+   Takes two parameters, one required symbols, one optional `longest'
+
+   symbols presents the symbols to seed from
+
+   `longest' sets an upper limit on the longest chain to construct.
+(defaults to 4)
+
+$obj->spew()
+------------
+
+   Uses the constructed chains to produce symbol streams
+
+   Takes four optional parameters complete, length, `longest_subchain',
+`force_length' and `stop_at_terminal'
+
+   complete provides a starting point for the generation of output.  Note:
+the algorithm will discard elements of this list if it does not find a
+starting chain that matches it, this is infinite-loop avoidance.
+
+   length specifies the minimum number of symbols desired (default is 30)
+
+   `stop_at_terminal' directs the spew to stop chaining at the first
+terminal point reached
+
+   `force_length' ensures you get exactly length symbols returned (note
+this overrides the behaviour of `stop_at_terminal')
+
+TODO
+====
+
+Documentation
+     I need to explain Markov Chains, and flesh out the examples some more.
+
+Serialization interface
+     Currently seeding the chain list is very intensive, and so there
+     should be a useful way to serialize objects of Algorithm::MarkovChain.
+
+     With the current implementation there are no private object variables,
+     so it's possible to cheat and just freeze the raw object, but I
+     wouldn't want for people to rely on that.
+
+Fix bugs/respond to feature requests
+     Just email me <richardc@unixbeard.net> and we'll sort something out...
+
+BUGS
+====
+
+   Hopefully not, though if they probably arise from my not understanding
+Markov chaining as well as I thought I did when coding commenced.
+
+   That or they're jst stupid mistakes :)
+
+AUTHOR
+======
+
+   Richard Clamp <richardc@unixbeard.net>
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: Algorithm/Numerical/Sample,  Next: Algorithm/Numerical/Shuffle,  Prev: Algorithm/MarkovChain,  Up: Module List
+
+Draw samples from a set
+***********************
+
+NAME
+====
+
+   Algorithm::Numerical::Sample - Draw samples from a set
+
+SYNOPSIS
+========
+
+     use Algorithm::Numerical::Sample  qw /sample/;
+
+     @sample = sample (-set         => [1 .. 10000],
+                       -sample_size => 100);
+
+     $sampler = Algorithm::Numerical::Sample::Stream -> new;
+     while (<>) {$sampler -> data ($_)}
+     $random_line = $sampler -> extract;
+
+DESCRIPTION
+===========
+
+   This package gives two methods to draw fair, random samples from a set.
+There is a procedural interface for the case the entire set is known, and
+an object oriented interface when the a set with unknown size has to be
+processed.
+
+A: `sample (set => ARRAYREF [,sample_size => EXPR])'
+----------------------------------------------------
+
+   The sample function takes a set and a sample size as arguments.  If the
+sample size is omitted, a sample of 1 is taken. The keywords set and
+`sample_size' may be preceeded with an optional -.  The function returns
+the sample list, or a reference to the sample list, depending on the
+context.
+
+B: `Algorithm::Numerical::Sample::Stream'
+-----------------------------------------
+
+   The class `Algorithm::Numerical::Sample::Stream' has the following
+methods:
+
+new
+     This function returns an object of the
+     `Algorithm::Numerical::Sample::Stream' class.  It will take an
+     optional argument of the form `sample_size => EXPR', where EXPR
+     evaluates to the sample size to be taken. If this argument is missing,
+     a sample of size 1 will be taken.  The keyword `sample_size' may be
+     preceeded by an optional dash.
+
+`data (LIST)'
+     The method data takes a list of parameters which are elements of the
+     set we are sampling. Any number of arguments can be given.
+
+extract
+     This method will extract the sample from the object, and reset it to
+     a fresh state, such that a sample of the same size but from a
+     different set, can be taken. extract will return a list in list
+     context, or the first element of the sample in scalar context.
+
+CORRECTNESS PROOFS
+==================
+
+Algorithm A.
+------------
+
+   Crucial to see that the sample algorithm is correct is the fact that
+when we sample n elements from a set of size N that the `t + 1'st element
+is choosen with probability `(n - m)/(N - t)', when already m elements
+have been choosen. We can immediately see that we will never pick too many
+elements (as the probability is 0 as soon as `n == m'), nor too few, as
+the probability will be 1 if we have k elements to choose from the
+remaining k elements, for some k. For the proof that the sampling is
+unbiased, we refer to [3].  (Section 3.4.2, Exercise 3).
+
+Algorithm B.
+------------
+
+   It is easy to see that the second algorithm returns the correct number
+of elements. For a sample of size n, the first n elements go into the
+reservoir, and after that, the reservoir never grows or shrinks in size;
+elements only get replaced.  A detailed proof of the fairness of the
+algorithm appears in [3].  (Section 3.4.2, Exercise 7).
+
+LITERATURE
+==========
+
+   Both algorithms are discussed by Knuth [3] (Section 3.4.2).  The first
+algoritm, *Selection sampling technique*, was discovered by Fan, Muller
+and Rezucha [1], and independently by Jones [2]. The second algorithm,
+*Reservoir sampling*, is due to Waterman.
+
+REFERENCES
+==========
+
+[1]
+     C. T. Fan, M. E. Muller and I. Rezucha, *J. Amer. Stat. Assoc.* 57
+     (1962), pp 387 - 402.
+
+[2]
+     T. G. Jones, *CACM* 5 (1962), pp 343.
+
+[3]
+     D. E. Knuth: *The Art of Computer Programming*, Volume 2, Third
+     edition.  Reading: Addison-Wesley, 1997. ISBN: 0-201-89684-2.
+
+HISTORY
+=======
+
+     $Date: 1999/08/09 08:01:05 $
+
+     $Log: Sample.pm,v $
+     Revision 1.3  1999/08/09 08:01:05  abigail
+     Changed *all* occurences of Algorithms to Algorithm.
+
+     Revision 1.2  1999/03/01 21:06:07  abigail
+     Changed package to Algorithm::*
+
+     Revision 1.1  1998/04/29 03:05:57  abigail
+     Initial revision
+
+AUTHOR
+======
+
+   This package was written by Abigail.
+
+COPYRIGHT
+=========
+
+   Copyright 1998, 1999 by Abigail.
+
+LICENSE
+=======
+
+   This package is free and open software.
+
+   You may use, copy, modify, distribute and sell this package or any
+modifications there of in any form you wish, provided you do not do any of
+the following:
+
+     - claim that any of the original code was written by someone
+       else than the original author(s).
+     - restrict someone in using, copying, modifying, distributing or
+       selling this program or module or any modifications of it.
+
+   THIS PACKAGE IS PROVIDED "AS IS" AND WITHOUT ANY EXPRESS OR IMPLIED
+WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
+MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+
+

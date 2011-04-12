@@ -1,0 +1,1788 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Memoize/Expire,  Next: Memoize/ExpireLRU,  Prev: Memoize,  Up: Module List
+
+Plug-in module for automatic expiration of memoized values
+**********************************************************
+
+NAME
+====
+
+   Memoize::Expire - Plug-in module for automatic expiration of memoized
+values
+
+SYNOPSIS
+========
+
+     use Memoize;
+     memoize 'function',
+       SCALAR_CACHE => [TIE, Memoize::Expire,
+     	  	     LIFETIME => $lifetime,    # In seconds
+     		     NUM_USES => $n_uses,
+                        TIE      => [Module, args...],
+     		    ],
+
+DESCRIPTION
+===========
+
+   Memoize::Expire is a plug-in module for Memoize.  It allows the cached
+values for memoized functions to expire automatically.  This manual
+assumes you are already familiar with the Memoize module.  If not, you
+should study that manual carefully first, paying particular attention to
+the TIE feature.
+
+   Memoize::Expire is a layer of software that you can insert in between
+Memoize itself and whatever underlying package implements the cache.  (By
+default, plain hash variables implement the cache.)  The layer expires
+cached values whenever they get too old, have been used too often, or both.
+
+   To specify a real-time timeout, supply the LIFETIME option with a
+numeric value.  Cached data will expire after this many seconds, and will
+be looked up afresh when it expires.  When a data item is looked up
+afresh, its lifetime is reset.
+
+   If you specify NUM_USES with an argument of n, then each cached data
+item will be discarded and looked up afresh after the nth time you access
+it.  When a data item is looked up afresh, its number of uses is reset.
+
+   If you specify both arguments, data will be discarded from the cache
+when either expiration condition holds.
+
+   If you want the cache to persist between invocations of your program,
+supply a TIE option to specify the package name and arguments for a the
+tied hash that will implement the persistence.  For example:
+
+     use Memoize;
+     use DB_File;
+     memoize 'function',
+       SCALAR_CACHE => [TIE, Memoize::Expire,
+     	  	     LIFETIME => $lifetime,    # In seconds
+     		     NUM_USES => $n_uses,
+                        TIE      => [DB_File, $filename, O_CREAT|O_RDWR, 0666],
+     		    ], ...;
+
+INTERFACE
+=========
+
+   There is nothing special about Memoize::Expire.  It is just an example.
+If you don't like the policy that it implements, you are free to write
+your own expiration policy module that implements whatever policy you
+desire.  Here is how to do that.  Let us suppose that your module will be
+named MyExpirePolicy.
+
+   Short summary: You need to create a package that defines four methods:
+
+TIEHASH
+     Construct and return cache object.
+
+EXISTS
+     Given a function argument, is the corresponding function value in the
+     cache, and if so, is it fresh enough to use?
+
+FETCH
+     Given a function argument, look up the corresponding function value in
+     the cache and return it.
+
+STORE
+     Given a function argument and the corresponding function value, store
+     them into the cache.
+
+   The user who wants the memoization cache to be expired according to
+your policy will say so by writing
+
+     memoize 'function',
+       SCALAR_CACHE => [TIE, MyExpirePolicy, args...];
+
+   This will invoke MyExpirePolicy->TIEHASH(args).
+MyExpirePolicy::TIEHASH should do whatever is appropriate to set up the
+cache, and it should return the cache object to the caller.
+
+   For example, MyExpirePolicy::TIEHASH might create an object that
+contains a regular Perl hash (which it will to store the cached values)
+and some extra information about the arguments and how old the data is and
+things like that.  Let us call this object `C'.
+
+   When Memoize needs to check to see if an entry is in the cache already,
+it will invoke C->EXISTS(key).  key is the normalized function argument.
+MyExpirePolicy::EXISTS should return 0 if the key is not in the cache, or
+if it has expired, and 1 if an unexpired value is in the cache.  It should
+not return undef, because there is a bug in some versions of Perl that
+will cause a spurious FETCH if the EXISTS method returns undef.
+
+   If your EXISTS function returns true, Memoize will try to fetch the
+cached value by invoking C->FETCH(key).  MyExpirePolicy::FETCH should
+return the cached value.  Otherwise, Memoize will call the memoized
+function to compute the appropriate value, and will store it into the
+cache by calling C->STORE(key, value).
+
+   Here is a very brief example of a policy module that expires each cache
+item after ten seconds.
+
+     package Memoize::TenSecondExpire;
+
+     sub TIEHASH {
+       my ($package) = @_;
+       my %cache;
+       bless \%cache => $package;
+     }
+
+     sub EXISTS {
+       my ($cache, $key) = @_;
+       if (exists $cache->{$key} &&
+                   $cache->{$key}{EXPIRE_TIME} > time) {
+         return 1
+       } else {
+         return 0;  # Do NOT return `undef' here.
+       }
+     }
+
+     sub FETCH {
+       my ($cache, $key) = @_;
+       return $cache->{$key}{VALUE};
+     }
+
+     sub STORE {
+       my ($cache, $key, $newvalue) = @_;
+       $cache->{$key}{VALUE} = $newvalue;
+       $cache->{$key}{EXPIRE_TIME} = time + 10;
+     }
+
+   To use this expiration policy, the user would say
+
+     use Memoize;
+     memoize 'function',
+         SCALAR_CACHE => [TIE, Memoize::TenSecondExpire];
+
+   Memoize would then call function whenever a cached value was entirely
+absent or was older than ten seconds.
+
+   It's nice if you allow a TIE argument to TIEHASH that ties the
+underlying cache so that the user can specify that the cache is persistent
+or that it has some other interesting semantics.  The sample
+`Memoize::Expire' module demonstrates how to do this.  It implements a
+policy that expires cache items when they get too old or when they have
+been accessed too many times.
+
+   Another sample module, `Memoize::Saves', is included with this package.
+It implements a policy that allows you to specify that certain function
+values whould always be looked up afresh.  See the documentation for
+details.
+
+ALTERNATIVES
+============
+
+   Joshua Chamas's Tie::Cache module may be useful as an expiration
+manager.  (If you try this, let me know how it works out.)
+
+   If you develop any useful expiration managers that you think should be
+distributed with Memoize, please let me know.
+
+CAVEATS
+=======
+
+   This module is experimental, and may contain bugs.  Please report bugs
+to the address below.
+
+   Number-of-uses is stored as a 16-bit unsigned integer, so can't exceed
+65535.
+
+   Because of clock granularity, expiration times may occur up to one
+second sooner than you expect.  For example, suppose you store a value
+with a lifetime of ten seconds, and you store it at 12:00:00.998 on a
+certain day.  Memoize will look at the clock and see 12:00:00.  Then 9.01
+seconds later, at 12:00:10.008 you try to read it back.  Memoize will look
+at the clock and see 12:00:10 and conclude that the value has expired.
+Solution: Build an expiration policy module that uses Time::HiRes to
+examine a clock with better granularity.  Contributions are welcome.  Send
+them to:
+
+AUTHOR
+======
+
+   Mark-Jason Dominus (mjd-perl-memoize+@plover.com)
+
+   Mike Cariaso provided valuable insight into the best way to solve this
+problem.
+
+SEE ALSO
+========
+
+   perl(1)
+
+   The Memoize man page.
+
+   http://www.plover.com/~mjd/perl/Memoize/  (for news and updates)
+
+   I maintain a mailing list on which I occasionally announce new versions
+of Memoize.  The list is for announcements only, not discussion.  To join,
+send an empty message to mjd-perl-memoize-request@Plover.com.
+
+
+File: pm.info,  Node: Memoize/ExpireLRU,  Next: Memoize/Saves,  Prev: Memoize/Expire,  Up: Module List
+
+Expiry plug-in for Memoize that adds LRU cache expiration
+*********************************************************
+
+NAME
+====
+
+   Memoize - Expiry plug-in for Memoize that adds LRU cache expiration
+
+SYNOPSIS
+========
+
+     use Memoize;
+
+     memoize('slow_function',
+     	    TIE => [Memoize::ExpireLRU,
+     		    CACHESIZE => n,
+     	           ]);
+
+   Note that one need not use this module. It will be found by the Memoize
+module.
+
+   The argument to CACHESIZE must be an integer. Normally, this is all
+that is needed. Additional options are available:
+
+     TUNECACHESIZE => m,
+     INSTANCE => 'descriptive_name',
+     TIE => '[DB_File, $filename, O_RDWR | O_CREATE, 0666]'
+
+DESCRIPTION
+===========
+
+   For the theory of Memoization, please see the Memoize module
+documentation. This module implements an expiry policy for Memoize that
+follows LRU semantics, that is, the last n results, where n is specified
+as the argument to the CACHESIZE parameter, will be cached.
+
+PERFORMANCE TUNING
+==================
+
+   It is often quite difficult to determine what size cache will give
+optimal results for a given function. To aid in determining this,
+ExpireLRU includes cache tuning support. Enabling this causes a definite
+performance hit, but it is often useful before code is released to
+production.
+
+   To enable cache tuning support, simply specify the optional
+`TUNECACHESIZE' parameter with a size greater than that of the CACHESIZE
+parameter.
+
+   When the program exits, a set of statistics will be printed to stderr.
+If multiple routines have been memoized, separate sets of statistics are
+printed for each routine. The default names are somewhat cryptic: this is
+the purpose of the INSTANCE parameter. The value of this parameter will be
+used as the identifier within the statistics report.
+
+DIAGNOSTIC METHODS
+==================
+
+   Two additional routines are available but not exported.
+Memoize::ExpireLRU::ShowStats returns a string identical to the statistics
+report printed to STDERR at the end of the program if test caches have
+been enabled; Memoize::ExpireLRU::DumpCache takes the instance name of a
+memoized function as a parameter, and returns a string describing the
+current state of that instance.
+
+AUTHOR
+======
+
+   Brent B. Powers (B2Pi), Powers@B2Pi.com
+
+   Copyright(c) 1999 Brent B. Powers. All rights reserved. This program is
+free software, you may redistribute it and/or modify it under the same
+terms as Perl itself.
+
+SEE ALSO
+========
+
+   Memoize
+
+
+File: pm.info,  Node: Memoize/Saves,  Next: Metadata/Base,  Prev: Memoize/ExpireLRU,  Up: Module List
+
+Plug-in module to specify which return values should be memoized
+****************************************************************
+
+NAME
+====
+
+   Memoize::Saves - Plug-in module to specify which return values should
+be memoized
+
+SYNOPSIS
+========
+
+     use Memoize;
+
+     memoize 'function',
+       SCALAR_CACHE => [TIE, Memoize::Saves,
+                        CACHE => [ "word1", "word2" ],
+     		       DUMP  => [ "word3", "word4" ],
+     		       REGEX => "Regular Expression",
+     		       TIE      => [Module, args...],
+     		      ],
+
+DESCRIPTION
+===========
+
+   Memoize::Saves is a plug-in module for Memoize.  It allows the user to
+specify which values should be cached or which should be dumped.  Please
+read the manual for Memoize for background information.
+
+   Use the CACHE option to specify a list of return values which should be
+memoized.  All other values will need to be recomputed each time.
+
+   Use the DUMP option to specify a list of return values which should not
+be memoized.  Only these values will need to be recomputed each time.
+
+   Use the REGEX option to specify a Regular Expression which must match
+for the return value to be saved.  You can supply either a plain text
+string or a compiled regular expression using qr//.  Obviously the second
+method is prefered.
+
+   Specifying multiple options will result in the least common denominator
+being saved.
+
+   You can use the TIE option to string multiple Memoize Plug-ins together:
+
+   memoize ('printme',           SCALAR_CACHE =>              [TIE,
+Memoize::Saves,               REGEX => qr/my/,               TIE   =>
+[Memoize::Expire,                         LIFETIME => 5,
+     TIE => [ GDBM_File, $filename,
+O_RDWR | O_CREAT, 0666]                        ]              ]          );
+
+CAVEATS
+=======
+
+   This module is experimental, and may contain bugs.  Please report bugs
+to the address below.
+
+   If you are going to use Memoize::Saves with Memoize::Expire it is
+import to use it in that order.  Memoize::Expire changes the return value
+to include expire information and it may no longer match your CACHE, DUMP,
+or REGEX.
+
+AUTHOR
+======
+
+   Joshua Gerth <gerth@teleport.com>
+
+SEE ALSO
+========
+
+   perl(1)
+
+   The Memoize man page.
+
+
+File: pm.info,  Node: Metadata/Base,  Next: Metadata/HTTP,  Prev: Memoize/Saves,  Up: Module List
+
+base class for metadata
+***********************
+
+NAME
+====
+
+   Metadata::Base - base class for metadata
+
+SYNOPSIS
+========
+
+     package Metadata::FOO
+
+     use vars(@ISA);
+     ...
+     @ISA=qw(Metadata::Base);
+     ...
+
+DESCRIPTION
+===========
+
+   Metadata:Base class - the core functionality for handling metadata.
+
+CONSTRUCTOR
+===========
+
+new [OPTIONS]
+     Create a new Metadata object with an optional hash of options to
+     describe the metadata characteristics.  Currently only the following
+     can be set:
+
+    DEBUG
+          Set if debugging should be enabled from creation.  This can also
+          be set and read by the debug method below.  If this is not
+          defined, it is set to the current class debugging state which
+          can be read from the class method `debug' in this node described
+          below.
+
+    ORDERED
+          Set if the metadata elements are ordered
+
+COPY CONSTRUCTOR
+================
+
+clone
+     Create a new identical Metadata object from this one.
+
+CLASS METHODS
+=============
+
+debug [VALUE]
+     If VALUE is given, sets the debugging state of this class and returns
+     the old state.  Otherwise returns the current debugging state.
+
+seconds_to_iso8601 SECONDS
+     Convert the *SECONDS* value to (subset of) ISO-8601 format
+     YYYY-MM-DDThh:mm:SSZ representing the GMT/UTC value.
+
+iso8601_to_seconds VALUE
+     Convert 6 ISO-8601 subset formats to a seconds value.  The 6 formats
+     are those proposed for the Dublin Core date use:
+
+          YYYY
+          YYYY-MM
+          YYYY-MM-DD
+          YYYY-MM-DDThh:mm
+          YYYY-MM-DDThh:mm:ssTZ
+          YYYY-MM-DDThh:mm:ss.ssTZ
+
+     where TZ can be 'Z', +hh:mm or -hh:mm
+
+     NOTE: This method rounds towards the start of the period (it should
+     really return two values for start and end).
+
+METHODS
+=======
+
+debug [VALUE]
+     If VALUE is given, sets the debugging state of this object and
+     returns the old state.  Otherwise returns the current debugging
+     state.  The default debugging state is determined by the class debug
+     state.
+
+set ELEMENT, VALUE, [INDEX]
+     Set element *ELEMENT* to VALUE.  If VALUE is an array reference, the
+     existing array is used to as all the existing sub-values.  Otherwise
+     if INDEX is given, sets the particular sub-value of *ELEMENT*,
+     otherwise appends to the end of the existing list of sub-values for
+     *ELEMENT*.
+
+get ELEMENT, [INDEX]
+     Return the contents of the given *ELEMENT*.  In an array context
+     returns the sub-values as an array, in a scalar context they are all
+     returned separated by spaces. If INDEX is given, returns the value of
+     the given sub-value.
+
+delete ELEMENT, [INDEX}
+     Delete the given *ELEMENT*.  If an INDEX is given, remove just that
+     sub-value.
+
+exists ELEMENT, [INDEX]
+     Returns a defined value if the given *ELEMENT* and/or sub-value INDEX
+     exists.
+
+size [ELEMENT]
+     Returns number of elements with no argument or the number of subvalues
+     for the given *ELEMENT* or undef if *ELEMENT* does not exist.
+
+elements
+     Return a list of the elements (in the correct order if there is one).
+
+order [ORDER]
+     If *ORDER* is given, sets that as the order of the elements and
+     returns the old order list.  Otherwise, returns the current order of
+     the elements.  If the elements are not ordered, returns undef.
+
+validate ELEMENT, VALUE, [INDEX]
+     This method is intended to be overriden by subclasses.  It is called
+     when a element value is being set.  The method should return either a
+     list of *ELEMENT*, VALUE and INDEX values to use or an undefined value
+     in which case no element will be set.
+
+validate_elements ELEMENT, [INDEX]
+     This method is intended to be overriden by subclasses.  It is called
+     when a element and/or index is being read.  The method should return
+     a list of *ELEMENT* and INDEX values to use.
+
+as_string =item format
+     Returns a string representing the metadata, suitable for storing (in
+     a text file).  This is different from the pack method because this
+     value is meant to be the native encoding format of the metadata,
+     usually human readable, wheras pack uses the minimum space.
+
+pack
+     Return a packed string representing the metadata format.  This can be
+     used with unpack to restore the values.
+
+unpack VALUE
+     Initialise the metadata from the packed VALUE which must be the value
+     made by the pack method.
+
+read HANDLE
+     Reads from the given file handle and initialises the metadata
+     elements.  Returns undef if end of file is seen.
+
+write HANDLE
+     Write to the given file handle a formatted version of this metadata
+     format.  Likely to use format in most implementations.
+
+reset
+     Reset the metadata object to the default ones (including any passed
+     with the constructor) and then do a clear.
+
+clear
+     Remove any stored elements in this metadata object.  This can be used
+     in conjuction with read to prevent the overhead of many new
+     operations when reading metadata objects from files.
+
+get_date_as_seconds ELEMENT
+     Assuming *ELEMENT* is stored in a date format, returns the number of
+     seconds since 1st January 1970.
+
+set_date_as_seconds ELEMENT, VALUE
+     Set *ELEMENT* encoded as a date corresponding to VALUE which is the
+     number of seconds since 1st January 1970.
+
+AUTHOR
+======
+
+   By Dave Beckett - http://purl.org/net/dajobe/
+
+COPYRIGHT
+=========
+
+   Copyright (C) 1997-2001 Dave Beckett - http://purl.org/net/dajobe/ All
+rights reserved.
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Metadata/HTTP,  Next: Metadata/IAFA,  Prev: Metadata/Base,  Up: Module List
+
+metadata class for HTTP log records
+***********************************
+
+NAME
+====
+
+   Metadata::HTTP - metadata class for HTTP log records
+
+SYNOPSIS
+========
+
+     use Metadata::HTTP
+     ...
+     $i=new Metadata::HTTP;
+     open(IN, $logfile);
+     while($i->read('IN')) {
+       print $i->get('agent'),"\n";
+     }
+     ...
+
+DESCRIPTION
+===========
+
+   The Metadata::HTTP class allows the handling of HTTP log records as
+metadata objects using the *Note Metadata/Base: Metadata/Base, class.
+
+   The following fields are set after using the read method:
+
+     host ident authuser
+     date day month year time hour min sec
+     timezone (in format +/-NNNN)
+     status bytes
+     request - 'GET /foo' etc
+
+   Optionally set:   referer (if supported by log)   agent (if supported
+by log)   http-version (if present)   command - GET, POST, etc.    path
+- operand to command
+
+CONSTRUCTOR
+===========
+
+new [OPTIONS]
+     An optional hash of options can be given to the constructor to set
+     various options.  There is only one *Metadata::HTTP* options defined:
+
+    DEBUG
+          This class has a separate debug class / object method that works
+          in the same fashion as the *Metadata::Base* method debug.
+          Setting it here also sets the debugging on the base
+          *Metadata::Base* object too.
+
+METHODS
+=======
+
+   The methods here describe the differences from the *Note Metadata/Base:
+Metadata/Base, class methods.
+
+read HANDLE
+     Reads a single line from the file descriptor and uses it to fill the
+     fields of the HTTP metadata object.
+
+format [URL]
+     Returns the original HTTP line used in the parsing.
+
+SEE ALSO
+========
+
+   *Note Metadata/Base: Metadata/Base,
+
+AUTHOR
+======
+
+   By Dave Beckett - http://purl.org/net/dajobe/
+
+COPYRIGHT
+=========
+
+   Copyright (C) 1997-2001 Dave Beckett - http://purl.org/net/dajobe/ All
+rights reserved.
+
+
+File: pm.info,  Node: Metadata/IAFA,  Next: Metadata/SOIF,  Prev: Metadata/HTTP,  Up: Module List
+
+IAFA Template metadata class
+****************************
+
+NAME
+====
+
+   Metadata::IAFA - IAFA Template metadata class
+
+SYNOPSIS
+========
+
+     use Metadata::IAFA
+     ...
+     $i=new Metadata::IAFA;
+     $i->set('element1', [qw(v1 v2 v3)]);
+     $i->set('element2', 'v2');
+
+     my $val=$i->get('element2);
+     for my $v ($i->get('element1') {
+       ...
+     }
+     ...
+
+DESCRIPTION
+===========
+
+   The Metadata::IAFA class supports IAFA Templates metadata using the
+*Note Metadata/Base: Metadata/Base, class and customises it for IAFA
+Templates where element names have *variants* to represent to sub-values.
+
+CONSTRUCTOR
+===========
+
+new [OPTIONS]
+     An optional hash of options can be given to the constructor to set
+     various options.  There are currently three *Metadata::IAFA* options
+     defined:
+
+    STRICT
+          This is defined to turn on strict interpretation of the draft
+          IAFA Templates standard.  See the read method for what this
+          implies.
+
+    TEMPLATE_TYPE
+          Set the template type for this IAFA Template (default is
+          DOCUMENT).  The alternate ways to set this are via the
+          template_type or set methods.
+
+    DEBUG
+          This class has a separate debug class / object method that works
+          in the same fashion as the *Metadata::Base* method debug.
+          Setting it here also sets the debugging on the base
+          *Metadata::Base* object too.
+
+    WRAP
+          When formatting the metadata for output, word wrap the results
+          so that they fit into 80-columns.  This is done using the
+          Text::Wrap class.
+
+METHODS
+=======
+
+   The methods here describe the differences from the *Note Metadata/Base:
+Metadata/Base, class methods.
+
+set ELEMENT, VALUE, [INDEX]
+get ELEMENT, [INDEX]
+exists ELEMENT, [INDEX]
+     These methods work in the same way as the *Metadata::Base::set*
+     methods except that *ELEMENT* can contain the *variant* if it is of
+     the form: *ELEMENT*-INDEX where INDEX is a decimal number.
+
+template_type [TEMPLATE-TYPE]
+     The Template-Type of the metadata can be set by the set method but it
+     is stored separately from the regular elements and can only be
+     retrieved from using this method when it is called with no arguments.
+
+read HANDLE
+     Implements reading a single IAFA Template from the given *HANDLE*.
+     This is done in a generous style (different from the draft standard),
+     rather than ending the template on a blank line, uses empty lines and
+     thus allows element values to contain multiple paragraphs separated by
+     entirely white space lines.
+
+format
+     Returns a formatted version of the IAFA Template suitable for writing
+     to a file (and reading in with the read method).
+
+get_date_as_seconds ELEMENT
+     This handles the strict IAFA format as well as a format of YYYY-MM-DD
+     and a raw decimal number-of-seconds.
+
+decode_uri_element VALUE
+     Return a list of three elements from decoding the VALUE as a URI
+     element: the base file name, the full path and the destination path
+     (if a symlink).  If the URI is just a plain URI, the full path will be
+     empty.
+
+encode_uri_element URI =item encode_uri_element FILE, PATH
+     Return an encoding for either a *URI* or a local FILE and its remote
+     PATH (symlink).
+
+order_template_type TEMPLATE-TYPE
+     Return an ordering of the *TEMPLATE-TYPE* suitable for sort.
+
+SEE ALSO
+========
+
+   *Note Metadata/Base: Metadata/Base,, *Note Text/Wrap: Text/Wrap,
+
+AUTHOR
+======
+
+   By Dave Beckett - http://purl.org/net/dajobe/
+
+COPYRIGHT
+=========
+
+   Copyright (C) 1997-2001 Dave Beckett - http://purl.org/net/dajobe/ All
+rights reserved.
+
+
+File: pm.info,  Node: Metadata/SOIF,  Next: Mhash,  Prev: Metadata/IAFA,  Up: Module List
+
+SOIF object metadata class
+**************************
+
+NAME
+====
+
+   Metadata::SOIF - SOIF object metadata class
+
+SYNOPSIS
+========
+
+     use Metadata::SOIF
+     ...
+     $i=new Metadata::SOIF;
+     $i->set('element1', [qw(v1 v2 v3)]);
+     $i->set('element2', 'v2');
+
+     my $val=$i->get('element2);
+     for my $v ($i->get('element1') {
+       ...
+     }
+     ...
+
+DESCRIPTION
+===========
+
+   The Metadata::SOIF class supports SOIF objects metadata using the *Note
+Metadata/Base: Metadata/Base, class and customises it for SOIF objects
+where element names have *variants* to represent to sub-values.
+
+   SOIF was developed by the Harvest project - the Structured Objects
+Interchange Format - to be used for distributed resource discovery.  See
+the Harvest Project home page at http://harvest.transarc.com/ for more
+details.
+
+CONSTRUCTOR
+===========
+
+new [OPTIONS]
+     An optional hash of options can be given to the constructor to set
+     various options.  There are currently two *Metadata::SOIF* options
+     defined:
+
+    DEBUG
+          This class has a separate debug class / object method that works
+          in the same fashion as the *Metadata::Base* method debug.
+          Setting it here also sets the debugging on the base
+          *Metadata::Base* object too.
+
+    SPLIT
+          In the read method, split the SOIF values on newlines to give
+          multiple subvalues (default off).
+
+METHODS
+=======
+
+   The methods here describe the differences from the *Note Metadata/Base:
+Metadata/Base, class methods.
+
+template_type [TEMPLATE TYPE]
+     The template type of the metadata can be set by this method if an
+     *TEMPLATE TYPE* is given.  The old value is returned when it is set or
+     returned when this method is called with no arguments.
+
+url [URL]
+     The URL of the metadata can be set by this method if an URL is given.
+     The old value is returned when it is set or returned when this method
+     is called with no arguments.
+
+read HANDLE, [URL]
+     Implements reading a single SOIF object from the given *HANDLE*.
+     Optionally allows the setting of the SOIF URL for the object in
+     preference for the one read from the *HANDLE*
+
+format [URL]
+     Returns a formatted version of the SOIF object suitable for writing
+     to a file (and reading in with the read method).  Optionally allows
+     the setting of the object URL to use in formatting.
+
+SEE ALSO
+========
+
+   *Note Metadata/Base: Metadata/Base,
+
+AUTHOR
+======
+
+   By Dave Beckett <*D.J.Beckett@ukc.ac.uk*>.
+
+COPYRIGHT
+=========
+
+   Copyright 1997 Dave Beckett.  All rights reserved.
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Mhash,  Next: Mmap,  Prev: Metadata/SOIF,  Up: Module List
+
+Perl extension for Mhash Hash library
+*************************************
+
+NAME
+====
+
+   Mhash - Perl extension for Mhash Hash library
+
+DISCLAIMER
+==========
+
+   If you have use for this, please try and use it and report any bugs you
+find.  Feedback and comments from users of this module is important for
+further development.
+
+SYNOPSIS
+========
+
+A STANDARD HASHING EXAMPLE
+--------------------------
+
+     use Mhash qw( mhash_hex ) ;
+     my $data  = "this is my secret data";
+     $hash_hex = mhash_hex(Mhash::MHASH_MD5, $data) ;
+
+AN EXAMPLE PROGRAM USING HMAC
+-----------------------------
+
+     use Mhash qw( mhash_hmac_hex ) ;
+     my $key  = "Jefe" ;
+     my $data = "what do ya want for nothing?" ;
+     my $hash_hex = mhash_hmac_hex(Mhash::MHASH_MD5, $data, $key) ;
+     # $hash_hex should be 750c783e6ab0b503eaa86e310a5db738 according to RFC 2104.
+
+     **NOTE** Please read the section on EXPORT TAGS below for information on the MHASH_ constants and the how to manage your namespace.
+
+DEPENDENCIES
+============
+
+   This interface is dependent on the MHASH library.  Please download and
+install the latest mhash-x.x.x.tar.gz at ftp://mhash.sourceforge.net/dl/.
+As of this writing, the latest is mhash-0.8.3.tar.gz.  Additional
+information about the mhash library can be found at
+http://mhash.sourceforge.net.
+
+   The MHASH library MUST be found in your library path when using this
+module.  In Linux, libmhash is defaultly installed in /usr/local/lib - in
+this case, be sure that the /usr/local/lib path is in your
+/etc/ld.so.conf.  Don't forget to run /sbin/ldconfig to update your linker
+cache after mhash library installation!
+
+DESCRIPTION
+===========
+
+   This is an perl interface to the Mhash hash library, which provides a
+uniform interface to a large number of hash algorithms (also known as
+"one-way" algorithms).  These algorithms can be used to compute checksums,
+message digests, and other signatures. Mhash support HMAC generation (a
+mechanism for message authentication using cryptographic hash functions,
+and is described in RFC2104). HMAC can be used to create message digests
+using a secret key, so that these message digests cannot be regenerated
+(or replaced) by someone else.  At the time of writing this, the library
+supports the algorithms: SHA1, GOST, HAVAL, MD5, RIPEMD160, TIGER, and
+CRC32 checksums.
+
+   Here is the list of hash constants which are currently supported by the
+Mhash module:
+
+     MHASH_CRC32
+
+     MHASH_MD5
+
+     MHASH_SHA1
+
+     MHASH_GOST
+
+     MHASH_RIPEMD160
+
+     MHASH_TIGER
+
+     MHASH_GOST
+
+     MHASH_CRC32B
+
+     MHASH_HAVAL224
+
+     MHASH_HAVAL192
+
+     MHASH_HAVAL160
+
+EXPORT TAGS
+===========
+
+:Functions
+----------
+
+     This tag exports all the functions related to Mhash.  This tag should be imported for convenience unless you are going to be importing specific functions into your namespace by hand.  This tag is automatically imported if no export tags are supplied as in the above example.
+
+   The following functions are imported with this export tag:
+
+   mhash mhash_hex mhash_hmac mhash_hmac_hex mhash_count
+mhash_get_block_size mhash_get_hash_name
+
+   example:
+
+     use Mhash;
+         OR
+     use Mhash(:Functions) ;
+
+:Types
+------
+
+     This tag exports the cipher constants defined by the list of hash types above in DESCRIPTION.  It is recommended you import this tag for ease of use.  If you are concerned with polluting your namespace, do not import this tag, and use the form Mhash::MHASH_HASHNAME when supplying the cipher to the Mhash functions.
+
+   example:
+
+     use Mhash(:Types :Functions) ;
+     $blah = mhash(MHASH_MD5, $data) ;
+
+PROGRAMMING FUNCTIONS AND METHODS
+=================================
+
+   The following methods are available:
+
+   mhash(), mhash_hex()
+
+   mhash() applies a hash function specified by hash to the data and
+returns the resulting hash (also called digest).   mhash_hex() computes
+the hash and returns the hash value in hexadecimal form.
+
+     $hash = mhash($hash, $data) ;
+
+   $hash is one of the MHASH_ciphername constants.
+
+   $data is the data which shall be hashed.
+
+   mhash_hmac(), mhash_hmac_hex()
+
+     mhash_hmac() computes a HMAC hash and returns the binary hash value.
+     mhash_hmac_hex() computes a HMAC hash and returns the hash value in hexadecimal form.
+
+     $hash_hmac = mhash_hmac($hash, $data, $key) ;
+
+   $hash is one of the MHASH_ciphername constants.
+
+   $data is the data which shall be hashed.
+
+   $key is the key supplied to the hash algorithm. It must be kept secret.
+It should be the blocksize of the current hash - use
+mhash_get_block_size() to get the blocksize.
+
+   mhash_get_block_size()
+
+   Mhash_get_block_size() is used to get the size of a block of the
+specified hash.  Mhash_get_block_size() takes one argument, the hash and
+returns the size in bytes or false, if the hash does not exist.
+
+     $blocksize = mhash_get_block_size($hash) ;
+
+   $hash is one of the MHASH_ciphername constants.
+
+   mhash_get_hash_name()
+
+     Mhash_get_hash_name() gets the name of the specified hash.  Mhash_get_hash_name() takes one argument, the hash and returns the name of the hash as a string or false, if the hash does not exist.
+
+     $hashname = mhash_get_hash_name($hash) ;
+
+   $hash is one of the MHASH_ciphername constants.
+
+   mhash_count()
+
+     Mhash_count() returns the highest available hash id. Hashes are numbered from 0 to this hash id.
+
+     Mhash_count() takes no arguments.
+
+TODO
+====
+
+     - More bug testing.
+     - detection of libmhash installation
+     - support for the key generation functions of mhash
+
+AUTHOR
+======
+
+   Kuo, Frey. <kero@3SHEEP.COM>.
+
+CREDITS
+-------
+
+   Mavroyanopoulos, Nikos <nmav@hellug.gr>, Schumann, Sasha
+<sascha@schumann.2ns.de> - for the libmhash library.
+
+SEE ALSO
+========
+
+   mhash(3).
+
+
+File: pm.info,  Node: Mmap,  Next: Modem/VBox,  Prev: Mhash,  Up: Module List
+
+uses mmap to map in a file as a perl variable
+*********************************************
+
+NAME
+====
+
+   Mmap - uses mmap to map in a file as a perl variable
+
+SYNOPSIS
+========
+
+     use Mmap;
+
+     mmap($foo, 0, PROT_READ, MAP_SHARED, FILEHANDLE) or die "mmap: $!";
+     @tags = $foo =~ /<(.*?)>/g;
+     munmap($foo) or die "munmap: $!";
+     
+     mmap($bar, 8192, PROT_READ|PROT_WRITE, MAP_SHARED, FILEHANDLE);
+     substr($bar, 1024, 11) = "Hello world";
+
+DESCRIPTION
+===========
+
+   The Mmap module lets you use mmap to map in a file as a perl variable
+rather than reading the file into dynamically allocated memory. It depends
+on your operating system supporting UNIX or POSIX.1b mmap, of course. You
+need to be careful how you use such a variable. Some programming
+constructs may create copies of a string which, while unimportant for
+smallish strings, are far less welcome if you're mapping in a file which
+is a few gigabytes big. If you use PROT_WRITE and attempt to write to the
+file via the variable you need to be even more careful. One of the few
+ways in which you can safely write to the string in-place is by using
+substr as an lvalue and ensuring that the part of the string that you
+replace is exactly the same length.
+
+mmap(VARIABLE, LENGTH, PROTECTION, FLAGS, FILEHANDLE, OFFSET)
+     Maps LENGTH bytes of (the underlying contents of) FILEHANDLE into your
+     address space, starting at offset OFFSET and makes VARIABLE refer to
+     that memory. The OFFSET argument can be omitted in which case it
+     defaults to zero. The LENGTH argument can be zero in which case a
+     stat is done on FILEHANDLE and the size of the underlying file is
+     used instead.
+
+     The PROTECTION argument should be some ORed combination of the
+     constants PROT_READ, PROT_WRITE and PROT_EXEC or else PROT_NONE. The
+     constants PROT_EXEC and PROT_NONE are unlikely to be useful here but
+     are included for completeness.
+
+     The FLAGS argument must include either MAP_SHARED or MAP_PRIVATE (the
+     latter is unlikely to be useful here).  If your platform supports it,
+     you may also use MAP_ANON or MAP_ANONYMOUS.  If your platform
+     supplies MAP_FILE as a non-zero constant (necessarily non-POSIX) then
+     you should also include that in FLAGS. POSIX.1b does not specify
+     MAP_FILE as a FLAG argument and most if not all versions of Unix have
+     MAP_FILE as zero.
+
+     mmap returns 1 on success and undef on failure.
+
+munmap(VARIABLE)
+     Unmaps the part of your address space which was previously mapped in
+     with a call to `mmap(VARIABLE, ...)' and makes VARIABLE become
+     undefined.
+
+     munmap returns 1 on success and undef on failure.
+
+Constants
+     The Mmap module exports the following constants into your namespace
+      MAP_SHARED MAP_PRIVATE MAP_ANON MAP_ANONYMOUS MAP_FILE
+     PROT_EXEC PROT_NONE PROT_READ PROT_WRITE
+
+     Of the constants beginning MAP_, only MAP_SHARED and MAP_PRIVATE are
+     defined in POSIX.1b and only MAP_SHARED is likely to be useful.
+
+AUTHOR
+======
+
+   Malcolm Beattie, 21 June 1996.
+
+
+File: pm.info,  Node: Modem/VBox,  Next: Modem/Vgetty,  Prev: Mmap,  Up: Module List
+
+Perl module for creation of voiceboxes.
+***************************************
+
+NAME
+====
+
+   Modem::VBox - Perl module for creation of voiceboxes.
+
+SYNOPSIS
+========
+
+     use Modem::VBox;
+
+DESCRIPTION
+===========
+
+   Oh well ;) Not written yet! An example script (`vbox') is included in
+the distro, though.
+
+AUTHOR
+======
+
+   Marc Lehmann <pcg@goof.com>.
+
+SEE ALSO
+========
+
+   perl(1), *Note Modem/Vgetty: Modem/Vgetty, a similar but uglier
+interface.
+
+
+File: pm.info,  Node: Modem/Vgetty,  Next: Module/Check_Args,  Prev: Modem/VBox,  Up: Module List
+
+interface to vgetty(8)
+**********************
+
+NAME
+====
+
+   Modem::Vgetty - interface to vgetty(8)
+
+SYNOPSIS
+========
+
+     use Modem::Vgetty;
+     $v = new Modem::Vgetty;
+
+     $string = $v->receive;
+     $v->send($string);
+     $string = $v->expect($str1, $str2, ...);
+     $v->waitfor($string);
+     $rv = $v->chat($expect1, $send1, $expect2, $send2, ...);
+
+     $ttyname = $v->getty;
+     $rv = $v->device($dev_type);
+     $rv = $v->autostop($bool);
+     $rv = $v->modem_type; # !!! see the docs below.
+
+     $rv = $v->beep($freq, $len);
+     $rv = $v->dial($number);
+     $rv = $v->play($filename);
+     $rv = $v->record($filename);
+     $rv = $v->wait($seconds);
+     $rv = $v->play_and_wait($filename);
+     $v->stop;
+
+     $v->add_handler($event, $handler_name, $handler);
+     $v->del_handler($event, $handler_name);
+     $v->enable_events;
+     $v->disable_events;
+
+     $number = $v->readnum($message, $tmout, $repeat);
+
+     $v->shutdown;
+
+DESCRIPTION
+===========
+
+   `Modem::Vgetty' is an encapsulation object for writing applications for
+voice modems using the *vgetty(8)* or *vm(8)* package. The answering
+machines and sofisticated voice applications can be written using this
+module.
+
+OVERVIEW
+========
+
+   *Voice modem* is a special kind of modem, which (besides the normal
+data and/or fax mode) can communicate also in voice mode. It means it can
+record sounds it hears from the phone line to the file, Play-back recorded
+files, it can beep to the line, and it can detect various standard sounds
+coming from the line (busy tone, silence, dual tone modulation frequency
+(DTMF) keypad tones, etc).  An example of the voice modem can be the ZyXEL
+U1496, US Robotics Sportster (not Courier), etc.
+
+   To use this software with the voice modem you need to have the
+*vgetty(8)* package installed. *Vgetty* is distributed as a part of
+*mgetty* package. In fact, *vgetty* is a *mgetty(8)* with the voice
+extensions. Vgetty has some support for scripting - when it receives an
+incoming call, it runs a voice shell (it is program specified in the
+*voice.conf* file) as its child process, establishes the read and write
+pipes to it, and tells it the number of the appropriate descriptors in the
+environment variables. Voice shell can now communicate with *vgetty*. It
+can tell *vgetty* "Play this file", or "Record anything you hear to that
+file", or "Notify me when user hangs up", etc. Sophisticated voice systems
+and answering machines can be build on top of *vgetty*.
+
+   *mgetty* (including the *vgetty*) is available at the following URL:
+
+     ftp://alpha.greenie.net/pub/mgetty/
+
+   Originally there was a (Bourne) shell interface to *vgetty* only.  The
+*Modem::Vgetty* module allows user to write the voice shell in Perl.  The
+typical use is to write a script and point the *vgetty* to it (in
+*voice.conf* file). The script will be run when somebody calls in.
+Another use is running voice shell from the *vm(8)* program, which can for
+example dial somewhere and say something.
+
+QUICK START
+===========
+
+     #!/usr/bin/perl
+     use Modem::Vgetty;
+     my $v = new Modem::Vgetty;
+     $v->add_handler('BUSY_TONE', 'endh', sub { $v->stop; exit(0); });
+     local $SIG{ALRM} = sub { $v->stop; };
+     $v->enable_events;
+     $v->record('/tmp/hello.rmd');
+     alarm(20);
+     $v->waitfor('READY');
+     $v->shutdown;
+
+   The above example installs the simple `exit now'-style handler for the
+BUSY_TONE event (which is sent by *vgetty* when user hangs up) and then
+records the *hello.rmd* file. Put this text into a file and then point
+*vgetty* to it in the *voice.conf*. After you dial into your voice modem,
+you can record a 20-seconds of some message.  Verify that */tmp/hello.rmd*
+exists. Now delete the line contaning the word "record" and two subsequent
+lines and insert to the file the following line instead of them:
+
+     $v->play_and_wait('/tmp/hello.rmd');
+
+   Now call the voice modem and listen to the sounds you have just
+recorded.
+
+METHODS
+=======
+
+Begin and end of communication
+------------------------------
+
+   The *Modem::Vgetty* object will initialize the communication pipes to
+the *vgetty* at the creation time - in the constructor. The closing of the
+communication is done via the shutdown method:
+
+     $v->shutdown;
+
+   The module will call this method itself from the destructor, if you do
+not call it explicitly.
+
+Low-level communication
+-----------------------
+
+   Users probably don't want to use these methods directly. Use the
+higher-level functions instead.
+
+receive
+     This method returns a string received from the *vgetty*. It parses
+     the string for the event types and runs appropriate event handlers.
+     If event handler is run it waits for another string.
+
+send($string)
+     This method sends the string $string to the *vgetty* process.
+
+expect($string1, $string2, ...)
+     Receives a string from *vgetty* (using the receive method described
+     above) and returns it iff it is equal to one of the strings in the
+     argument list. When something different is received, this method
+     returns undef.
+
+waitfor($string)
+     Waits until the string *$sring* is received from *vgetty* (using the
+     receive method described above).  =item chat($expect1, $sent1,
+     $expect2, $sent2, ...)
+
+     A chat-script with *vgetty*. Arguments are interpreted as the
+     received-sent string pairs. A received string equals to the empty
+     string means that no receive method will be called at that place.
+     This can be used for constructing chat scripts beginning with the
+     sent string instead of the received one.
+
+Vgetty control methods
+----------------------
+
+   There are miscellaneous methods for controllig *vgetty* and querying its
+status.
+
+getty
+     Returns the name of the modem special file (e.g. */dev/ttyC4*).
+
+device($name)
+     Sets the port of the voice modem input and output is done to.
+     Possible values are qw(NO_DEVICE DIALUP_LINE EXTERNAL_MICROPHONE
+     INTERNAL_SPEAKER LOCAL_HANDSET).
+
+autostop($bool)
+     With autostop on, the voicelib will automatically abort a play in
+     progress and return READY. This is useful for faster reaction times
+     for voice menus. Possible arguments are qw(ON OFF).  Note: The
+     interface should probably be changed to accept the Perl boolean
+     arguments (undef, something else). Returns defined value on success,
+     undef on failure.
+
+modem_type
+     *vgetty* currently has no way of telling voice shell the type of the
+     current modem. This method is a proposed interface for determining
+     this type. Currently returns undef. The appropriate low-level
+     interface has to be implemented in *vgetty* first.
+
+Voice commands
+--------------
+
+beep($freq, $len)
+     Sends a beep through the chosen device using given frequency (HZ) and
+     length (in miliseconds).  Returns a defined value on success or undef
+     on failure.  The state of the vgetty changes to "BEEPING" and *vgetty*
+     returns "READY" after a beep is finshed. Example:
+
+          $v->beep(50,10);
+          # Possibly do something else
+          $v->waitfor('READY');
+
+dial($number)
+     Modem tries to dial a given number. The *vgetty* changes its state to
+     "DIALING" and returns "READY" after the dialing is finished.
+
+play($filename)
+     The *vgetty* tries to play the given file as a raw modem data.  See
+     the "Voice data" section for details on creating the raw modem data
+     file. It changes the state to "PLAYING" and returns "READY" after
+     playing the whole file.
+
+record($filename)
+     The *vgetty* records the voice it can hear on the line to the given
+     file.  It uses the raw modem data format (which can be re-played
+     using the play subroutine). *vgetty* changes its state to "RECORDING"
+     and you need to manually stop the recording using the stop method
+     after some time (or, you can set *autostop* and wait for any event -
+     silence, busy tone, etc).
+
+wait($seconds)
+     The modem waits for a given number of seconds. Changes its state to
+     "WAITING" and returns "READY" after the wait is finished. Example:
+
+          $v->wait(5);
+          $v->waitfor('READY');
+
+stop
+     The *vgetty* stops anything it is currently doing and returns to the
+     command state. You must use stop when you want to call another
+     *beep*, *dial*, play, record or wait before the previous one is
+     finished. The *vgetty* returns "READY" after the stop is called. So
+     it is possible to interrupt a main routine waiting for "READY" from
+     the event handler:
+
+          my $dtmf;
+          $v->add_handler('RECEIVED_DTMF', 'readnum',
+          	sub { my $self=shift; $self->stop; $dtmf = $_[2]; });
+          $v->enable_events;
+          $v->wait(10);
+          $v->waitfor('READY');
+
+     In the previous example the waitfor method can be finished either by
+     the 10-second timeout expired, or by the 'READY' generated by the
+     stop in the event handler. See also the Events section.
+
+play_and_wait($file)
+     It is an abbreviation for the following:
+
+          $v->play($file);
+          $v->waitfor('READY');
+
+     It is repeated so much time in the voice applications so I have
+     decided to make a special routine for it. I may add the similar
+     routines for *dial*, record, *beep* and even wait in the future
+     releases.
+
+Event handler methods
+---------------------
+
+add_handler($event, $handler_name, $handler)
+     Installs a call-back routine $handler for the event type $event.  The
+     call-back routine is called with three arguments. The first one is
+     the Modem::Vgetty object itself, the second one is the event name and
+     the third one is optional event argument.  The *$handler_name*
+     argument can be anything. It is used when you want to delete this
+     handler for identificating it.
+
+del_handler($event, $handler_name)
+     This method deletes the handler $handler_name for the $event event.
+     The result of unregistering the handler from the event handler of the
+     same event is unspecified. It may or may not be called.
+
+enable_events
+     Tells the *vgetty* that the voice shell is willing to dispatch events.
+     No events are sent by *vgetty* until this method is called.
+
+disable_events
+     Tells the *vgetty* that the voice shell doesn't want to receive any
+     events anymore.
+
+The *readnum* method
+--------------------
+
+readnum($message, $tmout, $repeat)
+     The applications often need to read the multi-digit number via the
+     DTMF tones.  This routine plays the *$message* to the voice object
+     and then waits for the sequence of the DTMF keys finished by the `#'
+     key. If no key is pressed for *$tmout* of seconds, it re-plays the
+     message again. It returns failure if no key is pressed after the
+     message is played *$repeat*-th time. It returns a string (a sequence
+     of DTMF tones 0-9,A-D and `*') without the final `#'. When some DTMF
+     tones are received and no terminating `#' or other tone is received
+     for *$tmout* seconds, the routine returns the string it currently has
+     without waiting for the final '#'.  DTMF tones are accepted even at
+     the time the *$message* is played.  When the DTMF tone is received,
+     the playing of the *$message* is (with some latency, of course)
+     stopped.
+
+     NOTE: The interface of this routine can be changed in future releases,
+     because I am not (yet) decided whether the current interface is the
+     best one.  See also the EXAMPLES section where the source code of
+     this routine (and its co-routine) is discussed.
+
+EVENTS
+======
+
+Introduction
+------------
+
+   Events are asynchronous messages sent by *vgetty* to the voice shell.
+The *Modem::Vgetty* module dispatches events itself in the receive method.
+User can register any number of handlers for each event.  When an event
+arrives, all handlers for that event are called (in no specified order).
+
+Event types
+-----------
+
+   At this time, the *Modem::Vgetty* module recognizes the following event
+types (description is mostly re-typed from the *vgetty* documentation):
+
+BONG_TONE
+     The modem detected a bong tone on the line.
+
+BUSY_TONE
+     The modem detected busy tone on the line (when dialing to the busy
+     number or when caller finished the call).
+
+CALL_WAITING
+     Defined in IS-101 (I think it is when the line receives another
+     call-in when some call is already in progress. -Yenya).
+
+DIAL_TONE
+     The modem detected dial tone on the line.
+
+DATA_CALLING_TONE
+     The modem detected data calling tone on the line.
+
+DATA_OR_FAX_DETECTED
+     The modem detected data or fax calling tones on the line.
+
+FAX_CALLING_TONE
+     The modem detected fax calling tone on the line.
+
+HANDSET_ON_HOOK
+     Locally connected handset went on hook.
+
+HANDSET_OFF_HOOK
+     Locally connected handset went off hook.
+
+LOOP_BREAK
+     Defined in IS-101.
+
+LOOP_POLARITY_CHANGE
+     Defined in IS-101.
+
+NO_ANSWER
+     After dialing the modem didn't detect answer for the time give in
+     dial_timeout in voice.conf.
+
+NO_DIAL_TONE
+     The modem didn't detect dial tone (make sure your modem is connected
+     properly to your telephone company's line, or check the ATX command
+     if dial tone in your system differs from the standard).
+
+NO_VOICE_ENERGY
+     It means that the modem detected voice energy at the beginning of the
+     session, but after that there was a period of some time of silence
+     (the actual time can be set using the *rec_silence_len* and
+     *rec_silence_treshold* parameters in *voice.conf*).
+
+RING_DETECTED
+     The modem detected an incoming ring.
+
+RINGBACK_DETECTED
+     The modem detected a ringback condition on the line.
+
+RECEIVE_DTMF
+     The modem detected a dtmf code. The actual code value (one of 0-9, *,
+     #, A-D) is given to the event handler as the third argument.
+
+SILENCE_DETECTED
+     The modem detected that there was no voice energy at the beginning of
+     the session and after some time of silence (the actual time can be
+     set using the *rec_silence_len* and *rec_silence_treshold* parameters
+     in *voice.conf*).
+
+SIT_TONE
+     Defined in IS-101.
+
+TDD_DETECTED
+     Defined in IS-101.
+
+VOICE_DETECTED
+     The modem detected a voice signal on the line. IS-101 does not
+     define, how the modem makes this decision, so be careful.
+
+UNKNOWN_EVENT
+     None of the above :)
+
+VOICE DATA
+==========
+
+   Voice shell can send the voice data to the modem using the play method
+and record them using the record method. The ".rmd" extension (Raw Modem
+Data) is usually used for these files. The ".rmd" is not a single format -
+every modem has its own format (sampling frequency, data bit depth, etc).
+There is a *pvftools* package for converting the sound files (it is a set
+of filters similar to the *netpbm* for image files). The *pvftormd(1)*
+filter can be used to create the RMD files for all known types of modems.
+
+EXAMPLES
+========
+
+Answering machine
+-----------------
+
+   A simple answering machine can look like this:
+
+     #!/usr/bin/perl
+     use Modem::Vgetty;
+     	my $voicemaster = 'root@localhost';
+     	my $tmout = 30;
+     	my $finish = 0;
+     my $v = new Modem::Vgetty;
+     $v->add_handler('BUSY_TONE', 'finish',
+     		sub { $v->stop; $finish=1; });
+     $v->add_handler('SILENCE_DETECTED', 'finish',
+     		sub { $v->stop; $finish=1; });
+     	local $SIG{ALRM} = sub { $v->stop; };
+     $v->enable_events;
+     $v->play_and_wait('/path/welcome.rmd');
+     $v->beep(100,10);
+     	$v->waitfor('READY');
+     	if ($finish == 0) {
+     		my $num = 0;
+     		$num++ while(-r "/path/$num.rmd");
+     		$v->record("/path/$num.rmd");
+     		alarm $tmout;
+     		$v->waitfor('READY');
+     	}
+     	system "echo 'Play with rmdtopvf /path/$num.rmd|pvftoau >/dev/audio'" .
+     		 " | mail -s 'New voice message' $voicemaster";
+     exit 0;
+
+   See the *examples/answering_machine.pl* in the source distribution,
+which contains a more configurable version of the above text.  It first
+sets the event handlers for the case of busy tone (the caller hangs up) or
+silence (the caller doesn't speak at all). The handler stops *vgetty* from
+anything it is currently doing and sets the $finish variable to 1. Then
+the reception of the events is enabled and the welcome message is played.
+Then the answering machine beeps and starts to record the message. Note
+that we need to check the $finish variable before we start recording to
+determine if user hanged up the phone. Now we find the first filename
+<number>.rmd such that this file does not exist and we start to record the
+message to this file. We record until user hangs up the phone or until the
+timeout occurs.
+
+Readnum routine
+---------------
+
+   An interesting application of the low-level routines is the
+*Voice::Modem::readnum* method. The calling sequence of this method has
+been discussed above. The source code for this routine and its co-routine
+will be discussed here, so that you can write your own variants of
+*readnum* (which in fact does not have too general interface). See also
+the source code of *Vgetty.pm* for the *readnum* source.
+
+   The *readnum* routine needs to have its own event handler for the
+*RECEIVED_DTMF* event and the way the handler can communicate with this
+routine. In our solution we use "static" variables:
+
+     my $_readnum_number = '';
+     my $_readnum_timeout = 10;
+     my $_readnum_in_timeout = 1;
+
+   The event handler will add the new character to the end of the
+*$_readnum_number* variable. The *$_readnum_timeout* is the number of
+seconds both *readnum* and the event handler should wait for the next
+keypress, and the *$_readnum_in_timeout* is a flag used by the event
+handler for notifying the main *readnum* routine that it forced the
+*vgetty* to emit the `READY' message because of the final `#' has been
+received.
+
+     sub _readnum_event {
+     	my $self = shift;
+     	my $input = shift; # Unused. Should be 'RECEIVED_DTMF'.
+     	my $dtmf = shift;
+
+     if ($dtmf eq '#') { # Stop the reading now.
+     	$_readnum_in_timeout = 0;
+     	$self->stop;
+     	$self->{LOG}->print("_readnum_event(): Got #; stopping\n");
+     	return;
+     }
+     $_readnum_number .= $dtmf;
+     $self->stop;
+     $self->expect('READY');
+     # Restart the wait again.
+     $_readnum_in_timeout = 1;
+     $self->wait($_readnum_timeout);
+     	}
+
+   The event handler is installed for the `RECEIVED_DTMF' event only, so it
+doesn't need to check for the *$input* value. The actual DTMF key is in
+the third parameter, *$dtmf*. Note that the handler will be called when
+*vgetty* is PLAYING or WAITING and the *readnum* routine will be waiting
+for the `READY' message. This allows us to immediately interrupt waiting
+by the *$self-*stop> (which emits the `READY' message).  So when the `#'
+DTMF tone is received, we send a stop to *vgetty*.  If something else is
+received, we stop the *vgetty* too but we enter a new wait using
+*$self-*wait>.
+
+     sub readnum {
+     	my $self = shift;
+     	my $message = shift;
+     	my $timeout = shift;
+     	my $times = shift;
+     	$_readnum_number = '';
+     	$_readnum_in_timeout = 1;
+     	$_readnum_timeout = $timeout if $timeout != 0;
+     	$times = 3 if $times == 0;
+
+     # Install the handler.
+     $self->add_handler('RECEIVED_DTMF', 'readnum', \&_readnum_event);
+     while($_readnum_in_timeout != 0 && $_readnum_number eq ''
+     	&& $times-- > 0) {
+     	$self->play_and_wait($message);
+     	last if $_readnum_in_timeout == 0;
+     	while ($_readnum_in_timeout != 0) {
+     		$self->wait($_readnum_timeout);
+     		$self->expect('READY');
+     	}
+     }
+     return undef if $times < 0;
+     $self->del_handler('RECEIVED_DTMF', 'readnum');
+     $self->stop;
+     $self->expect('READY');
+     $_readnum_number;
+     	}
+
+   The *readnum* routine just sets up the event handler, then plays the
+*$message* and waits for the input (possibly several times).  The main
+work is done in the event handler. At the end the handler is unregistered
+and the final value is returned.
+
+Callme script
+-------------
+
+   In the examples subdirectory of the source distribution there is a
+*callme.pl* script. This dials the given number and plays the given
+message. Use the following command to run it:
+
+     vm shell -S /usr/bin/perl callme.pl <number> <message>.rmd
+
+BUGS
+====
+
+   There may be some, but it will more likely be in the *vgetty* itself.
+On the other hand, there can be typos in this manual (English is not my
+native language) or some parts of the interface that should be redesigned.
+Feel free to mail any comments on this module to me.
+
+TODO
+====
+
+Modem type recognition
+     The *vgetty* should be able to tell the voice shell the name of the
+     current modem type.
+
+The _wait() routines
+     I need to implement the routines similar to *play_and_wait* for other
+     *vgetty* states as well.
+
+Debugging information
+     The module has currently some support for writing a debug logs (use
+     the $Modem::Vgetty::testing = 1 and watch the /var/log/voicelog
+     file). This needs to be re-done using (I think) Sys::Syslog.  I need
+     to implement some kind of log-levels, etc.
+
+Mgetty/Vgetty 1.1.17
+     Need to figure out what is new in 1.1.17 (I use 1.1.14 now). I think
+     new *vgetty* can play more than one file in the single `PLAY' command,
+     it (I think) have some support for sending voice data from/to the
+     voice shell via the pipe, etc.
+
+AUTHOR
+======
+
+   The *Modem::Vgetty* package was written by Jan "Yenya" Kasprzak
+<kas@fi.muni.cz>. Feel free to mail me any suggestions etc.  on this
+module. Module itself is available from CPAN, but be sure to check the
+following address, where the development versions can be found:
+
+     http://www.fi.muni.cz/~kas/vgetty/
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1998 Jan "Yenya" Kasprzak <kas@fi.muni.cz>. All rights
+reserved. This package is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.
+
+

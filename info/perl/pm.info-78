@@ -1,0 +1,1606 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: CGI3/Fast,  Next: CGI3/Pretty,  Prev: CGI3,  Up: Module List
+
+CGI3 Interface for Fast CGI3
+****************************
+
+NAME
+====
+
+   CGI3::Fast - CGI3 Interface for Fast CGI3
+
+SYNOPSIS
+========
+
+     use CGI3::Fast qw(:standard);
+     $COUNTER = 0;
+     while (new CGI3::Fast) {
+     print header;
+     print start_html("Fast CGI3 Rocks");
+     print
+         h1("Fast CGI3 Rocks"),
+         "Invocation number ",b($COUNTER++),
+             " PID ",b($$),".",
+         hr;
+         print end_html;
+     }
+
+DESCRIPTION
+===========
+
+   CGI3::Fast is a subclass of the CGI3 object created by CGI3.pm.  It is
+specialized to work well with the Open Market FastCGI3 standard, which
+greatly speeds up CGI3 scripts by turning them into persistently running
+server processes.  Scripts that perform time-consuming initialization
+processes, such as loading large modules or opening persistent database
+connections, will see large performance improvements.
+
+OTHER PIECES OF THE PUZZLE
+==========================
+
+   In order to use CGI3::Fast you'll need a FastCGI3-enabled Web server.
+Open Market's server is FastCGI3-savvy.  There are also freely
+redistributable FastCGI3 modules for NCSA httpd 1.5 and Apache.
+FastCGI3-enabling modules for Microsoft Internet Information Server and
+Netscape Communications Server have been announced.
+
+   In addition, you'll need a version of the Perl interpreter that has
+been linked with the FastCGI3 I/O library.  Precompiled binaries are
+available for several platforms, including DEC Alpha, HP-UX and
+SPARC/Solaris, or you can rebuild Perl from source with patches provided
+in the FastCGI3 developer's kit.  The FastCGI3 Perl interpreter can be
+used in place of your normal Perl without ill consequences.
+
+   You can find FastCGI3 modules for Apache and NCSA httpd, precompiled
+Perl interpreters, and the FastCGI3 developer's kit all at URL:
+
+     http://www.fastcgi.com/
+
+WRITING FASTCGI3 PERL SCRIPTS
+=============================
+
+   FastCGI3 scripts are persistent: one or more copies of the script are
+started up when the server initializes, and stay around until the server
+exits or they die a natural death.  After performing whatever one-time
+initialization it needs, the script enters a loop waiting for incoming
+connections, processing the request, and waiting some more.
+
+   A typical FastCGI3 script will look like this:
+
+     #!/usr/local/bin/perl    # must be a FastCGI3 version of perl!
+     use CGI3::Fast;
+     &do_some_initialization();
+     while ($q = new CGI3::Fast) {
+     &process_request($q);
+     }
+
+   Each time there's a new request, CGI3::Fast returns a CGI3 object to
+your loop.  The rest of the time your script waits in the call to new().
+When the server requests that your script be terminated, new() will return
+undef.  You can of course exit earlier if you choose.  A new version of the
+script will be respawned to take its place (this may be necessary in order
+to avoid Perl memory leaks in long-running scripts).
+
+   CGI3.pm's default CGI3 object mode also works.  Just modify the loop
+this way:
+
+     while (new CGI3::Fast) {
+     &process_request;
+     }
+
+   Calls to header(), start_form(), etc. will all operate on the current
+request.
+
+INSTALLING FASTCGI3 SCRIPTS
+===========================
+
+   See the FastCGI3 developer's kit documentation for full details.  On
+the Apache server, the following line must be added to srm.conf:
+
+     AddType application/x-httpd-fcgi .fcgi
+
+   FastCGI3 scripts must end in the extension .fcgi.  For each script you
+install, you must add something like the following to srm.conf:
+
+     AppClass /usr/etc/httpd/fcgi-bin/file_upload.fcgi -processes 2
+
+   This instructs Apache to launch two copies of file_upload.fcgi at
+startup time.
+
+USING FASTCGI3 SCRIPTS AS CGI3 SCRIPTS
+======================================
+
+   Any script that works correctly as a FastCGI3 script will also work
+correctly when installed as a vanilla CGI3 script.  However it will not
+see any performance benefit.
+
+CAVEATS
+=======
+
+   I haven't tested this very much.
+
+AUTHOR INFORMATION
+==================
+
+   Copyright 1996-1998, Lincoln D. Stein.  All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   Address bug reports and comments to: lstein@cshl.org
+
+BUGS
+====
+
+   This section intentionally left blank.
+
+SEE ALSO
+========
+
+   `CGI3::Carp' in this node, *Note CGI3: CGI3,
+
+   =cut
+
+
+File: pm.info,  Node: CGI3/Pretty,  Next: CGI3/Push,  Prev: CGI3/Fast,  Up: Module List
+
+module to produce nicely formatted HTML code
+********************************************
+
+NAME
+====
+
+   CGI3::Pretty - module to produce nicely formatted HTML code
+
+SYNOPSIS
+========
+
+     use CGI3::Pretty qw( :html3 );
+
+     # Print a table with a single data element
+     print table( TR( td( "foo" ) ) );
+
+DESCRIPTION
+===========
+
+   CGI3::Pretty is a module that derives from CGI3.  It's sole function is
+to allow users of CGI3 to output nicely formatted HTML code.
+
+   When using the CGI3 module, the following code:     print table( TR(
+td( "foo" ) ) );
+
+   produces the following output:     <TABLE><TR><TD>foo</TD></TR></TABLE>
+
+   If a user were to create a table consisting of many rows and many
+columns, the resultant HTML code would be quite difficult to read since it
+has no carriage returns or indentation.
+
+   CGI3::Pretty fixes this problem.  What it does is add a carriage return
+and indentation to the HTML code so that one can easily read it.
+
+     print table( TR( td( "foo" ) ) );
+
+   now produces the following output:     <TABLE>        <TR>
+<TD>              foo           </TD>        </TR>     </TABLE>
+
+Tags that won't be formatted
+----------------------------
+
+   The <A> and <PRE> tags are not formatted.  If these tags were
+formatted, the user would see the extra indentation on the web browser
+causing the page to look different than what would be expected.  If you
+wish to add more tags to the list of tags that are not to be touched, push
+them onto the `@AS_IS' array:
+
+     push @CGI3::Pretty::AS_IS,qw(CODE XMP);
+
+Customizing the Indenting
+-------------------------
+
+   If you wish to have your own personal style of indenting, you can
+change the `$INDENT' variable:
+
+     $CGI3::Pretty::INDENT = "\t\t";
+
+   would cause the indents to be two tabs.
+
+   Similarly, if you wish to have more space between lines, you may change
+the `$LINEBREAK' variable:
+
+     $CGI3::Pretty::LINEBREAK = "\n\n";
+
+   would create two carriage returns between lines.
+
+   If you decide you want to use the regular CGI3 indenting, you can
+easily do the following:
+
+     $CGI3::Pretty::INDENT = $CGI3::Pretty::LINEBREAK = "";
+
+BUGS
+====
+
+   This section intentionally left blank.
+
+AUTHOR
+======
+
+   Brian Paulsen <Brian@ThePaulsens.com>, with minor modifications by
+Lincoln Stein <lstein@cshl.org> for incorporation into the CGI3.pm
+distribution.
+
+   Copyright 1999, Brian Paulsen.  All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   Bug reports and comments to Brian@ThePaulsens.com.  You can also write
+to lstein@cshl.org, but this code looks pretty hairy to me and I'm not
+sure I understand it!
+
+SEE ALSO
+========
+
+   *Note CGI3: CGI3,
+
+
+File: pm.info,  Node: CGI3/Push,  Next: CGI/ASP/Lite,  Prev: CGI3/Pretty,  Up: Module List
+
+Simple Interface to Server Push
+*******************************
+
+NAME
+====
+
+   CGI3::Push - Simple Interface to Server Push
+
+SYNOPSIS
+========
+
+     use CGI3::Push qw(:standard);
+
+     do_push(-next_page=>\&next_page,
+             -last_page=>\&last_page,
+             -delay=>0.5);
+
+     sub next_page {
+         my($q,$counter) = @_;
+         return undef if $counter >= 10;
+         return start_html('Test'),
+            h1('Visible'),"\n",
+                "This page has been called ", strong($counter)," times",
+                end_html();
+       }
+
+     sub last_page {
+     my($q,$counter) = @_;
+         return start_html('Done'),
+                h1('Finished'),
+                strong($counter),' iterations.',
+                end_html;
+     }
+
+DESCRIPTION
+===========
+
+   CGI3::Push is a subclass of the CGI3 object created by CGI3.pm.  It is
+specialized for server push operations, which allow you to create animated
+pages whose content changes at regular intervals.
+
+   You provide CGI3::Push with a pointer to a subroutine that will draw
+one page.  Every time your subroutine is called, it generates a new page.
+The contents of the page will be transmitted to the browser in such a way
+that it will replace what was there beforehand.  The technique will work
+with HTML pages as well as with graphics files, allowing you to create
+animated GIFs.
+
+USING CGI3::Push
+================
+
+   CGI3::Push adds one new method to the standard CGI3 suite, do_push().
+When you call this method, you pass it a reference to a subroutine that is
+responsible for drawing each new page, an interval delay, and an optional
+subroutine for drawing the last page.  Other optional parameters include
+most of those recognized by the CGI3 header() method.
+
+   You may call do_push() in the object oriented manner or not, as you
+prefer:
+
+     use CGI3::Push;
+     $q = new CGI3::Push;
+     $q->do_push(-next_page=>\&draw_a_page);
+
+     -or-
+
+     use CGI3::Push qw(:standard);
+     do_push(-next_page=>\&draw_a_page);
+
+   Parameters are as follows:
+
+-next_page
+          do_push(-next_page=>\&my_draw_routine);
+
+     This required parameter points to a reference to a subroutine
+     responsible for drawing each new page.  The subroutine should expect
+     two parameters consisting of the CGI3 object and a counter indicating
+     the number of times the subroutine has been called.  It should return
+     the contents of the page as an array of one or more items to print.
+     It can return a false value (or an empty array) in order to abort the
+     redrawing loop and print out the final page (if any)
+
+          sub my_draw_routine {
+              my($q,$counter) = @_;
+              return undef if $counter > 100;
+              return start_html('testing'),
+                     h1('testing'),
+                 "This page called $counter times";
+          }
+
+     You are of course free to refer to create and use global variables
+     within your draw routine in order to achieve special effects.
+
+-last_page
+     This optional parameter points to a reference to the subroutine
+     responsible for drawing the last page of the series.  It is called
+     after the -next_page routine returns a false value.  The subroutine
+     itself should have exactly the same calling conventions as the
+     -next_page routine.
+
+-type
+     This optional parameter indicates the content type of each page.  It
+     defaults to "text/html".  Normally the module assumes that each page
+     is of a homogenous MIME type.  However if you provide either of the
+     magic values "heterogeneous" or "dynamic" (the latter provided for the
+     convenience of those who hate long parameter names), you can specify
+     the MIME type - and other header fields - on a per-page basis.  See
+     "heterogeneous pages" for more details.
+
+-delay
+     This indicates the delay, in seconds, between frames.  Smaller delays
+     refresh the page faster.  Fractional values are allowed.
+
+     *If not specified, -delay will default to 1 second*
+
+-cookie, -target, -expires
+     These have the same meaning as the like-named parameters in
+     CGI3::header().
+
+Heterogeneous Pages
+-------------------
+
+   Ordinarily all pages displayed by CGI3::Push share a common MIME type.
+However by providing a value of "heterogeneous" or "dynamic" in the
+do_push() -type parameter, you can specify the MIME type of each page on a
+case-by-case basis.
+
+   If you use this option, you will be responsible for producing the HTTP
+header for each page.  Simply modify your draw routine to look like this:
+
+     sub my_draw_routine {
+         my($q,$counter) = @_;
+         return header('text/html'),   # note we're producing the header here
+            start_html('testing'),
+                h1('testing'),
+            "This page called $counter times";
+     }
+
+   You can add any header fields that you like, but some (cookies and
+status fields included) may not be interpreted by the browser.  One
+interesting effect is to display a series of pages, then, after the last
+page, to redirect the browser to a new URL.  Because redirect() does
+b<not> work, the easiest way is with a -refresh header field, as shown
+below:
+
+     sub my_draw_routine {
+         my($q,$counter) = @_;
+     return undef if $counter > 10;
+         return header('text/html'),   # note we're producing the header here
+            start_html('testing'),
+                h1('testing'),
+            "This page called $counter times";
+     }
+
+     sub my_last_page {
+     header(-refresh=>'5; URL=http://somewhere.else/finished.html',
+            -type=>'text/html'),
+         start_html('Moved'),
+         h1('This is the last page'),
+     'Goodbye!'
+          hr,
+          end_html;
+     }
+
+Changing the Page Delay on the Fly
+----------------------------------
+
+   If you would like to control the delay between pages on a page-by-page
+basis, call push_delay() from within your draw routine.  push_delay()
+takes a single numeric argument representing the number of seconds you
+wish to delay after the current page is displayed and before displaying
+the next one.  The delay may be fractional.  Without parameters,
+push_delay() just returns the current delay.
+
+INSTALLING CGI3::Push SCRIPTS
+=============================
+
+   Server push scripts must be installed as no-parsed-header (NPH) scripts
+in order to work correctly.  On Unix systems, this is most often
+accomplished by prefixing the script's name with "nph-".  Recognition of
+NPH scripts happens automatically with WebSTAR and Microsoft IIS.  Users
+of other servers should see their documentation for help.
+
+AUTHOR INFORMATION
+==================
+
+   Copyright 1995-1998, Lincoln D. Stein.  All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   Address bug reports and comments to: lstein@cshl.org
+
+BUGS
+====
+
+   This section intentionally left blank.
+
+SEE ALSO
+========
+
+   `CGI3::Carp' in this node, *Note CGI3: CGI3,
+
+
+File: pm.info,  Node: CGI/ASP/Lite,  Next: CGI/Apache,  Prev: CGI3/Push,  Up: Module List
+
+a Module for ASP emulation
+**************************
+
+NAME
+====
+
+   CGI::ASP::Lite - a Module for ASP emulation
+
+SYNOPSIS
+========
+
+     use CGI::ASP::Lite;
+
+     $Response->Write("hello<br>\n");
+
+     $IE=true if $Request->ServerVariables("HTTP_USER_AGENT")->Item =~/MSIE/;
+     
+     $Response->Write("IE=$IE<br>\n");
+
+     $id    = $Request->QueryString("id")->Item;
+
+     $name  = $Request->Form("name")->Item;
+
+DESCRIPTION
+===========
+
+   Implement IIS $Request $Response objects in non-IIS environment
+Provides common CGI API across both platforms
+
+
+File: pm.info,  Node: CGI/Apache,  Next: CGI/Application,  Prev: CGI/ASP/Lite,  Up: Module List
+
+Backward compatibility module for CGI.pm
+****************************************
+
+NAME
+====
+
+   CGI::Apache - Backward compatibility module for CGI.pm
+
+SYNOPSIS
+========
+
+   Do not use this module.  It is deprecated.
+
+ABSTRACT
+========
+
+DESCRIPTION
+===========
+
+AUTHOR INFORMATION
+==================
+
+BUGS
+====
+
+SEE ALSO
+========
+
+
+File: pm.info,  Node: CGI/Application,  Next: CGI/ArgChecker,  Prev: CGI/Apache,  Up: Module List
+
+Framework for building reusable web-applications
+************************************************
+
+NAME
+====
+
+   CGI::Application - Framework for building reusable web-applications
+
+SYNOPSIS
+========
+
+     # WebApp.pm
+     package WebApp;
+     use base 'CGI::Application';
+     sub setup {
+     	my $self = shift;
+     	$self->start_mode('mode1');
+     	$self->mode_param('rm');
+     	$self->run_modes(
+     		'mode1' => \&do_stuff,
+     		'mode2' => \&do_more_stuff
+     	);
+     }
+     sub teardown {
+     	my $self = shift;
+     	# Post-response shutdown functions
+     }
+     sub do_stuff { ... }
+     sub do_more_stuff { ... }
+     
+     
+     # webapp.cgi
+     use WebApp;
+     my $webapp = WebApp->new();
+     $webapp->run();
+
+USAGE EXAMPLE
+=============
+
+   CGI::Application is intended to make it easier to create sophisticated,
+reusable web-based applications.  This module implements a methodology
+which, if followed, will make your web software easier to design, easier
+to document, easier to write, and easier to evolve.
+
+   CGI::Application builds on standard, non-proprietary technologies and
+techniques, such as the Common Gateway Interface and Lincoln D. Stein's
+excellent CGI.pm module.  CGI::Application judiciously avoids employing
+technologies and techniques which would bind a developer to any one set of
+tools, operating system or web server.
+
+   Following is an example of the typical usage of CGI::Application.
+
+   Imagine you have to write an application to search through a database
+of widgets.  Your application has three screens:
+
+     1. Search form
+     2. List of results
+     3. Detail of a single record
+
+   To write this application using CGI::Application you will create two
+files:
+
+     1. WidgetView.pm -- Your "Application Module"
+     2. widgetview.cgi -- Your "Instance Script"
+
+   The Application Module contains all the code specific to your
+application functionality, and it exists outside of your web server's
+document root, somewhere in the Perl library search path.
+
+   The Instance Script is what is actually called by your web server.  It
+is a very small, simple file which simply creates an instance of your
+application and calls an inherited method, run().  Following is the
+entirety of "widgetview.cgi":
+
+     #!/usr/bin/perl -w
+     use WidgetView;
+     my $webapp = WidgetView->new();
+     $webapp->run();
+
+   As you can see, widgetview.cgi simply "uses" your Application module
+(which implements a Perl package called "WidgetView").  Your Application
+Module, "WidgetView.pm", is somewhat more lengthy:
+
+     package WidgetView;
+     use base 'CGI::Application';
+     use strict;
+
+     # Needed for our database connection
+     use DBI;
+
+     sub setup {
+     	my $self = shift;
+     	$self->start_mode('mode1');
+     	$self->run_modes(
+     		'mode1' => \&showform,
+     		'mode2' => \&showlist,
+     		'mode3' => \&showdetail
+     	);
+
+     # Connect to DBI database
+     $self->param('mydbh' => DBI->connect());
+        }
+
+     sub teardown {
+     	my $self = shift;
+
+     # Disconnect when we're done
+     $self->param('mydbh')->disconnect();
+        }
+
+     sub showform {
+     	my $self = shift;
+
+     # Get CGI query object
+     my $q = $self->query();
+
+     my $output = '';
+     $output .= $q->start_html(-title => 'Widget Search Form');
+     $output .= $q->start_form();
+     $output .= $q->textfield(-name => 'widgetcode');
+     $output .= $q->hidden(-name => 'rm', -value => 'mode2');
+     $output .= $q->submit();
+     $output .= $q->end_form();
+     $output .= $q->end_html();
+
+     return $output;
+        }
+
+     sub showlist {
+     	my $self = shift;
+
+     # Get our database connection
+     my $dbh = $self->param('mydbh');
+
+     # Get CGI query object
+     my $q = $self->query();
+     my $widgetcode = $q->param("widgetcode");
+
+     my $output = '';
+     $output .= $q->start_html(-title => 'List of Matching Widgets');
+
+     ## Do a bunch of stuff to select "widgets" from a DBI-connected
+     ## database which match the user-supplied value of "widgetcode"
+     ## which has been supplied from the previous HTML form via a
+     ## CGI.pm query object.
+     ##
+     ## Each row will contain a link to a "Widget Detail" which
+     ## provides an anchor tag, as follows:
+     ##
+     ##   "widgetview.cgi?rm=mode3&widgetid=XXX"
+     ##
+     ##  ...Where "XXX" is a unique value referencing the ID of
+     ## the particular "widget" upon which the user has clicked.
+
+     $output .= $q->end_html();
+
+     return $output;
+        }
+
+     sub showdetail {
+     	my $self = shift;
+
+     # Get our database connection
+     my $dbh = $self->param('mydbh');
+
+     # Get CGI query object
+     my $q = $self->query();
+     my $widgetid = $q->param("widgetid");
+
+     my $output = '';
+     $output .= $q->start_html(-title => 'Widget Detail');
+
+     ## Do a bunch of things to select all the properties of
+     ## the particular "widget" upon which the user has
+     ## clicked.  The key id value of this widget is provided
+     ## via the "widgetid" property, accessed via the CGI.pm
+     ## query object.
+
+     $output .= $q->end_html();
+
+     return $output;
+        }
+
+   CGI::Application takes care of implementing the new() and the run()
+methods.  Notice that at no point do you call print() to send any output
+to STDOUT.  Instead, all output is returned as a scalar.
+
+   CGI::Application's most significant contribution is in managing the
+application state.  Notice that all which is needed to push the
+application forward is to set the value of a HTML form parameter 'rm' to
+the value of the "run mode" you wish to handle the form submission.  This
+is the key to CGI::Application.
+
+ABSTRACT
+========
+
+   The guiding philosophy behind CGI::Application is that a web-based
+application can be organized into a specific set of "Run-Modes."  Each
+Run-Mode is roughly analogous to a single screen (a form, some output,
+etc.).  All the Run-Modes are managed by a single "Application Module"
+which is a Perl module.  In your web server's document space there is an
+"Instance Script" which is called by the web server as a CGI (or an
+Apache::Registry script if you're using Apache + mod_perl).
+
+   This methodology is an inversion of the "Embedded" philosophy (ASP, JSP,
+EmbPerl, Mason, etc.) in which there are "pages" for each state of the
+application, and the page drives functionality.  In CGI::Application, form
+follows function - the Application Module drives pages, and the code for a
+single application is in one place; not spread out over multiple "pages".
+If you feel that Embedded architectures are confusing, unorganized,
+difficult to design and difficult to manage, CGI::Application is the
+methodology for you!
+
+   Apache is NOT a requirement for CGI::Application.  Web applications
+based on CGI::Application will run equally well on NT/IIS or any other
+CGI-compatible environment.  CGI::Application-based applications are,
+however, ripe for use on Apache/mod_perl servers, as they naturally
+encourage Good Programming Practices.  As always, use strict!
+
+DESCRIPTION
+===========
+
+   CGI::Application is an Object-Oriented Perl module which implements an
+Abstract Class.  It is not intended that this package be instantiated
+directly.  Instead, it is intended that your Application Module will be
+implemented as a Sub-Class of CGI::Application.
+
+   To inherit from CGI::Application, the following code should go at the
+beginning of your Application Module, after your package declaration:
+
+     use base 'CGI::Application';
+
+   *Notation and Conventions*
+
+   For the purpose of this document, we will refer to the following
+conventions:
+
+     WebApp.pm   The Perl module which implements your Application Module class.
+     WebApp      Your Application Module class; a sub-class of CGI::Application.
+     webapp.cgi  The Instance Script which implements your Application Module.
+     $webapp     An instance (object) of your Application Module class.
+     $self       Same as $webapp, used in instance methods to pass around the
+                 current object. (Standard Perl Object-Oriented technique)
+
+Instance Script Methods
+-----------------------
+
+   By inheriting from CGI::Application you have access to a number of
+built-in methods.  The following are those which are expected to be called
+from your Instance Script.
+
+new()
+     The new() method is the constructor for a CGI::Application.  It
+     returns a blessed reference to your Application Module package
+     (class).  Optionally, new() may take a set of parameters as key =>
+     value pairs:
+
+          my $webapp = App->new(
+          		TMPL_PATH => 'App/',
+          		PARAMS => {
+          			'custom_thing_1' => 'some val',
+          			'another_custom_thing' => [qw/123 456/]
+          		}
+          );
+
+     This method may take some specific parameters:
+
+     TMPL_PATH     - This optional parameter adds value to the load_tmpl()
+     method (specified below).  This sets a path which is prepended to all
+     the filenames specified when you call load_tmpl() to get your
+     HTML::Template object.  This run-time parameter allows you to further
+     encapsulate instantiating templates, providing potential for more
+     reusability.
+
+     PARAMS        - This parameter, if used, allows you to set a number
+     of custom parameters at run-time.  By passing in different values in
+     different instance scripts which use the same application module you
+     can achieve a higher level of reusability.  For instance, imagine an
+     application module, "MailForm.pm".  The application takes the
+     contents of a HTML form and emails it to a specified recipient.  You
+     could have multiple instance scripts throughout your site which all
+     use this "MailForm.pm" module, but which set different recipients or
+     different forms.
+
+run()
+     The run() method is called upon your Application Module object, from
+     your Instance Script.  When called, it executes the functionality in
+     your Application Module.
+
+          my $webapp = WebApp->new();
+          $webapp->run();
+
+     This method first determines the application state by looking at the
+     value of the CGI parameter specified by mode_param() (defaults to
+     'rm' for "Run Mode"), which is expected to contain the name of the
+     mode of operation.  If not specified, the state defaults to the value
+     of start_mode().
+
+     Once the mode has been determined, run() looks at the dispatch table
+     stored in run_modes() and finds the function pointer which is keyed
+     from the mode name.  If found, the function is called and the data
+     returned is print()'ed to STDOUT and to the browser.  If the
+     specified mode is not found in the run_modes() table, run() will
+     croak().
+
+Sub-classing and Override Methods
+---------------------------------
+
+   CGI::Application implements some methods which are expected to be
+overridden by implementing them in your sub-class module.  These methods
+are as follows:
+
+setup()
+     This method is called by the inherited new() constructor method.  The
+     setup() method should be used to define the following
+     property/methods:
+
+          mode_param() - set the name of the run mode CGI param.
+          start_mode() - text scalar containing the default run mode.
+          run_modes() - hash table containing mode => function mappings.
+          tmpl_path() - text scalar containing path to template files.
+
+     Your setup() method may call any of the instance methods of your
+     application.  This function is a good place to define properties
+     specific to your application via the $webapp->param() method.
+
+     Your setup() method might be implemented something like this:
+
+          sub setup {
+          	my $self = shift;
+          	$self->tmpl_path('/path/to/my/templates/');
+          	$self->start_mode('putform');
+          	$self->run_modes({
+          		'putform' => \&my_putform_func,
+          		'postdata' => \&my_data_func
+          	});
+          	$self->param('myprop1');
+          	$self->param('myprop2', 'prop2value');
+          	$self->param('myprop3', ['p3v1', 'p3v2', 'p3v3']);
+          }
+
+teardown()
+     This method is called automatically after your application runs.  It
+     can be used to clean up after your operations.  A typical use of the
+     teardown() function is to disconnect a database connection which was
+     established in the setup() function.  You could also use the
+     teardown() method to store state information about the application to
+     the server.
+
+Application Module Methods
+--------------------------
+
+   The following methods are inherited from CGI::Application, and are
+available to be called by your application within your Application Module.
+These functions are listed in alphabetical order.
+
+dump()
+          print STDERR $webapp->dump();
+
+     The dump() method is a debugging function which will return a chunk
+     of text which contains all the environment and CGI form data of the
+     request, formatted nicely for human readability.  Useful for
+     outputting to STDERR.
+
+dump_html()
+          my $output = $webapp->dump_html();
+
+     The dump_html() method is a debugging function which will return a
+     chunk of text which contains all the environment and CGI form data of
+     the request, formatted nicely for human readability via a web
+     browser.  Useful for outputting to a browser.
+
+header_props()
+          $webapp->header_props(-type=>'image/gif',-expires=>'+3d');
+
+     The header_props() method expects a hash of CGI.pm-compatible HTTP
+     header properties.  These properties will be passed directly to
+     CGI.pm's header() or redirect() methods.  Refer to *Note CGI: CGI,
+     for usage details.
+
+     *IMPORTANT NOTE REGARDING HTTP HEADERS*
+
+     It is through the header_props() method that you may modify the
+     outgoing HTTP headers.  This is necessary when you want to set a
+     cookie, set the mime type to something other than "text/html", or
+     perform a redirect.  The header_props() method works in conjunction
+     with the header_type() method.  The value contained in header_type()
+     determines if we use CGI::header() or CGI::redirect().  The content
+     of header_props() is passed as an argument to whichever CGI.pm
+     function is called.
+
+     Understanding this relationship is important if you wish to manipulate
+     the HTTP header properly.
+
+header_type([<'header' || 'redirect'>])
+          $webapp->header_type('redirect');
+
+     The header_type() method expects to be passed either 'header' or
+     'redirect'.  This method specifies the type of HTTP headers which
+     should be sent back to the browser.  If not specified, defaults is
+     'header'.  See the header section of *Note CGI: CGI, for details.
+
+load_tmpl()
+          my $tmpl_obj = $webapp->load_tmpl('some.tmpl');
+
+     This method takes the name of a template file and returns an
+     HTML::Template object.  The HTML::Template->new_file() constructor is
+     used for create the object.  Refer to *Note HTML/Template:
+     HTML/Template, for specific usage of HTML::Template.
+
+     If tmpl_path() has been specified, load_tmpl() will prepend the
+     tmpl_path() property to the filename provided.  This further assists
+     in encapsulating template usage.
+
+     The load_tmpl() method will pass any extra paramaters sent to it
+     directly to HTML::Template->new_file().  This will allow the
+     HTML::Template object to be further customized:
+
+          my $tmpl_obj = $webapp->load_tmpl('some_other.tmpl',
+               die_on_bad_params => 0,
+               cache => 1
+          );
+
+     If your application requires more specialized behavior than this, you
+     are encoraged to override load_tmpl() by implementing your own
+     load_tmpl() in your CGI::Application sub-class application module.
+
+mode_param()
+          $webapp->mode_param('rm');
+
+     This accessor/mutator method is generally called in the setup()
+     method.  The mode_param() method sets the name of the CGI form
+     parameter which contains the run mode of the application.  If not
+     specified, the default value is 'rm'.  This CGI parameter is queried
+     by the run() method to send the program to the correct mode.
+
+param()
+          $webapp->param('pname', $somevalue);
+
+     The param() method provides a facility through which you may set
+     application instance properties which are accessible throughout your
+     application.
+
+     The param() method may be used in two basic ways.  First, you may use
+     it to get or set the value of a parameter:
+
+          $webapp->param('scalar_param', '123');
+          my $scalar_param_values = $webapp->param('some_param');
+
+     Second, when called in the context of an array, with no parameter name
+     specified, param() returns an array containing all the parameters
+     which currently exist:
+
+          my @all_params = $webapp->param();
+
+     The param() method enables a very valuable system for customizing
+     your applications on a per-instance basis.  One Application Module
+     might be instantiated by different Instance Scripts.  Each Instance
+     Script might set different values for a set of parameters.  This
+     allows similar applications to share a common code-base, but behave
+     differently.  For example, imagine a mail form application with a
+     single Application Module, but multiple Instance Scripts.  Each
+     Instance Script might specify a different recipient.  Another example
+     would be a web bulletin boards system.  There could be multiple
+     boards, each with a different topic and set of administrators.
+
+     The new() method provides a shortcut for specifying a number of
+     run-time parameters at once.  Internally, CGI::Application calls the
+     param() method to set these properties.  The param() method is a
+     powerful tool for greatly increasing your application's reusability.
+
+query()
+          my $q = $webapp->query();
+          my $remote_user = $q->remote_user();
+
+     This method retrieves the CGI.pm query object which has been created
+     by instantiating your Application Module.  For details on usage of
+     this query object, refer to *Note CGI: CGI,.  CGI::Application is
+     built on the CGI module.  Generally speaking, you will want to become
+     very familiar with CGI.pm, as you will use the query object whenever
+     you want to interact with form data.
+
+     When the new() method is called, a CGI query object is automatically
+     created.  If, for some reason, you want to use your own CGI query
+     object, the new() method supports passing in your existing query
+     object on construction.
+
+run_modes()
+          $webapp->run_modes('mode1' => \&some_sub, 'mode2' => \&some_other_sub);
+
+     This accessor/mutator expects a hash which specifies the dispatch
+     table for the different CGI states.  The run method uses the data in
+     this table to send the CGI to the correct function as determined by
+     reading the CGI parameter specified by mode_param() (defaults to 'rm'
+     for "Run Mode").
+
+     The hash table set by this method is expected to contain the mode
+     name as a key.  The value should be a pointer to the function which
+     you want to be called when the CGI enters the specified mode:
+
+          'mode_name' => \&mode_function
+
+     The function referenced is expected to return a chunk of text which
+     will eventually be sent back to the web browser.
+
+     *IMPORTANT NOTE ABOUT RUN MODE FUNCTIONS*
+
+     Your application should *NEVER* print() to STDOUT.  Using print() to
+     send output to STDOUT (including HTTP headers) is exclusively the
+     domain of the inherited run() method.  Breaking this rule is a common
+     source of errors.  If your program is erroneously sending content
+     before your HTTP header, you are probably breaking this rule.
+
+start_mode()
+          $webapp->start_mode('mode1');
+
+     The start_mode contains the name of the mode as specified in the
+     run_modes() table.  Default mode is "start".  The mode key specified
+     here will be used whenever the value of the CGI form parameter
+     specified by mode_param() is not defined.  Generally, this is the
+     first time your application is executed.
+
+tmpl_path()
+          $webapp->tmpl_path('/path/to/some/templates/');
+
+     This access/mutator method sets the file path to the directory where
+     the templates are stored.  It is used by load_tmpl() to find the
+     template files.
+
+     It is important to make sure your tmpl_path() ends with your
+     operating system's directory delimiter ('/' for UNIX, '\' for
+     windows, ':' for Macintosh, etc).  The load_tmpl() method does not
+     try to make sense of the various OS particularities - it simply
+     prepends tmpl_path() to the file name passed to load_tmpl().
+
+SEE ALSO
+========
+
+   *Note CGI: CGI,, *Note HTML/Template: HTML/Template,, perl(1)
+
+AUTHOR
+======
+
+   Jesse Erlbaum <jesse@vm.com>
+
+   *Support Mailing List*
+
+   If you have any questions, comments, bug reports or feature suggestions,
+post them to the support mailing list!  To join the mailing list, simply
+send a blank message to "cgiapp-subscribe@lists.vm.com".
+
+CREDITS
+=======
+
+   Thanks go to my place of work, Vanguard Media (http://www.vm.com), for
+funding the development of this library, and encouraging me to release it
+to the world.  If you need a web-application for your business, do check
+us out!
+
+   Many thanks to Sam Tregar (author of the most excellent HTML::Template
+module!) for his innumerable contributions to this module over the past
+year, and most of all for getting me off my ass to finally get this thing
+up on CPAN!
+
+LICENSE
+=======
+
+   Copyright (c) 2000, Jesse Erlbaum <jesse@vm.com> and Vanguard Media
+(http://www.vm.com).  All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: CGI/ArgChecker,  Next: CGI/Authent,  Prev: CGI/Application,  Up: Module List
+
+An extensible CGI parameter validation module (allowing commonly used checks on parameters to be called more concisely and consistently).
+*****************************************************************************************************************************************
+
+NAME
+====
+
+   CGI::ArgChecker - An extensible CGI parameter validation module
+(allowing commonly used checks on parameters to be called more concisely
+and consistently).
+
+SYNOPSIS
+========
+
+     use CGI::ArgChecker;
+
+     $checker = new CGI::Argchecker;
+     $checker->register_check($name, \&sub);
+     $checker->error_handler(\&errhandler);
+     $checker->argcheck($CGI_query_object,
+                        'param_name' => [ 'expectation', ... ],
+                        ... );
+
+DESCRIPTION
+===========
+
+   Note: Since this is really a simple wrapper around String::Checker(3),
+most of the interesting reading is in that document (i.e. the definition
+of an 'expectation').  The documentation that follows assumes you are
+pretty familiar with String::Checker(3), and focuses on the additional
+functionality provided by this module.
+
+CGI Parameter Checking
+----------------------
+
+   The argcheck() method takes a CGI object (can be any of the CGI modules
+which have a param method for fetching a parameter...) followed by a list
+of parameter_name/expectation_list_reference pairs.  The parameter name is
+the name of a CGI variable to examine.  The expectation list is precisely
+the same as the String::Checker(3) expectation list.
+
+   Each parameter will be retrieved from the CGI object using the param()
+method, checked against all the expectations, and then the result of all
+checks will be stored for returning.  If all parameters pass all
+expectations, a reference to a hash will be returned, containing
+parameter_name/parameter_value pairs.  If any expectation fails, the hash
+will still be returned.  To check whether any errors occurred, check the
+'ERROR' hash value (a boolean flag value).  For every expectation which
+fails, in addition, an error handling routine (described below) will be
+called.
+
+Error Handling
+--------------
+
+   Using the error_handler() method, you can register a chunk of code
+which will be called for every expectation which fails.  This subroutine
+will be called with two arguments: the name of the parameter which failed,
+and the name of the expectation which failed.  The return value of the
+error handling code is ignored.
+
+BUGS
+====
+
+   Hopefully none.
+
+AUTHOR
+======
+
+   J. David Lowe, dlowe@webjuice.com
+
+SEE ALSO
+========
+
+   perl(1), String::Checker(3)
+
+
+File: pm.info,  Node: CGI/Authent,  Next: CGI/Base,  Prev: CGI/ArgChecker,  Up: Module List
+
+request a HTTP authentification under specified conditions
+**********************************************************
+
+NAME
+====
+
+   CGI::Authent - request a HTTP authentification under specified
+conditions
+
+   version 0.2.1
+
+SYNOPSIS
+========
+
+   use CGI::Authent Basic => 'The realm name', test =>
+'CGI::Authent::between "h:m-h:m"';
+
+DESCRIPTION
+===========
+
+   Send the HTTP 401 UnAuthentified header if a condition (by default
+"defined $ENV{REMOTE_USER}") fails. Since your script doesn't get the
+password the user entered, you cannot use it as the only authentification
+scheme. And it was not intended to work like this. You have to find some
+other way to check the username/password pair.
+
+   It was written primarily to overcome a bug in MS IIS/3.0.  IIS usualy
+sends a HTTP 401 response if it finds out that it cannot access a file
+using the current users premissions (IUSR_... or the login/password you
+entered), but since IIS doesn't check the permissions to the script before
+launching perl, you get an error message :
+
+     CGI Error
+
+     The specified CGI application misbehaved by not returning a complete set
+     of HTTP headers. The headers it did return are:
+
+     Can't open perl script "...": Permission denied
+
+   instead of a login/password dialog.
+
+   So instead of restricting the permissions for the scripts, you will add
+
+     use CGI::Authent;
+
+   at the very beginning of your scripts and update CGI/Authent.config.pl
+to suggest your servers authentification method.
+
+   The login/password pair your user will enter into the dialog /s?he/ will
+get will be checked by the server and mapped to an account, so all you
+have to do, if all authentified users are to be able to access your
+script, is to check the system variable REMOTE_USER - the default test.
+
+   If you want to restrict the access to a group of users you may check
+whether the script as it runs has enough permissions to access a file and
+then restrict the access to this file.
+
+     use CGI::Authent {test => 'CGI::Authent::can_read "c:\\inetpub\\group1.lck"'}
+
+Ussage
+------
+
+     use CGI::Authent;
+      Use the default options as set in CGI/Authent.config.pl.
+     use CGI::Authent {options}, [$msg];
+     use CGI::Authent options, [$msg];
+      Replace the default options from CGI/Authent.congfig.pl, by the ones
+      presented here.
+
+Options
+-------
+
+     NTLM => 1/0
+      Should we use/suggest NTLM authentification?
+     
+     Basic => ''/'IP'/'_default'/'the realm'
+      Should we use the Basic authentification?
+      '', 'IP' and '_default' both mean that the realm will
+      be the servers IP address, which is default for MS IIS.
+     
+     msg => 'the message that should be showed if the authentification fails'
+     
+     test => \&some_boolean_function / 'some perl code' / '_default'
+          / 'Authent::can_read "filename"' / 'Authent::between "h:m-h:m"'
+      The test that should be performed. You may use either a reference to
+      a function, or a string to be eval()uated. The string '_default' has
+      a special meaning, it gets translated to 'defined $ENV{REMOTE_USER}',
+      so it checks if the user was authentificated by the server.
+      If the function/expression returns a true value, the script runs,
+      otherwise the user gets asked for a login/password pair.
+
+     header => 'Some: additional headers'
+      You may add some headers to the response that will be sent if the test fails.
+      You may add several headers either as
+       header => 'Header1\r\nHeader2'
+      or
+       header1 => 'Header1',
+       header2 => 'Header2'
+     
+     Authenticate => 'Additional authentification methods'
+      You may specify additional authentification methods here.
+      The string you specify will be prepended by 'WWW-Authenticate: ' and
+      added to the headers.
+      You may use the same methods for several methods as with headers.
+
+Tests
+-----
+
+   The default test is 'defined $ENV{REMOTE_USER}' which only checks
+whether the user entered any login/password pair that was accepted by the
+server.
+
+   Other predefined tests are :
+
+     CGI::Authent::can_read $file[, $file2, ...]
+      Does the script have permissions to read the file(s)?
+     
+     CGI::Authent::isbetween 'h:m-h:m';
+      It the time in this range?
+
+     CGI::Authent::between 'h:m-h:m';
+      It the time in this range? This version will disallow
+      access buring other times completely! No request for authentification,
+      just 403 Forbiden response!
+
+   You may of course combine several tests :
+
+     test => 'CGI::Authent::can_read "c:\\inetpub\\group1.lck" and CGIAuthent::between '8:00-17:00'
+              or
+              CGI::Authent::can_read "c:\\inetpub\\group2.lck" and CGI::Authent::between '17:00-8:00'
+             '
+
+Other functions
+---------------
+
+     CGI::Authent::forbide [$message]
+      Send the "HTTP 403 Forbiden" response.
+
+     CGI::Authent::login [$message]
+      Send the "HTTP 401 UnAuthentified" response.
+
+REMINDER
+--------
+
+   CGI::Authent doesn't validate the passwords. It cannot even see them. It
+just does a few tests and if the tests fail it sends to the user a request
+for authentication. But it's the server's task to validate the credentials
+passed by the browser.
+
+   If you want for example to validate passwords against a database,
+consult your servers documentation. You will probably have to install some
+filter or plugin.  It should be relatively easy to find such beasts on the
+net. I've written an ISAPI filter for this, you may get it at
+http://jenda.krynicky.cz/authfilter.1.0.zip . Take it as an example, not
+as a solution!
+
+Guts
+----
+
+   All options are parsed and added to the headers before yout test runs,
+so you may change the headers from it.
+
+   The headers are in $CGI::Authent::header, the message is in
+$CGI::Authent::message.
+
+AUTHOR
+------
+
+   Jan Krynicky <Jenda@Krynicky.cz> 7/26/1999
+
+
+File: pm.info,  Node: CGI/Base,  Next: CGI/BasePlus,  Prev: CGI/Authent,  Up: Module List
+
+HTTP Daemon Common Gateway Interface (CGI) Base Class
+*****************************************************
+
+NAME
+====
+
+   CGI::Base - HTTP Daemon Common Gateway Interface (CGI) Base Class
+
+SYNOPSIS
+========
+
+     use CGI::Base;
+     
+     $cgi = new CGI::Base;       # reads vars from environment
+     
+     $cgi->var($name);           # get CGI variable value
+     $cgi->var($name, $value);   # set CGI variable value
+     
+     @names  = $cgi->vars;       # lists standard CGI variables
+     
+     $mime_type  = $cgi->accept_best(@mime_types);
+     $preference = $cgi->accept_type($mime_type);
+     
+     $cgi->pass_thru($host, $port); # forward request to server
+     $cgi->redirect($url);          # redirect client
+     
+     $cgi->done($dump);     # end response, does NOT send </BODY>
+     
+     $cgi->exit(@log_msgs); # exit, optionally logging messages
+     
+     
+     # Other functions:
+     
+     @escaped_texts = html_escape(@texts);   # '>' -> '&lt;' etc
+     @texts         = html_br_lines(@texts); #  \n -> '<BR>'
+     
+     SendHeaders();  # send and flush HTTP header(s)
+     
+     CGI::Base::Debug($level);
+
+DESCRIPTION
+===========
+
+   This module implements a CGI::Base object. This object represents the
+interface between the application and an HTTP deamon.
+
+   In a typical CGI scenario the interface is just a collection of
+environment variables. This module makes those variables available either
+via a $cgi->var() method or optionally as plain perl variables (see
+IMPORTING CGI VARIABLES below).  Small scripts will tend to use the
+imported variables, larger scripts may prefer to use the var method.
+
+   By default the CGI::Base class will transparently deal with POST and
+PUT submissions by reading STDIN into $QUERY_STRING.
+
+   The CGI::Base module simplifies CGI debugging by providing logging
+methods (which redirect STDERR to a file) and a very handy test mode.  The
+test mode automatically detects that the script is not being run by a HTTP
+server and requests test input from the user (or command line).
+
+IMPORTING CGI VARIABLES
+-----------------------
+
+   Users of this module can optionally import the CGI values as ordinary
+perl variables of the same name into their package. For example, saying:
+
+     use CGI::Base qw(:DEFAULT QUERY_STRING REQUEST_METHOD);
+
+   will allow you to refer to the CGI query string and request method as
+simply $QUERY_STRING and $REQUEST_METHOD.  Any changes made to these
+variables will be reflected in the values returned by the var() method.
+
+   To import all the fixed CGI variables (excludes optional variables
+string with HTTP_) use:
+
+     use CGI::Base qw(:DEFAULT :CGI);
+
+NOTES
+-----
+
+   The CGI::Base class has been specifically designed to enable it to be
+subclassed to implement alternative interfaces. For example the
+CGI::MiniSvr class implements a 'mini http daemon' which can be spawned
+from a CGI script in order, for example, to maintain state information for
+a client 'session'.
+
+   The CGI::Base class (and classes derived from it) are not designed to
+understand the contents of the data they are handling. Only basic data
+acquisition tasks and basic metadata parsing are performed by CGI::Base.
+The QUERY_STRING is not parsed.
+
+   Higher level query processing (parsing of QUERY_STRING and handling of
+form fields etc) is performed by the CGI::Request module.
+
+   Note that CGI application developers will generally deal with the
+CGI::Request class and not directly with the CGI::Base class.
+
+FEATURES
+--------
+
+   Object oriented and sub-classable.
+
+   Exporting of CGI environment variables as plain perl variables.
+
+   Supports pass_thru and redirection of URL's.
+
+   Extensible attribute system for CGI environment variables.
+
+   Very handy automatic test mode if script is run manually.
+
+PRINCIPLES and ASSUMPTIONS
+--------------------------
+
+   These basic principles and assumptions apply to CGI::Base and can be
+built into any application using CGI::Base. Any subclass of CGI::Base,
+such as CGI::MiniSvr, must uphold these principles.
+
+   STDIN, STDOUT are connected to the client, possibly via a server.
+
+   STDERR can be used for error logging (see open_log method).
+
+   %ENV should not be used to access CGI parameters. See ENVIRONMENT
+section below.
+
+ENVIRONMENT
+-----------
+
+   The CGI::Base module copies all the CGI/1.1 standard environment
+variables into internal storage. See the definition of %CgiEnv and
+@CgiObj. The stored values are available either via the var method or as
+exported variables.
+
+   It is recommended that $ENV{...} is not used to access the CGI
+variables because alternative CGI interfaces, such as CGI::MiniSvr, may
+not bother to maintain %ENV consistent with the internal values. The
+simple scalar variables are also much faster to access.
+
+RECENT CHANGES
+--------------
+
+  1. Changes to create compatability with CGI::Form.
+
+  2. Miscellaneous small bug fixes.
+
+  3. get_url() now adds SERVER_PORT to the url. pass_thru() split into
+     component methods forward_request() and pass_back().  The new
+     forward_request method can shutdown() the sending side of the socket.
+     SendHeaders does nothing and returns undef if called more than once.
+     All these changes are useful for sophisticated applications.
+
+  4. and 2.3 Slightly improved documentation. Added html_br_lines() to
+     purify html_escape().  Added SIGPIPE handling (not used by default).
+     Documented the automatic test mode. Assorted other minor clean ups.
+
+  5. Added support for any letter case in HTTP headers. Fixed (worked
+     around) a perl/stdio bug which affected POST handling in the MiniSvr.
+     Added $ENTITY_BODY to hold the Entity-Body for PUT, POST and CHECKIN
+     methods. $QUERY_STRING now only set from $ENTITY_BODY if CONTENT_TYPE
+     is application/x-www-form-urlencoded. Changed some uses of map to
+     foreach.  Slight improved performance of pass_thru.
+
+  6. A major overhaul. Now much more object oriented but retaining the
+     ability to export CGI variables. A new var() method provides access
+     to CGI variables in a controlled manner. Some rather fancy footwork
+     with globs and references to hash elements enables the global
+     variables and hash elements to be automatically kept in sync with
+     each other.  Take a look at the link_global_vars method. An export
+     tag is provided to simplify importing the CGI variables.
+
+     The new code is also much faster, mainly because it does less. Less
+     work is done up front, more is defered until actually used. I have
+     removed the 'expand variables' concept for now. It might return later.
+     The code for read_entity_body(), get_vars_from_env() and accept_best()
+     and many others has been revised. All the code now compiles with use
+     strict;
+
+     SendHeaders can now be told to automatically add a server Status-Line
+     header if one is not included in the headers to be output. This
+     greatly simplifies header handling in the MiniSvr and fixes the
+     redirect() method.
+
+     The module file can be run as a cgi script to execute a demo/test. You
+     may need to chmod +x this file and teach your httpd that it can
+     execute *.pm files.
+
+  7. The done method no longer sends </BODY>. It was appealing but
+     inappropriate for it to do so.  Added html_escape function and
+     exported it by default (this should be moved into an HTML module once
+     we have one). Applied html_escape to as_string.  ContentTypeHdr,
+     LocationHdr, StatusHdr and ServerHdr no longer exported by default.
+     Added Debug function.  Set default Debug level to 0 (off). Code to
+     set $URI is no longer invoked by default and has been moved to a new
+     get_uri method.  This avoids the overhead for setting $URI which few
+     people used.  Methods like as_string which make use of $URI now call
+     get_uri if needed.
+
+  8. POST data read more robust. fmt() renamed to as_string(). pass_thru()
+     now takes host and port parameters, applies a timeout and has better
+     logging.  HTTP_REFERER defined by default. Assorted fixes and tidyups.
+
+
+FUTURE DEVELOPMENTS
+-------------------
+
+   Full pod documentation.
+
+   None of this is perfect. All suggestions welcome.
+
+   How reliable is CONTENT_LENGTH?
+
+   Pod documentation for the methods needs to be added.
+
+   Header handling is not ideal (but it's getting better).  Header
+handling should be moved into an HTTP specific module.
+
+   Need mechanism to identify a 'session'. This may come out of the
+ongoing HTTP security work. A session-id would be very useful for any
+advanced form of inter-query state maintenance.  The CGI::Base module may
+have a hand in providing some form of session-id but would not be involved
+in any further use of it.
+
+   For very large POST's we may need some mechanism to replace
+read_entity_body on a per call basis or at least prevent its automatic
+use. Subclassing is probably the 'right' way to do this.
+
+   These functions should be moved out into a CGI::BasePlus module since
+few simple CGI applications need them:  pass_thru, forward_request,
+pass_back, new_server_link, pass_thru_headers. The CGI::BasePlus module
+would still be a 'package CGI::Base;'.
+
+AUTHOR, COPYRIGHT and ACKNOWLEDGEMENTS
+--------------------------------------
+
+   This code is Copyright (C) Tim Bunce 1995. All rights reserved.  This
+code is free software; you can redistribute it and/or modify it under the
+same terms as Perl itself.
+
+   This code includes ideas from the work of Steven E. Brenner
+<S.E.Brenner@bioc.cam.ac.uk> (cgi-lib), Lincoln Stein
+<lstein@genome.wi.mit.edu> (CGI.pm), Pratap Pereira
+<pereira@ee.eng.ohio-state.edu> (phttpd) and possibly others.
+
+   IN NO EVENT SHALL THE AUTHORS BE LIABLE TO ANY PARTY FOR DIRECT,
+INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT OF THE
+USE OF THIS SOFTWARE AND ITS DOCUMENTATION (INCLUDING, BUT NOT LIMITED TO,
+LOST PROFITS) EVEN IF THE AUTHORS HAVE BEEN ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGE.
+
+SEE ALSO
+--------
+
+   URI::URL, CGI::Request, CGI::MiniSvr
+
+SUPPORT
+-------
+
+   Please use comp.infosystems.www.* and comp.lang.perl.misc for support.
+Please do _NOT_ contact the author directly. I'm sorry but I just don't
+have the time.
+
+

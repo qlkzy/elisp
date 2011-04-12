@@ -1,0 +1,1860 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Net/Jabber/X,  Next: Net/Jabber/X/AutoUpdate,  Prev: Net/Jabber/Transport,  Up: Module List
+
+Jabber X Module
+***************
+
+NAME
+====
+
+   Net::Jabber::X - Jabber X Module
+
+SYNOPSIS
+========
+
+     Net::Jabber::X is a companion to the Net::Jabber module. It
+     provides the user a simple interface to set and retrieve all
+     parts of a Jabber X.
+
+DESCRIPTION
+===========
+
+     Net::Jabber::X differs from the other Net::Jabber::* modules in that
+     the XMLNS of the query is split out into more submodules under
+     X.  For specifics on each module please view the documentation
+     for each Net::Jabber::X::* module.  The available modules are:
+
+     Net::Jabber::X::AutoUpdate - Auto Update information
+     Net::Jabber::X::Delay      - Message Routing and Delay Information
+     Net::Jabber::X::GC         - GroupChat
+     Net::Jabber::X::Ident      - Rich Identification
+     Net::Jabber::X::Oob        - Out Of Band File Transfers
+     Net::Jabber::X::Roster     - Roster Items for embedding in messages
+
+     Each of these modules provide Net::Jabber::X with the functions
+     to access the data.  By using delegates and the AUTOLOAD function
+     the functions for each namespace is used when that namespace is
+     active.
+
+     To access an X object you must create a Message object and use the
+     access functions there to get to the X.  To initialize the Message with
+     a Jabber <message/> you must pass it the XML::Parser Tree array from the
+     Net::Jabber::Client module.  In the callback function for the message
+     you can access the x tags for the namespace "my:namespace" by doing
+     the following:
+
+     use Net::Jabber;
+
+     sub messageCB {
+       my $message = new Net::Jabber::Message(@_);
+       my @xTags = $mesage->GetX("my:namespace");
+       my $xTag;
+       foreach $xTag (@xTags) {
+         .
+         .
+         .
+       }
+     }
+
+     You now have access to all of the retrieval functions available.
+
+     To create a new x to send to the server:
+
+     use Net::Jabber;
+
+     my $message = new Net::Jabber::Message();
+     my $x = $message->NewX("jabber:x:ident");
+
+     Now you can call the creation functions for the X as defined in the
+     proper namespace.  See below for the general <x/> functions, and in
+     each query module for those functions.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     $xmlns     = $X->GetXMLNS();
+
+     $str       = $X->GetXML();
+     @x         = $X->GetTree();
+
+Creation functions
+------------------
+
+     $X->SetXMLNS("jabber:x:delay");
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetXMLNS() - returns a string with the namespace of the query that
+                  the <x/> contains.
+
+     GetXML() - returns the XML string that represents the <x/>. This
+                is used by the Send() function in Client.pm to send
+                this object as a Jabber X.
+
+     GetTree() - returns an array that contains the <x/> tag in XML::Parser
+                 Tree format.
+
+Creation functions
+------------------
+
+     SetXMLNS(string) - sets the xmlns of the <x/> to the string.
+
+CUSTOM X MODULES
+================
+
+     Part of the flexability of this module is that you can write your own
+     module to handle a new namespace if you so choose.  The SetDelegates
+     function is your way to register the xmlns and which module will
+     provide the missing access functions.
+
+     To register your namespace and module, you can either create an X
+     object and register it once, or you can use the SetDelegates
+     function in Client.pm to do it for you:
+
+     my $Client = new Net::Jabber::Client();
+     $Client->AddDelegate(namespace=>"blah:blah",
+     			 parent=>"Net::Jabber::X",
+     			 delegate=>"Blah::Blah");
+     
+       or
+
+     my $Transport = new Net::Jabber::Transport();
+     $Transport->AddDelegate(namespace=>"blah:blah",
+     			    parent=>"Net::Jabber::X",
+     			    delegate=>"Blah::Blah");
+     
+       Once you have the delegate registered you need to define the access
+       functions.  Here is a an example module:
+
+     package Blah::Blah;
+
+     sub new {
+       my $proto = shift;
+       my $class = ref($proto) || $proto;
+       my $self = { };
+       $self->{VERSION} = $VERSION;
+       bless($self, $proto);
+       return $self;
+     }
+
+     sub SetBlah {
+       shift;
+       my $self = shift;
+       my ($blah) = @_;
+       return &Net::Jabber::SetXMLData("single",$self->{X},"blah","$blah",{});
+     }
+
+     sub GetBlah {
+       shift;
+       my $self = shift;
+       return &Net::Jabber::GetXMLData("value",$self->{X},"blah","");
+     }
+
+     1;
+
+     Now when you create a new X object and call GetBlah on that object
+     it will AUTOLOAD the above function and handle the request.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in May of 2000 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/X/AutoUpdate,  Next: Net/Jabber/X/Delay,  Prev: Net/Jabber/X,  Up: Module List
+
+Jabber X AutoUpdate Delegate
+****************************
+
+NAME
+====
+
+   Net::Jabber::X::AutoUpdate - Jabber X AutoUpdate Delegate
+
+SYNOPSIS
+========
+
+     Net::Jabber::X::AutoUpdate is a companion to the Net::Jabber::X module.
+     It provides the user a simple interface to set and retrieve all
+     parts of a Jabber X AutoUpdate.
+
+DESCRIPTION
+===========
+
+     To initialize the AutoUpdate with a Jabber <x/> you must pass it the
+     XML::Parser Tree array from the module trying to access the <x/>.
+     In the callback function:
+
+     use Net::Jabber;
+
+     sub iq {
+       my $foo = new Net::Jabber::Foo(@_);
+
+     my @xTags = $foo->GetX("jabber:x:autoupdate");
+
+     my $xTag;
+     foreach $xTag (@xTags) {
+     	$xTag->....
+     
+     }
+     .
+     .
+     .
+         }
+
+     You now have access to all of the retrieval functions available.
+
+     To create a new AutoUpdate to send to the server:
+
+     use Net::Jabber;
+
+     $foo = new Net::Jabber::Foo();
+     $x = $foo->NewX("jabber:x:autoupdate");
+
+     Now you can call the creation functions below.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     $jid = $xTag->GetJID();
+
+Creation functions
+------------------
+
+     $xTag->SetX(jid=>"update.jabber.org");
+
+     $xTag->SetJID("update.jabber.com");
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetJID() - returns a string with the Jabber Identifier of the
+                agent that is going to handle the update.
+
+Creation functions
+------------------
+
+     SetX(jid=>string) - set multiple fields in the <x/> at one
+                         time.  This is a cumulative and over
+                         writing action.  If you set the "jid"
+                         attribute twice, the second setting is
+                         what is used.  For valid settings read the
+                         specific Set functions below.
+
+     SetJID(string) - sets the JID of the agent that is going to handle the
+                      update.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in May of 2000 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/X/Delay,  Next: Net/Jabber/X/Encrypted,  Prev: Net/Jabber/X/AutoUpdate,  Up: Module List
+
+Jabber X Delay Delegate
+***********************
+
+NAME
+====
+
+   Net::Jabber::X::Delay - Jabber X Delay Delegate
+
+SYNOPSIS
+========
+
+     Net::Jabber::X::Delay is a companion to the Net::Jabber::X module.
+     It provides the user a simple interface to set and retrieve all
+     parts of a Jabber X Delay.
+
+DESCRIPTION
+===========
+
+     To initialize the Delay with a Jabber <x/> you must pass it the
+     XML::Parser Tree array from the module trying to access the <x/>.
+     In the callback function:
+
+     use Net::Jabber;
+
+     sub iq {
+       my $foo = new Net::Jabber::Foo(@_);
+
+     my @xTags = $foo->GetX("jabber:x:delay");
+
+     my $xTag;
+     foreach $xTag (@xTags) {
+     	$xTag->....
+     
+     }
+     .
+     .
+     .
+         }
+
+     You now have access to all of the retrieval functions available.
+
+     To create a new Delay to send to the server:
+
+     use Net::Jabber;
+
+     $foo = new Net::Jabber::Foo();
+     $xTag = $foo->NewX("jabber:x:delay");
+
+     Now you can call the creation functions below.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     $from      = $xTag->GetFrom();
+     $stamp     = $xTag->GetStamp();
+     $message   = $xTag->GetMessage();
+
+Creation functions
+------------------
+
+     $xTag->SetDelay(FRom=>"jabber:foo.bar.com",
+     	            message=>"Stored offline");
+
+     $xTag->SetFrom("bob@jabber.org");
+     $xTag->SetStamp();
+     $xTag->SetStamp("20000124T10:54:00");
+     $xTag->SetMessage("Stored Offline");
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetFrom() - returns a string with the Jabber Identifier of the
+                 person who added the delay.
+
+     GetStamp() - returns a string that represents the time stamp of
+                  the delay.
+
+     GetMessage() - returns a string with the message that describes
+                    the nature of the delay.
+
+Creation functions
+------------------
+
+     SetDelay(from=>string,    - set multiple fields in the <x/> at one
+              stamp=>string,     time.  This is a cumulative and over
+              message=>string)   writing action.  If you set the "from"
+                                 attribute twice, the second setting is
+                                 what is used.  If you set the status, and
+                                 then set the priority then both will be in
+                                 the <x/> tag.  For valid settings read the
+                                 specific Set functions below.
+
+     SetFrom(string) - sets the from attribute of the server adding the
+                       delay.
+
+     SetStamp(string) - sets the timestamp of the delay.  If the string is
+                        left blank then the module adds the current date/time
+                        in the proper format as the stamp.
+
+     SetMessage(string) - sets description of the delay.
+     
+     =head2 Test functions
+
+     DefinedFrom() - returns 1 if the from attribute exists in the x,
+                     0 otherwise.
+
+     DefinedStamp() - returns 1 if the stamp attribute exists in the x,
+                      0 otherwise.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in May of 2000 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/X/Encrypted,  Next: Net/Jabber/X/Form,  Prev: Net/Jabber/X/Delay,  Up: Module List
+
+Jabber X Encrypted Module
+*************************
+
+NAME
+====
+
+   Net::Jabber::X::Encrypted - Jabber X Encrypted Module
+
+SYNOPSIS
+========
+
+     Net::Jabber::X::Encrypted is a companion to the Net::Jabber::X module.
+     It provides the user a simple interface to set and retrieve all
+     parts of a Jabber X Encrypted.
+
+DESCRIPTION
+===========
+
+     To initialize the Encrypted with a Jabber <x/> you must pass it the
+     XML::Parser Tree array from the module trying to access the <x/>.
+     In the callback function:
+
+     use Net::Jabber;
+
+     sub iq {
+       my $foo = new Net::Jabber::Foo(@_);
+
+     my @xTags = $foo->GetX("jabber:x:encrypted");
+
+     my $xTag;
+     foreach $xTag (@xTags) {
+     	$xTag->....
+     
+     }
+     .
+     .
+     .
+         }
+
+     You now have access to all of the retrieval functions available.
+
+     To create a new Encrypted to send to the server:
+
+     use Net::Jabber;
+
+     $foo = new Net::Jabber::Foo();
+     $x = $foo->NewX("jabber:x:encrypted");
+
+     Now you can call the creation functions below.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     $message = $xTag->GetMessage();
+
+Creation functions
+------------------
+
+     $xTag->SetEncrypted(message=>data);
+
+     $xTag->SetMessage(data);
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetMessage() - returns a string with the message data.
+
+Creation functions
+------------------
+
+     SetEncrypted(message=>string) - set multiple fields in the <x/> at one
+                                     time.  This is a cumulative and over
+                                     writing action.  If you set the
+                                     "message" data twice, the second
+                                     setting is what is used.  If you set the
+                                     message, and then set another field
+                                     then both will be in the <x/> tag.  For
+                                     valid settings read the specific Set
+                                     functions below.
+
+     SetMessage(string) - sets the data for the message.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in December of 2000 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/X/Form,  Next: Net/Jabber/X/Form/Field,  Prev: Net/Jabber/X/Encrypted,  Up: Module List
+
+Jabber X Form Module
+********************
+
+NAME
+====
+
+   Net::Jabber::X::Form - Jabber X Form Module
+
+SYNOPSIS
+========
+
+     Net::Jabber::X::Form is a companion to the Net::Jabber::X module.
+     It provides the user a simple interface to set and retrieve all parts
+     of a Jabber X Form.
+
+DESCRIPTION
+===========
+
+     To initialize the X with a Jabber <x/> and then access the form
+     query you must pass it the XML::Parser Tree array from the
+     Net::Jabber::Client module.  In the callback function for the x:
+
+     use Net::Jabber;
+
+     sub foo {
+       my $foo = new Net::Jabber::Foo(@_);
+       my $form = $foo->GetX();
+       .
+       .
+       .
+     }
+
+     You now have access to all of the retrieval functions available.
+
+     To create a new X form to send to the server:
+
+     use Net::Jabber;
+
+     $client = new Net::Jabber::Client();
+     ...
+
+     $foo = new Net::Jabber::Foo();
+     $form = $foo->NewX("jabber:x:form");
+     ...
+
+     $client->Send($foo);
+
+     Using $form you can call the creation functions below to populate the
+     tag before sending it.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     @fields     = $form->GetFields();
+     @fieldTrees = $form->GetFieldTrees();
+
+Creation functions
+------------------
+
+     $field   = $form->AddField();
+     $field   = $form->AddField(jid=>"bob\@jabber.org",
+                                name=>"Bob",
+                                groups=>["school","friends"]);
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetFields() - returns an array of Net::Jabber::X::Form::Field objects.
+                  These can be modified or accessed with the functions
+                  available to them.
+
+     GetFieldTrees() - returns an array of XML::Parser objects that contain
+                      the data for each field.
+
+Creation functions
+------------------
+
+     AddField(hash) - creates and returns a new Net::Jabbber::X::Form::Field
+                     object.  The argument hash is passed to the SetField
+                     function.  Check the Net::Jabber::X::Form::Field
+                     for valid values.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in February of 2001 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/X/Form/Field,  Next: Net/Jabber/X/Form/Field/Option,  Prev: Net/Jabber/X/Form,  Up: Module List
+
+Jabber X Form Field Module
+**************************
+
+NAME
+====
+
+   Net::Jabber::X::Form::Field - Jabber X Form Field Module
+
+SYNOPSIS
+========
+
+     Net::Jabber::X::Form::Field is a companion to the
+     Net::Jabber::X::Form module.  It provides the user a simple
+     interface to set and retrieve all parts of a Jabber Form Field.
+
+DESCRIPTION
+===========
+
+     To initialize the Field with a Jabber <x/> and then access the </x>
+     you must pass it the XML::Parser Tree array from the
+     Net::Jabber::Client module.  In the callback function for the object
+     type foo:
+
+     use Net::Jabber;
+
+     sub foo {
+       my $foo = new Net::Jabber::Foo(@_);
+
+     my @xTags = $foo->GetX("jabber:x:form");
+
+     my $xTag;
+     foreach $xTag (@xTags) {
+       my @fields = $xTag->GetFields();
+     	my $field;
+     	foreach $field (@fields) {
+     	  $field->GetXXXX();
+     	  .
+     	  .
+     	  .
+     	}
+     }
+     .
+     .
+     .
+         }
+
+     You now have access to all of the retrieval functions available below.
+
+     To create a new X Form Field to send to another user:
+
+     use Net::Jabber;
+
+     $Client = new Net::Jabber::Client();
+     ...
+
+     $foo = new Net::Jabber::Foo();
+     $form = $foo->NewX("jabber:x:form");
+     $foo = $form->AddField();
+     ...
+
+     $client->Send($foo);
+
+     Using $field you can call the creation functions below to populate the
+     tag before sending it.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     $type    = $field->GetType();
+     $var     = $field->GetVar();
+     $label   = $field->GetLabel();
+     $value   = $field->GetValue();
+     $order   = $field->GetOrder();
+
+     @options = $field->GetOptions();
+
+     @field   = $field->GetTree();
+     $str     = $field->GetXML();
+
+Creation functions
+------------------
+
+     $field->SetField(type=>"entry",
+     		     var=>"icqnum",
+     		     label=>"ICQ #",
+     		     order=>1);
+     $field->SetType('pulldown');
+     $field->SetVar('sex');
+     $field->SetLabel('Sex');
+     $field->SetOrder('2');
+     $field->AddOption(value=>"m",
+     		      label=>"Male");
+     $field->AddOption(value=>"f",
+     		      label=>"Female");
+     $field->AddOption(value=>"u",
+     		      label=>"Unknown");
+
+Test functions
+--------------
+
+     $test = $field->DefinedType();
+     $test = $field->DefinedVar();
+     $test = $field->DefinedLabel();
+     $test = $field->DefinedOrder();
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetType() - returns a string with type of field this is.
+
+     GetVar() - returns a string with variable name that the field sets.
+                This is meant to be used as an index to a hash, but mainly
+                so that when returned to the server the thing parsing it
+                can quickly see which value goes with what variable.
+
+     GetLabel() - returns a string with label that should be displayed in
+                  front of the widget for this field.
+
+     GetValue() - returns a string with the value that this is field is set
+                  to.  If set then this should be the default value for the
+                  field in the widget, otherwise it is the value that the
+                  program returned.
+
+     GetOrder() - returns an integer with the order that this field should
+                  be displayed in on the form.  So a field with order=1
+                  should be displayed, or prompted, before the field with
+                  order=2.
+
+     GetXML() - returns the XML string that represents the <field/>.
+
+     GetTree() - returns an array that contains the <field/> tag
+                 in XML::Parser Tree format.
+
+Creation functions
+------------------
+
+     SetField(type=>string,   - set multiple fields in the <field/>
+              var=>string,      at one time.  This is a cumulative
+              label=>string,    and overwriting action.  If you
+              value=>string,    set the "var" twice, the second
+              order=>integer)   setting is what is used.  If you set
+                                the tpe, and then set the
+                                label then both will be in the
+                                <field/> tag.  For valid settings
+                                read the specific Set functions below.
+
+     SetType(string) - sets the type of field that this <field/> is.
+
+     SetVar(string) - sets the var name for the <field/>.
+
+     SetLabel(string) - sets the label that should be shown next to the
+                        widget in the form.
+
+     SetValue(string) - sets the value of the field.
+
+     SetOrder(integer) - sets the order to show the field in.
+
+Test functions
+--------------
+
+     DefinedType() - returns 1 if the type attribute is set in the <field/>,
+                     0 otherwise.
+
+     DefinedVar() - returns 1 if the var attribute is set in the <field/>,
+                    0 otherwise.
+
+     DefinedLabel() - returns 1 if the label attribute is set in the <field/>,
+                      0 otherwise.
+
+     DefinedOrder() - returns 1 if the order attribute is set in the <field/>,
+                      0 otherwise.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in February of 2001 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/X/Form/Field/Option,  Next: Net/Jabber/X/GC,  Prev: Net/Jabber/X/Form/Field,  Up: Module List
+
+Jabber X Form Field Option Module
+*********************************
+
+NAME
+====
+
+   Net::Jabber::X::Form::Field::Option - Jabber X Form Field Option Module
+
+SYNOPSIS
+========
+
+     Net::Jabber::X::Form::Field::Option is a companion to the
+     Net::Jabber::X::Form::Field module.  It provides the user a simple
+     interface to set and retrieve all parts of a Jabber Form Field
+     Option.
+
+DESCRIPTION
+===========
+
+     To initialize the Option with a Jabber <x/> and then access the </x>
+     you must pass it the XML::Parser Tree array from the
+     Net::Jabber::Client module.  In the callback function for the object
+     type foo:
+
+     use Net::Jabber;
+
+     sub foo {
+       my $foo = new Net::Jabber::Foo(@_);
+
+     my @xTags = $foo->GetX("jabber:x:form");
+
+     my $xTag;
+     foreach $xTag (@xTags) {
+       my @fields = $xTag->GetFields();
+     	my $field;
+     	foreach $field (@fields) {
+     	  if ($field->GetType() eq "option") {
+     	    foreach my $option ($field->GetOptions()) {
+     	      $option->GetXXXX();
+     	    }
+     	  }
+     	  .
+     	  .
+     	  .
+     	}
+     }
+     .
+     .
+     .
+         }
+
+     You now have access to all of the retrieval functions available below.
+
+     To create a new X Form Field Option to send to another user:
+
+     use Net::Jabber;
+
+     $Client = new Net::Jabber::Client();
+     ...
+
+     $foo = new Net::Jabber::Foo();
+     $form = $foo->NewX("jabber:x:form");
+     $field = $form->AddField(tpye=>"option");
+     $option = $field->AddOption();
+     ...
+
+     $client->Send($foo);
+
+     Using $field you can call the creation functions below to populate the
+     tag before sending it.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     $label  = $option->GetLabel();
+     $value  = $option->GetValue();
+
+     @option = $option->GetTree();
+     $str    = $option->GetXML();
+
+Creation functions
+------------------
+
+     $option->SetOption(label=>"Male",
+     		       value=>"m");
+
+     $option->SetLabel('Yes');
+     $option->SetValue('1');
+
+Test functions
+--------------
+
+     $test = $option->DefinedLabel();
+     $test = $option->DefinedValue();
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetLabel() - returns a string with the label that the option should have
+                  in the GUI.
+
+     GetValuel() - returns a string with the value that the option should have
+                   when selected.
+
+     GetXML() - returns the XML string that represents the <presence/>.
+                This is used by the Send() function in Client.pm to send
+                this object as a Jabber Presence.
+
+     GetTree() - returns an array that contains the <presence/> tag
+                 in XML::Parser Tree format.
+
+Creation functions
+------------------
+
+     SetOption(label=>string, - set multiple options in the <option/>
+               value=>string)   at one time.  This is a cumulative
+                                and overwriting action.  If you
+                                set the "label" twice, the second
+                                setting is what is used.  If you set
+                                the label, and then set the
+                                value then both will be in the
+                                <option/> tag.  For valid settings
+                                read the specific Set functions below.
+
+     SetLabel(string) - sets the label to show in the GUI for this option.
+
+     SetValue(string) - sets the value to set the field to when this option
+                        is selected in the GUI.
+
+Test functions
+--------------
+
+     DefinedLabel() - returns 1 if the label attribute is set in the <field/>,
+                      0 otherwise.
+
+     DefinedValue() - returns 1 if the value attribute is set in the <field/>,
+                      0 otherwise.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in February of 2001 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/X/GC,  Next: Net/Jabber/X/Ident,  Prev: Net/Jabber/X/Form/Field/Option,  Up: Module List
+
+Jabber X GroupChat Delegate
+***************************
+
+NAME
+====
+
+   Net::Jabber::X::GC - Jabber X GroupChat Delegate
+
+SYNOPSIS
+========
+
+     Net::Jabber::X::GC is a companion to the Net::Jabber::X module.
+     It provides the user a simple interface to set and retrieve all
+     parts of a Jabber X GroupChat.
+     
+     The main purpose for this module is to handle nick changes from
+     a groupchat server (i.e. IRC, etc...)
+
+DESCRIPTION
+===========
+
+     To initialize the GC with a Jabber <x/> you must pass it the
+     XML::Parser Tree array from the module trying to access the <x/>.
+     In the callback function:
+
+     use Net::Jabber;
+
+     sub iq {
+       my $foo = new Net::Jabber::Foo(@_);
+
+     my @xTags = $foo->GetX("jabber:x:gc");
+
+     my $xTag;
+     foreach $xTag (@xTags) {
+     	$xTag->....
+     
+     }
+     .
+     .
+     .
+         }
+
+     You now have access to all of the retrieval functions available.
+
+     To create a new GC to send to the server:
+
+     use Net::Jabber;
+
+     $foo = new Net::Jabber::Foo();
+     $xTag = $foo->NewX("jabber:x:gc");
+
+     Now you can call the creation functions below.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     $nick = $xTag->GetNick();
+
+Creation functions
+------------------
+
+     $xTag->SetGC(nick=>"bob");
+
+     $xTag->SetNick("bob_");
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetNick() - returns a string with the Jabber Identifier of the
+                 person who added the gc.
+
+Creation functions
+------------------
+
+     SetGC(nick=>string) - set multiple fields in the <x/> at one
+                           time.  This is a cumulative and over
+                           writing action.  If you set the "nick"
+                           attribute twice, the second setting is
+                           what is used.  If you set the nick, and
+                           then set another field then both will be in
+                           the <x/> tag.  For valid settings read the
+                           specific Set functions below.
+
+     SetNick(string) - sets the new nick sent from the server.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in May of 2000 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/X/Ident,  Next: Net/Jabber/X/Oob,  Prev: Net/Jabber/X/GC,  Up: Module List
+
+Jabber X Ident Delegate
+***********************
+
+NAME
+====
+
+   Net::Jabber::X::Ident - Jabber X Ident Delegate
+
+SYNOPSIS
+========
+
+     Net::Jabber::X::Ident is a companion to the Net::Jabber::X module.
+     It provides the user a simple interface to set and retrieve all
+     parts of a Jabber X Ident.
+
+DESCRIPTION
+===========
+
+     To initialize the Ident with a Jabber <x/> you must pass it the
+     XML::Parser Tree array from the module trying to access the <x/>.
+     In the callback function:
+
+     use Net::Jabber;
+
+     sub iq {
+       my $foo = new Net::Jabber::Foo(@_);
+
+     my @xTags = $foo->GetX("jabber:x:ident");
+
+     my $xTag;
+     foreach $xTag (@xTags) {
+     	$xTag->....
+     
+     }
+     .
+     .
+     .
+         }
+
+     You now have access to all of the retrieval functions available.
+
+     To create a new Ident to send to the server:
+
+     use Net::Jabber;
+
+     $foo = new Net::Jabber::Foo();
+     $x = $foo->NewX("jabber:x:ident");
+
+     Now you can call the creation functions below.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     $from        = $xTag->GetFrom();
+     $to          = $xTag->GetTo();
+     $replyto     = $xtag->GetReplyTo();
+     $cc          = $xTag->GetCC();
+     $forwardedby = $xTag->GetForwardedBy();
+
+Creation functions
+------------------
+
+     $xTag->SetX(FRom=>"jabber:foo.bar.com",
+     	        replyTo=>"bob@jabber.org");
+
+     $xTag->SetFrom("bob@jabber.org");
+     $xTag->SetFromID("bob@jabber.org");
+
+     $xTag->SetTo("bob@jabber.org");
+     $xTag->SetToID("bob@jabber.org");
+
+     $xTag->SetReplyTo("bob@jabber.org");
+     $xTag->SetReplyToID("bob@jabber.org");
+
+     $xTag->SetCC("bob@jabber.org");
+     $xTag->SetCCID("bob@jabber.org");
+
+     $xTag->SetForwardedBy("bob@jabber.org");
+     $xTag->SetForwardedByID("bob@jabber.org");
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetFrom() - returns a string with the Jabber Identifier of the
+                 person who added the ident.
+
+     GetStamp() - returns a string that represents the time stamp of
+                  the ident.
+
+     GetMessage() - returns a string with the message that describes
+                    the nature of the ident.
+
+     GetXMLNS() - returns a string with the namespace of the query that
+                  the <iq/> contains.
+
+Creation functions
+------------------
+
+     SetX(from=>string,       - set multiple fields in the <x/> at one
+          stamp=>string,        time.  This is a cumulative and over
+          message=>string)      writing action.  If you set the "from"
+                                attribute twice, the second setting is
+                                what is used.  If you set the status, and
+                                then set the priority then both will be in
+                                the <x/> tag.  For valid settings read the
+                                specific Set functions below.
+
+     SetFrom(string) - sets the from attribute of the server adding the
+                       ident.
+
+     SetStamp(string) - sets the timestamp of the ident.  If the string is
+                        left blank then the module adds the current date/time
+                        in the proper format as the stamp.
+
+     SetMessage(string) - sets description of the ident.
+     
+     =head1 AUTHOR
+
+   By Ryan Eatmon in May of 2000 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/X/Oob,  Next: Net/Jabber/X/ReplyPres,  Prev: Net/Jabber/X/Ident,  Up: Module List
+
+Jabber X Out Of Bandwidth File Transfer Module
+**********************************************
+
+NAME
+====
+
+   Net::Jabber::X::Oob - Jabber X Out Of Bandwidth File Transfer Module
+
+SYNOPSIS
+========
+
+     Net::Jabber::X::Oob is a companion to the Net::Jabber::X module.
+     It provides the user a simple interface to set and retrieve all
+     parts of a Jabber X Oob.
+
+DESCRIPTION
+===========
+
+     To initialize the Oob with a Jabber <x/> you must pass it the
+     XML::Parser Tree array from the module trying to access the <x/>.
+     In the callback function:
+
+     use Net::Jabber;
+
+     sub iq {
+       my $foo = new Net::Jabber::Foo(@_);
+
+     my @xTags = $foo->GetX("jabber:x:oob");
+
+     my $xTag;
+     foreach $xTag (@xTags) {
+     	$xTag->....
+     
+     }
+     .
+     .
+     .
+         }
+
+     You now have access to all of the retrieval functions available.
+
+     To create a new Oob to send to the server:
+
+     use Net::Jabber;
+
+     $foo = new Net::Jabber::Foo();
+     $x = $foo->NewX("jabber:x:oob");
+
+     Now you can call the creation functions below.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     $url  = $xTag->GetURL();
+     $desc = $xTag->GetDesc();
+
+Creation functions
+------------------
+
+     $xTag->SetOob(UrL=>"http://my.web.server.com/~me/pics/bob.jpg",
+     	          desc=>"Picture of Bob, the one and only");
+
+     $xTag->SetURL("http://my.web.server.com/~me/pics/bobandme.jpg");
+     $xTag->SetDesc("Bob and Me at the Open Source conference");
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetURL() - returns a string with the URL of the file being sent Oob.
+
+     GetDesc() - returns a string with the description of the file being
+                  sent Oob.
+
+Creation functions
+------------------
+
+     SetOob(url=>string,  - set multiple fields in the <x/> at one
+            desc=>string)   time.  This is a cumulative and over
+                            writing action.  If you set the "url"
+                            attribute twice, the second setting is
+                            what is used.  If you set the url, and
+                            then set the desc then both will be in
+                            the <x/> tag.  For valid settings read the
+                            specific Set functions below.
+
+     SetURL(string) - sets the URL for the file being sent Oob.
+
+     SetDesc(string) - sets the description for the file being sent Oob.
+
+Test functions
+--------------
+
+     DefinedURL() - returns 1 if <url/> exists in the x, 0 otherwise.
+
+     DefinedDesc() - returns 1 if <desc/> exists in the x, 0 otherwise.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in May of 2000 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/X/ReplyPres,  Next: Net/Jabber/X/Roster,  Prev: Net/Jabber/X/Oob,  Up: Module List
+
+Jabber X Reply Presence Notification
+************************************
+
+NAME
+====
+
+   Net::Jabber::X::ReplyPres - Jabber X Reply Presence Notification
+
+SYNOPSIS
+========
+
+     Net::Jabber::X::ReplyPres is a companion to the Net::Jabber::X module.
+     It provides the user a simple interface to set and retrieve all
+     parts of a Jabber X Reply Presence.
+     
+     The main purpose for this module is to handle the presence that is sent
+     when a user is typing a reply to you.
+
+DESCRIPTION
+===========
+
+     To initialize the ReplyPres with a Jabber <x/> you must pass it the
+     XML::Parser Tree array from the module trying to access the <x/>.
+     In the callback function:
+
+     use Net::Jabber;
+
+     sub presence {
+       my $foo = new Net::Jabber::Foo(@_);
+
+     my @xTags = $foo->GetX("jabber:x:replypres");
+
+     my $xTag;
+     foreach $xTag (@xTags) {
+     	$xTag->....
+     
+     }
+     .
+     .
+     .
+         }
+
+     You now have access to all of the retrieval functions available.
+
+     To create a new ReplyPres to send to the server:
+
+     use Net::Jabber;
+
+     $foo = new Net::Jabber::Foo();
+     $xTag = $foo->NewX("jabber:x:replypres");
+
+     Now you can call the creation functions below.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     n/a
+
+Creation functions
+------------------
+
+     n/a
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     n/a
+
+Creation functions
+------------------
+
+     n/a
+
+AUTHOR
+======
+
+   By Ryan Eatmon in November of 2000 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/X/Roster,  Next: Net/Jabber/X/Roster/Item,  Prev: Net/Jabber/X/ReplyPres,  Up: Module List
+
+Jabber X Roster Module
+**********************
+
+NAME
+====
+
+   Net::Jabber::X::Roster - Jabber X Roster Module
+
+SYNOPSIS
+========
+
+     Net::Jabber::X::Roster is a companion to the Net::Jabber::X module.
+     It provides the user a simple interface to set and retrieve all parts
+     of a Jabber X Roster.
+
+DESCRIPTION
+===========
+
+     To initialize the X with a Jabber <x/> and then access the roster
+     query you must pass it the XML::Parser Tree array from the
+     Net::Jabber::Client module.  In the callback function for the x:
+
+     use Net::Jabber;
+
+     sub foo {
+       my $foo = new Net::Jabber::Foo(@_);
+       my $roster = $foo->GetX();
+       .
+       .
+       .
+     }
+
+     You now have access to all of the retrieval functions available.
+
+     To create a new X roster to send to the server:
+
+     use Net::Jabber;
+
+     $client = new Net::Jabber::Client();
+     ...
+
+     $foo = new Net::Jabber::Foo();
+     $roster = $foo->NewX("jabber:x:roster");
+     ...
+
+     $client->Send($foo);
+
+     Using $roster you can call the creation functions below to populate the
+     tag before sending it.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     @items     = $roster->GetItems();
+     @itemTrees = $roster->GetItemTrees();
+
+Creation functions
+------------------
+
+     $item   = $roster->AddItem();
+     $item   = $roster->AddItem(jid=>"bob\@jabber.org",
+                                name=>"Bob",
+                                groups=>["school","friends"]);
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetItems() - returns an array of Net::Jabber::X::Roster::Item objects.
+                  These can be modified or accessed with the functions
+                  available to them.
+
+     GetItemTrees() - returns an array of XML::Parser objects that contain
+                      the data for each item.
+
+Creation functions
+------------------
+
+     AddItem(hash) - creates and returns a new Net::Jabbber::X::Roster::Item
+                     object.  The argument hash is passed to the SetItem
+                     function.  Check the Net::Jabber::X::Roster::Item
+                     for valid values.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in May of 2000 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/X/Roster/Item,  Next: Net/Jabber/X/SXPM,  Prev: Net/Jabber/X/Roster,  Up: Module List
+
+Jabber X Roster Item Module
+***************************
+
+NAME
+====
+
+   Net::Jabber::X::Roster::Item - Jabber X Roster Item Module
+
+SYNOPSIS
+========
+
+     Net::Jabber::X::Roster::Item is a companion to the
+     Net::Jabber::X::Roster module.  It provides the user a simple
+     interface to set and retrieve all parts of a Jabber Roster Item.
+
+DESCRIPTION
+===========
+
+     To initialize the Item with a Jabber <x/> and then access the </x>
+     you must pass it the XML::Parser Tree array from the
+     Net::Jabber::Client module.  In the callback function for the object
+     type foo:
+
+     use Net::Jabber;
+
+     sub foo {
+       my $foo = new Net::Jabber::Foo(@_);
+
+     my @xTags = $foo->GetX("jabber:x:roster");
+
+     my $xTag;
+     foreach $xTag (@xTags) {
+       my @items = $xTag->GetItems();
+     	my $item;
+     	foreach $item (@items) {
+     	  $item->GetXXXX();
+     	  .
+     	  .
+     	  .
+     	}
+     }
+     .
+     .
+     .
+         }
+
+     You now have access to all of the retrieval functions available below.
+
+     To create a new X Roster Item to send to another user:
+
+     use Net::Jabber;
+
+     $Client = new Net::Jabber::Client();
+     ...
+
+     $foo = new Net::Jabber::Foo();
+     $roster = $foo->NewX("jabber:x:roster");
+     $foo = $roster->AddItem();
+     ...
+
+     $client->Send($foo);
+
+     Using $item you can call the creation functions below to populate the
+     tag before sending it.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     $jid          = $item->GetJID();
+     $jidJID       = $item->GetJID("jid");
+     $name         = $item->GetName();
+     @groups       = $item->GetGroups();
+
+     @item         = $item->GetTree();
+     $str          = $item->GetXML();
+
+Creation functions
+------------------
+
+     $item->SetItem(jid=>'bob@jabber.org',
+     		   name=>'Bob',
+     		   subscription=>'both',
+     		   groups=>[ 'friends','school' ]);
+
+     $item->SetJID('bob@jabber.org');
+     $item->SetName('Bob');
+     $item->SetGroups(['friends','school']);
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetJID()      - returns either a string with the Jabber Identifier,
+     GetJID("jid")   or a Net::Jabber::JID object for the person who is
+                     listed in this <item/>.  To get the JID object set the
+                     string to "jid", otherwise leave blank for the text
+                     string.
+
+     GetName() - returns a string with the name of the jabber ID.
+
+     GetGroups() - returns an array of strings with the names of the groups
+                  that this <item/> belongs to.
+
+     GetXML() - returns the XML string that represents the <presence/>.
+                This is used by the Send() function in Client.pm to send
+                this object as a Jabber Presence.
+
+     GetTree() - returns an array that contains the <presence/> tag
+                 in XML::Parser Tree format.
+
+Creation functions
+------------------
+
+     SetItem(jid=>string|JID, - set multiple fields in the <item/>
+             name=>string,      at one time.  This is a cumulative
+             groups=>array)     and overwriting action.  If you
+                                set the "name" twice, the second
+                                setting is what is used.  If you set
+                                the name, and then set the
+                                jid then both will be in the
+                                <item/> tag.  For valid settings
+                                read the specific Set functions below.
+                                Note: groups does not behave in this
+                                manner.  For each group setting a
+                                new <group/> tag will be created.
+
+     SetJID(string) - sets the Jabber Identifier.  You can either pass a
+     SetJID(JID)      string or a JID object.  They must be valid Jabber
+                      Identifiers or the server will return an error message.
+                      (ie.  jabber:bob@jabber.org/Silent Bob, etc...)
+
+     SetName(string) - sets the name to show in the roster instead of the
+                       JID.
+
+     SetGroups(array) - sets the group for each group in the array.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in May of 2000 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Jabber/X/SXPM,  Next: Net/Jabber/X/SXPM/Map,  Prev: Net/Jabber/X/Roster/Item,  Up: Module List
+
+Jabber X SXPM Delegate
+**********************
+
+NAME
+====
+
+   Net::Jabber::X::SXPM - Jabber X SXPM Delegate
+
+SYNOPSIS
+========
+
+     Net::Jabber::X::SXPM is a companion to the Net::Jabber::X module.
+     It provides the user a simple interface to set and retrieve all
+     parts of a Jabber X SXPM.
+
+DESCRIPTION
+===========
+
+     To initialize the SXPM with a Jabber <x/> you must pass it the
+     XML::Parser Tree array from the module trying to access the <x/>.
+     In the callback function:
+
+     use Net::Jabber;
+
+     sub iq {
+       my $foo = new Net::Jabber::Foo(@_);
+
+     my @xTags = $foo->GetX("jabber:x:sxpm");
+
+     my $xTag;
+     foreach $xTag (@xTags) {
+     	$xTag->....
+     
+     }
+     .
+     .
+     .
+         }
+
+     You now have access to all of the retrieval functions available.
+
+     To create a new SXPM to send to the server:
+
+     use Net::Jabber;
+
+     $foo = new Net::Jabber::Foo();
+     $xTag = $foo->NewX("jabber:x:sxpm");
+
+     Now you can call the creation functions below.
+
+     For more information about the array format being passed to the CallBack
+     please read the Net::Jabber::Client documentation.
+
+Retrieval functions
+-------------------
+
+     $data        = $xTag->GetData();
+     $datawidth   = $xTag->GetDataWidth();
+     $datax       = $xTag->GetDataX();
+     $datay       = $xTag->GetDataY();
+     $boardheight = $xTag->GetBoardHeight();
+     $boardwidth  = $xTag->GetBoardWidth();
+
+     @maps      = $xTag->GetMaps();
+
+Creation functions
+------------------
+
+     $xTag->SetSXPM(boardwidth=>400,
+                    boardheight=>600);
+     $xTag->SetSXPM(data=>"3 a2 a  a2 a3 ",
+                    datawidth=>4,
+     		   datax=>100,
+     		   datay=>300);
+
+     $xTag->SetData(" a aa a");
+     $xTag->SetDataWidth(2);
+     $xTag->SetDataX(15);
+     $xTag->SetDataY(40);
+     $xTag->SetBoardHeight(200);
+     $xTag->SetBoardWidth(200);
+
+     $map = $xTag->AddMap();
+
+METHODS
+=======
+
+Retrieval functions
+-------------------
+
+     GetData() - returns a string with the compressed sxpm data in it.
+                 To uncompress it, run through the string and anytime
+                 you encounter a number, replace the number and following
+                 character with that number of that character:
+
+     10a5b10a = aaaaaaaaaabbbbbaaaaaaaaaa
+
+     The use the GetDataWidth() function to get the width
+     of a line and break the line to some number of width
+     wide strings and that becomes the update block for the
+     sxpm.
+
+     GetDataWidth() - how long a row of the block is so that you can
+                      chop up the sxpm block you were sent.
+     
+     GetDataX() - the x coordinate to overlay the sxpm data at.
+     
+     GetDataY() - the x coordinate to overlay the sxpm data at.
+     
+     GetBoardHeight() - returns an integer with the height of the new board
+                        to create, or to resize the current board to.
+
+     GetBoardWidth() - returns an integer with the width of the new board
+                       to create, or to resize the current board to.
+
+     GetMaps() - returns an array of Net::Jabber::X::SXPM::Map objects.
+                 These can be modified or accessed with the functions
+                 available to them.
+
+Creation functions
+------------------
+
+     SetSXPM(data=>string,         - set multiple fields in the <x/> at one
+             datawidth=>integer,     time.  This is a cumulative and over
+             datax=>integer,         writing action.  If you set the "data"
+             datay=>integer)         value twice, the second setting is
+             boardheight=>integer,   what is used.  If you set the boardheight,
+             boardwidth=>integer)    and then set the boardwidth then both
+                                     will be in the <x/> tag.  For valid
+                                     settings read the specific Set functions
+                                     below.
+
+     SetData(string) - sets the <data/> cdata to the string.  The string
+                       must be valid sxpm data.
+
+     SetDataWidth(integer) - sets the width so that the other side can
+                             decode the sxpm data correctly.
+
+     SetDataX(integer) - sets the x coordinate to anchor the sxpm data at.
+
+     SetDataY(integer) - sets the y coordinate to anchor the sxpm data at.
+
+     SetBoardHeight(string) - sets the board height when creating a new board,
+                              or resizing the current board.
+
+     SetBoardWidth(string) - sets the board width when creating a new board,
+                             or resizing the current board.
+
+     AddMap(XML::Parser tree) - creates a new Net::Jabbber::X::SXPM::Map
+                                object and populates it with the tree if one
+                                was passed in.  This returns the pointer to
+                                the <map/> so you can modify it with the
+                                creation functions from that module.
+
+Test functions
+--------------
+
+     DefinedData() - returns 1 if the <data/> tag exists in the x,
+                     0 otherwise.
+
+     DefinedDataWidth() - returns 1 if the width attribute exists in the
+                          <data/> tag, 0 otherwise.
+
+     DefinedDataX() - returns 1 if the x attribute exists in the </data>
+                      tag, 0 otherwise.
+
+     DefinedDataY() - returns 1 if the y attribute exists in the </data>
+                      tag, 0 otherwise.
+
+     DefinedBoard() - returns 1 if there is a <board/> tag in the <x/>.
+
+     DefinedBoardHeight() - returns 1 if the height attribute exists in the
+                           <board/> tag, 0 otherwise.
+
+     DefinedBoardWidth() - returns 1 if the width attribute exists in the
+                          <board/> tag, 0 otherwise.
+
+AUTHOR
+======
+
+   By Ryan Eatmon in January of 2001 for http://jabber.org..
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+

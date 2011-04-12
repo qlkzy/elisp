@@ -1,0 +1,1545 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Template/Utils,  Next: Term/ANSIColor,  Prev: Template/Tutorial,  Up: Module List
+
+Various utility functions for the Template Tookit.
+**************************************************
+
+NAME
+====
+
+   Template::Utils - Various utility functions for the Template Tookit.
+
+SYNOPSIS
+========
+
+     use Template::Utils qw( :all );
+
+     my $handler = output_handler($target);
+     my $target  = update_hash(\%target, \%params, \%defaults)
+
+DESCRIPTION
+===========
+
+   The Template::Utils module defines a number of general sub-routines used
+by the Template Toolkit.  These can be called by explicitly prefixing the
+`Template::Utils' package name to the sub-routine, or by first importing
+the functions into the current package by passing the ':subs' or ':all'
+tagset names to the `use Template::Utils' line.
+
+UTILITY SUB-ROUTINES
+====================
+
+output_handler($target)
+-----------------------
+
+   Creates a closure which can be called to send output to a particular
+target.  The $target parameter may be an existing CODE ref (the ref is
+returned), a reference to a GLOB such as `\*STDOUT' (a closure which print
+to the GLOB is returned), a reference to an IO::Handle (a closure which
+calls the handle's print() method is returned) or a reference to a target
+string (a closure which appends output to the string is returned).
+
+   The closure returned will print all parameters passed to it, as per
+print().
+
+     open(ERRLOG, "> $errorlog")
+     	|| die "$errorlog: $!\n";
+
+     my $fh = IO::File->new("> $myfile")
+     	|| die "$myfile: $!\n";
+
+     my $h1 = output_handler(\*STDERR);
+     my $h2 = output_handler(\*ERRLOG);
+     my $h3 = output_handler($fh);
+     my $h4 = output_handler(\$mystring);
+
+     foreach my $h ( $h1, $h2, h3, $h4 ) {
+         &$h("An error has occured...\n");
+     }
+
+update_hash(\%target, \%params, \%defaults)
+-------------------------------------------
+
+   Updates the target hash referenced by the first paramter with values
+specified in the second.  The third parameter may also reference a hash
+which is used to define the valid keys and default values.
+
+   A reference to the target hash ($target) is returned.
+
+AUTHOR
+======
+
+   Andy Wardley <cre.canon.co.uk>
+
+REVISION
+========
+
+   $Revision: 1.8 $
+
+COPYRIGHT
+=========
+
+   Copyright (C) 1996-1999 Andy Wardley.  All Rights Reserved.  Copyright
+(C) 1998-1999 Canon Research Centre Europe Ltd.
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   `Template|Template' in this node
+
+
+File: pm.info,  Node: Term/ANSIColor,  Next: Term/ANSIScreen,  Prev: Template/Utils,  Up: Module List
+
+Color screen output using ANSI escape sequences
+***********************************************
+
+NAME
+====
+
+   Term::ANSIColor - Color screen output using ANSI escape sequences
+
+SYNOPSIS
+========
+
+     use Term::ANSIColor;
+     print color 'bold blue';
+     print "This text is bold blue.\n";
+     print color 'reset';
+     print "This text is normal.\n";
+     print colored ("Yellow on magenta.\n", 'yellow on_magenta');
+     print "This text is normal.\n";
+     print colored ['yellow on_magenta'], "Yellow on magenta.\n";
+
+     use Term::ANSIColor qw(:constants);
+     print BOLD, BLUE, "This text is in bold blue.\n", RESET;
+
+     use Term::ANSIColor qw(:constants);
+     $Term::ANSIColor::AUTORESET = 1;
+     print BOLD BLUE "This text is in bold blue.\n";
+     print "This text is normal.\n";
+
+DESCRIPTION
+===========
+
+   This module has two interfaces, one through color() and colored() and
+the other through constants.
+
+   color() takes any number of strings as arguments and considers them to
+be space-separated lists of attributes.  It then forms and returns the
+escape sequence to set those attributes.  It doesn't print it out, just
+returns it, so you'll have to print it yourself if you want to (this is so
+that you can save it as a string, pass it to something else, send it to a
+file handle, or do anything else with it that you might care to).
+
+   The recognized attributes (all of which should be fairly intuitive) are
+clear, reset, dark, bold, underline, underscore, blink, reverse,
+concealed, black, red, green, yellow, blue, magenta, on_black, on_red,
+on_green, on_yellow, on_blue, on_magenta, on_cyan, and on_white.  Case is
+not significant.  Underline and underscore are equivalent, as are clear
+and reset, so use whichever is the most intuitive to you.  The color alone
+sets the foreground color, and on_color sets the background color.
+
+   Note that not all attributes are supported by all terminal types, and
+some terminals may not support any of these sequences.  Dark, blink, and
+concealed in particular are frequently not implemented.
+
+   Attributes, once set, last until they are unset (by sending the
+attribute "reset").  Be careful to do this, or otherwise your attribute
+will last after your script is done running, and people get very annoyed
+at having their prompt and typing changed to weird colors.
+
+   As an aid to help with this, colored() takes a scalar as the first
+argument and any number of attribute strings as the second argument and
+returns the scalar wrapped in escape codes so that the attributes will be
+set as requested before the string and reset to normal after the string.
+Alternately, you can pass a reference to an array as the first argument,
+and then the contents of that array will be taken as attributes and color
+codes and the remainder of the arguments as text to colorize.
+
+   Normally, colored() just puts attribute codes at the beginning and end
+of the string, but if you set $Term::ANSIColor::EACHLINE to some string,
+that string will be considered the line delimiter and the attribute will
+be set at the beginning of each line of the passed string and reset at the
+end of each line.  This is often desirable if the output is being sent to
+a program like a pager that can be confused by attributes that span lines.
+Normally you'll want to set $Term::ANSIColor::EACHLINE to `"\n"' to use
+this feature.
+
+   Alternately, if you import `:constants', you can use the constants
+CLEAR, RESET, BOLD, DARK, UNDERLINE, UNDERSCORE, BLINK, REVERSE, CONCEALED,
+BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, ON_BLACK, ON_RED, ON_GREEN,
+ON_YELLOW, ON_BLUE, ON_MAGENTA, ON_CYAN, and ON_WHITE directly.  These are
+the same as color('attribute') and can be used if you prefer typing:
+
+     print BOLD BLUE ON_WHITE "Text\n", RESET;
+
+   to
+
+     print colored ("Text\n", 'bold blue on_white');
+
+   When using the constants, if you don't want to have to remember to add
+the `, RESET' at the end of each print line, you can set
+$Term::ANSIColor::AUTORESET to a true value.  Then, the display mode will
+automatically be reset if there is no comma after the constant.  In other
+words, with that variable set:
+
+     print BOLD BLUE "Text\n";
+
+   will reset the display mode afterwards, whereas:
+
+     print BOLD, BLUE, "Text\n";
+
+   will not.
+
+   The subroutine interface has the advantage over the constants interface
+in that only two subroutines are exported into your namespace, versus
+twenty-two in the constants interface.  On the flip side, the constants
+interface has the advantage of better compile time error checking, since
+misspelled names of colors or attributes in calls to color() and colored()
+won't be caught until runtime whereas misspelled names of constants will
+be caught at compile time.  So, polute your namespace with almost two
+dozen subroutines that you may not even use that often, or risk a silly
+bug by mistyping an attribute.  Your choice, TMTOWTDI after all.
+
+DIAGNOSTICS
+===========
+
+Invalid attribute name %s
+     (F) You passed an invalid attribute name to either color() or
+     colored().
+
+Name "%s" used only once: possible typo
+     (W) You probably mistyped a constant color name such as:
+
+          print FOOBAR "This text is color FOOBAR\n";
+
+     It's probably better to always use commas after constant names in
+     order to force the next error.
+
+No comma allowed after filehandle
+     (F) You probably mistyped a constant color name such as:
+
+          print FOOBAR, "This text is color FOOBAR\n";
+
+     Generating this fatal compile error is one of the main advantages of
+     using the constants interface, since you'll immediately know if you
+     mistype a color name.
+
+Bareword "%s" not allowed while "strict subs" in use
+     (F) You probably mistyped a constant color name such as:
+
+          $Foobar = FOOBAR . "This line should be blue\n";
+
+     or:
+
+          @Foobar = FOOBAR, "This line should be blue\n";
+
+     This will only show up under use strict (another good reason to run
+     under use strict).
+
+RESTRICTIONS
+============
+
+   It would be nice if one could leave off the commas around the constants
+entirely and just say:
+
+     print BOLD BLUE ON_WHITE "Text\n" RESET;
+
+   but the syntax of Perl doesn't allow this.  You need a comma after the
+string.  (Of course, you may consider it a bug that commas between all the
+constants aren't required, in which case you may feel free to insert
+commas unless you're using $Term::ANSIColor::AUTORESET.)
+
+   For easier debuging, you may prefer to always use the commas when not
+setting $Term::ANSIColor::AUTORESET so that you'll get a fatal compile
+error rather than a warning.
+
+NOTES
+=====
+
+   Jean Delvare provided the following table of different common terminal
+emulators and their support for the various attributes:
+
+     clear    bold     dark    under    blink   reverse  conceal
+      ------------------------------------------------------------------------
+      xterm         yes      yes      no      yes     bold      yes      yes
+      linux         yes      yes      yes    bold      yes      yes      no
+      rxvt          yes      yes      no      yes  bold/black   yes      no
+      dtterm        yes      yes      yes     yes    reverse    yes      yes
+      teraterm      yes    reverse    no      yes    rev/red    yes      no
+      aixterm      kinda   normal     no      yes      no       yes      yes
+
+   Where the entry is other than yes or no, that emulator interpret the
+given attribute as something else instead.  Note that on an aixterm, clear
+doesn't reset colors; you have to explicitly set the colors back to what
+you want.  More entries in this table are welcome.
+
+AUTHORS
+=======
+
+   Original idea (using constants) by Zenin (zenin@best.com), reimplemented
+using subs by Russ Allbery (rra@stanford.edu), and then combined with the
+original idea by Russ with input from Zenin.
+
+
+File: pm.info,  Node: Term/ANSIScreen,  Next: Term/Cap,  Prev: Term/ANSIColor,  Up: Module List
+
+Terminal control using ANSI escape sequences.
+*********************************************
+
+NAME
+====
+
+   Term::ANSIScreen - Terminal control using ANSI escape sequences.
+
+SYNOPSIS
+========
+
+     # qw/:color/ is exported by default, i.e. color() & colored()
+
+     use Term::ANSIScreen qw/:color :cursor :screen :keyboard/;
+
+     print setmode(1), setkey('a','b');
+     print "40x25 mode now, with 'a' mapped to 'b'.";
+     <STDIN>; resetkey; setmode 3; cls;
+
+     locate 1, 1; print "@ This is (1,1)", savepos;
+     print locate(24,60), "@ This is (24,60)"; loadpos;
+     print down(2), clline, "@ This is (3,15)\n";
+
+     color 'black on white'; clline;
+     print "This line is black on white.\n";
+     print color 'reset'; print "This text is normal.\n";
+
+     print colored ("This text is bold blue.\n", 'bold blue');
+     print "This text is normal.\n";
+     print colored ['bold blue'], "This text is bold blue.\n";
+     print "This text is normal.\n";
+
+     use Term::ANSIScreen qw/:constants/; # constants mode
+
+     print BLUE ON GREEN . "Blue on green.\n";
+
+     $Term::ANSIScreen::AUTORESET = 1;
+     print BOLD GREEN . ON_BLUE "Bold green on blue.", CLEAR;
+     print "\nThis text is normal.\n";
+
+DESCRIPTION
+===========
+
+   Term::ANSIScreen is a superset of Term::ANSIColor.  In addition to
+color-sequence generating subroutines exported by `:color' and
+`:constants', this module also features `:cursor' for cursor positioning,
+`:screen' for screen control, as well as `:keyboard' for key mapping.
+
+NOTES
+-----
+
+   * All subroutines in Term::ANSIScreen will print its return value if
+     called under a void context.
+
+   * The cursor position, current color, screen mode and keyboard mappings
+     affected by Term::ANSIScreen will last after the program terminates.
+     You might want to reset them before the end of your program.
+
+The `:color' function set (exported by default)
+-----------------------------------------------
+
+   Term::ANSIScreen recognizes (case-insensitively) following color
+attributes: clear, reset, bold, underline, underscore, blink, reverse,
+concealed, black, red, green, yellow, blue, magenta, on_black, on_red,
+on_green, on_yellow, on_blue, on_magenta, on_cyan, and on_white.
+
+   The color alone sets the foreground color, and on_color sets the
+background color. You may also use on_color without the underscore, e.g.
+"black on white".
+
+color LIST
+     Takes any number of strings as arguments and considers them to be
+     space-separated lists of attributes.  It then forms and returns the
+     escape sequence to set those attributes.
+
+colored EXPR, LIST
+     Takes a scalar as the first argument and any number of attribute
+     strings as the second argument, then returns the scalar wrapped in
+     escape codes so that the attributes will be set as requested before
+     the string and reset to normal after the string.
+
+     Alternately, you can pass a reference to an array as the first
+     argument, and then the contents of that array will be taken as
+     attributes and color codes and the remainder of the arguments as text
+     to colorize.
+
+     Normally, this function just puts attribute codes at the beginning
+     and end of the string, but if you set $Term::ANSIScreen::EACHLINE to
+     some string, that string will be considered the line delimiter and
+     the attribute will be set at the beginning of each line of the passed
+     string and reset at the end of each line.  This is often desirable if
+     the output is being sent to a program like a pager, which can be
+     confused by attributes that span lines.
+
+     Normally you'll want to set $Term::ANSIColor::EACHLINE to `"\n"' to
+     use this feature.
+
+The `:constants' function set
+-----------------------------
+
+   If you import `:constants' you can use the constants CLEAR, RESET,
+BOLD, UNDERLINE, UNDERSCORE, BLINK, REVERSE, CONCEALED, BLACK, RED, GREEN,
+YELLOW, BLUE, MAGENTA, ON_BLACK, ON_RED, ON_GREEN, ON_YELLOW, ON_BLUE,
+ON_MAGENTA, ON_CYAN, and ON_WHITE directly.  These are the same as
+color('attribute') and can be used if you prefer typing:
+
+     print BOLD BLUE ON_WHITE "Text\n", RESET;
+     print BOLD BLUE ON WHITE "Text\n", RESET; # _ is optional
+
+   to     print colored ("Text\n", 'bold blue on_white');
+
+   When using the constants, if you don't want to have to remember to add
+the `, RESET' at the end of each print line, you can set
+$Term::ANSIColor::AUTORESET to a true value.  Then, the display mode will
+automatically be reset if there is no comma after the constant.  In other
+words, with that variable set:
+
+     print BOLD BLUE "Text\n";
+
+   will reset the display mode afterwards, whereas:
+
+     print BOLD, BLUE, "Text\n";
+
+   will not.
+
+The `:cursor' function set
+--------------------------
+
+locate [EXPR, EXPR]
+     Sets the cursor position. The first argument is its row number, and
+     the second one its column number.  If omitted, the cursor will be
+     located at (1,1).
+
+up    [EXPR] =item down  [EXPR] =item left  [EXPR] =item right [EXPR]
+     Moves the cursor toward any direction for EXPR characters. If
+     omitted, EXPR is 1.
+
+savepos =item loadpos
+     Saves/restores the current cursor position.
+
+The `:screen' function set
+--------------------------
+
+cls
+     Clears the screen with the current background color, and set cursor
+     to (1,1).
+
+clline
+     Clears the current row with the current background color, and set
+     cursor to the 1st column.
+
+setmode EXPR
+     Sets the screen mode to EXPR. Under DOS, ANSI.SYS recognizes
+     following values:
+
+          0:  40 x  25 x   2 (text)   1:  40 x  25 x 16 (text)
+          2:  80 x  25 x   2 (text)   3:  80 x  25 x 16 (text)
+          4: 320 x 200 x   4          5: 320 x 200 x  2
+          6: 640 x 200 x   2          7: Enables line wrapping
+            13: 320 x 200 x   4         14: 640 x 200 x 16
+            15: 640 x 350 x   2         16: 640 x 350 x 16
+            17: 640 x 480 x   2         18: 640 x 480 x 16
+            19: 320 x 200 x 256
+
+wrapon =item wrapoff
+     Enables/disables the line-wraping mode.
+
+The `:keyboard' function set
+----------------------------
+
+setkey EXPR, EXPR
+     Takes a scalar representing a single keystroke as the first argument
+     (either a character or an escape sequence in the form of
+     "num1;num2"), and maps it to a string defined by the second argument.
+     Afterwards, when the user presses the mapped key, the string will
+     get outputed instead.
+
+resetkey [LIST]
+     Resets each keys in the argument list to its original mapping.  If
+     called without an argument, resets all previously mapped keys.
+
+DIAGNOSTICS
+===========
+
+Invalid attribute name %s
+     You passed an invalid attribute name to either color() or colored().
+
+Identifier %s used only once: possible typo
+     You probably mistyped a constant color name such as:
+
+          print FOOBAR "This text is color FOOBAR\n";
+
+     It's probably better to always use commas after constant names in
+     order to force the next error.
+
+No comma allowed after filehandle
+     You probably mistyped a constant color name such as:
+
+          print FOOBAR, "This text is color FOOBAR\n";
+
+     Generating this fatal compile error is one of the main advantages of
+     using the constants interface, since you'll immediately know if you
+     mistype a color name.
+
+Bareword %s not allowed while "strict subs" in use
+     You probably mistyped a constant color name such as:
+
+          $Foobar = FOOBAR . "This line should be blue\n";
+
+     or:
+
+          @Foobar = FOOBAR, "This line should be blue\n";
+
+     This will only show up under use strict (another good reason to run
+     under use strict).
+
+AUTHORS
+=======
+
+   Original idea (using constants) by Zenin (zenin@best.com),
+reimplemented using subs by Russ Allbery (rra@stanford.edu), and then
+combined with the original idea by Russ with input from Zenin to
+Term::ANSIColor. Screen mode and keyboard mapping codes were added by
+Autrijus Tang, along with revised code and documentation.
+
+COPYRIGHT
+=========
+
+   Copyright 2001 by Autrijus Tang <autrijus@autrijus.org>.  Based on
+works of Zenin (zenin@best.com),                   Russ Allbery
+(rra@stanford.edu).
+
+   All rights reserved.  This module is free software; you can
+redistribute it and/or modify it under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Term/Cap,  Next: Term/Complete,  Prev: Term/ANSIScreen,  Up: Module List
+
+Perl termcap interface
+**********************
+
+NAME
+====
+
+   Term::Cap - Perl termcap interface
+
+SYNOPSIS
+========
+
+     require Term::Cap;
+     $terminal = Tgetent Term::Cap { TERM => undef, OSPEED => $ospeed };
+     $terminal->Trequire(qw/ce ku kd/);
+     $terminal->Tgoto('cm', $col, $row, $FH);
+     $terminal->Tputs('dl', $count, $FH);
+     $terminal->Tpad($string, $count, $FH);
+
+DESCRIPTION
+===========
+
+   These are low-level functions to extract and use capabilities from a
+terminal capability (termcap) database.
+
+   The *Tgetent* function extracts the entry of the specified terminal
+type TERM (defaults to the environment variable TERM) from the database.
+
+   It will look in the environment for a *TERMCAP* variable.  If found,
+and the value does not begin with a slash, and the terminal type name is
+the same as the environment string TERM, the *TERMCAP* string is used
+instead of reading a termcap file.  If it does begin with a slash, the
+string is used as a path name of the termcap file to search.  If *TERMCAP*
+does not begin with a slash and name is different from TERM, *Tgetent*
+searches the files `$HOME/.termcap', `/etc/termcap', and
+`/usr/share/misc/termcap', in that order, unless the environment variable
+*TERMPATH* exists, in which case it specifies a list of file pathnames
+(separated by spaces or colons) to be searched *instead*.  Whenever
+multiple files are searched and a tc field occurs in the requested entry,
+the entry it names must be found in the same file or one of the succeeding
+files.  If there is a `:tc=...:' in the *TERMCAP* environment variable
+string it will continue the search in the files as above.
+
+   *OSPEED* is the terminal output bit rate (often mistakenly called the
+baud rate).  *OSPEED* can be specified as either a POSIX termios/SYSV
+termio speeds (where 9600 equals 9600) or an old BSD-style speeds (where
+13 equals 9600).
+
+   *Tgetent* returns a blessed object reference which the user can then
+use to send the control strings to the terminal using *Tputs* and *Tgoto*.
+It calls croak on failure.
+
+   *Tgoto* decodes a cursor addressing string with the given parameters.
+
+   The output strings for *Tputs* are cached for counts of 1 for
+performance.  *Tgoto* and *Tpad* do not cache.  `$self->{_xx}' is the raw
+termcap data and `$self->{xx}' is the cached version.
+
+     print $terminal->Tpad($self->{_xx}, 1);
+
+   *Tgoto*, *Tputs*, and *Tpad* return the string and will also output the
+string to $FH if specified.
+
+   The extracted termcap entry is available in the object as
+`$self->{TERMCAP}'.
+
+EXAMPLES
+========
+
+     # Get terminal output speed
+     require POSIX;
+     my $termios = new POSIX::Termios;
+     $termios->getattr;
+     my $ospeed = $termios->getospeed;
+
+     # Old-style ioctl code to get ospeed:
+     #     require 'ioctl.pl';
+     #     ioctl(TTY,$TIOCGETP,$sgtty);
+     #     ($ispeed,$ospeed) = unpack('cc',$sgtty);
+
+     # allocate and initialize a terminal structure
+     $terminal = Tgetent Term::Cap { TERM => undef, OSPEED => $ospeed };
+
+     # require certain capabilities to be available
+     $terminal->Trequire(qw/ce ku kd/);
+
+     # Output Routines, if $FH is undefined these just return the string
+
+     # Tgoto does the % expansion stuff with the given args
+     $terminal->Tgoto('cm', $col, $row, $FH);
+
+     # Tputs doesn't do any % expansion.
+     $terminal->Tputs('dl', $count = 1, $FH);
+
+
+File: pm.info,  Node: Term/Complete,  Next: Term/Gnuplot,  Prev: Term/Cap,  Up: Module List
+
+Perl word completion module
+***************************
+
+NAME
+====
+
+   Term::Complete - Perl word completion module
+
+SYNOPSIS
+========
+
+     $input = Complete('prompt_string', \@completion_list);
+     $input = Complete('prompt_string', @completion_list);
+
+DESCRIPTION
+===========
+
+   This routine provides word completion on the list of words in the array
+(or array ref).
+
+   The tty driver is put into raw mode using the system command `stty raw
+-echo' and restored using `stty -raw echo'.
+
+   The following command characters are defined:
+
+<tab>
+     Attempts word completion.  Cannot be changed.
+
+^D
+     Prints completion list.  Defined by *$Term::Complete::complete*.
+
+^U
+     Erases the current input.  Defined by *$Term::Complete::kill*.
+
+<del>, <bs>
+     Erases one character.  Defined by *$Term::Complete::erase1* and
+     *$Term::Complete::erase2*.
+
+DIAGNOSTICS
+===========
+
+   Bell sounds when word completion fails.
+
+BUGS
+====
+
+   The completion character <tab> cannot be changed.
+
+AUTHOR
+======
+
+   Wayne Thompson
+
+
+File: pm.info,  Node: Term/Gnuplot,  Next: Term/GnuplotTerminals,  Prev: Term/Complete,  Up: Module List
+
+lowlevel graphics using gnuplot drawing routines.
+*************************************************
+
+NAME
+====
+
+   Term::Gnuplot - lowlevel graphics using gnuplot drawing routines.
+
+SYNOPSIS
+========
+
+     use Term::Gnuplot ':ALL';
+     list_terms();
+     change_term('dumb') or die "Cannot set terminal.\n";
+     term_init();				# init()
+     term_start_plot();			# graphics();
+     $xmax = scaled_xmax();
+     $ymax = scaled_ymax();
+     linetype(-2);
+     move(0,0);
+     vector($xmax-1,0);
+     vector($xmax-1,$ymax-1);
+     vector(0,$ymax-1);
+     vector(0,0);
+     justify_text(LEFT);
+     put_text(h_char()*5, $ymax - v_char()*3,"Terminal Test, Perl");
+     $x = $xmax/4;
+     $y = $ymax/4;
+     $xl = h_tic()*5;
+     $yl = v_tic()*5;
+     linetype(2);
+     arrow($x,$y,$x+$xl,$y,1);
+     arrow($x,$y,$x+$xl/2,$y+$yl,1);
+     arrow($x,$y,$x,$y+$yl,1);
+     arrow($x,$y,$x-$xl/2,$y+$yl,0);
+     arrow($x,$y,$x-$xl,$y,1);
+     arrow($x,$y,$x-$xl,$y-$yl,1);
+     arrow($x,$y,$x,$y-$yl,1);
+     arrow($x,$y,$x+$xl,$y-$yl,1);
+     term_end_plot();			# text();
+     Term::Gnuplot::reset();
+
+EXPORTS
+=======
+
+   None by default.
+
+Exportable and export tags:
+---------------------------
+
+`:SETUP'
+          change_term test_term init_terminal list_terms  plot_outfile_set
+          term_init term_start_plot term_end_plot
+          term_start_multiplot term_end_multiplot plotsizes_scale
+          setcanvas
+
+`:JUSTIFY'
+          LEFT CENTRE RIGHT
+
+`:FIELDS'
+          name description xmax ymax v_char h_char v_tic h_tic
+          scaled_xmax scaled_ymax
+
+`:METHODS'
+          init scale graphics linetype move vector point text_angle
+          justify_text put_text arrow text
+
+%description
+     Hash of `name => description' pairs.  In particular, `keys
+     %description' contains names of supported terminals.
+
+:ALL
+     All of the above.
+
+DESCRIPTION
+===========
+
+   Below I include the contents of the file `term/README' from gnuplot
+distribution (see `gnuplot `term' in this node'). It explains the meaning
+of the methods of `"SYNOPSIS"' in this node.
+
+   All methods are supported under Perl, the options method is available as
+set_options(). The discription below includes underscores, that are
+deleted in the perl interface.
+
+   The functions which are not included in the description below:
+
+`change_term($newname)'
+test_term()
+init_terminal()
+     self-explanatory.
+
+list_terms()
+     Print names/descriptions of supported terminals.
+
+`plot_outfile_set($filename)'
+     set the output file.  This should be done before setting the terminal
+     type.
+
+`plotsizes_scale($xfactor, $yfactor)'
+     set the size of the output device (such as a graphic file) in
+     fractions of the default size.  Some output drivers may ignore this
+     request.  The request is active until the next request.
+
+     Does not change sizes reported by xmax() and ymax()!  After such a
+     call one should use the following calls:
+
+scaled_xmax(), scaled_ymax()
+     Report xmax() and ymax() corrected by the scaling factors given to
+     plotsizes_scale().
+
+term_init(), term_start_plot(), term_end_plot()
+     higher-level functions variants of init(), graphics(), text().  Should
+     be prefered over init(), graphics(), text() if the output file is
+     changed, since they take into account resetting of output file mode
+     (if needed).
+
+term_start_multiplot(), term_end_multiplot()
+     Interfaces to C functions with the same names.  How to use them
+     outside of gnuplot proper is not clear.
+
+_term_descrs()
+     Returns hash of names/descriptions of supported terminals (available
+     as %Term::Gnuplot::description too).
+
+setcanvas($ptk_canvas)
+     Sets the Tk widget for direct-draw operations (may be used with
+     terminal 'tkcanvas' with the option 'tkperl_canvas').
+
+   *NOTE.* Some terminals require calling set_options() before init()!
+
+gnuplot `term/README'
+=====================
+
+   DOCUMENTATION FOR GNUPLOT TERMINAL DRIVER WRITERS
+
+   By Russell Lang 1/90
+
+   Updated for new file layout by drd 4/95
+
+   Paragraphs about inclusion of TERM_HELP added by rcc 1/96
+
+   No change to the interface between gnuplot and the terminal drivers,
+but we would like to make the terminal drivers standalone
+
+   1) in order move the support for the terminal drivers outside of the
+support for the main program, thereby encouraging a library of
+contributed drivers 2) To make it easy for users to add contributed
+drivers, by adding    a single #include line to term.h 3) To allow
+individual compilation on DOS, to save the overlay    manager from having
+to load _all_ drivers together.
+
+   CORRECTION - scale() interface is no longer supported, since it is
+incompatible with multiplot.
+
+   Whole of terminal driver should be contained in one <driver>.trm file,
+with a fairly strict layout as detailed below - this allows the gnuplot
+maintainers to change the way the terminal drivers are compiled without
+having to change the drivers themselves.
+
+   term.h, and therefore each file.trm file, may be loaded more than once,
+with different sections selected by macros.
+
+   Each driver provides all the functions it needs, and a table of
+function pointers and other data to interface to gnuplot.  The table entry
+is currently defined as follows in plot.h:
+
+     struct TERMENTRY {
+
+     /* required entries */
+
+     char *name;
+     char *description;
+     unsigned int xmax,ymax,v_char,h_char,v_tic,h_tic;
+
+     void (*options) __PROTO((void));
+     void (*init) __PROTO((void));
+     void (*reset) __PROTO((void));
+     void (*text) __PROTO((void));
+     int (*scale) __PROTO((double, double));
+     void (*graphics) __PROTO((void));
+     void (*move) __PROTO((unsigned int, unsigned int));
+     void (*vector) __PROTO((unsigned int, unsigned int));
+     void (*linetype) __PROTO((int));
+     void (*put_text) __PROTO((unsigned int, unsigned int,char*));
+
+     /* optional entries */
+
+     int (*text_angle) __PROTO((int));
+     int (*justify_text) __PROTO((enum JUSTIFY));
+     void (*point) __PROTO((unsigned int, unsigned int,int));
+     void (*arrow) __PROTO((unsigned int, unsigned int, unsigned int,
+     		   unsigned int, int));
+        int (*set_font) __PROTO((char *font));  /* "font,size" */
+     void (*set_pointsize) __PROTO((double size)); /* notification of set pointsize */
+     int flags; /* various flags */
+        void (*suspend) __PROTO((void)); /* after one plot of multiplot */
+        void (*resume) __PROTO((void));  /* before subsequent plot of multiplot */
+        void (*boxfill) __PROTO((int style, unsigned int x1, unsigned int y1, unsigned int width, unsigned int height)); /* clear part of multiplot */
+        void (*linewidth) __PROTO((double linewidth));
+        void (*pointsize) __PROTO((double pointsize));
+       };
+
+   One consequence of (1) is that we would like drivers to be backwards
+compatible - drivers in the correct form below should work in future
+versions of gnuplot without change. C compilers guarantee to fill
+unitialised members of a structure to zero, so gnuplot can detect old
+drivers, in which fields have not been initalised, and can point new
+interface entry pointers to dummy functions.
+
+   We can add fields to the terminal structure, but only at the end of the
+list.  If you design a terminal that cant work without a new interface
+being defined, and consequent changes to the main gnuplot source, please
+contact bug-gnuplot@dartmouth.edu simply to ensure that you have the most
+up to date defn of the terminal structure. Also, please ensure that the
+'set term' command checks for 0 values in added fields when an old driver
+is selected, and a pointer to a suitable 'cant do' function is provided.
+It is therefore not required (and in fact not possible) to add padding
+fields to the end of all drivers.
+
+   Similarly, if you add an optional field to an old driver, take care to
+ensure that all intervening fields are padded with zeros.
+
+   Some of the above fields are required - this should not be a problem,
+since they were all required in earlier releases of gnuplot.  The later
+fields are interfaces to capabilities that not all devices can do, or for
+which the generic routines provided should be adequate.  There are several
+null ('cant do') functions provided by term.c which a driver can reference
+in the table. Similarly, for bitmap devices, there are generic routines
+for lines and text provided by bitmap.c
+
+   Here's a brief description of each variable:
+
+   The char *name is a pointer to a string containing the name of the
+terminal.  This name is used by the 'set terminal' and 'show terminal'
+commands.  The name must be unique and must not be confused with an
+abbreviation of another name.  For example if the name "postscript"
+exists, it is not possible to have another name "postscript2".  Keep the
+name under 15 characters.
+
+   The char *description is a pointer to a string containing a description
+of the terminal, which is displayed in response to the 'set terminal'
+command.  Keep the description under 60 characters.
+
+   xmax is the maximum number of points in the x direction.  The range of
+points used by gnuplot is 0 to xmax-1.
+
+   ymax is the maximum number of points in the y direction.  The range of
+points used by gnuplot is 0 to ymax-1.
+
+   v_char is the height of characters, in the same units as xmax and ymax.
+The border for labelling at the top and bottom of the plot is calculated
+using v_char.  v_char is used as the vertical line spacing for characters.
+
+   h_char is the width of characters, in the same units as xmax and ymax.
+The border for labelling at the left and right of the plot is calculated
+using h_char, for example.  If the _justify_text function returns FALSE,
+h_char is used to justify text right or centre.  If characters are not
+fixed width, then the _justify_text function must correctly justify the
+text.
+
+   v_tic is the vertical size of tics along the x axis, in the same units
+as ymax.
+
+   h_tic is the horizontal size of tics along the y axis, in the same
+units as xmax.
+
+   v_tic and h_tic should give tics of the same physical size on the
+output. The ratio of these two quantities is used by gnuplot to set the
+aspect ratio to 1 so that circles appear circular when 'set size square'
+is active.
+
+   All the above values need not be static - values can be substituted
+into the table during terminal initialisation, based on options for
+example.
+
+   Here's a brief description of what each term.c function does:
+
+   _options()  Called when terminal type is selected.  This procedure
+should parse options on the command line.  A list of the currently
+selected options should be stored in term_options[] in a form suitable for
+use with the set term command.  term_options[] is used by the save
+command.  Use options_null() if no options are available.
+
+   _init()  Called once, when the device is first selected.  This procedure
+should set up things that only need to be set once, like handshaking and
+character sets etc...  There is a global variable 'pointsize' which you
+might want to use here.  If set pointsize is issued after init has been
+called, the set_pointsize() function is called.
+
+   _reset()  Called when gnuplot is exited, the output device changed or
+the terminal type changed.  This procedure should reset the device,
+possibly flushing a buffer somewhere or generating a form feed.
+
+   _scale(xs,ys) Called just before _graphics(). This takes the x and y
+scaling factors as information. If the terminal would like to do its own
+scaling, it returns TRUE. Otherwise, it can ignore the information and
+return FALSE: do_plot will do the scaling for you. null_scale is provided
+to do just this, so most drivers can ignore this function entirely. The
+Latex driver is currently the only one providing its own scaling. PLEASE
+DO NOT USE THIS INTERFACE - IT IS NOT COMPATIBLE WITH MULTIPLOT.
+
+   _graphics()  Called just before a plot is going to be displayed.  This
+procedure should set the device into graphics mode.  Devices which can't
+be used as terminals (like plotters) will probably be in graphics mode
+always and therefore won't need this.
+
+   _text()  Called immediately after a plot is displayed.  This procedure
+should set the device back into text mode if it is also a terminal, so
+that commands can be seen as they're typed.  Again, this will probably do
+nothing if the device can't be used as a terminal. This call can be used
+to trigger conversion and output for bitmap devices.
+
+   _move(x,y)  Called at the start of a line.  The cursor should move to
+the (x,y) position without drawing.
+
+   _vector(x,y)  Called when a line is to be drawn.  This should display a
+line from the last (x,y) position given by _move() or _vector() to this
+new (x,y) position.
+
+   _linetype(lt)  Called to set the line type before text is displayed or
+line(s) plotted.  This procedure should select a pen color or line style
+if the device has these capabilities.  lt is an integer from -2 to 0 or
+greater.  An lt of -2 is used for the border of the plot.  An lt of -1 is
+used for the X and Y axes.  lt 0 and upwards are used for plots 0 and
+upwards.  If _linetype() is called with lt greater than the available line
+types, it should map it to one of the available line types.  Most drivers
+provide 9 different linetypes (lt is 0 to 8).
+
+   _put_text(x,y,str)  Called to display text at the (x,y) position, while
+in graphics mode.   The text should be vertically (with respect to the
+text) justified about (x,y).  The text is rotated according to _text_angle
+and then horizontally (with respect to the text) justified according to
+_justify_text.
+
+   The following are optional
+
+   _text_angle(ang)  Called to rotate the text angle when placing the y
+label.  If ang = 0 then text is horizontal.  If ang = 1 then text is
+vertically upwards.  Returns TRUE if text can be rotated, FALSE otherwise.
+[But you must return TRUE if called with ang=0]
+
+   _justify_text(mode)  Called to justify text left, right or centre.  If
+mode = LEFT then text placed by _put_text is flushed left against (x,y).
+If mode = CENTRE then centre of text is at (x,y).  If mode = RIGHT then
+text is placed flushed right against (x,y).  Returns TRUE if text can be
+justified Returns FALSE otherwise and then _put_text assumes text is
+flushed left; justification of text is then performed by calculating the
+text width using strlen(text) * h_char.
+
+   _point(x,y,point)  Called to place a point at position (x,y).  point is
+-1 or an integer from 0 upwards.  At least 6 point types (numbered 0 to 5)
+are normally provided.  Point type -1 is a dot.  If point is more than the
+available point types then it should be mapped back to one of the
+available points.  Two _point() functions called do_point() and
+line_and_point() are provided in term.c and should be suitable for most
+drivers.  do_point() draws the points in the current line type.  If your
+driver uses dotted line types (generally because it is monochrome), you
+should use line_and_point() which changes to line type 0 before drawing
+the point.  line type 0 should be solid.
+
+   There is a global variable 'pointsize' which is controlled by the set
+pointsize command. If possible, use that. pointsize should be examined at
+terminal init. If it is subsequently changed, the set_pointsize() fn will
+be called.
+
+   _arrow(sx,sy,ex,ey,head)  Called to draw an arrrow from (sx,sy) to
+(ex,ey).  A head is drawn on the arrow if head = TRUE.  An _arrow()
+function called do_arrow() is provided in term.c which will draw arrows
+using the _move() and _vector() functions.  Drivers should use do_arrow
+unless it causes problems.
+
+   _set_font() is called to set the font of labels, etc [new 3.7 feature]
+fonts are selected as strings "name,size"
+
+   _pointsize() is used to set the pointsize for subsequent points
+
+   _flags stores various flags describing driver capabilities. Currently
+three bits are allocated   - TERM_CAN_MULTIPLOT - driver can do multiplot
+fully-interactively when output is not redirected. ie text and graphics
+go to different places, or driver can flip using suspend.    -
+TERM_CANT_MULTIPLOT - driver cannot multiplot, even if output   is
+redirected.    - TERM_BINARY - output file must be opened in binary mode
+Another bit is earmarked for VMS_PASTHRU, but not yet implemented.
+
+   _suspend() - called before gnuplot issues a prompt in multiplot mode
+linux vga driver uses this entry point to flip from graphics to    text
+mode. X11 driver will take this opportunity to paint the window    on the
+display.
+
+   _resume() - called after suspend(), before subsequent plots of a
+multiplot.
+
+   _boxfill() - fills a box in given style (currently unimplemented -
+always            background colour at present). used by 'clear' in
+multiplot for            support of inset graphs
+
+   _linewidth() - sets the linewidth
+
+   The following should illustrate the order in which calls to these
+routines are made:
+
+     _options()
+      _init()
+        _scale(xs,ys)
+        _graphics()
+          _linewidth(lw)
+          _linetype(lt)
+          _move(x,y)
+          _vector(x,y)
+          _pointsize(size)
+          _point(x,y,point)
+          _text_angle(angle)
+          _justify(mode)
+          _set_font(font)
+          _put_text(x,y,text)
+          _arrow(sx,sy,ex,ey)
+        _text()
+        _graphics()
+          .
+        _suspend()
+        _set_pointsize()
+        _resume()
+          .
+        _text()
+      _reset()
+
+   -----------------------------------
+
+   BITMAP DEVICES
+
+   A file bitmap.c is provided, implementing a generic set of bitmap
+routines. It provides all the routines required to generate a bitmap in
+memory, drawing lines and writing text. A simple driver need provide only
+a text() entry point, which converts and outputs the stored bitmap in the
+format required by the device.
+
+   Internally, the bitmap is built of one or more planes of 1 bit per
+pixel. In fact, I think the library would be easier to use if it offered
+one or more planes of pixels with 1,2,4 or 8 bits per pixel, since not all
+bitmap devices are based on planes, and the planes have to be recombined
+at the end at present.  In general, a device would use either planes or
+bits-per-pixel, though I guess a 24-bit bitmap could use 3 planes of 8 bits
+per pixel..?
+
+   The pixels are currently organised horizontally packed into bytes.
+
+   ie
+
+     ********%%%%%%%%$$$$$$$$!!!!!!!! etc
+     ^^^^^^^^@@@@@@@@########++++++++ etc
+
+   where like symbols are stored in one byte. Vertical packing can be
+arranged by reversing x and y dimensions and setting the global
+b_rastermode to TRUE.  (eg epson 8-pin dot-matrix printer)
+
+   Functions provided are
+
+   (internal fns ? - should probably be static, not external ?)
+
+     b_setpixel(x,y,value)
+     b_setmaskpixel(x,y,value)
+     b_putc(x,y,char,angle)
+     b_setvalue(size)
+
+   setting up stuff
+
+     b_makebitmap(x,y,planes)  - make a bitmap of size x * y
+     b_freebitmap()            - free bitmap
+     b_charsize(size)
+
+   gnuplot driver interface functions  (can go straight into gnuplot
+structure)
+
+     b_setlinetype(linetype)
+     b_move(x,y)
+     b_vector(x,y)
+     b_put_text(x,y,*str)
+     b_text_angle(ang)
+
+   I think that the library could be made easier to use if we defined a
+structure which described the bitmap (raster mode, planes, bits-per-pixel,
+colours, etc) and then added to the gnuplot term struct a pointer to this
+structure. Then we could have b_graphics() routine which did all the
+initialisation that presently has to be done by the driver graphics()
+entry point.  Also, one day I would like to have parsing, including
+terminal driver options, table-driven, but I'm getting ahead of myself
+here.
+
+   At present, bitmap.c is linked into gnuplot unconditionally. Perhaps it
+should be put into a library, so that it is linked in only if any of the
+user-selected drivers require bitmap support.
+
+   There may be scope to do similar things with some of the other stuff
+that is shared by several drivers. Rather than requiring, for example,
+that LATEX driver is required if EMTEX is to be used, the shared routines
+could be extracted to a library and linked if any of the drivers which use
+them are used.  Just a thought...
+
+   -----------------------------------
+
+   FILE LAYOUT ----------
+
+   I think a file layout like the following will leave most flexibility to
+the gnuplot maintainers. I use REGIS for example.
+
+     #include "driver.h"
+
+     #ifdef TERM_REGISTER
+     register_term(regis) /* no ; */
+     #endif
+
+     #ifdef TERM_PROTO
+     TERM_PUBLIC void REGISinit __PROTO((void));
+     TERM_PUBLIC void REGISgraphics __PROTO((void));
+     /* etc */
+     #define GOT_REGIS_PROTO
+     #endif
+
+     #ifndef TERM_PROTO_ONLY
+     #ifdef TERM_BODY
+
+     TERM_PUBLIC void REGISinit()
+     {
+       /* etc */
+     }
+
+     /* etc */
+
+     #endif
+
+     #ifdef TERM_TABLE
+
+     TERM_TABLE_START(regis_driver)
+       /* no { */
+       "regis", "REGIS graphics language",
+       REGISXMAX, /* etc */
+       /* no } */
+     TERM_TABLE_END(regis_driver)
+
+     #undef LAST_TERM
+     #define LAST_TERM regis_driver
+
+     #endif /* TERM_TABLE */
+     #endif /* TERM_PROTO_ONLY */
+
+     #ifdef TERM_HELP
+     START_HELP(regis)
+     "1 regis",
+     "?set terminal regis",
+     "?regis",
+     " The `regis` terminal device generates output in the REGIS graphics language.",
+     " It has the option of using 4 (the default) or 16 colors.",
+     "",
+     " Syntax:",
+     "         set term regis {4 | 16}"
+     END_HELP(regis)
+     #endif
+
+   -------------
+
+   The first three lines in the TERM_HELP section must contain the same
+name as that specified by register_term, since this is the name that will
+be entered into the list of available terminals.  If more than one name is
+registered, the additional names should have their own two "?" lines, but
+not the "1" line.
+
+   Each record is enclosed in double-quotes and (except for the last
+record) followed by a comma.  The text is copied as a single string into
+gnuplot.doc, so the syntax must obey the rules of that entity.  If the
+text includes double-quotes or backslashes, these must be escaped by
+preceding each occurence with a backslash.
+
+   -------------
+
+   Rationale:
+
+   We may want to compile all drivers into term.c or one driver at a time
+this layout should support both TERM_PUBLIC will be static  if all modules
+are in term.c, or blank otherwise.  Please make private support functions
+static if possible.
+
+   We may include term.h, and therefore all these files, one or more times.
+If just once (all modules compiled into term.c) putting the four parts in
+this order should make it work.
+
+   we may compile the table entries into either an array or a linked list
+This organisation should support both
+
+   For separate compilation, we may write a program which defines
+TERM_REGISTER and #include term.h to find out which drivers are selected
+in term.h and thereby generate a makefile.
+
+   For a driver which depends on another (eg enhpost and pslatex on post)
+the driver can do something like
+
+     #ifndef GOT_POST_PROTO
+     #define TERM_PROTO_ONLY
+     #include "post.trm"
+     #undef TERM_PROTO_ONLY
+     #endif
+
+   this is probably needed only in the TERM_TABLE section only, but may
+also be used in the body. The TERM_PROTO_ONLY means that we pick up only
+the protos from post.trm, even if current driver is being compiled with
+TERM_BODY or TERM_TABLE
+
+   If we do it the linked-list way, the arg to TERM_TABLE_START will be
+the name of the variable, so any valid, unique name is fine.  The
+TERM_TABLE_START macro will do all the work of linking the entries
+together, probably using LAST_TERM
+
+   The inclusion of the TERM_HELP section (and removal of terminal
+documentation from the master gnuplot.doc file) means that the online help
+will include discussions of only those terminals available to the user.
+For generation of the printed manual, all can be included.
+
+   Please make as many things as possible static, but do still try to use
+unique names since all drivers may all be compiled into term.o
+
+   The bit in the PROTO section is basically what you would put into a .h
+file if we had them - everything that is needed by the TABLE_ENTRY should
+be defined in this part. In particular, dont forget all the maxes and
+character sizes and things for the table entry.
+
+   Dont forget to put TERM_PUBLIC in the defns of the fns as well as the
+prototypes. It will probably always expand to 'static' except for pcs.
+
+Using Term::Gnuplot from C libraries
+====================================
+
+   The interface of this module to gnuplot version 3.7 is going via a
+translation layer in `Gnuplot.h'.  This layer isolates low-level drawing
+routines from gnuplot program.  (In doing this unsupported job it does
+some nasty thing, in particular `Gnuplot.h' cannot be included in more than
+one C compilation unit.)
+
+   In fact `Gnuplot.h' can be used by any C program or library which wants
+to use device-independent plotting routines of gnuplot.
+
+   C library should use the same syntax of calls as `Term::Gnuplot', with
+the only difference that to call low-level _init() method one calls
+gptable_init(), to set terminal one calls `termset(name)', and to get a
+property of terminal (say `xmax') one uses `termprop(xmax)'.
+
+   To set options one can setup the array token and data `c_token',
+`num_tokens', `input_line', then call options().  Alternately, one can
+define `SET_OPTIONS_FROM_STRING', then a call `set_options_from(string)'
+is avalable.  This call will set up all these variables and will call
+options().  However, the logic of the parsing of the string is very
+primitive.
+
+   *NOTES.*
+
+   * To initialize the facilities of `Gnuplot.h' from C one needs to call
+     setup_gpshim().  This call can be made as many times as wanted, only
+     the first call will do anything.
+
+   * NULL argument to term_set_output() means "reset back to stdout".
+
+   * `Gnuplot.h' expects that the macro/function `croak(...)' is defined.
+     This function should have the same syntax as printf(), and should not
+     return.  It is used as an error-reporting function.
+
+   * One should define functions `int StartOutput()', `int EndOutput()' and
+     `int OutLine(char *s)' which will be used by gnuplot for error
+     messages and for terminal listing.  Alternatively, one can define
+     `GNUPLOT_OUTLINE_STDOUT', and gnuplot will put these messages to
+     stdout.
+
+Runtime link with gnuplot DLL
+-----------------------------
+
+   There are two different ways to use the plotting calls via `Gnuplot.h'.
+One can either establish the link to gnuplot library at *compile/link
+time*, or to postpone this link to *run time*.  By default `Gnuplot.h'
+provides the first way, to switch to the second way define
+`DYNAMIC_GNUPLOT' before including `Gnuplot.h'.
+
+   To establish a link at *run time*, one needs to load a dynamic library
+which is compiled from `Gnuplot.h' - but without `DYNAMIC_GNUPLOT' defined.
+Feed the result of the call to get_term_ftable() as an argument to
+set_term_ftable(), as in (with error-condition checking disabled):
+
+     typedef struct t_ftable *(*g_ftable)(void);
+     g_ftable g_ftable_addr;
+     void *handle = dlopen("gnuterm.dll", mode);
+
+     g_ftable_addr = (g_ftable) dlsym(handle, "get_term_ftable");
+     set_term_ftable((*g_ftable_addr)());
+
+   This means that any C library/program which uses the API provided by
+`Gnuplot.h' does not *need* to be even linked with gnuplot, neither it
+requires include files of gnuplot.  If plotting is done in some situations
+only, one will not need the overhead of gnuplot plotting library
+(`gnuterm.dll' in the above example) unless plotting is requested.
+
+Runtime link of a Perl module with `Term::Gnuplot'
+--------------------------------------------------
+
+   To facilitate *run time* link the `Term::Gnuplot' Perl module provides
+a Perl subroutine get_term_ftable() which is a variant of C
+get_term_ftable() which returns an integer instead of an address.  One can
+feed this integer to a C function `v_set_term_ftable(void*)', which will
+establish a runtime link.  Thus the external XS library which wants to use
+Term::Gnuplot at runtime can put this in `.xs' file:
+
+     #define int_set_term_ftable(a) (v_set_term_ftable((void*)a))
+     extern  void v_set_term_ftable(void *a);
+     ...
+
+     void
+     int_set_term_ftable(a)
+       IV a
+
+   include `Gnuplot.h' (with `DYNAMIC_GNUPLOT' defined) into any C file,
+and define this Perl subroutine
+
+     sub link_gnuplot {
+       eval 'use Term::Gnuplot 0.56; 1' or die;
+       int_set_term_ftable(Term::Gnuplot::get_term_ftable());
+     }
+
+   in `.pm' file.
+
+   Now if it needs to do plotting, it calls link_gnuplot(), then does the
+plotting - without a need to interact with gnuplot at compile/link time,
+and having the additional burden of low-level plotting code loaded in the
+executable/DLL.
+
+   After a call link_gnuplot(), all the `Gnuplot.h' API calls made from
+the above C file will be directed through the vtables of the Perl module
+`Term::Gnuplot'.
+
+Using different Plotting libraries
+----------------------------------
+
+   In fact `Gnuplot.h' knows almost nothing about gnuplot, with a notable
+exceptions that there is an API call `term = change_term(name)', which
+returns a table of methods.  Thus *in principle* `Gnuplot.h' can establish
+a runtime-link with any plotting library which supports (or can be coerced
+to support) this call.  (The table is assumed to be compatible with
+gnuplot layout of `struct termentry'.)
+
+   `Gnuplot.h' uses also a handful of other gnuplot APIs (such as changing
+output file and several initialization shortcuts), but they should be easy
+to be ignored if an interface to another plotting library is needed.
+
+Examples
+========
+
+High-level plotting
+-------------------
+
+     sub ploth {
+       my ($xmin, $xmax, $sub) = (shift, shift, shift);
+       my $wpoints = scaled_xmax() - 1;
+       my $hpoints = scaled_ymax() - 1;
+       my $delta = ($xmax - $xmin)/$wpoints;
+       my (@ys, $y);
+       my ($ymin, $ymax) = (1e300, -1e300);
+       my $x = $xmin;
+       for my $i (0 .. $wpoints) {
+         $y = $sub->($x);
+         push @ys, $y;
+         $ymin = $y if $ymin > $y;
+         $ymax = $y if $ymax < $y;
+         $x += $delta;
+       }
+       my $deltay = ($ymax - $ymin)/$hpoints;
+       $_ = ($_ - $ymin)/$deltay + $yfix for @ys;
+
+     term_start_plot();
+
+     linetype -2;
+     move 0, $yfix;
+     vector 0, $hpoints + $yfix;
+     vector $wpoints, $hpoints + $yfix;
+     vector $wpoints, $yfix;
+     vector 0, $yfix;
+     
+     linetype -1;
+     if ($xmin < 0 && $xmax > 0) {
+       my $xzero = -$xmin/$delta;
+       move $xzero, $yfix;
+       vector $xzero, $hpoints + $yfix;
+     }
+     if ($ymin < 0 && $ymax > 0) {
+       my $yzero = -$ymin/$deltay + $yfix;
+       move 0, $yzero;
+       vector $wpoints, $yzero;
+     }
+
+     linetype 0;
+     move 0, int($ys[0] + 0.5);
+     linetype 0;
+     for my $i (1 .. $wpoints) {
+       $x += $delta;
+       vector $i, int($ys[$i] + 0.5);
+     }
+     term_end_plot();
+       }
+
+   This function should be used as in
+
+     ploth(-1,3, sub { sin( (shift)**6 ) })
+
+   $yfix should be set to 1 for gif terminal to compensate for off-by-one
+bug.
+
+Multifile plotting
+------------------
+
+     use strict;
+     use Term::Gnuplot qw(:ALL);
+
+     my ($yfix, $ext) = (1, 'gif');
+     plot_outfile_set "manypl1.$ext";		# Need to set before plotterm()
+
+     change_term "gif";
+     set_options "size", 300, ',', 200;
+     term_init();
+
+     for my $k (1..6) {
+       plot_outfile_set "manypl$k.$ext" unless $k == 1;
+       ploth( -1, 3, sub { sin((shift)**$k) } );
+     }
+
+   Here we use the function ploth() from `High-level plotting' in this
+node, it should be in the same scope so that $yfix is visible there.  Note
+that gif terminal requires $yfix to be 1 to circumvent a bug, and requires
+a literal `','' in the set_options call.
+
+   If a terminal does not support direct setting of the size of the output
+device, one may set global rescaling factors by calling plotsizes_scale():
+
+     plotsizes_scale(300/xmax(), 200/ymax());
+
+BUGS and LIMITATIONS
+====================
+
+   The following C macros are set to reasonable values, no peeking is
+performed to get correct values, this may break Gnuplot on some systems:
+
+     NO_ATEXIT HAVE_ON_EXIT PIPES HAVE_LIBC_H
+
+   No testing for
+
+     X11
+
+   macros is performed either, however, this may only increase size of the
+executable (since `X11' module is not making any direct X calls, but calls
+an external program to serve the requests).
+
+   Apparently gif terminal has off-by-one error: yrange is `1..ymax()'.
+All the bugs of gnuplot low-level plotting show in this module as well.
+
+SEE ALSO
+========
+
+   *Note Term/GnuplotTerminals: Term/GnuplotTerminals,.
+
+

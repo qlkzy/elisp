@@ -1,0 +1,3154 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Class/DBI,  Next: Class/Data/Inheritable,  Prev: Class/Contract/Production,  Up: Module List
+
+Simple Object Persistance
+*************************
+
+NAME
+====
+
+     Class::DBI - Simple Object Persistance
+
+SYNOPSIS
+========
+
+     package Film;
+     use base qw(Class::DBI);
+
+     # Tell Class::DBI a little about yourself.
+     Film->table('Movies');
+     Film->columns(All     => qw( Title Director Rating NumExplodingSheep ));
+     Film->columns(Primary => qw( Title ));
+     Film->set_db('Main', 'dbi:mysql', 'me', 'noneofyourgoddamnedbusiness',
+                  {AutoCommit => 1});
+
+     #-- Meanwhile, in a nearby piece of code! --#
+     use Film;
+
+     # Create a new film entry for Bad Taste.
+     $btaste = Film->new({ Title       => 'Bad Taste',
+                           Director    => 'Peter Jackson',
+                           Rating      => 'R',
+                           NumExplodingSheep   => 1
+                         });
+     
+     # Retrieve the 'Gone With The Wind' entry from the database.
+     my $gone = Film->retrieve('Gone With The Wind');
+     
+     # Shocking new footage found reveals bizarre Scarlet/sheep scene!
+     $gone->NumExplodingSheep(5);
+     $gone->Rating('NC-17');
+     $gone->commit;
+
+     # Grab the 'Bladerunner' entry.
+     my $blrunner = Film->retrieve('Bladerunner');
+
+     # Make a copy of 'Bladerunner' and create an entry of the director's
+     # cut from it.
+     my $blrunner_dc = $blrunner->copy("Bladerunner: Director's Cut");
+
+     # Ishtar doesn't deserve an entry anymore.
+     Film->retrieve('Ishtar')->delete;
+
+     # Find all films which have a rating of PG.
+     @films = Film->search('Rating', 'PG');
+
+     # Find all films which were directed by Bob
+     @films = Film->search_like('Director', 'Bob %');
+
+DESCRIPTION
+===========
+
+   I hate SQL.  You hate SQL.  We all hate SQL.  Alas, we often find the
+need to make our objects persistant and like it or not an SQL database is
+usually the most flexible solution.
+
+   This module is for setting up a reasonably efficient, reasonably
+simple, reasonably extendable persistant object with as little SQL and DBI
+knowledge as possible.
+
+   Its uses a scheme to automatically set up accessors for each data field
+in your class.  These accessors control access to the underlying database.
+
+How to set it up
+----------------
+
+   Here's a fairly quick set of steps on how to make your class
+persistant.  More details about individual methods will follow.
+
+*Set up a database.*
+     You must have an existing database set up, have DBI.pm installed and
+     the necessary DBD:: driver module for that database.  See `DBI' in
+     this node and the documentation of your particular database for
+     details.
+
+     DBD::CSV works in a pinch.
+
+*Set up a table for your objects to be stored in.*
+     Class::DBI works on a simple one class/one table model.  It is your
+     responsibility to set up that table, automating the process would
+     introduce too many complications (unless somebody wants to convince me
+     otherwise).
+
+     Using our Film example, you might declare a table something like this:
+
+          CREATE TABLE Movies (
+                 Title      VARCHAR(255)    PRIMARY KEY,
+                 Director   VARCHAR(80),
+                 Rating     CHAR(5),    /* to fit at least 'NC-17' */
+                 NumExplodingSheep      INTEGER
+          )
+
+*Inherit from Class::DBI.*
+     It is prefered that you use base.pm to do this rather than appending
+     directly to @ISA as your class may have to inherit some protected data
+     fields from Class::DBI and this is important if you're using
+     pseudohashes.
+
+          package Film;
+          use base qw(Class::DBI);
+
+*Declare your columns.*
+     This can be done using columns().  The names of your fields should
+     match the columns in your database, one to one.  Class::DBI (via
+     Class::Accessor) will use this information to determine how to create
+     accessors.
+
+          Film->columns(All => qw( Title Director Rating NumExplodingSheep ));
+
+     For more information about how you can more efficiently declare your
+     columns, `"Lazy Population of Columns"' in this node
+
+*Declare the name of your table*
+     Inform Class::DBI what table you will be storing your objects in.
+     This is the table you set up eariler.
+
+          Film->table('Movies');
+
+*Declare which field is your primary key*
+     One of your fields must be a unique identifier for each object.  This
+     will be the primary key in your database.  Class::DBI needs this
+     piece of information in order to construct the proper SQL statements
+     to access your stored objects.
+
+          Film->columns(Primary => 'Title');
+
+*Declare a database connection*
+     Class::DBI needs to know how to access the database.  It does this
+     through a DBI connection which you set up.  Set up is by calling the
+     set_db() method and declaring a database connection named 'Main'.
+
+          Film->set_db('Main', 'dbi:mysql', 'user', 'password', {AutoCommit => 1});
+
+     set_db() is inherited from Ima::DBI.  See that module's man page for
+     details.
+
+     XXX I should probably make this even simpler.  set_db_main() or
+     something.
+
+Done.
+     All set!  You can now use the constructors (new(), copy() and
+     retrieve()) destructors (delete()) and all the accessors and other
+     garbage provided by Class::DBI.  Make some new objects and muck
+     around a bit.  Watch the table in your database as your object does
+     its thing and see things being stored, changed and deleted.
+
+   Is it not nifty?  Worship the module.
+
+METHODS
+=======
+
+   The following provided methods make the assumption that you're using
+either a hash or a pseudohash as your underlying data structure for your
+object.
+
+Life and Death - Constructors and Destructors
+---------------------------------------------
+
+   The following are methods provided for convenience to create, retrieve
+and delete stored objects.  Its not entirely one-size fits all and you
+might find it necessary to override them.
+
+new
+          $obj = Class->new(\%data);
+
+     This is a constructor to create a new object and store it in the
+     database.  %data consists of the initial information to place in your
+     object and the database.  The keys of %data match up with the columns
+     of your objects and the values are the initial settings of those
+     fields.
+
+     $obj is an instance of Class built out of a hash reference.
+
+          # Create a new film entry for Bad Taste.
+          $btaste = Film->new({ Title       => 'Bad Taste',
+                                Director    => 'Peter Jackson',
+                                Rating      => 'R',
+                                NumExplodingSheep   => 1
+                              });
+
+     If the primary column is not in %data, new() will assume it is to be
+     generated.  If a sequence() has been specified for this Class, it will
+     use that.  Otherwise, it will assume the primary key has an
+     AUTO_INCREMENT constraint on it and attempt to use that.
+
+     If the class has declared relationships with foreign classes via
+     hasa(), it can pass an object to new() for the value of that key.
+     Class::DBI will Do The Right Thing.
+
+retrieve
+          $obj = Class->retrieve($id);
+
+     Given an ID it will retrieve an object with that ID from the database.
+
+          my $gone = Film->retrieve('Gone With The Wind');
+
+copy
+          $new_obj = $obj->copy;
+          $new_obj = $obj->copy($new_id);
+
+     This creates a copy of the given $obj both in memory and in the
+     database.  The only difference is that the $new_obj will have a new
+     primary identifier.  $new_id will be used if provided, otherwise the
+     usual sequence or autoincremented primary key will be used.
+
+          my $blrunner_dc = $blrunner->copy("Bladerunner: Director's Cut");
+
+move
+          my $new_obj = Sub::Class->move($old_obj);
+          my $new_obj = Sub::Class->move($old_obj, $new_id);
+
+     For transfering objects from one class to another.  Similar to copy(),
+     an instance of Sub::Class is created using the data in $old_obj
+     (Sub::Class is a subclass of $old_obj's subclass).  Like copy(),
+     $new_id is used as the primary key of $new_obj, otherwise the usual
+     sequence or autoincrement is used.
+
+delete
+          $obj->delete;
+
+     Deletes this object from the database and from memory.  $obj is no
+     longer usable after this call.
+
+Accessors
+---------
+
+   Class::DBI inherits from Class::Accessor and thus provides accessor
+methods for every column in your subclass.  It overrides the get() and
+set() methods provided by Accessor to automagically handle database
+transactions.
+
+   There are two modes for the accessors to work in.  Manual commit and
+autocommit.  This is sort of analagous to the manual vs autocommit in DBI,
+but is not implemented in terms of this.  What it simply means is this...
+when in autocommit mode every time one calls an accessor to make a change
+the change will immediately be written to the database.  Otherwise, if
+autocommit is off, no changes will be written until commit() is explicitly
+called.
+
+   This is an example of manual committing:
+
+     # The calls to NumExplodingSheep() and Rating() will only make the
+     # changes in memory, not in the database.  Once commit() is called
+     # it writes to the database in one swell foop.
+     $gone->NumExplodingSheep(5);
+     $gone->Rating('NC-17');
+     $gone->commit;
+
+   And of autocommitting:
+
+     # Turn autocommitting on for this object.
+     $gone->autocommit(1);
+
+     # Each accessor call causes the new value to immediately be written.
+     $gone->NumExplodingSheep(5);
+     $gone->Rating('NC-17');
+
+   Manual committing is probably more efficient than autocommiting and it
+provides the extra safety of a rollback() option to clear out all unsaved
+changes.  Autocommitting is more convient for the programmer.
+
+   If changes are left uncommitted or not rolledback when the object is
+destroyed (falls out of scope or the program ends) then Class::DBI's
+DESTROY method will print a warning about unsaved changes.
+
+autocommit
+          Class->autocommit($on_or_off);
+          $commit_style = Class->autocommit;
+
+          $obj->autocommit($on_or_off);
+          $commit_style = $obj->autocommit;
+
+     This is an accessor to the current style of autocommitting.  When
+     called with no arguments it returns the current autocommitting state,
+     true for on, false for off.  When given an argument it turns
+     autocommiting on and off.  A true value turns it on, a false one off.
+     When called as a class method it will control the committing style for
+     every instance of the class.  When called on an individual object it
+     will control committing for just that object, overriding the choice
+     for the class.
+
+          Class->autocommit(1);     # Autocommit is now on for the class.
+          
+          $obj = Class->retrieve('Aliens Cut My Hair');
+          $obj->autocommit(0);      # Shut off autocommitting for this object.
+
+     The commit setting for an object is not stored in the database.
+
+     Autocommitting is off by default.
+
+     NOTE This has *nothing* to do with DBI's AutoCommit attribute.
+
+commit
+          $obj->commit;
+
+     Writes any changes you've made via accessors to disk.  There's nothing
+     wrong with using commit() when autocommit is on, it'll just silently
+     do nothing.
+
+rollback
+          $obj->rollback;
+
+     Removes any changes you've made to this object since the last commit.
+     Currently this simply reloads the values from the database.  This can
+     have concurrency issues.
+
+     If you're using autocommit this method will throw an exception.
+
+is_changed
+          @changed_keys = $obj->is_changed;
+
+     Indicates if the given $obj has uncommitted changes.  Returns a list
+     of keys which have changed.
+
+Database information
+--------------------
+
+set_db
+          Class->set_db($db_name, $data_source, $user, $password, \%attr);
+
+     For details on this method, *Note Ima/DBI: Ima/DBI,.
+
+     The special connection named 'Main' must always be set.  Connections
+     are inherited.
+
+     Its often wise to set up a "top level" class for your entire
+     application to inherit from, rather than directly from Class::DBI.
+     This gives you a convenient point to place system-wide overrides and
+     enhancements to Class::DBI's behavior.  It also lets you set the Main
+     connection in one place rather than scattering the connection info all
+     over the code.
+
+          package My::Class::DBI;
+
+          use base qw(Class::DBI);
+          __PACKAGE__->set_db('Main', 'dbi:foo', 'user', 'password');
+
+          package My::Other::Thing;
+
+          # Instead of inheriting from Class::DBI.  We now have the Main
+          # connection all set up.
+          use base qw(My::Class::DBI);
+
+     Class::DBI helps you along a bit to set up the database connection.
+     set_db() normally provides its own default attributes on a per
+     database basis.  For instance, if MySQL is detected, AutoCommit will
+     be turned on.  Under Oracle, ChopBlanks is turned on.  As more
+     databases are tested, more defaults will be added.
+
+     The defaults can always be overridden by supplying your own %attr.
+
+id
+          $id = $obj->id;
+
+     Returns a unique identifier for this object.  Its the equivalent of
+     $obj->get($self->columns('Primary'));
+
+table
+          Class->table($table);
+          $table = Class->table;
+          $table = $obj->table;
+
+     An accessor to get/set the name of the database table in which this
+     class is stored.  It -must- be set.
+
+     Table information is inherited by subclasses, but can be overridden.
+
+sequence
+          Class->sequence($sequence_name);
+          $sequence_name = Class->sequence;
+          $sequence_name = $obj->sequence;
+
+     An accessor to get/set the name of a sequence for the primary key.
+
+          Class->columns(Primary => 'id');
+          Class->sequence('class_id_seq');
+
+     Class::DBI will use the sequence to generate primary keys when objects
+     are created yet the primary key is not specified.
+
+     NOTE: Class::DBI also supports AUTO_INCREMENT and similar semantics.
+
+columns
+          @all_columns  = $obj->columns;
+          @columns      = $obj->columns($group);
+          Class->columns($group, @columns);
+
+     This is an accessor to the names of the database columns of a class.
+     Its used to construct SQL statements to act on the class.
+
+     Columns are grouped together by typical usage, this can allow more
+     efficient access by loading all columns in a group at once.  For more
+     information about this, `"Lazy Population of Columns"' in this node.
+
+     There are three 'reserved' groups.  'All', 'Essential' and 'Primary'.
+
+     *'All'* are all columns used by the class.  If not set it will be
+     created from all the other groups.
+
+     *'Primary'* is the single primary key column for this class.  It must
+     be set before objects can be used.  (Multiple primary keys will be
+     supported eventually)
+
+          Class->columns('Primary', 'Title');
+
+     *'Essential'* are the minimal set of columns needed to load and use
+     the object.  Only the columns in this group will be loaded when an
+     object is retreive()'d.  Its typically used so save memory on a class
+     that has alot of columns but most only uses a few of them.  It will
+     automatically be generated from `Class-'columns('All')> if you don't
+     set it yourself.
+
+     If no arguments are given it will assume you want a list of All
+     columns.
+
+     NOTE I haven't decided on this method's behavior in scalar context.
+
+is_column
+          Class->is_column($column);
+          $obj->is_column($column);
+
+     This will return true if the given $column is a column of the class or
+     object.
+
+Table relationships, Object relationships
+-----------------------------------------
+
+   Often you'll want one object to contain other objects in your database,
+in the same way one table references another with foreign keys.  For
+example, say we decided we wanted to store more information about
+directors of our films.  You might set up a table...
+
+     CREATE TABLE Directors (
+         Name            VARCHAR(80),
+         Birthday        INTEGER,
+         IsInsane        BOOLEAN
+     )
+
+   And put a Class::DBI subclass around it.
+
+     package Film::Directors;
+     use base qw(Class::DBI);
+
+     Film::Directors->table('Directors');
+     Film::Directors->columns(All    => qw( Name Birthday IsInsane ));
+     Film::Directors->columns(Prmary => qw( Name ));
+     Film::Directors->set_db(Main => 'dbi:mysql', 'me', 'heywoodjablowme',
+                             {AutoCommit => 1});
+
+   Now Film can use its Director column as a way of getting at
+Film::Directors objects, instead of just the director's name.  Its a
+simple matter of adding one line to Film.
+
+     # Director() is now an accessor to Film::Directors objects.
+     Film->hasa('Film::Directors', 'Director');
+
+   Now the Film->Director() accessor gets and sets Film::Director objects
+instead of just their name.
+
+hasa
+          Class->hasa($foreign_class, @foreign_key_columns);
+
+     Declares that the given Class has a relationship with the
+     $foreign_class and is storing $foreign_class's primary key
+     information in the @foreign_key_columns.
+
+     An accessor will be generated with the name of the first element in
+     @foreign_key_columns.  It gets/sets objects of $foreign_class.  Using
+     our Film::Director example...
+
+          # Set the director of Bad Taste to the Film::Director object
+          # representing Peter Jackson.
+          $pj     = Film::Directory->retreive('Peter Jackson');
+          $btaste = Film->retreive('Bad Taste');
+          $btaste->Director($pj);
+
+     hasa() will try to require the foreign class for you.  If the require
+     fails, it will assume its not a simple require (ie. Foreign::Class
+     isn't in Foreign/Class.pm) and that you've already taken care of it
+     and ignore the warning.
+
+     It is not necessary to call columns() to set up the
+     @foreign_key_columns.  hasa() will do this for you if you haven't
+     already.
+
+     XXX I don't know if I like the way this works.  It may change a bit in
+     the future.  I'm not sure about the way the accessor is named.
+
+     NOTE  The two classes do not have to be in the same database!
+
+Lazy Population of Columns
+--------------------------
+
+   In the tradition of Perl, Class::DBI is lazy about how it loads your
+objects.  Often, you find yourself using only a small number of the
+available columns and it would be a waste of memory to load all of them
+just to get at two, especially if you're dealing with large numbers of
+objects simultaneously.
+
+   Class::DBI will load a group of columns together.  You access one
+column in the group, and it will load them all on the assumption that if
+you use one you're probably going to use the rest.  So for example, say we
+wanted to add NetProfit and GrossProfit to our Film class.  You're
+probably going to use them together, so...
+
+     Film->columns('Profit', qw(NetProfit GrossProfit));
+
+   Now when you say:
+
+     $net = $film->NetProfit;
+
+   Class::DBI will load both NetProfit and GrossProfit from the database.
+If you then call GrossProfit() on that same object it will not have to hit
+the database.  This can potentially increase performance (YMMV).
+
+   If you don't like this behavior, just create a group called 'All' and
+stick all your columns into it.  Then Class::DBI will load everything at
+once.
+
+Data Normalization
+------------------
+
+   SQL is largely case insensitive.  Perl is largely not.  This can lead
+to problems when reading information out of a database.  Class::DBI does
+some data normalization.
+
+normalize
+          $obj->normalize(\@columns);
+
+     There is no guarantee how a database will muck with the case of
+     columns, so to protect against things like DBI->fetchrow_hashref()
+     returning strangely cased column names (along with table names
+     appended to the front) we normalize all column names before using them
+     as data keys.
+
+normalize_hash
+          $obj->normalize_hash(\%hash);
+
+     Given a %hash, it will normalize all its keys using normalize().
+     This is for convenience.
+
+Defining SQL statements
+-----------------------
+
+   Class::DBI inherits from Ima::DBI and prefers to use that class's style
+of dealing with databases and DBI.  (Now is a good time to skim Ima::DBI's
+man page).
+
+   In order to write new methods which are inheritable by your subclasses
+you must be careful not to hardcode any information about your class's
+table name or primary key.  However, it is more efficient to use set_sql()
+to generate cached statement handles.
+
+   Generally, a call to set_sql() looks something like this:
+
+     # Define sql_GetFooBar()
+     Class->set_sql('GetFooBar', <<'SQL');
+     SELECT %s
+     FROM   %s
+     WHERE  Foo = ? AND Bar = ?
+
+   This generates a method called sql_GetFooBar().  Any arguments given
+are used fill in your SQL statement via sprintf().
+
+     my $sth = Class->sql_GetFooBar(join(', ', Class->columns('Essential')),
+                                    Class->table);
+
+   You must be careful not to hardcode information about your class's
+table name or primary key column in your statement and instead use the
+table() and columns() methods instead.
+
+   If $db_name is omitted it will assume you are using the 'Main'
+connection.
+
+Searching
+---------
+
+   We provide a few simple search methods, more to show the potential of
+the class than to be serious search methods.
+
+search
+          @objs = Class->search($key, $value);
+          @objs = $obj->search($key, $value);
+
+     This is a simple search through the stored objects for all objects
+     whose $key has the given $value.
+
+          @films = Film->search('Rating', 'PG');
+
+search_like
+          @objs = Class->search_like($key, $like_pattern);
+          @objs = $obj->search_like($key, $like_pattern);
+
+     A simple search for objects whose $key matches the $like_pattern
+     given.  $like_pattern is a pattern given in SQL LIKE predicate syntax.
+     '%' means "any one or more characters", '_' means "any single
+     character".
+
+     XXX Should I offer glob-style * and ? instead of % and _?
+
+          # Search for movies directed by guys named Bob.
+          @films = Film->search_like('Director', 'Bob %');
+
+EXAMPLES
+========
+
+   Ummm... well, there's the SYNOPSIS.
+
+   XXX Need more examples.  They'll come.
+
+CAVEATS
+=======
+
+Only simple scalar values can be stored
+---------------------------------------
+
+   SQL sucks in that lists are really complicated to store and hashes
+practically require a whole new table.  Don't even start about anything
+more complicated.  If you want to store a list you're going to have to
+write the accessors for it yourself (although I plan to prove ways to
+handle this soon).  If you want to store a hash you should probably
+consider making a new table and a new class.
+
+   Someone might be able to convince me to build accessors which
+automagically serialize data.
+
+One table, one class
+--------------------
+
+   For every class you define one table.  Classes cannot be spread over
+more than one table, this is too much of a headache to deal with.
+
+   Eventually I'll ease this restriction for link tables and tables
+representing lists of data.
+
+Single column primary keys only
+-------------------------------
+
+   Having more than one column as your primary key in the SQL table is
+currently not supported.  Why?  Its more complicated.  A later version
+will support multi-column keys.
+
+TODO
+====
+
+Table/object relationships need to be handled.
+----------------------------------------------
+
+   There's no graceful way to handle relationships between two
+tables/objects.  I plan to eventually support these relationships in a
+fairly simple manner.
+
+Lists are poorly supported
+--------------------------
+
+   There's no graceful way to handle lists of things as object data.  This
+is also something I plan to implement eventually.
+
+Using pseudohashes as objects has to be documented
+--------------------------------------------------
+
+Cookbook needs to be written
+----------------------------
+
+Object caching needs to be added
+--------------------------------
+
+Multi-column primary keys untested.
+-----------------------------------
+
+   If you need this feature let me know and I'll get it working.
+
+More testing with more databases.
+---------------------------------
+
+Complex data storage via Storable needed.
+-----------------------------------------
+
+There are concurrency problems
+------------------------------
+
+rollback() has concurrency problems
+-----------------------------------
+
+Working with transactions needs to be made easier.
+--------------------------------------------------
+
+   $obj->commit should DBI->commit???
+
+   Need an easy way to do class-wide commit and rollback.
+
+BUGS and CAVEATS
+================
+
+Tested with...
+--------------
+
+   DBD::mysql - MySQL 3.22 and 3.23
+
+   DBD::Pg - PostgreSQL 7.0
+
+   DBD::CSV
+
+Reports it works with...
+------------------------
+
+   DBD::Oracle (patches still coming in)
+
+Known not to work with...
+-------------------------
+
+   DBD::RAM
+
+AUTHOR
+======
+
+   Michael G Schwern <schwern@pobox.com> with much late-night help from
+Uri Gutman, Damian Conway, Mike Lambert and the POOP group.
+
+SEE ALSO
+========
+
+   *Note Ima/DBI: Ima/DBI,, *Note Class/Accessor: Class/Accessor,, *Note
+Base: base,, *Note Class/Data/Inheritable: Class/Data/Inheritable,
+http://www.pobox.com/~schwern/papers/Class-DBI/, Perl Object-Oriented
+Persistence <poop-group@lists.sourceforge.net>, `Alzabo' in this node and
+`Tangram' in this node
+
+
+File: pm.info,  Node: Class/Data/Inheritable,  Next: Class/Delegate,  Prev: Class/DBI,  Up: Module List
+
+Inheritable, overridable class data
+***********************************
+
+NAME
+====
+
+   Class::Data::Inheritable - Inheritable, overridable class data
+
+SYNOPSIS
+========
+
+     package Stuff;
+     use base qw(Class::Data::Inheritable);
+
+     # Set up DataFile as inheritable class data.
+     Stuff->mk_classdata('DataFile');
+
+     # Declare the location of the data file for this class.
+     Stuff->DataFile('/etc/stuff/data');
+
+DESCRIPTION
+===========
+
+   Class::Data::Inheritable is for creating accessor/mutators to class
+data.  That is, if you want to store something about your class as a whole
+(instead of about a single object).  This data is then inherited by your
+subclasses and can be overriden.
+
+   For example:
+
+     Pere::Ubu->mk_classdata('Suitcase');
+
+   will generate the method Suitcase() in the class Pere::Ubu.
+
+   This new method can be used to get and set a piece of class data.
+
+     Pere::Ubu->Suitcase('Red');
+     $suitcase = Pere::Ubu->Suitcase;
+
+   The interesting part happens when a class inherits from Pere::Ubu:
+
+     package Raygun;
+     use base qw(Pere::Ubu);
+     
+     # Raygun's suitcase is Red.
+     $suitcase = Raygun->Suitcase;
+
+   Raygun inherits its Suitcase class data from Pere::Ubu.
+
+   Inheritance of class data works analgous to method inheritance.  As
+long as Raygun does not "override" its inherited class data (by using
+Suitcase() to set a new value) it will continue to use whatever is set in
+Pere::Ubu and inherit further changes:
+
+     # Both Raygun's and Pere::Ubu's suitcases are now Blue
+     Pere::Ubu->Suitcase('Blue');
+
+   However, should Raygun decide to set its own Suitcase() it has now
+"overridden" Pere::Ubu and is on its own, just like if it had overriden a
+method:
+
+     # Raygun has an orange suitcase, Pere::Ubu's is still Blue.
+     Raygun->Suitcase('Orange');
+
+   Now that Raygun has overridden Pere::Ubu futher changes by Pere::Ubu no
+longer effect Raygun.
+
+     # Raygun still has an orange suitcase, but Pere::Ubu is using Samsonite.
+     Pere::Ubu->Suitcase('Samsonite');
+
+Methods
+=======
+
+mk_classdata
+          Class->mk_classdata($data_accessor_name);
+
+     This is a class method used to declare new class data accessors.  A
+     new accessor will be created in the Class using the name from
+     $data_accessor_name.
+
+     To facilitate overriding, mk_classdata creates an alias to the
+     accessor, _field_accessor().  So Suitcase() would have an alias
+     _Suitcase_accessor() that does the exact same thing as Suitcase().
+     This is useful if you want to alter the behavior of a single accessor
+     yet still get the benefits of inheritable class data.  For example.
+
+          sub Suitcase {
+              my($self) = shift;
+              warn "Fashion tragedy" if @_ and $_[0] eq 'Plaid';
+
+          $self->_Suitcase_accessor(@_);
+            }
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000, Damian Conway and Michael G Schwern. All Rights
+Reserved.  This module is free software. It may be used, redistributed
+and/or modified under the terms of the Perl Artistic License (see
+http://www.perl.com/perl/misc/Artistic.html)
+
+AUTHOR
+======
+
+   Original code by Damian Conway.
+
+   Maintained by Michael G Schwern <schwern@pobox.com>
+
+SEE ALSO
+========
+
+   *Note Perltootc: (perl.info)perltootc, has a very elaborate discussion
+of class data in Perl.
+
+
+File: pm.info,  Node: Class/Delegate,  Next: Class/Fields,  Prev: Class/Data/Inheritable,  Up: Module List
+
+easy-to-use implementation of object delegation.
+************************************************
+
+NAME
+====
+
+   Class::Delegate - easy-to-use implementation of object delegation.
+
+SYNOPSIS
+========
+
+     require Class::Delegate;
+     @ISA    = 'Class::Delegate';
+
+     $self->add_delegate('some_name', $a);
+     $self->add_delegate($b);
+     $self->do_something_that_b_knows_how_to_do();
+     $self->do_something_that_a_knows_how_to_do();
+
+DESCRIPTION
+===========
+
+   This class provides transparent support for object delegation.  For more
+information on delegation, see *Design Patterns* by Erich Gamma, et al.
+
+METHODS
+=======
+
+add_delegate([ $name, ] $delegate)
+     Assigns a delegate to your object.  Any delegate can be named or
+     unnamed (see the delegate() method for information on the usefulness
+     of naming a delegate).
+
+resolve($methodname, $delegatename)
+     Declare that calls to $methodname should be dispatched to the delegate
+     named $delegatename.  This is primarily for resolving ambiguities when
+     an object may have multiple delegates, more than one of which
+     implements the same method.
+
+delegate($name)
+     This method returns the delegate named $name, or the empty list if
+     there is no such delegate.
+
+SOME DETAILS
+============
+
+   If a delegate's class defines a package variable called @PUBLIC, then
+it is taken to be a list of method names that are available to be made
+visible through the owner object.  Otherwise, all methods that are
+implemented by the delegate (as returned by `can()') will be available as
+call-throughs from the owner.
+
+EXAMPLES
+========
+
+CALLING THE OWNER FROM THE DELEGATE
+-----------------------------------
+
+   If the delegate object implements a `set_owner()' method, then that
+method will be called as part of the call to add_delegate().  Example:
+
+     package Dispatcher;
+     require Class::Delegate;
+     @ISA    = qw(Class::Delegate);
+
+     require Worker;
+
+     sub new
+     {
+         my ($class) = @_;
+         my $self    = bless {}, $class;
+
+     $worker = Worker->new;
+     $self->add_delegate('gofer', $worker);
+         }
+
+     sub respond_to_error { die "Oh no!\n" }
+
+     ...
+
+     package Worker;
+
+     sub new { bless {}, shift }
+
+     sub set_owner
+     {
+         my ($self, $owner)  = @_;
+
+     $$self{owner}   = $owner;
+         }
+
+     sub do_something
+     {
+         my ($self, @args)   = @_;
+
+     if (!@args) {
+         $$self{owner}->respond_to_error();
+     }
+
+     ...
+         }
+
+BUGS
+====
+
+   This class only works with owner objects that are implemented as hash
+references.
+
+   If you assign a new value to a named delegate, the Right Thing will not
+happen.
+
+AUTHOR
+======
+
+     Kurt D. Starsinic <kstar@cpan.org>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000, Smith Renaud, Inc.  This program is free software;
+you may distribute it and/or modify it under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: Class/Fields,  Next: Class/Fields/Attribs,  Prev: Class/Delegate,  Up: Module List
+
+Inspect the fields of a class.
+******************************
+
+NAME
+====
+
+   Class::Fields - Inspect the fields of a class.
+
+SYNOPSIS
+========
+
+     use Class::Fields;
+
+     is_field    ($class, $field);
+     is_public   ($class, $field);
+     is_private  ($class, $field);
+     is_protected($class, $field);
+     is_inherited($class, $field);
+
+     @fields = show_fields($class, @attribs);
+
+     $attrib     = field_attrib_mask($class, $field);
+     @attribs    = field_attribs($class, $field);
+
+     dump_all_attribs(@classes);
+
+     # All functions also work as methods.
+     package Foo;
+     use base qw( Class::Fields );
+
+     Foo->is_public($field);
+     @fields = Foo->show_fields(@attribs);
+     # ...etc...
+
+DESCRIPTION
+===========
+
+   A collection of utility functions/methods for examining the data
+members of a class.  It provides a nice, high-level interface that should
+stand the test of time and Perl upgrades nicely.
+
+   The functions in this module also serve double-duty as methods and can
+be used that way by having your module inherit from it.  For example:
+
+     package Foo;
+     use base qw( Class::Fields );
+     use fields qw( this that _whatever );
+
+     print "'_whatever' is a private data member of 'Foo'" if
+         Foo->is_private('_whatever');
+
+     # Let's assume we have a new() method defined for Foo, okay?
+     $obj = Foo->new;
+     print "'this' is a public data member of 'Foo'" if
+         $obj->is_public('this');
+
+is_field
+          is_field($class, $field);
+          $class->is_field($field);
+
+     Simply asks if a given $class has the given $field defined in it.
+
+is_public
+is_private
+is_protected
+is_inherited
+          is_public($class, $field);
+          is_private($class, $field);
+          ...etc...
+                or
+          $obj->is_public($field);
+                or
+          Class->is_public($field);
+
+     A bunch of functions to quickly check if a given $field in a given
+     $class is of a given type.  For example...
+
+          package Foo;
+          use public  qw( Ford   );
+          use private qw( _Nixon );
+
+          package Bar;
+          use base qw(Foo);
+
+          # This will print only 'Ford is public' because Ford is a public
+          # field of the class Bar.  _Nixon is a private field of the class
+          # Foo, but it is not inherited.
+          print 'Ford is public'        if is_public('Bar', 'Ford');
+          print '_Nixon is inherited'   if is_inherited('Foo', '_Nixon');
+
+show_fields
+          @all_fields   = show_fields($class);
+          @fields       = show_fields($class, @attribs);
+                or
+          @all_fields   = $obj->show_fields;
+          @fields       = $obj->show_fields(@attribs);
+                or
+          @all_fields   = Class->show_fields;
+          @fields       = Class->show_fields(@attribs);
+
+     This will list all fields in a given $class that have the given set of
+     @attribs.  If @attribs is not given it will simply list all fields.
+
+     The currently available attributes are:     Public, Private,
+     Protected and Inherited
+
+     For example:
+
+          package Foo;
+          use fields qw(this that meme);
+
+          package Bar;
+          use base qw(Foo);
+          use fields qw(salmon);
+
+          # @fields contains 'that' and 'meme' since they are Public and
+          # Inherited.  It doesn't contain 'salmon' since while it is
+          # Public it is not Inherited.
+          @fields = show_fields('Bar', qw(Private Inherited));
+
+field_attrib_mask
+          $attrib = field_attrib_mask($class, $field);
+                or
+          $attrib = $obj->field_attrib_mask($field);
+                or
+          $attrib = Class->field_attrib_mask($field);
+
+     It will tell you the numeric attribute for the given $field in the
+     given $class.  $attrib is a bitmask which must be interpreted with
+     the PUBLIC, PRIVATE, etc... constants from Class::Fields::Attrib.
+
+     field_attribs() is probably easier to work with in general.
+
+field_attribs
+          @attribs = field_attribs($class, $field);
+                or
+          @attribs = $obj->field_attribs($field);
+                or
+          @attribs = Class->field_attribs($field);
+
+     Exactly the same as field_attrib_mask(), except that instead of
+     returning a bitmask it returns a somewhat friendlier list of
+     attributes which are applied to this field.  For example...
+
+          package Foo;
+          use fields qw( yarrow );
+
+          package Bar;
+          use base qw(Foo);
+
+          # @attribs will contain 'Public' and 'Inherited'
+          @attribs = field_attribs('Bar', 'yarrow');
+
+     The attributes returned are the same as those taken by show_fields().
+
+dump_all_attribs
+          dump_all_attribs;
+          dump_all_attribs(@classes);
+                or
+          Class->dump_all_attribs;
+                or
+          $obj->dump_all_attribs;
+
+     A debugging tool which simply prints to STDERR everything it can about
+     a given set of @classes in a relatively formated manner.
+
+     Alas, this function works slightly differently if used as a function
+     as opposed to a method:
+
+     When called as a function it will print out attribute information
+     about all @classes given.  If no @classes are given it will print out
+     the attributes of -every- class it can find that has attributes.
+
+     When uses as a method, it will print out attribute information for the
+     class or object which uses the method.  No arguments are accepted.
+
+     I'm not entirely happy about this split and I might change it in the
+     future.
+
+EXAMPLES
+========
+
+   Neat tricks that can be done with this module:
+
+An integrity check for your object.
+     Upon destruction, check to make sure no strange keys were added to
+     your object hash.  This is a nice check against typos and other
+     modules sticking their dirty little fingers where they shouldn't be
+     if you're not using a pseudo-hash.
+
+          sub DESTROY {
+              my($self) = @_;
+              my($class) = ref $self;
+
+          my %fields = map { ($_,1) } $self->show_fields;
+          foreach my $key ( keys %$self ) {
+              warn "Strange key '$key' found in object '$self' ".
+                    "of class '$class'" unless
+                  exists $fields{$key};
+          }
+              }
+
+Autoloaded accessors for public data members.
+     Proper OO dogma tells you to do all public data access through
+     accessors (methods who's sole purpose is to get and set data in your
+     object).  This can be a royal pain in the ass to write and can also
+     get rapidly unmaintainable since you wind up with a series of nearly
+     identical methods.
+
+     *Perfect* for an autoloader!
+
+          package Test::Autoload::Example;
+          use base qw(Class::Fields);
+          use public qw(this that up down);
+          use private qw(_left _right);
+
+          sub AUTOLOAD {
+              my $self = $_[0];
+              my $class = ref $self;
+
+          my($field) = $AUTOLOAD =~ /::([^:]+)$/;
+
+          return if $field eq 'DESTROY';
+
+          # If its a public field, set up a named closure as its
+          # data accessor.
+          if ( $self->is_public($field) ) {
+              *{$class."::$field"} = sub {
+                  my($self) = shift;
+                  if (@_) {
+                      $self->{$field} = shift;
+                  }
+                  return $self->{$field};
+              };
+              goto &{$class."::$field"};
+          } else {
+              die "'$field' is not a public data member of '$class'";
+          }
+              }
+
+     `EXAMPLES', *Note Class/Accessor: Class/Accessor, for a much simpler
+     version of this same technique.
+
+AUTHOR
+======
+
+   Michael G Schwern <schwern@pobox.com> with much code liberated from the
+original fields.pm.
+
+THANKS
+======
+
+   Thanks to Tels for his big feature request/bug report.
+
+SEE ALSO
+========
+
+   *Note Fields: fields,, *Note Public: public,, *Note Private: private,,
+*Note Protected: protected,
+
+   Modules with similar effects...  *Note Tie/SecureHash: Tie/SecureHash,,
+*Note Class/Contract: Class/Contract,
+
+
+File: pm.info,  Node: Class/Fields/Attribs,  Next: Class/Fields/Fuxor,  Prev: Class/Fields,  Up: Module List
+
+Attribute constants for use with data members
+*********************************************
+
+NAME
+====
+
+     Class::Fields::Attribs - Attribute constants for use with data members
+
+SYNOPSIS
+========
+
+     # Export the attribute constants
+     use Class::Fields::Attribs;
+
+DESCRIPTION
+===========
+
+   Simply exports a set of constants used for low level work on data
+members.  Each constant is a bitmask used to represent the type of a data
+member (as in Public, Private, etc...).
+
+   The exported attributes are:
+
+PUBLIC
+PRIVATE
+PROTECTED
+INHERITED
+     Each of these constants is a bitmask representing a possible setting
+     of a field attribute.  They can be combined by using a bitwise OR and
+     attributes can be checked for using a bitwise AND.  For example:
+
+          # Indicate a piece of data which is both public and inherited.
+          $attrib = PUBLIC | INHERITED;
+
+          # Check to see if an attribute is protected.
+          print "Protected" if $attrib & PROTECTED;
+
+     It is rare that one has to use these constants and it is generally
+     better to use the functions provided by Class::Fields.
+
+AUTHOR
+======
+
+   Michael G Schwern <schwern@pobox.com>
+
+SEE ALSO
+========
+
+   *Note Class/Fields: Class/Fields,
+
+
+File: pm.info,  Node: Class/Fields/Fuxor,  Next: Class/Fields/Inherit,  Prev: Class/Fields/Attribs,  Up: Module List
+
+Low level manipuation of object data members
+********************************************
+
+NAME
+====
+
+     Class::Fields::Fuxor - Low level manipuation of object data members
+
+SYNOPSIS
+========
+
+     # As functions.
+     use Class::Fields::Fuxor;
+     add_fields($class, $attrib, @fields);
+     add_field_set($class, \@fields, \@attribs);
+     has_fields($class);
+     $fields = get_fields($class);
+     $fattr  = get_attr($class);
+
+     # As methods.
+     package Foo;
+     use base qw( Class::Fields::Fuxor );
+
+     Foo->add_fields($attrib, @fields);
+     Foo->has_fields;
+     $fields   = Foo->get_fields;
+     $fattr    = Foo->get_attr;
+
+DESCRIPTION
+===========
+
+   This is a module for low level manipuation of the %FIELDS hash and its
+accompying %fields::attr hash without actually touching them.  Modules
+like fields.pm, base.pm and public.pm make use of this module.
+
+   %FIELDS and %fields::attr are currently used to store information about
+the data members of classes.  Since the current data inheritance system,
+built around pseudo-hashes, is considered a bit twitchy, it is wise to
+encapsulate and rope it off in the expectation that it will be replaced
+with something better.
+
+   Typically one does not want to mess with this stuff and instead uses
+fields.pm and friends or perhaps Class::Fields.
+
+add_fields
+          add_fields($class, $attrib, @fields);
+
+     Adds a bunch of @fields to the given $class using the given $attrib.
+     For example:
+
+          # Add the public fields 'this' and 'that' to the class Foo.
+          use Class::Fields::Attribs;
+          add_fields('Foo', PUBLIC, qw(this that));
+
+     $attrib is built from the constants in Class::Fields::Attribs
+
+add_field_set
+          add_field_set($class, \@fields, \@attribs);
+
+     Functionally similar to add_fields(), excepting that it can add a
+     group of fields with different attributes all at once.  This is
+     necessary for the proper functioning of fields.pm.
+
+     Each element in @fields matches up with one in @attribs.  Obviously,
+     the two arrays must be the same size.
+
+has_fields
+          has_fields($class);
+
+     A simple check to see if the given $class has a %FIELDS hash defined.
+     A simple test like (defined %{"$class\::FIELDS"}) will sometimes
+     produce typo warnings because it would create the hash if it was not
+     present before.
+
+get_attr
+          $fattr = get_attr($class);
+
+     Get's the field attribute array for the given $class.  This is roughly
+     equivalent to $fields::attr{$class} but we put a nice wrapper around
+     it for compatibility and readability.
+
+     $fattr is an array reference containing the attributes of the fields
+     in the given $class.  Each entry in $fattr corresponds to the position
+     indicated by the $class's %FIELDS has.  For example:
+
+          package Foo;
+          use fields qw(this _that);
+
+          $fattr = get_attr('Foo');
+
+          # Get the attributes for '_that' in the class 'Foo'.
+          $that_attribs = print $fattr->[$Foo::FIELDS->{_that}];
+
+     When possible, one should avoid using this function since it exposes
+     more implementation detail than I'd like.  Class::Fields should
+     provide most of the functionality you'll need.
+
+get_fields
+          $fields = get_fields($class);
+
+     Gets a reference to the %FIELDS hash for the given $class.  It will
+     autogenerate a %FIELDS hash if one doesn't already exist.  If you
+     don't want this behavior, be sure to check beforehand with
+     has_fields().
+
+     When possible, one should avoid using this function since it exposes
+     more implementation detail than I'd like.  Class::Fields should
+     provide most of the functionality you'll need.
+
+AUTHOR
+======
+
+   Michael G Schwern <schwern@pobox.com> based heavily on code liberated
+from the original fields.pm and base.pm.
+
+SEE ALSO
+========
+
+   *Note Fields: fields,, *Note Base: base,, *Note Public: public,, *Note
+Private: private,, *Note Protected: protected,, *Note Class/Fields:
+Class/Fields,, *Note Class/Fields/Attribs: Class/Fields/Attribs,
+
+
+File: pm.info,  Node: Class/Fields/Inherit,  Next: Class/Generate,  Prev: Class/Fields/Fuxor,  Up: Module List
+
+Inheritance of %FIELDS
+**********************
+
+NAME
+====
+
+   Class::Fields::Inherit - Inheritance of %FIELDS
+
+SYNOPSIS
+========
+
+     use Class::Fields::Inherit;
+     inherit_fields($derived_class, $base_class);
+
+DESCRIPTION
+===========
+
+   A simple module to handle inheritance of the %FIELDS hash.  base.pm is
+usually its only customer, though there's nothing stopping you from using
+it.
+
+inherit_fields
+          inherit_fields($derived_class, $base_class);
+
+     The $derived_class will inherit all of the $base_class's fields.  This
+     is a good chunk of what happens when you use base.pm.
+
+AUTHOR
+======
+
+   Michael G Schwern <schwern@pobox.com> largely from code liberated from
+fields.pm
+
+SEE ALSO
+========
+
+   *Note Base: base,, *Note Class/Fields: Class/Fields,
+
+
+File: pm.info,  Node: Class/Generate,  Next: Class/Handler,  Prev: Class/Fields/Inherit,  Up: Module List
+
+Generate Perl class hierarchies
+*******************************
+
+NAME
+====
+
+   Class::Generate - Generate Perl class hierarchies
+
+SYNOPSIS
+========
+
+     use Class::Generate qw(class subclass delete_class);
+
+     # Declare class Class_Name, with the following types of members:
+     class
+         Class_Name => [
+             s => '$',			# scalar
+     	 a => '@',			# array
+     	 h => '%',			# hash
+     	 c => 'Class',			# Class
+     	 c_a => '@Class',		# array of Class
+     	 c_h => '%Class',		# hash of Class
+             '&m' => 'body',		# method
+         ];
+
+     # Allocate an instance of class_name, with members initialized to the
+     # given values (pass arrays and hashes using references).
+     $obj = Class_Name->new ( s => scalar,
+     			  a => [ values ],
+     			  h => { key1 => v1, ... },
+     			  c => Class->new,
+     			  c_a => [ Class->new, ... ],
+     			  c_h => [ key1 => Class->new, ... ] );
+
+     # Scalar type accessor:
+      $obj->s($value);			# Assign $value to member s.
+      $member_value = $obj->s;		# Access member's value.
+
+     # (Class) Array type accessor:
+      $obj->a([value1, value2, ...]);	# Assign whole array to member.
+      $obj->a(2, $value);			# Assign $value to array member 2.
+      $obj->add_a($value);			# Append $value to end of array.
+      @a = $obj->a;				# Access whole array.
+      $ary_member_value = $obj->a(2);	# Access array member 2.
+      $s = $obj->a_size;			# Return size of array.
+      $value = $obj->last_a;			# Return last element of array.
+
+     # (Class) Hash type accessor:
+      $obj->h({ k_1=>v1, ..., k_n=>v_n })	# Assign whole hash to member.
+      $obj->h($key, $value);			# Assign $value to hash member $key.
+      %hash = $obj->h;			# Access whole hash.
+      $hash_member_value = $obj->h($key);	# Access hash member value $key.
+      $obj->delete_h($key);			# Delete slot occupied by $key.
+      @keys = $obj->h_keys;			# Access keys of member h.
+      @values = $obj->h_values;		# Access values of member h.
+
+     $another = $obj->copy;			# Copy an object.
+     if ( $obj->equals($another) ) { ... }	# Test equality.
+
+     subclass s  => [ <more members> ], -parent => 'class_name';
+
+DESCRIPTION
+===========
+
+   The `Class::Generate' package exports functions that take as arguments
+a class specification and create from these specifications a Perl 5 class.
+The specification language allows many object-oriented constructs: typed
+members, inheritance, private members, required members, default values,
+object methods, class methods, class variables, and more.
+
+   CPAN contains similar packages.  Why another?  Because object-oriented
+programming, especially in a dynamic language like Perl, is a complicated
+endeavor.  I wanted a package that would work very hard to catch the
+errors you (well, I anyway) commonly make.  I wanted a package that could
+help me enforce the contract of object-oriented programming.  I also
+wanted it to get out of my way when I asked.
+
+THE CLASS FUNCTION
+==================
+
+   You create classes by invoking the class function.  The class function
+has two forms:
+
+     class Class_Name => [ specification ];	# Objects are array-based.
+     class Class_Name => { specification };	# Objects are hash-based.
+
+   The result is a Perl 5 class, in a package `Class_Name'.  This package
+must not exist when class is invoked.
+
+   An array-based object is faster and smaller.  A hash-based object is
+more flexible.  Subsequent sections explain where and why flexibility
+matters.
+
+   The specification consists of zero or more name/value pairs.  Each pair
+declares one member of the class, with the given name, and with attributes
+specified by the given value.
+
+MEMBER TYPES
+============
+
+   In the simplest name/value form, the value you give is a string that
+defines the member's type.  A `'$'' denotes a scalar member type.  A `'@''
+denotes an array type.  A `'%'' denotes a hash type.  Thus:
+
+     class Person => [ name => '$', age => '$' ];
+
+   creates a class named `Person' with two scalar members, name and age.
+
+   If the type is followed by an identifier, the identifier is assumed to
+be a class name, and the member is restricted to a blessed reference of
+the class (or one of its subclasses), an array whose elements are blessed
+references of the class, or a hash whose keys are strings and whose values
+are blessed references of the class.  For scalars, the `$' may be omitted;
+i.e., `Class_Name' and `$Class_Name' are equivalent.  The class need not
+be declared using the `Class::Generate' package.
+
+CREATING INSTANCES
+==================
+
+   Each class that you generate has a constructor named new.  Invoking the
+constructor creates an instance of the class.  You may provide new with
+parameters to set the values of members:
+
+     class Person => [ name => '$', age => '$' ];
+     $p = Person->new;			# Neither name nor age is defined.
+     $q = Person->new( name => 'Jim' );	# Only name is defined.
+     $r = Person->new( age => 32 );	# Only age is defined.
+
+ACCESSOR METHODS
+================
+
+   A class has a standard set of accessor methods for each member you
+specify.  The accessor methods depend on a member's type.
+
+Scalar (name => '$', name => 'Class_Name', or name => '$Class_Name')
+--------------------------------------------------------------------
+
+   The member is a scalar.  The member has a single method name.  If
+called with no arguments, it returns the member's current value.  If
+called with arguments, it sets the member to the first value:
+
+     $p = Person->new;
+     $p->age(32);		# Sets age member to 32.
+     print $p->age;		# Prints 32.
+
+   If the `Class_Name' form is used, the member must be a reference blessed
+to the named class or to one of its subclasses.  If Perl's -w flag is
+used, the method will croak (see *Note Carp: Carp,) if the argument is not
+a blessed reference to an instance of `Class_Name' or one of its
+subclasses.
+
+     class Person => [
+     	name => '$',
+     	spouse => 'Person'	# Works, even though Person
+     ];				# isn't yet defined.
+     $p = Person->new(name => 'Simon Bar-Sinister');
+     $q = Person->new(name => 'Polly Purebred');
+     $r = Person->new(name => 'Underdog');
+     $r->spouse($q);				# Underdog marries Polly.
+     print $r->spouse->name;			# Prints 'Polly Purebred'.
+     print "He's married" if defined $p->spouse;	# Prints nothing.
+     $p->spouse('Natasha Fatale');		# Croaks.
+
+Array (name => '@' or name => '@Class')
+---------------------------------------
+
+   The member is an array.  If the `@Class' form is used, all members of
+the array must be a blessed reference to Class or one of its subclasses.
+An array member has three associated methods:
+
+name
+     With no argument, name returns the member's whole array.
+
+     With one argument, name's behavior depends on whether the argument is
+     an array reference.  If it is not, then the argument must be an
+     integer i, and name returns element i of the member.  If no such
+     element exists, name returns undef.  If the argument is an array
+     reference, it is cast into an array and assigned to the member.
+
+     With two arguments, the first argument must be an integer i.  The
+     second argument is assigned to element i of the member.
+
+`add_name'
+     This method appends its arguments to the member's array.
+
+`name_size'
+     This method returns the index of the last element in the array.
+
+`last_name'
+     This method returns the last element of name, or undef if name has no
+     elements.  It's a shorthand for `$o->array_mem($o->array_mem_size)'.
+
+   For example:
+
+     class Person => [ name => '$', kids => '@Person' ];
+     $p = Person->new;
+     $p->add_kids(Person->new(name => 'Heckle'),
+     		 Person->new(name => 'Jeckle'));
+     print $p->kids_size;	# Prints 1.
+     $p->kids([Person->new(name => 'Bugs Bunny'),
+     	      Person->new(name => 'Daffy Duck')]);
+     $p->add_kids(Person->new(name => 'Yosemite Sam'),
+     		 Person->new(name => 'Porky Pig'));
+     print $p->kids_size;	# Prints 3.
+     $p->kids(2, Person->new(name => 'Elmer Fudd'));
+     print $p->kids(2)->name;	# Prints 'Elmer Fudd'.
+     @kids = $p->kids;		# Get all the kids.
+     print $p->kids($p->kids_size)->name; # Prints 'Porky Pig'.
+     print $p->last_kids->name;	   # So does this.
+
+Hash (name => '%' or name => '%Class')
+--------------------------------------
+
+   The member is a hash.  If the `%Class' form is used, all values in the
+hash must be a blessed reference to Class or one of its subclasses.  A
+hash member has three associated methods:
+
+name
+     With no arguments, name returns the member's whole hash.
+
+     With one argument that is a hash reference, the member's value
+     becomes the argument.  With one argument that is a string, the
+     element of the hash keyed by that string is returned.  If no such
+     element exists, name returns undef.
+
+     With two arguments, the second argument is assigned to the hash,
+     keyed by the string representation of the first argument.
+
+`name_keys'
+     The `name_keys' method returns all keys associated with the member.
+
+`name_values'
+     The `name_values' method returns all values associated with the
+     member.
+
+`delete_name'
+     The `delete_name' method takes one or more arguments.  It deletes
+     from name's hash all elements matching the arguments.
+
+   For example:
+
+     class Person => [ name => '$', kids => '%Kid_Info' ];
+     class Kid_Info => [
+     	grade  => '$',
+     	skills => '@'
+     ];
+     $f = new Person(
+     	name => 'Fred Flintstone',
+     	kids => { Pebbles => new Kid_Info(grade => 1,
+     				          skills => ['Programs VCR']) }
+     );
+     print $f->kids('Pebbles')->grade;	# Prints 1.
+     $b = new Kid_Info;
+     $b->grade('Kindergarten');
+     $b->skills(['Knows Perl', 'Phreaks']);
+     $f->kids('BamBam', $b);
+     print join ', ', $f->kids_keys;	# Prints "Pebbles, BamBam",
+     					# though maybe not in that order.
+
+COMMON METHODS
+==============
+
+   All members also have a method `undef_m'.  This method undefines a
+member m.
+
+OBJECT INSTANCE METHODS
+=======================
+
+   There are also methods that you can invoke on an object instance.
+These are as follows:
+
+Copy
+----
+
+   Use the copy method to copy the value of an object.  The expression:
+
+     $p = $o->copy;
+
+   assigns to $p a copy of $o.  Members of $o that are classes (or arrays
+or hashes of classes) are copied using their own copy method.
+
+Equals
+------
+
+   Use the equals method to test the equality of two object instances:
+
+     if ( $o1->equals($o2) ) { ... }
+
+   The two object instances are equal if members that have values in `$o1'
+have equal values in `$o2', and vice versa.  Equality is tested as you
+would expect: two scalar members are equal if they have the same value;
+two array members are equal if they have the same elements; two hash
+members are equal if they have the same key/value pairs.
+
+   If a member's value is restricted to a class, then equality is tested
+using that class' equals method.  Otherwise, it is tested using the eq
+operator.
+
+   By default, all members participate in the equality test.  If one or
+more members possess true values for the key attribute, then only those
+members participate in the equality test.
+
+   You can override this definition of equality.  See `ADDING METHODS' in
+this node.
+
+ADVANCED MEMBER SPECIFICATIONS
+==============================
+
+   As shown, you specify each member as a `name=>value' pair.  If the
+value is a string, it specifies the member's type.  The value may also be
+a hash reference.  You use hash references to specify additional member
+attributes.  The following is a complete list of the attributes you may
+specify for a member:
+
+type=>string
+     If you use a hash reference for a member's value, you must use the
+     type attribute to specify its type:
+
+          scalar_member => { type => '$' }
+
+required=>boolean
+     If the required attribute is true, the member must be passed each
+     time the class' constructor is invoked:
+
+          class Person => [ name => { type => '$', required => 1 } ];
+          Person->new ( name => 'Wilma' );	# Valid
+          Person->new;			# Invalid
+
+     Also, you may not call `undef_name' for the member.
+
+default=>value
+     The default attribute provides a default value for a member if none
+     is passed to the constructor:
+
+          class Person => [ name => '$',
+          		      job => { type => '$',
+          			       default => "'Perl programmer'" } ];
+          $p = Person->new(name => 'Larry');
+          print $p->job;		# Prints 'Perl programmer'.
+          $q = Person->new(name => 'Bjourne', job => 'C++ programmer');
+          print $q->job;		# Unprintable.
+
+     The value is treated as a string that is evaluated when the
+     constructor is invoked.
+
+     For array members, use a string that looks like a Perl expression
+     that evaluates to an array reference:
+
+          class Person => {
+          	name => '$',
+          	lucky_numbers => { type => '@', default => '[42, 17]' }
+          };
+          class Silly => {
+          	UIDs => {		# Default value is all UIDs
+          	    type => '@',	# currently in /etc/passwd.
+          	    default => 'do {
+          		local $/ = undef;
+          		open PASSWD, "/etc/passwd";
+          		[ map {(split(/:/))[2]} split /\n/, <PASSWD> ]
+          	    }'
+          	}
+          };
+
+     Specify hash members analogously.
+
+     The value is evaluated each time the constructor is invoked.  In
+     `Silly', the default value for `UIDs' can change between invocations.
+     If the default value is a reference rather than a string, it is not
+     re-evaluated.  In the following, default values for `e1' and `e2' are
+     based on the members of `@default_value' each time `Example->new' is
+     invoked, whereas `e3''s default value is set when the class function
+     is invoked to define Example:
+
+          @default_value = (1, 2, 3);
+          $var_name = '@' . __PACKAGE__ . '::default_value';
+          class Example => {
+              e1 => { type => '@', default => "[$var_name]" },
+          	e2 => { type => '@', default => \@default_value },
+          	e3 => { type => '@', default => [ @default_value ] }
+          };
+          Example->new;	# e1, e2, and e3 are all identical.
+          @default_value = (10, 20, 30);
+          Example->new;	# Now only e3 is (1, 2, 3).
+
+     There are two more things to know about default values that are
+     strings.  First, if a member is typed, the class function evaluates
+     its (string-based) default value to ensure that it is of the correct
+     type for the member.  Be aware of this if your default value has side
+     effects (and see `Checking Default Value Types' in this node).
+
+     Second, the context of the default value is the new() method of the
+     package generated to implement your class.  That's why `e1' in
+     Example, above, needs the name of the current package in its default
+     value.
+
+post=>code
+     The value of this attribute is a string of Perl code.  It is executed
+     immediately after the member's value is modified through its accessor.
+     Within post code, you can refer to members as if they were Perl
+     identifiers.  For instance:
+
+          class Person => [ age => { type => '$',
+          			       post => '$age *= 2;' } ];
+          $p = Person->new(age => 30);
+          print $p->age;	# Prints 30.
+          $p->age(15);
+          print $p->age;	# Prints 30 again.
+
+     The trailing semicolon used to be required, but everyone forgot it.
+     As of version 1.06 it's optional: `'$age*=2'' is accepted and
+     equivalent to `'$age*=2;'' (but see `"BUGS"' in this node).
+
+     You reference array and hash members as usual (except for testing for
+     definition; see `"BUGS"' in this node).  You can reference individual
+     elements, or the whole list:
+
+          class Foo => [
+          	m1 => { type => '@', post => '$m1[$#m1/2] = $m2{xxx};' },
+          	m2 => { type => '%', post => '@m1 = keys %m2;' }
+          ];
+
+     You can also invoke accessors.  Prefix them with a &:
+
+          class Bar => [
+          	m1 => { type => '@', post => '&undef_m1;' },
+          	m2 => { type => '%', post => '@m1 = &m2_keys;' }
+          ];
+          $o = new Bar;
+          $o->m1([1, 2, 3]);		# m1 is still undefined.
+          $o->m2({a => 1, b => 2});	# Now m1 is qw(a b).
+
+pre=>code
+     The pre key is similar to the post key, but it is executed just
+     before an member is changed.  It is not executed if the member is
+     only accessed.  The pre and post code have the same scope, which lets
+     you share variables.  For instance:
+
+          class Foo => [
+          	mem => { type => '$', pre => 'my $v = $mem;', post => 'return $v;' }
+          ];
+          $o = new Foo;
+          $p = $o->mem(1);	# Sets $p to undef.
+          $q = $o->mem(2);	# Sets $q to 1.
+
+     is a way to return the previous value of `mem' any time it's modified
+     (but see `"NOTES"' in this node).
+
+assert=>expression
+     The value of this key should be a Perl expression that evaluates to
+     true or false.  Use member names in the expression, as with post.
+     The expression will be tested any time the member is modified through
+     its accessors.  Your code will croak if the expression evaluates to
+     false.  For instance,
+
+          class Person => [
+          	name => '$',
+          	age => { type => '$',
+          		 assert => '$age =~ /^\d+$/ && $age < 200' } ];
+
+     ensures the age is reasonable.
+
+     The assertion is executed after any post code associated with the
+     member.
+
+private=>boolean
+     If the private attribute is true, the member cannot be accessed
+     outside the class; that is, it has no accessor functions that can be
+     called outside the scope of the package defined by class.  A private
+     member can, however, be accessed in post, pre, and assert code of
+     other members of the class.
+
+protected=>boolean
+     If the `protected' attribute is true, the member cannot be accessed
+     outside the class or any of its subclasses.  A protected member can,
+     however, be accessed in post, pre, and assert code of other members
+     of the class or its subclasses.
+
+readonly=>boolean
+     If this attribute is true, then the member cannot be modified through
+     its accessors.  Users can set the member only by using the class
+     constructor.  The member's accessor that is its name can retrieve but
+     not set the member.  The `undef_'name accessor is not defined for the
+     member, nor are other accessors that might modify the member.  (Code
+     in post can set it, however.)
+
+key=>boolean
+     If this attribute is true, then the member participates in equality
+     tests.  See `"Equals"' in this node.
+
+nocopy=>value
+     The `nocopy' attribute gives you some per-member control over how the
+     copy method.  If `nocopy' is false (the default), the original's
+     value is copied as described in `"Copy"' in this node.  If `nocopy'
+     is true, the original's value is assigned rather than copied; in
+     other words, the copy and the original will have the same value if
+     the original's value is a reference.
+
+AFFECTING THE CONSTRUCTOR
+=========================
+
+   You may include a new attribute in the specification to affect the
+constructor.  Its value must be a hash reference.  Its attributes are:
+
+required=>list of constraints
+     This is another (and more general) way to require that parameters be
+     passed to the constructor.  Its value is a reference to an array of
+     constraints.  Each constraint is a string that must be an expression
+     composed of Perl logical operators and member names.  For example:
+
+          class Person => {
+          	name   => '$',
+              age    => '$',
+          	height => '$',
+          	weight => '$',
+          	new => { required => ['name', 'height^weight'] }
+          };
+
+     requires member name, and exactly one of height or weight.  Note that
+     the names are not prefixed with `$', `@', or %.
+
+     Specifying a list of constraints as an array reference can be clunky.
+     The class function also lets you specify the list as a string, with
+     individual constraints separated by spaces.  The following two
+     strings are equivalent to the above required attribute:
+
+          'name height^weight'
+          'name&(height^weight)'
+
+     However, `'name & (height ^ weight)'' would not work.  The class
+     function interprets it as a five-member list, four members of which
+     are not valid expressions.
+
+     This equivalence between a reference to array of strings and a string
+     of space-separated items is used throughout `Class::Generate'.  Use
+     whichever form works best for you.
+
+post=>string of code
+     The post key is similar to the post key for members.  Its value is
+     code that is inserted into the constructor after parameter values
+     have been assigned to members.  The class function performs variable
+     substitution.
+
+     The pre key is not recognized in new.
+
+assert=>expression
+     The assert key's value is inserted just after the post key's value
+     (if any).  Assertions for members are inserted after the
+     constructor's assertion.
+
+comment=>string
+     This attribute's value can be any string.  If you save the class to a
+     file (see `Saving the Classes' in this node), the string is included
+     as a comment just before the member's methods.
+
+style=>style definition
+     The style attribute controls how parameters are passed to the class'
+     constructor.  See `PARAMETER PASSING STYLES' in this node.
+
+ADDING METHODS
+==============
+
+   Accessors often do not provide a class with enough functionality.  They
+also do not encapsulate your algorithms.  For these reasons, the class
+function lets you add methods.  Both object methods and class methods are
+allowed.
+
+   Add methods using an member of the form `'&name'=>body', where body is
+a string containing valid Perl code.  This yields a method name with the
+specified body.  For object methods, the class function performs variable
+substitution as described in `ADVANCED MEMBER SPECIFICATIONS' in this node.
+For example,
+
+     class Person => [ first_name => '$',
+     		      last_name  => '$',
+     		      '&name'    => q{return "$first_name $last_name";}
+     ];
+     $p = Person->new(first_name => 'Barney', last_name => 'Rubble');
+     print $p->name;	# Prints "Barney Rubble".
+
+     class Stack => [	# Venerable example.
+     	top_e	 => { type => '$', private => 1, default => -1 },
+     	elements => { type => '@', private => 1, default => '[]' },
+     	'&push' => '$elements[++$top_e] = $_[0];',
+     	'&pop'  => '$top_e--;',
+     	'&top'  => 'return $elements[$top_e];'
+     ];
+
+   A method has the following attributes which, like members, are
+specified as a hash reference:
+
+body=>code
+     This attribute specifies the method's body.  It is required if other
+     attributes are given.
+
+private=>boolean
+     The method cannot be accessed outside the class.
+
+          class Example => [
+          	m1 => '$',
+          	m2 => '$',
+          	'&public_interface' => q{return &internal_algorithm;},
+          	'&internal_algorithm' => { private => 1,
+          				   body => q{return $m1 + 4*$m2;} }
+          ];
+          $e = Example->new(m1 => 2, m2 => 4);
+          print $e->public_interface;		# Prints 18.
+          print $e->internal_algorithm;	# Run-time error.
+
+protected=>boolean
+     If true, the method cannot be accessed outside the class or any of
+     its subclasses.
+
+class_method=>boolean
+     If true, the method applies to classes rather than objects.  Member
+     name substitution is not performed within a class method.  You can,
+     however, use accessors, as usual:
+
+          class Foo => [
+          	m1 => '$', m2 => '@',
+          	'&to_string' => {
+          	    class_method => 1,
+          	    body => 'my $o = $_[0];
+          		     return $o->m1 . "[" . join(",", $o->m2) . "]"';
+          	}
+          ];
+          $f = Foo->new(m1 => 1, m2 => [2, 3]);
+          print Foo->to_string($f);	# Prints "1[2,3]"
+
+     You can also call class methods from within instance and class
+     methods.  Use the `Class->method' syntax.
+
+     Currently, a class method may be public or private, but not protected.
+
+objects=>list of object instance expressions
+     This attribute is only used for class methods.  It is needed when the
+     method refers to a private or protected member or method.  Its
+     argument is a list, each element of which is a Perl expression that
+     occurs in the body of the class method.  The expression must evaluate
+     to an instance of the class.  It will be replaced by an appropriate
+     reference to the private member or method.  For example:
+
+          class Bar => [
+          	mem1 => '$',
+          	mem2 => { type => '@', private => 1 },
+          	'&meth1' => 'return $mem1 + $#mem2;',
+          	'&meth2' => { private => 1,
+          		      body    => 'return eval join "+", @mem2;' },
+          	'&cm1' => { class_method => 1,
+          		    objects => '$o',
+          		    body => 'my $o = Bar->new(m1 => 8);
+          			     $o->mem2([4, 5, 6]);
+          			     return $o->meth2;' },
+          	'&cm2' => { class_method => 1,
+          		    objects => ['$o', 'Bar->new(m1 => 3)'],
+          		    body => 'my $o => Bar->new(m1 => 8);
+          			     $o->mem2(0, Bar->new(m1 => 3)->meth2);
+          			     return $o;' }
+          ];
+
+     The `objects' attribute for `cm1' tells class to treat all
+     occurrences of the string $o as an instance of class `Bar', giving
+     the expression access to private members and methods of `Bar'.  The
+     string can be an arbitrary expression, as long as it's valid Perl and
+     evaluates to an instance of the class; hence the use of `Bar->new(m1
+     => 3)' in `cm2'.  The string must match exactly, so `Bar->new(m1 =>
+     8)' is not replaced.
+
+   You can add a method named `&equals' to provide your own definition of
+equality.  An example:
+
+     $epsilon = 0.1e-20;
+     class Imaginary_No => {			# Treat floating-point
+     	real => '$',				# values as equal if their
+     	imag => '$',				# difference is less than
+     	'&equals' => qq|my \$o = \$_[0];	# some epsilon.
+     		        return abs(\$real - \$o->real) < $epsilon &&
+     			       abs(\$imag - \$o->imag) < $epsilon;|
+     };
+
+   If you declare `&equals' to be private, you create a class whose
+instances cannot be tested for equality except within the class.
+
+THE SUBCLASS FUNCTION
+=====================
+
+   The `subclass()' function declares classes that are subclasses of
+another class.  The statement:
+
+     subclass S => [ specification ], -parent => P
+
+   declares a package s, and a constructor function new, just like class;
+but `s->new' yields a blessed reference that inherits from P.  You can use
+all the attributes discussed above in the specification of a subclass.
+(Prior to version 1.02 you specified the parent using `parent=>P', but
+this is deprecated in favor of `-parent=>P'.)
+
+   As of version 1.05, the class function also accepts `-parent'.  In
+other words,
+
+     class S => [ specification ], -parent => P
+     subclass S => [ specification ], -parent => P
+
+   are equivalent.
+
+   Class P need not have been defined using the class or `subclass'
+function.  It must have a constructor named new, however, or at least be
+an ancestor of a class that does.
+
+   A subclass may be either an array or hash reference.  Its parent must
+be the same type of reference.
+
+   You can inherit from multiple classes, providing all are hash-based
+(`Class::Generate' does not support multiple inheritance for array-based
+classes).  Just list more than one class as the value of parent:
+
+     subclass S => { specification }, -parent => 'P1 P2 P3';
+
+   Elements of the `@ISA' array for package S appear in the order you list
+them.  This guarantee should let you determine the order in which methods
+are invoked.
+
+   The subclass constructor automatically calls its parent constructor.
+It passes to the parent constructor any parameters that aren't members of
+the subclass.
+
+   Subclass members with the same name as that of their parent override
+their parent methods.
+
+   You can access a (non-private) member or method of a parent within
+user-defined code in the same way you access members or methods of the
+class:
+
+     class Person => [
+     	name => '$',
+     	age => '$',
+     	'&report' => q{return "$name is $age years old"}
+     ];
+     subclass Employee => [
+     	job_title => '$',
+     	'&report' => q{return "$name is $age years old and is a $job_title";}
+     ], -parent => 'Person';
+     subclass Manager => [
+     	workers => '@Employee',
+     	'&report' => q{return "$name is $age years old, is a $job_title, " .
+     			      "and manages " . (&workers_size + 1) . " people";}
+     ], -parent => 'Employee';
+
+   If a class has multiple parents, and these parents have members whose
+names conflict, the name used is determined by a depth-first search of the
+parents.
+
+   The previous example shows that a subclass may declare a member or
+method whose name is already declared in one of its ancestors.  The
+subclass declaration overrides any ancestor declarations: the report
+method behaves differently depending on the class of the instance that
+invokes it.
+
+   Sometimes you override an ancestor's method to add some extra
+functionality.  In that situation, you want the overriding method to
+invoke the ancestor's method.  All user-defined code in `Class::Generate'
+has access to a variable `$self', which is a blessed reference.  You
+therefore can use Perl's `SUPER::' construct to get at ancestor methods:
+
+     class Person => [
+     	name => '$',
+     	age => '$',
+     	'&report' => q{return &name . ": $age years old"}
+     ];
+     subclass Employee => [
+     	job_title => '$',
+     	'&report' => q{return $self->SUPER::report . "; job: $job_title";}
+     ], -parent => 'Person';
+     subclass Manager => [
+     	workers => '@Employee',
+     	'&report' => q{return $self->SUPER::report . "; manages: " .
+     			      (&workers_size + 1) . " people";}
+     ], -parent => 'Employee';
+
+   Currently, you cannot access a protected method of an ancestor this way.
+The following code will generate a run-time error:
+
+     class Foo => [
+     	'&method' => { protected => 1, body => '...' },
+     ];
+     subclass Bar => [
+     	'&method' => { protected => 1, body => '$self->SUPER::method;' }
+     ], -parent => 'Foo';
+
+THE DELETE_CLASS FUNCTION
+=========================
+
+   You can delete classes you declare using `Class::Generate', after which
+you can declare another class with the same name.  Use the `delete_class'
+function, which accepts as arguments one or more class names:
+
+     class Person => [ name => '$' ];
+     delete_class 'Person';			 # Nah...
+     class Name => [ last => '$', first => '$' ]; # ... let's really encapsulate.
+     class Person => [ name = 'Name' ];		 # That's better.
+
+   This function silently ignores classes that don't exist, but it croaks
+if you try to delete a package that wasn't declared using
+`Class::Generate'.
+
+FLAGS
+=====
+
+   You can affect the specification of a class using certain flags.  A
+flag is a key/value pair passed as an argument to class (or `subclass').
+The first character of the key is always a hyphen.  The following is a
+list of recognized flags:
+
+-use=>list
+     Your pre or post code, or your methods, may want to use functions
+     declared in other packages.  List these packages as the value of the
+     `-use' flag.  For example, suppose you are creating a class that does
+     date handling, and you want to use functions in the Time::Local and
+     Time::localtime packages.  Write the class as follows:
+
+          class Date_User => [ ... ],
+          	-use => 'Time::Local Time::localtime';
+
+     Any code you add to `Date_User' can now access the time functions
+     declared in these two packages.
+
+     To import functions, you need to use the array reference form:
+
+          class Foo => [ ... ],
+          	-use => ["FileHandle 'autoflush'"];
+
+     Otherwise, the class function would assume you want to use two
+     packages, Filehandle and `'autoflush''.
+
+     Package Carp is automatically used if $WARNING is true.
+
+-class_vars=>list
+     A class can have class variables, i.e., variables accessible to all
+     instances of the class as well as to class methods.  Specify class
+     variables using the `-class_vars' flag.  For example, suppose you
+     want the average age of all Persons:
+
+          $compute_average_age = '$n++; $total += $age; $average = $total/$n;';
+          class Person => [
+          	name => '$',
+          	age  => { type => '$', required => 1, readonly => 1 },
+          	new  => { post => $compute_average_age }
+          ],
+              -class_vars => '$n $total $average';
+          $p = Person->new(age => 24);		# Average age is now 24.
+          $q = Person->new(age => 30);		# Average age is now 27.
+
+     You can also provide an initial value for class variables.  Specify
+     the value of `-class_vars' as an array reference.  If any member of
+     this array is a hash reference, its members are taken to be variable
+     name/initial value pairs.  For example:
+
+          class Person => [ name => '$',
+          		      age => { type => '$', required => 1, readonly => 1 },
+          		      new => { post => $compute_average_age }
+          ],
+          	  -class_vars => [ { '$n' => 0 },
+          			   { '$total' => 0 },
+          			   '$average' ];
+
+-virtual=>boolean
+     A virtual class is a class that cannot be instantiated, although its
+     descendents can.  Virtual classes are useful as modeling aids and
+     debugging tools.  Specify them using the `-virtual' flag:
+
+          class Parent =>   [ e => '$' ], -virtual => 1;
+          subclass Child => [ d => '$' ], -parent => 'Parent';
+          Child->new;		# This is okay.
+          Parent->new;	# This croaks.
+
+     There is no built-in way to specify a virtual method, but the
+     following achieves the desired effect:
+
+          class Foo => [ '&m' => 'die "m is a virtual method";' ];
+
+-comment=>string
+     The string serves as a comment for the class.
+
+-options=>{ options }
+     This flag lets you specify options that alter your class' behavior.
+     See `"OPTIONS"' in this node.
+
+-exclude=>string
+     Sometimes it isn't appropriate for a user to be able to copy an
+     object.  And sometimes testing the equality of two object instances
+     makes no sense.  For these and other situations, you have some
+     control over the automatically generated methods for each class.
+
+     You control method generation using the `-exclude' flag.  Its value
+     is a string of space-separated regular expressions.  A method is
+     included if it does not match any of the regular expressions.  For
+     example, a person has a unique social security number, so you might
+     want a class where a person can't be copied:
+
+          class Person => [
+          	name => '$',
+          	ssn  => { type => '$', readonly => 1 }
+          ], -exclude => '^copy$';
+          $o = Person->new name => 'Forrest Gump', ssn => '000-00-0000';
+          $p = $o->copy;	# Run-time error.
+
+     The `-exclude' flag can describe a whole range of esoteric
+     restrictions:
+
+          class More_Examples => [
+          	mem1 => { type => '$', required => 1 },
+          	mem2 => { type => '@', required => 1 },
+          	mem3 => '%',
+          	new => { post => '%mem3 = map { $_ => $mem1 } @mem2' }
+          ], -exclude => 'undef_ mem2_size mem3';
+          $o = More_Examples->new mem1 => 1, mem2 => [2, 3, 4];
+          @keys = $o->mem3_keys;	# Run-time error.
+          $o->undef_mem1;		# Ditto.
+          print $o->last_mem2;	# This works as expected.
+          print $o->mem2_size;	# But this blows up.
+
+     In `More_Examples', it isn't possible to undefine a member.  The size
+     of `mem2' can't be determined.  And `mem3' is effectively private (it
+     can't even be accessed from class methods).
+
+PARAMETER PASSING STYLES
+========================
+
+   By default, parameters to the constructor are passed using a
+`name=>value' form.  You have some control over this using the style key
+in a constructor's new specifier.  It lets you pass parameters to
+constructors using one of the following styles:
+
+Key/Value
+     This is the default.  Parameters are passed using the `name=>value'
+     form, as shown in previous examples.  Specify it as
+     `style=>'key_value'' if you want to be explicit.
+
+Positional
+     Parameters are passed based on a positional order you specify.  For
+     example:
+
+          class Foo => [ e1 => '$', e2 => '@', e3 => '%',
+          	           new => { style => 'positional e1 e2 e3' } ];
+          $obj = Foo->new(1);			# Sets e1 to 1.
+          $obj = Foo->new(1, [2,3]);		# Ditto, and sets e2 to (2,3).
+          my %hash = (foo => 'bar');
+          $obj = Foo->new(1,			# Ditto,
+          		    [2, 3],		# ditto,
+          		    {%hash});		# and sets e3 to %hash.
+
+     You must list all non-private members, although you do not have to
+     include all of them in every invocation of new.  Also, if you want to
+     set `e1' and `e3' but not `e2', you can give undef as `e2''s value:
+
+          $obj = Foo->new(1, undef, { e3_value => 'see what I mean?' });
+
+Mixed Styles
+     Parameters are passed mixing the positional and key/value styles.
+     The values following mix are the names of the positional parameters,
+     in the order in which they will be passed.  This style is useful when
+     certain parameters are "obvious".  For example:
+
+          class Person => [
+          	first_name => { type => '$', required => 1 },
+          	last_name  => { type => '$', required => 1 },
+          	favorite_language => '$',
+          	favorite_os	  => '$',
+          	new => { style => 'mix first_name last_name' }
+          ];
+          $obj = Person->new('Joe',  'Programmer', favorite_language => 'Perl');
+          $obj = Person->new('Sally', 'Codesmith', favorite_os       => 'Linux');
+
+     The positional parameters need not be required, but they must all be
+     given if you want to set any members passed as key/value parameters.
+
+Your Own Parameter Handling
+     Finally, sometimes you want a constructor whose parameters aren't the
+     members.  Specify such classes using `own'.  Access the parameters
+     through `@_', as usual in Perl:
+
+          class Person => [
+          	first => { type => '$', private => 1 },
+          	last  => { type => '$', private => 1 },
+          	new   => { style => 'own',
+          		   post => '($first, $last) = split /\s+/, $_[0];' },
+          	'&name' => q|return $last . ', ' . $first;|
+          ];
+          $p = Person->new('Fred Flintstone');
+          print $p->name;			# Prints 'Flintstone, Fred'.
+
+     If `own' is followed by a space, and the class has a parent,
+     everything after the space is treated as a space-separated list of
+     Perl expressions.  The expressions are passed to the superclass
+     constructor in the order given.  Thus:
+
+          subclass Child => [
+          	grade => '$',
+          	new   => { style => 'own $_[0]', post => '$grade = $_[1];' }
+          ], -parent => 'Person';
+
+     Now you can create a Child by passing the grade as the second
+     parameter, and the name as the first:
+
+          $c = Child->new('Penny Robinson', 5);
+
+   If you use styles other than `key_value', you must be aware of how a
+subclass constructor passes parameter to its superclass constructor.
+`Class::Generate' has some understanding of styles, but not all
+combinations make sense, and for those that do, you have to follow certain
+conventions.  Here are the rules for a subclass S with parent P:
+
+  1. If S's constructor uses the `key_value' style, P's constructor must
+     use the `key_value' or `own' style.  The parameters are treated as a
+     hash; P's constructor receives a hash with all elements indexed by
+     nonprivate members of S deleted.  P's constructor must not expect the
+     hash elements to be passed in a prespecified order.
+
+  2. If S's constructor uses the `positional' style, P's constructor may
+     use any style.  If S has n nonprivate members, then parameters 0..n-1
+     are used to assign members of S.  Remaining parameters are passed to
+     `P::new', in the same order they were passed to `S::new'.
+
+  3. If S's constructor uses the mix style, P's constructor may use any
+     style.  If S has n nonprivate members, of which p are passed by
+     position, then parameters 0..(p-1)+2*(n-p) are used to assign members
+     of S.  Remaining parameters are passed to `P::new', in the same order
+     they were passed to `S::new'.
+
+  4. If S's constructor uses the `own' style, you are responsible for
+     ensuring that it passes parameters to P's constructor in the correct
+     style.
+
+
+OPTIONS
+=======
+
+   The `Class::Generate' package provides what its author believes is
+reasonable default style and behavior.  But if you disagree, there are
+certain defaults you can control on a class-by-class basis, or for all
+classes you generate.  These defaults are specified as options.  An option
+is given in one of two ways:
+
+  1. Via the `-options' flag, the value of which is a hash reference
+     containing the individual options.  This affects an individual class.
+
+  2. By setting a variable declared in `Class::Generate'.  The variable
+     has the same name as the option.  This affects all subsequently
+     generated classes except those where the option is explicitly
+     overridden via the `-options' flag.  You may export these variables,
+     although they are not exported by default.
+
+        The following sections list the options that class and `subclass'
+recognize.
+
+Saving the Classes
+------------------
+
+   If the save option is true for class c, the code implementing it will
+be saved to file `c.pm'.  This is useful in several situations:
+
+  1. You may need functionality that class and `subclass' cannot provide.
+
+  2. Errors in your methods, or in pre and post code, can result in
+     obscure diagnostics.  Debugging classes is easier if they are saved
+     in files.  This is especially true if you use Emacs for debugging, as
+     Emacs does not handle evaluated expressions very well.
+
+  3. If you have many classes, there is overhead in regenerating them each
+     time you execute your program.  Accessing them in files may be faster.
+
+        If the value of save looks like a Perl file name (i.e., if it ends
+in `.pl' or `.pm'), the class is appended to that file.  This feature lets
+your program avoid the overhead of opening and closing multiple files.  It
+also saves you from the burden of maintaining multiple files.
+
+   All comments specified using comment attributes and the `-comment' flag
+are saved along with your code.
+
+Passing References
+------------------
+
+   Sometimes you want to be able to assign a whole array to an array member
+(or a whole hash to a hash member):
+
+     class Person => [
+     	name	=> '$',
+     	parents => '@Person',
+     	new	=> { style => 'positional name parents' }
+     ];
+     $p = Person->new('Will Robinson');
+     $p->parents( [ Person->new('John Robinson'),
+     		   Person->new('Maureen Robinson') ] );
+
+   But sometimes you don't.  Often you only have one member value
+available at any time, and you only want to add values:
+
+     class Person => [
+     	name	=> '$',
+     	parents => '@Person',
+     	new	=> { style => 'positional name parents' }
+     ],
+     	-options => { accept_refs => 0 };
+     $p = Person->new('Will Robinson');
+     $p->add_parents( Person->new('Maureen Robinson'),
+     		     Person->new('John Robinson') );
+
+   Passing references is a matter of taste and situation.  If you don't
+think you will need or want to do it, set the `accept_refs' option to
+false.  An added benefit is that the classes will catch more
+parameter-passing errors, because with references there are two meanings
+for passing a single parameter to the method.
+
+Strictness
+----------
+
+   By default, the classes include a `use strict' directive.  You can
+change this (if you must) using a false value for the strict option.
+
+Redefining an Existing Package
+------------------------------
+
+   `Class::Generate' is intended for generating classes, not packages
+containing classes.  For that reason, class and `subclass' croak if you
+try to define a class whose name is a package that already exists.
+Setting the `allow_redefine' option to true changes this behavior.  It
+also opens up a minefield of potential errors, so be careful.
+
+Instance Variable Name
+----------------------
+
+   By default, the reference to an object instance is stored in a variable
+named `$self'.  If you prefer another name (e.g., `$this'), you can
+specify it using the `instance_var' option:
+
+     class Foo => {
+     	array => '@'
+     };
+     subclass Bar => {
+     	bar_mem => {
+     	    type => '$',
+     	    pre => 'print "array_size is ", $this->array_size;'
+     	}
+     }, -parent => 'Foo',
+        -options => { instance_var => 'this' };
+
+Class Variable Name
+-------------------
+
+   By default, the reference to a class variable is stored in a variable
+named $class.  If you prefer another name, you can specify it using the
+`class_var' option.
+
+Checking User-Defined Code
+--------------------------
+
+   The class and `subclass' functions check that any pre, post, or assert
+code is valid Perl.  They do so by creating and evaluating a subroutine
+that contains the code, along with declarations that mimic the context in
+which the code would execute.  The alternative would be to wait until the
+entire class has been defined, but that would yield error messages with
+line numbers that don't correspond to your code.  Never underestimate the
+value of meaningful error messages.
+
+   However, this approach results in code being evaluated twice: once to
+check its syntax and semantics, and again when the package is created.  To
+avoid this overhead, set the `check_code' option to false.
+
+Checking Default Value Types
+----------------------------
+
+   A default value for a member is checked against the type of the member.
+If a member is an array, for instance, you will get a warning if class
+detects that its default value is anything other than an array reference.
+
+   If you specify a default value as a string, class and `subclass' have
+to evaluate the string to see if it yields a value of the correct type.
+This may cause unwanted behavior if the string is an expression with side
+effects.  Furthermore, your program will behave differently depending on
+whether warnings are in effect (see `SANITY CHECKING' in this node).
+
+   If you set the `check_default' option to false, class and `subclass'
+will not check the types of default values.  It's common to do so after
+you have debugged a class.
+
+Creating New Objects From Instances
+-----------------------------------
+
+   By default, `Class::Generate' lets you create a new object instance only
+from a class name, i.e., `Class->new'.  However, some Perl programmers
+prefer another style, wherein you can create an object from either a class
+or an instance (see *Note Perlobj: (perl.info)perlobj,).  The `nfi' (new
+from instance) option controls whether you can use both:
+
+     class C => { ... };
+     $o = C->new;	# Always works.
+     $p = $o->new;	# Works if nfi option is true.
+
+SANITY CHECKING
+===============
+
+   Several sections have mentioned errors that will cause your program to
+croak.  Actually this only happens if you use Perl's -w flag.  Once your
+classes are *fully* debugged, you may want to stop using -w for the sake
+of efficiency.  But go slow on that.  Remember, you can still make
+mistakes in code that invokes a class.
+
+   Assertions are included only if the -w flag is used.
+
+DIAGNOSTICS
+===========
+
+   The following is a list of the diagnostics the class and `subclass'
+functions can produce.  Each diagnostic is prefixed with "(F)" or "(W)",
+indicating that it is fatal or a warning, respectively.  Warning messages
+are only emitted if you use Perl's -w flag.
+
+   Classes that contain user defined code can yield Perl errors and
+warnings.  These messages are prefixed by one of the following phrases:
+
+     Class_Name: Member "name": In "<x>" code:
+     Class_Name: Method "name":
+
+   where `<x>' is one of pre, post, or assert.  See *Note Perldiag:
+(perl.info)perldiag, for an explanation of such messages.  The message
+will include a line number that is relative to the lines in the erroneous
+code fragment, as well as the line number on which the class begins.  For
+instance, suppose the file `stacks.pl' contains the following code:
+
+     #! /usr/local/bin/perl -w
+     use Class::Generate 'class';
+     class Stack => [
+     	top_e	 => { type => '$', private => 1, default => -1 },
+     	elements => { type => '@', private => 1, default => '[]' },
+     	'&push' => '$elements[++$top_e] = $_[0];',
+     	'&pop'  => '$top_e--;',
+     	'&top'  => 'return $elements[$top_e];'
+     ];
+     class Integer_Stack => [
+     	'&push' => q{die 'Not an integer' if $_[0] !~ /^-?\d+$/;
+     		     $self->SUPER:push($_[0]);}	# Meant "::", not ":".
+     ], -parent => 'Stack';
+
+   Executing this file yields:
+
+     Subclass "Integer_Stack", method "push": syntax error at line 2,
+      near "->SUPER:"
+      at stacks.pl line 10
+
+   meaning the error occurs in the second line of the push method.
+
+Compile-Time Diagnostics
+------------------------
+
+   The class and `subclass' functions emit the following diagnostics:
+
+"-class_vars" flag must be string or array reference
+     (F) The value of the `-class_vars' flag must be a string containing a
+     space-separated list of class variables, or a reference to an array
+     of strings, each of which specifies one or more class variables.
+
+"-exclude" flag must be string or array reference
+     (F) The value of the `-exclude' flag must be a string containing a
+     space-separated list of regular expressions, or a reference to an
+     array of strings, each of which specifies one or more regular
+     expressions.
+
+"-use" flag must be string or array reference
+     (F) The value of the `-use' flag must be a string containing a
+     space-separated list of packages to use, or a reference to an array
+     of strings, each of which is a package to use.
+
+%s: "%s" is reserved
+     (F) The member name conflicts with the instance variable name for the
+     class.  Change the member name, or change the instance variable name
+     using the `instance_var' option.
+
+%s: "required" attribute ignored for private/protected member "%s"
+     (W) If member is private or protected, it cannot be a constructor
+     parameter.
+
+%s: %s-based class must have %s-based parent (%s is %s-based)
+     (F) If the class specified using `subclass' is specified as an array
+     reference, its parent must also be specified as array references.  If
+     it is specified as a hash reference, its parent(s) must be specified
+     as hash references.
+
+%s: A package of this name already exists
+     (F) The name passed to class or `subclass' must not be the name of an
+     existing package, unless the `allow_redefine' option is true.
+
+%s: An array reference based subclass must have exactly one parent
+     (F) Multiple inheritance is only permitted for class hierarchies
+     specified as hash references.
+
+%s: Cannot append to "%s": %s
+     (F) The save option was true, but a class definition cannot be
+     appended to the named file for the specified operating
+     system-specific reason.
+
+%s: Cannot save to "%s": %s
+     (F) The save option was true, but the class cannot be saved to the
+     named file for the specified operating system-specific reason.
+
+%s: Cannot continue after errors
+     (F) The class specification includes user defined code that is not
+     valid Perl.
+
+%s: Class was not declared using Class::Generate
+     (F) An argument of `delete_class' is the name of a package that
+     wasn't declared using class or `subclass'.
+
+%s: Default value for "%s" is not correctly typed
+     (W) The value of the default attribute specified for the named member
+     is either a reference that is does not match the type required for
+     the member, or a string that, when evaluated, does not match the
+     member's type.
+
+%s: Elements must be in array or hash reference
+     (F) A class specification must be an array or hash reference.
+     Scalars, lists, and other references are not allowed.
+
+%s: Error in new => { style => '... %s' }: %s is not a member
+     (F) A class' constructor specifies a style that requires listing
+     members, and the list includes a value that is not a member.
+
+%s: Error in new => { style => '... %s' }: %s is not a public member
+     (F) A class' constructor specifies a style that requires listing
+     members, and the list includes the name of a private or protected
+     member.  Only public members can be passed as a constructor parameter.
+
+%s: Error in new => { style => '... %s' }: Name "%s" used %d times
+     (F) A class' constructor specifies a style that requires listing
+     members, and the list contains the same member name more than once.
+
+%s: Evaluation failed (problem in Class::Generate?)
+     (F) You have done something the creator of `Class::Generate' did not
+     anticipate, you've found a bug (or both), or you've got a trailing
+     comment in user-defined code (see `"BUGS"' in this node).  Please
+     report either of the first two cases.  (This message is accompanied
+     by some contextual information that can help you identify the error.
+     Please include that information too.)
+
+%s: Extra parameters in style specifier
+     (F) A class' constructor was specified to use the mix style, but more
+     values were listed than exist non-private members.
+
+%s: Invalid member/method name "%s"
+     (F) The names of members and methods must be valid Perl identifiers,
+     starting with a letter or underscore and containing only letters,
+     underscores, or digits.
+
+%s: Invalid parameter-passing style (must be string or array reference)
+     (F) Within the new attribute of a class, the style attribute's value
+     must be given as a string or a reference to an array of strings.
+
+%s: Invalid parameter-passing style type "%s"
+     (F) Within the new attribute of a class, the style attribute's value
+     must begin with one of the words `key_value', mix, `positional', or
+     `own'.
+
+%s: Invalid specification for objects of "%s" (must be string or array reference)
+     (F) For the named class method, the expressions to be recognized as
+     objects must be passed as a string or a reference to a list of
+     strings.
+
+%s: Invalid specification for required constructor parameters (must be string or array reference)
+     (F) Within the new attribute of a class, the required attribute's
+     value must be given as a string or a reference to an array of strings.
+
+%s: Invalid specification of member "%s" (must be string or hash reference with "type" key)
+     (F) A member's specification must be given as either a string
+     (describing its type) or a hash reference (which must contain the
+     type key).
+
+%s: Invalid specification of method "%s" (must be string or hash reference with "body" key)
+     (F) The value of a method name must be a string (specifying the
+     method's body) or a hash reference, one of whose elements is keyed by
+     body.
+
+%s: Member "%s": "%s" is not a valid type
+     (F) The type of a member must be `$', `@', %, one of these three
+     types followed by an identifier, or an identifier.
+
+%s: Member "%s": Unknown attribute "%s"
+     (W) One of the attributes given in the hash reference specifying the
+     named member is not a recognized attribute.
+
+"%s: Member "%s" declared both private and protected (protected assumed)
+     (W) The member's specification has TRUE values for both the
+     `protected' and private attributes.  The more general attribute,
+     `protected', will be used.
+
+%s: Method "%s": A class method cannot be protected
+     (F) In the current implementation, a class method must be public or
+     private.
+
+%s: Method "%s": Unknown attribute "%s"
+     (W) One of the attributes given in the hash reference specifying the
+     named method is not a recognized attribute.
+
+%s: Missing/extra members in style
+     (F) A class' constructor was specified to use the `positional' style,
+     but not all non-private members (or too many members) were listed.
+
+%s: Name "%s" used %d times
+     (F) The set of member and method names cannot contain duplicates.
+     Member and method names share the same namespace.
+
+%s: Parent class "%s" was not defined using class() or subclass(); %s reference assumed
+     (W) The `subclass' function permits parents to be any package, not
+     just those defined using class and `subclass'.  However, because
+     certain capabilities are lost (e.g., base type checking), it emits
+     warnings when it detects such subclasses.  Also, the `subclass'
+     function assumes that invoking `parent->new' returns a blessed
+     reference to whatever the child expects.  If it's wrong, you'll get a
+     run-time error when your program invokes one of the parent's or
+     child's accessors.
+
+%s: Parent package "%s" does not exist
+     (F) The `subclass' function requires all parent classes to exist
+     (meaning each is a package) before it is invoked.
+
+%s: Probable mismatch calling constructor in superclass "%s"
+     (W) The `subclass' function's constructor specifies a parameter
+     passing style that is likely to conflict with the style of its
+     parent's.
+
+%s: Required params list for constructor contains unknown member "%s"
+     (F) Within the new attribute of a class, the required attribute's
+     value contains a name that is not given as class member.
+
+%s: Specification for "new" must be hash reference
+     (F) The new attribute of a class must be given as a hash reference.
+
+%s: Value of %s option must be an identifier (without a "$")
+     (F) The value passed to the `class_var' or `instance_var' option
+     must, when prefixed with a `$', be a valid Perl scalar identifier.
+     Note that you do not prefix it with a `$'.  Use:
+
+          -options => { class_var => 'x' }
+
+     and not
+
+          -options => { class_var => '$x' }
+
+Cannot save reference as initial value for "%s"
+     (W) References are legal default or initial values.  However, they
+     cannot be saved using the save option.
+
+Each class variable must be scalar or hash reference
+     (F) The specification of a class variable must be either a string
+     containing a valid Perl variable name, or a hash reference; for each
+     key/value pair of the reference the key must be a valid Perl variable
+     name, and the value must be a Perl expression to be used as the
+     variable's default value.
+
+Expected string or array reference
+     (F) The value of an attribute's key/value pair should have been a
+     string or an array reference, but was not.
+
+Expected string or hash reference
+     (F) The value of an attribute's key/value pair should have been a
+     string or an array reference, but was not.
+
+Invalid parent specification (must be string or array reference)
+     (F) The `subclass' function requires the class' parent(s) to be
+     specified as either a string, or a list of strings passed as an array
+     reference.
+
+Missing subclass parent
+     (F) The `subclass' function requires the class' parent(s) to be
+     specified, using the `parent=>list' form.
+
+Missing/extra arguments to class()
+     (F) The class function requires at least two arguments: the class'
+     name and specification.  Its other arguments must be flags.
+
+Missing/extra arguments to subclass()
+     (F) The `subclass' function requires at least four arguments: the
+     class' name, the class' specification, and the class' parent as a
+     key/value pair.  Other arguments to `subclass' must be flags.
+
+Options must be in hash reference
+     (F) The value of the `-options' flag must be a hash reference.
+
+Unknown flag "%s" ignored
+     (W) One of the arguments to class or `subclass' begins with -, but is
+     not a recognized flag.
+
+Unknown option "%s" ignored
+     (W) The `-options' flag includes a key/value pair where the key is
+     not a recognized option.
+
+Run-Time Diagnostics
+--------------------
+
+   If you use the -w flag, your classes will contain code that can cause
+the following diagnostics to be emitted:
+
+%s: Failed assertion: %s
+     (F) The specified assertion failed.
+
+%s: Invalid number of parameters
+     (F) One of the class' accessors was invoked with too many or too few
+     parameters.
+
+%s: Invalid parameter value (expected %s)
+     (F) One of the class' accessors was invoked with a parameter of the
+     wrong type.
+
+%s: Member is read-only
+     (F) Member m was specified read-only, but `$o->m' was invoked with
+     parameters that looked like an attempt to set m.
+
+%s: Parameter constraint "%s" failed
+     (F) The constraint for the constructor, which involves operators, has
+     failed.
+
+%s: Virtual class
+     (F) The constructor of a virtual class has been directly invoked.
+
+%s::new: %s: Not a member
+     (F) The named class uses the key/value parameter passing style.  Its
+     constructor was invoked with one or more key/value pairs whose keys
+     don't name a member of the class.  This message often occurs when you
+     forget that keys are needed.
+
+%s::new: Invalid value for %s
+     (F) The class' constructor was given an improper value for a member.
+     If the member is a list, the value passed is the wrong kind of list
+     (or not a list).  If the member is typed, the value passed isn't of
+     that type.
+
+%s::new: Missing or invalid value for %s
+     (F) The class' constructor was invoked without a value for a required
+     member, or the value was not of the correct type (e.g., hash
+     reference where an array reference is needed, not a blessed reference
+     to the necessary class).
+
+%s::new: Missing value for required member %s
+     (F) The class' constructor was invoked without a required parameter.
+
+%s::new: Odd number of parameters
+     (F) The named class uses the key/value or mix parameter passing style.
+     Its constructor was invoked with too many or too few (not just right)
+     parameters, i.e., something that didn't look like a list of key/value
+     pairs (accounting for any positional parameters in the mix style).
+
+%s::new: Only %d parameter(s) allowed (%d given)
+     (F) The named class uses the positional parameter passing style.  Its
+     constructor was invoked with more parameters than the class has
+     members.
+
+SEE ALSO
+========
+
+   PERLDIAG(1), PERLOBJ(1), Carp(3), Class::Struct(3)
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1999, 2000 Steven Wartik.  All rights reserved. This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+BUGS
+====
+
+   It would be nice to have more selective control of what errors are
+checked.
+
+   That pre and post code share the same name space can cause problems if
+the `check_code' option is true.  The reason is that the post code is
+evaluated with a prepended copy of pre in which all newlines are replaced
+by spaces.  This replacement ensures that an error message about post
+refers to the appropriate line number within post.  However, if the pre
+code contains the `<<' quotation form, Perl will probably complain about a
+syntax error; and if it contains a comment, Perl will ignore the first
+line of the post code.  Note that this only affects code checking, not the
+package that's generated.
+
+   In the current implementation, if member m is an array, then within
+user-defined code, the test `if ( @m ) { ... }' does not work in
+hash-based classes unless `@m' is initialized.  Use `$#m != -1' instead.
+Or specify m as explicitly empty:
+
+     m => { type => '@', default => '[]' }
+
+   Hash members have an analogous bug.  Use `scalar(&m_keys) != 0' to test
+if a hash member is empty in user-defined code.
+
+   The `&equals' and `&copy' functions do not understand multiple
+inheritance.
+
+   Member and method name substitution in code can be fooled if a member
+name is also declared as a variable.  Unfortunately the class function
+doesn't detect this error.  In the following class, the $f of `$f[0]' is
+mistaken for scalar member f, not array variable `@f':
+
+     class Foo => {
+     	f => {
+     	    type => '$',
+     	    post => 'my @f;
+     	     	     $f[0] = $f;    # This causes an error.
+     		     ${f}[0] = $f;' # However, this works.
+     	}
+     };
+
+   If a class declares a protected method m, and one of its subclasses
+also declares m, the subclass can't access the parent's version.
+
+   A subclass can declare a member m that overrides a parent's declaration
+of m, but it can cause some logical inconsistencies and isn't recommended.
+Tne entire model of member overriding may change in some future version.
+
+   The `subclass' function doesn't test for circularity in inheritance
+hierarchies.
+
+   The `-allow_redefine' option is intended to let you add functionality to
+packages not declared using `Class::Generate'.  This rule isn't strictly
+enforced, but probably should be.  If you redefine a class, you silently
+change the constructor, as well as the copy and equals methods.  Consider
+the following:
+
+     class Foo => [ mem1 => '$' ];
+     class Foo => [ mem2 => '@' ], # Intends to add a member to Foo.
+     	-options => { allow_redefine => 1 };
+     $o = new Foo;
+     $o->mem1('this works');
+     $o->mem2([qw(so does this)]);
+     $p = $o->copy;		  # But this doesn't copy mem1.
+     $p = new Foo mem1 => 'x';	  # And this fails.
+
+   Use inheritance instead.
+
+   The algorithm that adds a trailing semicolon to pre and post code uses
+a simple regular expression to test for a semicolon's presence.  Please
+don't strain it by doing odd things like embedding comments:
+
+     post => 'print "foo"  # This will fail, with an obscure error message.',
+     post => 'print "foo"' # Use this form instead.
+
+NOTES
+=====
+
+   Default values that are references cannot be saved to a file.
+
+   In pre and post code, you can access method parameters via `@_'.  You
+probably should not do so except for scalar members, though.  For array
+members, the same code is inserted into m and `add_'m, and the code can't
+tell which method it's in.  Even within method m, the code can't tell if
+it's looking at a reference or a value if `$accept_refs' is true.
+
+   The UNIVERSAL::isa function is used to determine if something is an
+array or hash reference.  This presents possibilities for
+metaspecification functions.
+
+   The name `_cginfo' is reserved in all packages generated by
+`Class::Generate'.
+
+   Emacs users will quickly discover that the form:
+
+     class Foo => [ member_name => '$' ];
+
+   causes subsequent lines to be incorrectly indented.  The reason is that
+perl-mode is confused by `'$''.  Use instead:
+
+     class Foo => [ member_name => "\$" ];
+
+   This package clearly owes much to Class::Struct.  I thank its creators
+for their insights.
+
+   Speaking of which, unlike Class::Struct, the m accessor for member m
+does not return a value when it is set.  This is a deliberate design
+decision.  If you would like that feature, you can simulate it for
+(scalar) member m by including `return $m;' as post code.  However, you
+then short-circuit any assertion for member m.
+
+

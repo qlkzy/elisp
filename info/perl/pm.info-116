@@ -1,0 +1,1753 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: DBIx/Lookup/Field,  Next: DBIx/MSSQLReporter,  Prev: DBIx/KwIndex,  Up: Module List
+
+Create a lookup hash from a database table
+******************************************
+
+NAME
+====
+
+   DBIx::Lookup::Field - Create a lookup hash from a database table
+
+SYNOPSIS
+========
+
+     use DBI;
+     use DBIx::Lookup::Field qw/dbi_lookup_field/;
+
+     $dbh = DBI->connect(...);
+     my $inst_id = dbi_lookup_field(
+         DBH   => $dbh,
+         TABLE => 'institution'
+         KEY   => 'name',
+         VALUE => 'id',
+     );
+
+     print "Inst_A has id ", $inst_id->{Inst_A};
+
+DESCRIPTION
+===========
+
+   This module provides a way to construct a hash from a database table.
+This is useful for the situation where you have to perform many lookups of
+a field by using a key from the same table. If, for example, a table has an
+id field and a name field and you often have to look up the name by its
+id, it might be wasteful to issue many separate SQL queries. Having the
+two fields as a hash speeds up processing, although at the expense of
+memory.
+
+EXPORTS
+=======
+
+dbi_lookup_field()
+     This function creates a hash from two fields in a database table on a
+     DBI connection. One field acts as the hash key, the other acts as the
+     hash value. It expects a parameter hash and returns a reference to the
+     lookup hash.
+
+     The following parameters are accepted. Parameters can be required or
+     optional. If a required parameter isn't given, an exception is raised
+     (i.e., it dies).
+
+    DBH
+          The database handle through which to access the table from which
+          to create the lookup. Required.
+
+    TABLE
+          The name of the table that contains the key and value fields.
+          Required.
+
+    KEY
+          The field name of the field that is to act as the hash key.
+          Required.
+
+    VALUE
+          The field name of the field that is to act as the hash value.
+          Required.
+
+    WHERE
+          A SQL 'WHERE' clause with which to restrict the 'SELECT'
+          statement that is used to create the hash. Optional.
+
+BUGS
+====
+
+   None known at this time. If you find any oddities or bugs, please do
+report them to the author.
+
+AUTHOR
+======
+
+   Marcel GrE<uuml>nauer <marcel@codewerk.com>
+
+COPYRIGHT
+=========
+
+   Copyright 2001 Marcel GrE<uuml>nauer. All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   DBI(3pm).
+
+
+File: pm.info,  Node: DBIx/MSSQLReporter,  Next: DBIx/OracleSequence,  Prev: DBIx/Lookup/Field,  Up: Module List
+
+An module to connect Perl to MS SQL Server and MS Data Engine
+*************************************************************
+
+NAME
+====
+
+   DBIx::MSSQLReporter - An module to connect Perl to MS SQL Server and MS
+Data Engine
+
+SYNOPSIS
+========
+
+   This is complete, runnable program.
+
+   Since you only use this module after installing MS SQL Server or MS
+Data Engine, you should not even have to worry about the DSN.
+
+     #!perl -w
+     use strict;
+     use DBIx::MSSQLReporter;
+     
+     my($connect) = "dbi:ODBC(RaiseError=>1, PrintError=>1, Taint=>1):DSN=LocalServer";
+     my($reporter) = DBIx::MSSQLReporter -> new(connexion => $connect);
+
+     print "User tables: \n";
+     print join("\n", @{$reporter -> get_tableNames()}), "\n\n";
+
+DESCRIPTION
+===========
+
+   `DBIx::MSSQLReporter' encapsulates the connection between Perl and MS
+SQL Server.
+
+   `DBIx::MSSQLReporter' was written so that I could teach myself about MS
+SQL Server and MSDE, and as part of my Perl tutorial series.
+
+   It should be clear from the name that this module is
+database-engine-specific. If you plan on writing code which is independent
+of any particular database, look elsewhere.
+
+   See the URI, below, for my demos sql7Demo[23].pl, which both use this
+module.
+
+   sql7Demo2.pl is a command-line program. sql7Demo3.pl is a CGI script.
+
+   Lastly, note that this module has a chequered future: I may well
+re-write it to fit under the umbrella of DBIx::Easy, or someone else
+working independently may have already released such a module.
+
+INSTALLATION
+============
+
+   You install `DBIx::MSSQLReporter', as you would install any perl module,
+by running these commands:
+
+     perl Makefile.PL
+     make
+     make test
+     make install
+
+CONSTRUCTOR new
+===============
+
+   The constructor takes 1 parameter and 1 value for that parameter.
+
+   It croaks if it can't connect. Otherwise it returns an object you can
+use thus:
+
+     my($reporter) = DBIx::MSSQLReporter -> new(connexion => $connect);
+     print join("\n", @{$reporter -> get_viewNames()}), "\n\n";
+
+METHOD do($sql)
+===============
+
+   It croaks if it can't prepare() and execute() the given SQL.
+
+   It returns a statment handle, which you need for things like:
+
+     my($sth) = $reporter -> do($sql);
+     $sth -> dump_results();
+     $sth -> finish();
+
+   dump_results() is built-in to DBI.
+
+METHOD dropDB($dbName)
+======================
+
+   It croaks if it can't drop the given database.
+
+     $reporter -> dropDB($dbName);
+
+METHOD dropTable($tableName)
+============================
+
+   It croaks if it can't drop the given table.
+
+     $reporter -> dropTable($tableName);
+
+METHOD get_dbNames($sysDbCount)
+===============================
+
+   It returns a sorted list of user database names, all in lower case.
+
+   $sysDbCount is optional. It defaults to 4, which means this method
+ignores the 4 system tables. See get_sysDbNames(), below.
+
+     my($dbName) = $reporter -> get_dbNames();
+     print "User databases: \n";
+     print join("\n", @$dbName), "\n\n";
+
+METHOD get_fieldNames($tableName)
+=================================
+
+   It returns a list of references to the names, types, and precisions, of
+the fields in the given table.
+
+     my($fieldName, $fieldType, $fieldPrecision) = $reporter -> get_fieldNames($tableName);
+     print join("\n", map{"Field: $$fieldName[$_]. Type: $$fieldType[$_]. Precision: $$fieldPrecision[$_]"} 0 .. $#{$fieldName}), "\n\n";
+
+METHOD get_tableNames()
+=======================
+
+   It returns a sorted list of user table names, all in lower case.
+Recall, the DSN specified the database.
+
+     my($tableName) = $reporter -> get_tableNames();
+     print "User tables: \n";
+     print join("\n", @$tableName), "\n\n";
+
+METHOD get_viewNames()
+======================
+
+   It returns a sorted list of user view names, all in lower case. Recall,
+the DSN specified the database.
+
+     my($viewName) = $reporter -> get_viewNames();
+     print "User views: \n";
+     print join("\n", @$viewName), "\n\n";
+
+METHOD get_sysDbNames($sysDbCount)
+==================================
+
+   It returns a sorted list of system database names, all in lower case.
+On my system, I get master, model, msDb and tempDb.
+
+   $sysDbCount is optional. It defaults to 4, which means this method
+returns the 4 system tables. See get_dbNames(), above.
+
+     my($sysDbName) = $reporter -> get_sysDbNames();
+     print "System databases: \n";
+     print join("\n", @$sysDbName), "\n\n";
+
+METHOD get_sysTableNames()
+==========================
+
+   It returns a sorted list of system table names, all in lower case.
+Recall, the DSN specified the database.
+
+     my($sysTableName) = $reporter -> get_sysTableNames();
+     print "System tables: \n";
+     print join("\n", @$sysTableName), "\n\n";
+
+METHOD get_sysViewNames()
+=========================
+
+   It returns a sorted list of system view names, all in lower case.
+Recall, the DSN specified the database.
+
+     my($sysViewName) = $reporter -> get_sysViewNames();
+     print "System views: \n";
+     print join("\n", @$sysViewName), "\n\n";
+
+METHOD hash2Table($select, $sep, $keyRef)
+=========================================
+
+   Convert a hash reference, as returned by $reporter -> select($sql),
+into an HTML table. See select(), below, for details.
+
+     my($html) = $reporter -> hash2Table($select);
+
+   $sep is optional. It separates the values of different rows in each
+column. It defaults to $;.
+
+   $keyRef is optional. It is a hash reference used to specify the order
+of columns.  It defaults to sorting the keys of %$select.
+
+   If you wish to use $keyRef, prepare it thus:
+
+     my(%key) =
+     (
+     	hostName	=>
+     		{
+     			someData	=> '',
+     			order		=> 2,
+     		},
+     	userName	=>
+     		{
+     			someData	=> '',
+     			order		=> 1,
+     		},
+     );
+
+     my($html) = $reporter -> hash2Table($select, $;, \%key);
+
+     The key 'order' is used to order the keys 'hostName' and 'userName', which are
+     presumed to appear as keys in %$select.
+
+     The key 'someData' is ignored.
+     
+     =head1 METHOD select($sql, $sep)
+
+   It croaks if it can't prepare() and execute() the given SQL.
+
+   $sep is optional. It defaults to $;.
+
+   It returns a reference to a hash, which hold the results of the select.
+
+   The keys of the hash are the names of the fields, which can be used for
+column headings.
+
+   The values of the hash are the values of the fields, which can be used
+for the column data. The values in each column are, by default, separated
+by Perl's $; variable.
+
+     my($select) = $reporter -> select($sql);
+
+   Warning: select() selects the whole table. Ideally we'd use
+DBIx::Recordset to page thru the table, but I had too many problems with
+various versions of DBIx::Recordset.
+
+   If you have binary data containing $;, you *<must>* set $sep to
+something else. Of course, with binary data, there may be no 'safe'
+character (string) which does not appear in your data.
+
+   Alternately, store your binary data in files, and put the file name or
+URI in the database.
+
+   The hash reference can be passed straight to hash2Table for conveting
+into an HTML table. Eg:
+
+     my($html) = $reporter -> hash2Table($select);
+     print $html;
+
+AUTHOR
+======
+
+   `DBIx::MSSQLReporter' was written by Ron Savage *<ron@savage.net.au>*
+in 2000.
+
+   Copyright &copy; 2000 Ron Savage.
+
+   Source available from http://savage.net.au/Perl.html.
+
+LICENCE
+=======
+
+   This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: DBIx/OracleSequence,  Next: DBIx/Password,  Prev: DBIx/MSSQLReporter,  Up: Module List
+
+interface to Oracle sequences via DBI.
+**************************************
+
+NAME
+====
+
+   DBIx::OracleSequence - interface to Oracle sequences via DBI.
+
+DESCRIPTION
+===========
+
+   DBIx::OracleSequence is an object oriented interface to Oracle
+Sequences via DBI.  A sequence is an Oracle database object from which
+multiple users may generate unique integers. You might use sequences to
+automatically generate primary key values.  See
+http://technet.oracle.com/doc/server.815/a68003/01_03sch.htm#1203 for the
+full story on Oracle sequences.  Note that you must register to access
+this URL, but registration is free.
+
+SYNOPSIS
+========
+
+     use DBIx::OracleSequence;
+
+     $oracleDbh = DBI->connect("dbi:Oracle:SID", 'login', 'password');
+
+     my $seq = new DBIx::OracleSequence($oracleDbh,'my_sequence_name');
+
+     $seq->create();                 # create a new sequence with default parms
+     $seq->incrementBy(5);           # alter the seq to increment by 5
+
+     my $nextVal = $seq->nextval();  # get the next sequence value
+     my $currval = $seq->currval();  # retrieve the current sequence value
+     $seq->print();                  # print information about the sequence
+
+     # connect to a sequence that already exists
+     my $seq2 = new DBIx::OracleSequence($oracleDbh,'preexisting_seq');
+     $seq2->print();
+     $seq2->drop();                  # get rid of it
+
+     # see if sequence name 'foo' exists
+     my $seq3 = new DBIx::OracleSequence($oracleDbh);
+     die "Doesn't exist!\n" unless $seq3->sequenceNameExists('foo');
+     $seq3->name('foo');             # attach to it
+     $seq3->print;
+
+NOTE
+====
+
+   The constructor is lazy, so if you want to alter the defaults for a
+sequence, you need to use the maxvalue(), cache(), incrementBy(), etc.
+methods after constructing your sequence.
+
+   You can access an existing Oracle sequence by calling the constructor
+with the existing sequence name as the second parameter.  To create a new
+sequence, call the constructor with your new sequence name as the second
+parameter, then call the create() method.
+
+   The OracleSequence object holds no state about the Oracle sequence
+(well, except for its name.) Instead it just serves as a passthrough to
+the Oracle DDL to create, drop, and set and get information about a
+sequence.
+
+METHODS
+=======
+
+
+     new($dbh,$S) - construct a new sequence with name $S
+
+
+     new($dbh) - construct a new sequence without naming it yet
+
+
+     name($S) - set the sequence name
+
+
+     name() - get the sequence name
+
+
+     create() - create a new sequence.  Must have already called new().
+     Sequence will start with 1.
+
+
+     create($N) - create a new sequence.  Must have already called new().
+     Sequence will start with $N
+
+
+     currval() - return the current sequence value.  Note that for a brand
+     new sequence, Oracle requires one reference to nextval before currval
+     is valid.
+
+
+     nextval() - return the next sequence value
+
+
+     reset() - drop and recreate the sequence with default parms
+
+
+     incrementBy($N) - alter sequence to increment by $N
+
+
+     incrementBy() - return the current sequence's INCREMENT_BY value
+
+
+     maxvalue($N) - alter sequence setting maxvalue to $N
+
+
+     maxvalue() - return the current sequence's maxvalue
+
+
+     minvalue($N) - alter sequence setting minvalue to $N
+
+
+     minvalue() - return the current sequence's minvalue
+
+
+     cache($N) - alter sequence to cache the next $N values
+
+
+     cache() - return the current sequence's cache size
+
+
+     nocache() - alter sequence to not cache values
+
+
+     cycle('Y')/cycle('N') - alter sequence to cycle/not cycle after
+     reaching maxvalue instead of returning an error.  Note that
+     cycle('N') and nocycle() are equivalent.
+
+
+     cycle() - return the current sequence's cycle flag
+
+
+     nocycle() - alter sequence to return an error after reaching maxvalue
+     instead of cycling
+
+
+     order('Y')/order('N') - alter sequence to guarantee/not guarantee
+     that sequence numbers are generated in the order of their request.
+     Note that order('N') and noorder() are equivalent.
+
+
+     order() - return current sequence's order flag
+
+
+     noorder() - alter sequence to not guarantee that sequence numbers are
+     generated in order of request
+
+
+     sequenceNameExists() - return 0 if current sequence's name does not
+     already exist as a sequence name, non-zero if it does
+
+
+     sequenceNameExists($S) - return 0 if $S does not exist as a sequence
+     name, non-zero if it does
+
+
+     getSequencesAref() - return an arrayRef of all existing sequence
+     names in the current schema
+
+
+     printSequences() - print all existing sequence names in the current
+     schema
+
+
+     info() - return a string containing information about the sequence
+
+
+     print() - print a string containing information about the sequence
+
+
+     drop() - drop the sequence
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1999 Doug Bloebaum. All rights reserved. This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+AUTHOR
+======
+
+   Doug Bloebaum <bloebaum@dma.org>
+
+
+File: pm.info,  Node: DBIx/Password,  Next: DBIx/Profile,  Prev: DBIx/OracleSequence,  Up: Module List
+
+Allows you to create a global password file for DB passwords
+************************************************************
+
+NAME
+====
+
+   DBIx::Password - Allows you to create a global password file for DB
+passwords
+
+SYNOPSIS
+========
+
+     use DBIx::Password;
+     my $dbh = DBIx::Password->connect($user);
+     my $dbh = DBIx::Password->connect_cached($user);
+     $dbh->getDriver;
+     DBIx::Password::getDriver($user);
+     DBIx::Password::checkVirtualUser($user);
+
+DESCRIPTION
+===========
+
+   Don't you hate keeping track of database passwords and such throughout
+your scripts? How about the problem of changing those passwords on a mass
+scale? This module is one possible solution. When you go to build this
+module it will ask you to create virtual users.  For each user you need to
+specify the database module to use, the database connect string, the
+username and the password. You will be prompted to give a name to this
+virtual user.  You can add as many as you like.
+
+   I would recommend that if you are only using this with web applications
+that you change the final permissions on this package after it is
+installed in site_perl such that only the webserver can read it.
+
+   A method called getDriver has been added so that you can determine what
+driver is being used (handy for working out database indepence issues).
+
+   If you want to find out if the virtual user is valid, you can call the
+class method checkVirtualUser().  It returns true (1) if the username is
+valid, and zero if not.
+
+   Once your are done you can use the connect method (or the connect_cache
+method) that comes with DBIx-Password and just specify one of the virtual
+users you defined while making the module.
+
+   BTW I learned the bless hack that is used from Apache::DBI so some
+credit should go to the authors of that module.  This is a rewrite of the
+module Tangent::DB that I did for slashcode.
+
+   Hope you enjoy it.
+
+INSTALL
+=======
+
+   Basically:
+
+   perl Makefile.PL
+
+   make
+
+   make test
+
+   make install
+
+   Be sure to answer the questions as you make the module
+
+HOME
+====
+
+   To find out more information look at:
+http://www.tangent.org/DBIx-Password/
+
+AUTHOR
+======
+
+   Brian Aker, brian@tangent.org
+
+SEE ALSO
+========
+
+   perl(1). DBI(3).
+
+
+File: pm.info,  Node: DBIx/Profile,  Next: DBIx/Renderer,  Prev: DBIx/Password,  Up: Module List
+
+DBI query profiler   Version 1.0
+********************************
+
+NAME
+====
+
+     DBIx::Profile - DBI query profiler
+     Version 1.0
+
+     Copyright (c) 1999,2000 Jeff Lathan, Kerry Clendinning.
+     All rights reserved.
+
+     This program is free software; you can redistribute it and/or modify it
+     under the same terms as Perl itself.
+
+SYNOPSIS
+========
+
+     use DBIx::Profile; or "perl -MDBIx::Profile <program>"
+     use DBI;
+     $dbh->printProfile();
+
+DESCRIPTION
+===========
+
+     DBIx::Profile is a quick and easy, and mostly transparent, profiler
+     for scripts using DBI.  It collects information on the query
+     level, and keeps track of first, failed, normal, and total amounts
+     (count, wall clock, cput time) for each function on the query.
+
+     NOTE: DBIx::Profile use Time::HiRes to clock the wall time and
+     the old standby times() to clock the cpu time.  The cpu time is
+     pretty coarse.
+
+     DBIx::Profile can also trace the execution of queries.  It will print
+     a timestamp and the query that was called.  This is optional, and
+     occurs only when the environment variable DBIXPROFILETRACE is set
+     to 1. (ex: (bash) export DBIXPROFILETRACE=1).
+
+     Not all DBI methods are profiled at this time.
+     Except for replacing the existing "use" and "connect" statements,
+     DBIx::Profile allows DBI functions to be called as usual on handles.
+
+     Prints information to STDERR, prefaced with the pid.
+
+RECIPE
+======
+
+     1) Add "use DBIx::Profile" or execute "perl -MDBIx::Profile <program>"
+     2) Optional: add $dbh->printProfile (will execute during
+        disconnect otherwise)
+     3) Run code
+     4) Data output will happen at printProfile or $dbh->disconnect;
+
+METHODS
+=======
+
+     printProfile
+        $dbh->printProfile();
+
+     Will print out the data collected.
+     If this is not called before disconnect, disconnect will call
+     printProfile.
+
+     setLogFile
+        $dbh->setLogFile("ProfileOutput.txt");
+
+     Will save all output to the file.
+
+AUTHORS
+=======
+
+     Jeff Lathan, lathan@pobox.com
+     Kerry Clendinning, kerry@deja.com
+
+     Aaron Lee, aaron@pointx.org
+     Michael G Schwern, schwern@pobox.com
+
+SEE ALSO
+========
+
+     L<perl(1)>, L<DBI>
+
+
+File: pm.info,  Node: DBIx/Renderer,  Next: DBIx/Renderer/Base,  Prev: DBIx/Profile,  Up: Module List
+
+talk SQL by using Perl data structures
+**************************************
+
+NAME
+====
+
+   DBIx::Renderer - talk SQL by using Perl data structures
+
+SYNOPSIS
+========
+
+     use DBIx::Renderer ':all';
+
+     # mandatory name
+     use constant TYPE_MANDNAME => ( VARCHAR(255), NOTNULL );
+
+     my $struct = [
+     	category => [
+     		id        => { TYPE_ID },
+     		name      => { TYPE_MANDNAME },
+     		parent_id => { INT4, INDEX },
+     	    ],
+     ];
+
+     my $renderer = DBIx::Renderer::get_renderer('Postgres');
+     print $renderer->create_schema($struct);
+
+DESCRIPTION
+===========
+
+   I got fed up with having to write different variants of SQL for
+different database engines. Also, I was looking for a way to specify a
+schema in Perl. The idea is that you construct data structures which are
+then rendered into the type of SQL appropriate for the target database
+server. Along the way we can make some optimizations and customizations,
+such as using database-specific features. For exmaple, we might make use
+of Postgres' array data types, but render them into weak relations for
+other servers.
+
+   Also, outputting the schema in XML might be useful.
+
+EXPORTS
+=======
+
+:all
+     Exports all the `DBIx::Renderer::Constants' constants and functions,
+     see its manpage for details.
+
+FUNCTIONS
+=========
+
+get_renderer($name)
+     Requests construction of a specific DBI renderer. The renderer is
+     constructed by called a new() constructor on the package
+     `DBIx::Renderer::$name'.
+
+TODO
+====
+
+test.pl
+     Write test cases.
+
+Renderers
+     Extend with renderers for other databases, also have an XML renderer.
+
+Specify relationships
+     Allow specification of weak relations or, in fact, any sort of
+     relations and have the necessary tables created automatically. This
+     would be the first step in integrating it with something like
+     `Class::DBI'.
+
+BUGS
+====
+
+   None known so far. If you find any bugs or oddities, please do inform
+the author.
+
+AUTHOR
+======
+
+   Marcel GrE<uuml>nauer <marcel@codewerk.com>
+
+COPYRIGHT
+=========
+
+   Copyright 2001 Marcel GrE<uuml>nauer. All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   perl(1), DBI(3pm).
+
+
+File: pm.info,  Node: DBIx/Renderer/Base,  Next: DBIx/Renderer/Constants,  Prev: DBIx/Renderer,  Up: Module List
+
+base class for DBI renderers
+****************************
+
+NAME
+====
+
+   DBIx::Renderer::Base - base class for DBI renderers
+
+SYNOPSIS
+========
+
+     package DBIx::Renderer::MyRenderer;
+     use base 'DBIx::Renderer::Base;
+
+DESCRIPTION
+===========
+
+   This base class for DBI renderers defines some general mechanisms that
+might be of use to actual renderers. It's not required that a specific
+renderer subclasses this class, but it does need to support the renderer
+API (which hasn't been formalized).
+
+METHODS
+=======
+
+new
+     Constructs the renderer object and returns it.
+
+_init
+     Object initialization. Does nothing in this class, but is called by
+     new(), so subclasses can override this method.
+
+create_index($indexname, $tablename, @fields)
+     Returns the SQL necessary to create an index called `$indexname' on
+     table `$tablename' for the specified fields. An example might be
+
+          CREATE INDEX product_idx ON product (title);
+
+create_table($tablename, $tabledef)
+     Returns the SQL necessary to create a table called `$tablename' using
+     field definitions given in the array reference `$tabledef'. Each
+     field definition is a hash with the fieldname being the key and the
+     field specification being the value. The field specification, in turn,
+     is a reference to an array consisting of attributes. The attributes
+     are themselves hashes with the key being the attribute name (e.g.,
+     'int4', 'bool', 'index', 'unique') and the value being the attribute
+     parameters (e.g. the size of varchar fields, or an id for grouping
+     index fields).
+
+     Instead of saying "hashes", I should really say key-value pairs, since
+     they are stored in a list. But they are interpreted as hashes.
+
+     All this sounds a bit abstract, so maybe looking at that data
+     structure helps. This has been produced with Data::Dumper but rolled
+     into hashes and lined up to make it more obvious what's going on.
+
+          use DBIx::Renderer ':all';
+
+          # mandatory name
+          use constant TYPE_MANDNAME => ( VARCHAR(255), NOTNULL );
+
+          my $struct = [
+          	    product => [
+          		    id         => { TYPE_ID },
+          		    name       => { TYPE_MANDNAME, INDEX },
+          		    short_desc => { TEXT },
+          		    long_desc  => { TEXT },
+          		    image      => { VARCHAR(255) },
+          		],
+          ];
+
+     constructs a structure looking like this:
+
+          product => [
+            id => {
+                'NOTNULL' => 1,
+                'type'    => 'INT4',
+                'PK'      => 1
+              },
+            name => {
+                'NOTNULL' => 1,
+                'size'    => 255,
+                'INDEX'   => 1,
+                'type'    => 'VARCHAR'
+              },
+            short_desc => {
+                'type'    => 'TEXT'
+              },
+            long_desc => {
+                'type'    => 'TEXT'
+              },
+            image => {
+                'size'    => 255,
+                'type'    => 'VARCHAR'
+              }
+          ];
+
+create_schema($schema)
+     Constructs all SQL commands necessary to create the specified database
+     schema. $schema is an array reference consisting of table definitions
+     as shown above. The method then calls `create_table' and create_index
+     to generate the SQL and returns the string.
+
+get_type_name($coldef)
+     Helper method that returns this SQL version's name for the type
+     specified in the column definition.
+
+find_fields($tabledef, $wanted)
+     Helper method that searches the given table definition for fields
+     whose definition have the `$wanted' attribute. For example, to find
+     all primary key fields of a table, use
+
+          @pk_fields = $self->find_fields($tabledef, 'PK');
+
+get_pk_fields($tabledef)
+     Helper method that returns a list of primary key fields for the given
+     table definition.
+
+get_index_fields($tabledef)
+     Helper method that returns a list of indexed fields for the given
+     table definition.
+
+get_attr_names($coldef)
+     Returns the SQL corresponding to a field's specification.
+
+     For example, the following field definition
+
+          name => {
+              'size'  => 255,
+              'type'  => 'VARCHAR'
+              'UNIQUE'=> 1,
+            }
+
+     might return
+
+          VARCHAR(255) UNIQUE
+
+get_attr($coldef)
+     Return a field's attributes by scanning the `$coldef' for attributes
+     as defined in `DBIx::Renderer::Constants'. The term 'attributes' is
+     used here to mean things like 'NOTNULL', 'UNIQUE', 'DEFAULT', but not
+     data types or whether the field is a primary key or indexed.
+
+get_const_name($const, @args)
+     This method takes a constant as defined in `DBIx::Renderer::Constants'
+     and an optional list of arguments (e.g., a varchar has the size as its
+     argument) and returns the appropriate name for this SQL version. The
+     default method implemented in this class, for example, returns
+     'VARCHAR(255)' when called as `get_const_name('VARCHAR', 255)'. Other
+     SQL dialects may have a different name for it.
+
+expand($l)
+     Helper function (not a method) that takes a scalar and recursively
+     expands array references to create a flat array reference, which it
+     returns. If the scalar isn't an array reference to begin with, it just
+     returns the scalar.
+
+     This function is useful for constructing the structures mentioned
+     above, since you can combine attributes by creating an array
+     reference containing them, but then inserting this combination into a
+     surrounding definition creates nested array references, so we use
+     this function to flatten them. Check the source for details.
+
+BUGS
+====
+
+   None known so far. If you find any bugs or oddities, please do inform
+the author.
+
+AUTHOR
+======
+
+   Marcel GrE<uuml>nauer <marcel@codewerk.com>
+
+COPYRIGHT
+=========
+
+   Copyright 2001 Marcel GrE<uuml>nauer. All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   perl(1), DBI(3pm), DBIx::Renderer(3pm), DBIx::Renderer::Constants(3pm).
+
+
+File: pm.info,  Node: DBIx/Renderer/Constants,  Next: DBIx/Renderer/Postgres,  Prev: DBIx/Renderer/Base,  Up: Module List
+
+constants for the DBI rendering framework
+*****************************************
+
+NAME
+====
+
+   DBIx::Renderer::Constants - constants for the DBI rendering framework
+
+SYNOPSIS
+========
+
+     use DBIx::Renderer ':all';
+
+     # mandatory name
+     use constant TYPE_MANDNAME => ( VARCHAR(255), NOTNULL );
+
+     my $struct = [
+     	    category => [
+     		    id        => { TYPE_ID },
+     		    name      => { TYPE_MANDNAME },
+     		    parent_id => { INT4, INDEX },
+     		],
+     ];
+
+DESCRIPTION
+===========
+
+   This module defines a range of constants and helper functions for use
+in writing and talking to DBI renderers. Typically you won't use this
+module directly, but import ':all' from `DBIx::Renderer', which passes
+this module's exports along.
+
+EXPORTS
+=======
+
+   The following constants and functions are exported:
+
+INT4 FLOAT4 TEXT BOOL TIMESTAMP
+     Constants for those data types; specific DBI renderers can then decide
+     how to render these constants in their SQL dialect. Actually they
+     return a hash element consisting of the key 'type' and the actual
+     constant as the value, so it doesn't make sense to specify more than
+     one type; the last one specified wins.
+
+CHAR($size) VARCHAR($size)
+     These aren't actually constants but functions that take the size as a
+     parameter, as shown in the synopsis. In addition to the 'type' hash
+     key and its value, these functions also return a 'size' hash key and
+     its value.
+
+DEFAULT
+     Like `CHAR' and `VARCHAR', this function returns a hash element with
+     'DEFAULT' as its key (as every field can have only one default value)
+     and the actual default as its value.
+
+NOTNULL UNIQUE PK INDEX
+     Defines constants for marking a field to be not nullable or to be
+     unique, or for specifying that this field is a primary key or that it
+     should be indexed. Per usual, these constants are a hash element with
+     the constant's name as the key and 1 as its value.
+
+TYPE_ID TYPE_FK
+     These two are "complex" types; a TYPE_ID being a not-nullable primary
+     key of type int4, and `TYPE_FK' being a notnullable int4 used as a
+     foreign key into some other table.
+
+get_types()
+     Returns a list of all possible data types.
+
+get_attrs()
+     Returns a list of all possible field attributes (such as 'not
+     nullable', 'unique value', 'has a default value').
+
+get_markers()
+     Returns a list of all field markers (such as 'primary key' or 'indexed
+     field').
+
+BUGS
+====
+
+   None known so far. If you find any bugs or oddities, please do inform
+the author.
+
+AUTHOR
+======
+
+   Marcel GrE<uuml>nauer <marcel@codewerk.com>
+
+COPYRIGHT
+=========
+
+   Copyright 2001 Marcel GrE<uuml>nauer. All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   perl(1), DBI(3pm), DBIx::Renderer(3pm).
+
+
+File: pm.info,  Node: DBIx/Renderer/Postgres,  Next: DBIx/Schema,  Prev: DBIx/Renderer/Constants,  Up: Module List
+
+DBI renderer for the Postgres SQL variant
+*****************************************
+
+NAME
+====
+
+   DBIx::Renderer::Postgres - DBI renderer for the Postgres SQL variant
+
+SYNOPSIS
+========
+
+     use DBIx::Renderer ':all';
+     my $struct = [ ... ];
+     my $renderer = DBIx::Renderer::get_renderer('Postgres');
+     print $renderer->create_schema($struct);
+
+DESCRIPTION
+===========
+
+   This is the renderer for the Postgres dialect of SQL. There's actually
+nothing to do, since `DBIx::Renderer::Base' is written to output Postgres'
+version of SQL, which should be largely compatible with other SQL
+versions; hence it all went into the base class.
+
+BUGS
+====
+
+   None known so far. If you find any bugs or oddities, please do inform
+the author.
+
+AUTHOR
+======
+
+   Marcel GrE<uuml>nauer <marcel@codewerk.com>
+
+COPYRIGHT
+=========
+
+   Copyright 2001 Marcel GrE<uuml>nauer. All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   perl(1), DBI(3pm), DBIx::Renderer(3pm), DBIx::Renderer::Base(3pm).
+
+
+File: pm.info,  Node: DBIx/Schema,  Next: DBIx/SearchBuilder,  Prev: DBIx/Renderer/Postgres,  Up: Module List
+
+An SQL Abstration layer for working with whole schemas
+******************************************************
+
+NAME
+====
+
+   DBIx::Schema - An SQL Abstration layer for working with whole schemas
+
+SYNOPSIS
+========
+
+     use Schema;
+     my $schema = DBIx::Schema->new({db=>'my_db',user=>'db_user',password=>'gigglesnark'});
+
+   ***
+
+     my $schema = DBIx::Schema->new($my_dbix_abstract_handle);
+
+     $sth = $schema->select({table=>'product', where=>{'product.id'=>['<',6]}});
+     while (my $row = $sth->fetchrow()) {
+       print $row->{'name'}."\n";
+       print $row->color->{'name'}."\n";
+       print $row->{'price'}."\n";
+       print $row->{'fish'}."\n";
+     }
+
+DESCRIPTION
+===========
+
+   Basically, this module lets you construct and use DBI-style statement
+handles involving arbitrarily large schemas of related SQL tables without
+concern about how exactly they're related; in essence, it builds the join
+clauses for you, as necessary, from case to case. This can be a boon to
+programs that want to knit together their own complex, relational SQL
+queries on the fly; through the use of this module, if they know that some
+tables are somehow related, even if they're two or more steps removed from
+one another, they can simply name them, and start pulling out data
+toot-suite.
+
+   Of course, you will need to prepare your databases with some metadata
+tables ahead of time in order for any of this to work. See the DATABASE
+PREPARATION section below for more.
+
+PREREQUISITES
+=============
+
+   You most certainly need DBI (as well as appropriate DBD modules for
+your setup) for this to work.
+
+   At this time, you also need Andrew Turner's DBIx::Abstract module. Much
+of the user-level syntax for this module is inherited from it, so it's
+good to be familiar with it, as well. This, like DBI and DBD, is available
+from CPAN.
+
+DATABASE PREPARATION
+====================
+
+   You will need to create three SQL tables in every database to which
+you'd like to apply this module. These will act as a data dictionary for
+all contents of the database. They will be called md_table, md_field, and
+md_relation ('md' stands for 'metadata').
+
+   You should have received a Perl script named md_rip.pl as part of the
+distribution within which you got this module. Running it will create
+these tables inside a given database if they're not already present, or
+rebuild and repopulate them if they are. See its perldocs for more
+information on its usage.
+
+   Note that at this time you must name your each of tables' primary key
+column 'id' for md_rip.pl to work, and you also must name columns relating
+to them "${table_name}_id". So a column in the 'foo' table relating to the
+'baz' table's primary key must be named 'baz_id'. Of course, it's not a
+very complicated script, so you can hack it to behave differently. :)
+Future versions will be more flexible.
+
+METHODS
+=======
+
+Schema handle Methods
+---------------------
+
+new
+     This is the schema object constructor. It requires, as an argument,
+     either a DBIx::Abstract database handle object, or a hashref ready for
+     feeding to DBIx::Abstract's 'connect' method.
+
+connect
+     An alias to the 'new' method. Takes the same arguments, returns the
+     same thing.
+
+select
+     Returns a statement handle object, primed with an SQL query and ready
+     for fetchrow calls (see below).
+
+     This method takes one hashref as an argument. You must specify a table
+     that you will be seleting from with the 'table' key.  You can specify
+     multiple tables by using the 'tables' key instead.  You should only
+     need to specify a 'tables' key if you are using a table that is
+     invisible to schema (for instance, if it is in a scalar where).
+
+     Optionally, you can have a 'where' key, which will be passed on to the
+     underlying DBIx::Abstract object, so see that module. Note that this
+     key's value needs only to hold the limit on results, the aspect of the
+     where necessary to join tables will be generated by schema for you.
+
+     For example:
+
+          $sth = $schema->select({table=>'product', where=>{'product.id'=>['<',6]}});
+
+     You can also specify a list of fields to be included beyond the normal
+     ones.  This allows you to do some special things like:
+
+          $sth = $schema->select({
+              table=>'product',
+              fields=>[
+                  'lower(substring(product.name,1,1)) as 'product.letter',
+                  'substring(product.description,1,50) as 'product.shortdesc',
+                  ],
+              where=>{'product.id'=>['<',6']},
+              });
+
+flush_cache
+     The object keeps an internal cache to help it crawl through the
+     database's relationships faster, but it doesn't check to see if the
+     database's structure may have changed since the last time it performed
+     a full crawl. Calling this method deletes the cache, forcing the
+     object to reexamine the actual tables and start a new cache the next
+     time it needs to know their structure.
+
+Statement handle Methods
+------------------------
+
+fetchrow
+     Returns a row object, or undef if no rows are available.
+
+     As with DBI (and DBIx::Abstract), subsequent calls to fetchrow return
+     the next row available to this statement handle, and undef once all
+     rows have been exhausted (or no rows were available in the first
+     place). Thus, a common code idiom is a while() loop, something like:
+
+          while (my $row = $sth->fetchrow()) {
+            # Do something with data from this row
+            my $id = $row->{'id'};
+            my $foo = $row->{'foo'};
+            print "The value of foo for row $id is $foo. \n";
+          }
+
+rows
+     Returns the number of rows returned from the SQL query within this
+     statement handle.
+
+key_table
+     Returns, as a string, the name of the handle's key table.
+
+Row objects
+-----------
+
+   Row object methods are special; see below.
+
+sth
+     Returns the statement handle from which this row emerged.
+
+   Row objects don't have any predefined methods (except for 'sth'). You
+can fetch data from them through directly accessing their instance
+variables (hash keys), one of which will exist for each column of the row.
+
+   For example, if a row represented with object $row has a 'foo' column,
+that column's value is available through $row->{'foo'}.
+
+   You can also pull additional statement handles out of a row by invoking
+them as methods; an AUTOLOAD method inside the row object will take care
+of the rest for you, and return a statement handle primed with the named
+table as the key table, and with a where clause identical to that of the
+row's statement handle, *with the addition of* a phrase requiring that the
+current key table's id field match this row's value of same.
+
+   For example:
+
+     # I already have a $schema object defined.
+     # I'll make a simple statement handle.
+
+     $sth = $schema->select({table=>'product', where=>{'product.price'=>['<',6]}});
+     # OK, $sth is now primed to return all products costing less than
+     # $6.00.
+     
+     while (my $product_row = $sth->fetchrow) {
+       print "I am on product ".$product_row->{'name'}."\n";
+       # Let's say I have a many-to-many relationship in my schema that
+       # allows products to exist in any number of categories. I want to
+       # display all categories to which this product belongs. The current
+       # statement handle doesn't know or care about categories, so it's
+       # time to pull out a new one.
+       if ($product_row->category->rows) {
+         print "It is in the following categories:\n";
+         while (my $cat_row = $product_row->category->fetchrow) {
+           print $cat_row->{'name'}."\n";
+         }
+       } else {
+         print "It is not in any category.\n";
+     }
+
+CAVEATS
+=======
+
+   I find the row object as it now stands a little sketchy due to the fact
+that it's essentially user-definable, since its instance variables and
+legal method names will depend on the nature of the data fetched from its
+statement handle. This requires that its actual methods, 'AUTOLOAD' and
+'sth' (and whatever might be added in the future) be reserved words. So,
+for now, don't name your tables after the Row class's methods. (Not that
+you'd want to, since they'd make pretty lousy table names, in my humble
+opinion)
+
+TODO
+====
+
+   It seems to warn about 'Unknown where piece' a bit too often, and
+unnecessarily.
+
+   The format of the data dictionaries needs to be far more configurable
+than it now is.
+
+BUGS
+====
+
+   This software is quite young, having received testing with only a
+handful of database systems and Perl versions, and having only a few users
+at the time of this writing (though it is in use in a production
+environment). The author welcomes bug reports and other feedback at the
+email address listed below.
+
+AUTHOR
+======
+
+   Jason McIntosh <jmac@jmac.org>
+
+HOMEPAGE
+========
+
+   http://www.jmac.org/projects/DBIx-Schema/
+
+VERSION
+=======
+
+   This documentation corresponds with version 0.06 of DBIx::Schema.
+
+COPYRIGHT
+=========
+
+   This software is copyright (c) 2000 Adelphia.
+
+   This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: DBIx/SearchBuilder,  Next: DBIx/SearchBuilder/Handle,  Prev: DBIx/Schema,  Up: Module List
+
+Perl extension for easy SQL SELECT Statement generation
+*******************************************************
+
+NAME
+====
+
+   DBIx::SearchBuilder - Perl extension for easy SQL SELECT Statement
+generation
+
+SYNOPSIS
+========
+
+     use DBIx::SearchBuilder;
+
+     ...
+
+DESCRIPTION
+===========
+
+CleanSlate
+----------
+
+   This completely erases all the data in the SearchBuilder object. It's
+useful if a subclass is doing funky stuff to keep track of a search
+
+Next
+----
+
+   Returns the next row from the set as an object of the type defined by
+sub NewItem.  When the complete set has been iterated through, returns
+undef and resets the search such that the following call to Next will
+start over with the first item retrieved from the database.
+
+GotoFirstItem
+-------------
+
+   Starts the recordset counter over from the first item. the next time
+you call Next, you'll get the first item returned by the database, as if
+you'd just started iterating through the result set.
+
+GotoItem
+--------
+
+   Takes an integer, n.  Sets the record counter to n. the next time you
+call Next, you'll get the nth item.
+
+First
+-----
+
+   Returns the first item
+
+ItemsArrayRef
+-------------
+
+   Return a refernece to an array containing all objects found by this
+search.
+
+NewItem
+-------
+
+     NewItem must be subclassed. It is used by DBIx::SearchBuilder to create record
+     objects for each row returned from the database.
+
+RedoSearch
+----------
+
+   Takes no arguments.  Tells DBIx::SearchBuilder that the next time it's
+asked for a record, it should requery the database
+
+UnLimit
+-------
+
+   UnLimit clears all restrictions and causes this object to return all
+rows in the primary table.
+
+Limit
+-----
+
+   Limit takes a paramhash.
+
+   # TABLE can be set to something different than this table if a join is
+# wanted (that means we can't do recursive joins as for now).  Unless
+
+   # ALIAS is set, the join criterias will be taken from EXT_LINKFIELD #
+and INT_LINKFIELD and added to the criterias.  If ALIAS is set, new #
+criterias about the foreign table will be added.
+
+   # VALUE should always be set and will always be quoted.
+
+   # IMO (TobiX) we # shouldn't use quoted values, we should rather use
+placeholders and # pass the arguments when executing the statement.  This
+will also # allow us to alter limits and reexecute the search with a low
+cost by # keeping the statement handler.
+
+   # ENTRYAGGREGATOR can be AND or OR (or anything else valid to aggregate
+two clauses in SQL
+
+   # OPERATOR is whatever should be putted in between the FIELD and the #
+VALUE.
+
+ShowRestrictions
+----------------
+
+   Returns the current object's proposed WHERE clause.
+
+   Deprecated.
+
+ImportRestrictions
+------------------
+
+   Replaces the current object's WHERE clause with the string passed as
+its argument.
+
+   Deprecated
+
+Orderby PARAMHASH
+-----------------
+
+   Orders the returned results by ALIAS.FIELD ORDER. (by default 'main.id
+ASC')
+
+   Takes a paramhash of ALIAS, FIELD and ORDER.  ALIAS defaults to main
+FIELD defaults to the primary key of the main table.  ORDER defaults to
+ASC(ending).  DESC(ending) is also a valid value for OrderBy
+
+_OrderClause
+------------
+
+   returns the ORDER BY clause for the search.
+
+NewAlias
+--------
+
+   Takes the name of a table.  Returns the string of a new Alias for that
+table, which can be used to Join tables or to Limit what gets found by a
+search.
+
+Join
+----
+
+   Join instructs DBIx::SearchBuilder to join two tables.  It takes a
+param hash with keys ALIAS1, FIELD1, ALIAS2 and FIELD2.
+
+   ALIAS1 and ALIAS2 are column aliases obtained from $self->NewAlias or a
+$self->Limit FIELD1 and FIELD2 are the fields in ALIAS1 and ALIAS2 that
+should be linked, respectively.
+
+RowsPerPage
+-----------
+
+   Limits the number of rows returned by the database.  Optionally, takes
+an integer which restricts the # of rows returned in a result Returns the
+number of rows the database should display.
+
+FirstRow
+--------
+
+   Get or set the first row of the result set the database should return.
+Takes an optional single integer argrument. Returns the currently set
+integer first row that the database should return.
+
+_ItemsCounter
+-------------
+
+   Returns the current position in the record set.
+
+Count
+-----
+
+   Returns the number of records in the set.
+
+IsLast
+------
+
+   Returns true if the current row is the last record in the set.
+
+AUTHOR
+======
+
+   Jesse Vincent, jesse@fsck.com
+
+SEE ALSO
+========
+
+   DBIx::SearchBuilder::Handle, DBIx::SearchBuilder::Record, perl(1).
+
+
+File: pm.info,  Node: DBIx/SearchBuilder/Handle,  Next: DBIx/SearchBuilder/Handle/Oracle,  Prev: DBIx/SearchBuilder,  Up: Module List
+
+Perl extension which is a generic DBI handle
+********************************************
+
+NAME
+====
+
+   DBIx::SearchBuilder::Handle - Perl extension which is a generic DBI
+handle
+
+SYNOPSIS
+========
+
+     use DBIx::SearchBuilder::Handle;
+
+     my $Handle = DBIx::SearchBuilder::Handle->new();
+     $Handle->Connect( Driver => 'mysql',
+     		   Database => 'dbname',
+     		   Host => 'hostname',
+     		   User => 'dbuser',
+     		   Password => 'dbpassword');
+
+DESCRIPTION
+===========
+
+   Jesse's a slacker.
+
+   Blah blah blah.
+
+AUTHOR
+======
+
+   Jesse Vincent, jesse@fsck.com
+
+   =cut
+
+   # }}}
+
+   # {{{ sub new
+
+new
+---
+
+   Generic constructor
+
+Connect PARAMHASH: Driver, Database, Host, User, Password
+---------------------------------------------------------
+
+   Takes a paramhash and connects to your DBI datasource.
+
+RaiseError [MODE]
+-----------------
+
+   Turns on the Database Handle's RaiseError attribute.
+
+PrintError [MODE]
+-----------------
+
+   Turns on the Database Handle's PrintError attribute.
+
+Disconnect
+----------
+
+   Disconnect from your DBI datasource
+
+dbh [HANDLE]
+------------
+
+   Return the current DBI handle. If we're handed a parameter, make the
+database handle that.
+
+UpdateRecordValue
+-----------------
+
+   Takes a hash with fields: Table, Column, Value PrimaryKeys, and
+IsSqlFunction.  Table, and Column should be obvious, Value is where you
+set the new value you want the column to have. The primary_keys field
+should be the lvalue of DBIx::SearchBuilder::Record::PrimaryKeys().
+Finally sql_function_p is set when the Value is a SQL function.  For
+example, you might have ('Value'=>'PASSWORD(string)'), by setting
+sql_function_p that string will be inserted into the query directly rather
+then as a binding.
+
+UpdateTableValue TABLE COLUMN NEW_VALUE RECORD_ID IS_SQL
+--------------------------------------------------------
+
+   Update column COLUMN of table TABLE where the record id = RECORD_ID.
+if IS_SQL is set, don\'t quote the NEW_VALUE
+
+SimpleQuery QUERY_STRING, [ BIND_VALUE, ... ]
+---------------------------------------------
+
+   Execute the SQL string specified in QUERY_STRING
+
+FetchResult QUERY, [ BIND_VALUE, ... ]
+--------------------------------------
+
+   Takes a SELECT query as a string, along with an array of BIND_VALUEs
+Returns the first row as an array
+
+SEE ALSO
+========
+
+   perl(1), *Note DBIx/SearchBuilder: DBIx/SearchBuilder,
+
+
+File: pm.info,  Node: DBIx/SearchBuilder/Handle/Oracle,  Next: DBIx/SearchBuilder/Handle/Pg,  Prev: DBIx/SearchBuilder/Handle,  Up: Module List
+
+Connect PARAMHASH: Driver, Database, Host, User, Password
+---------------------------------------------------------
+
+   Takes a paramhash and connects to your DBI datasource.
+
+Insert
+------
+
+   Takes a table name as the first argument and assumes that the rest of
+the arguments are an array of key-value pairs to be inserted.
+
+an oracle specific Handle object
+********************************
+
+NAME
+====
+
+     DBIx::SearchBuilder::Handle::Oracle -- an oracle specific Handle object
+
+SYNOPSIS
+========
+
+     =head1 DESCRIPTION
+
+AUTHOR
+======
+
+   Jesse Vincent, jesse@fsck.com
+
+SEE ALSO
+========
+
+   perl(1), DBIx::SearchBuilder
+
+

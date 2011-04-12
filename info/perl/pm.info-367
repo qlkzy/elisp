@@ -1,0 +1,1724 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Text/Bastardize,  Next: Text/Bind,  Prev: Text/BasicTemplate,  Up: Module List
+
+a corruptor of innocent text
+****************************
+
+NAME
+====
+
+   *Text::Bastardize* - a corruptor of innocent text
+
+SYNOPSIS
+========
+
+     #!/usr/bin/perl -w
+     use strict;
+     use Text::Bastardize;
+
+     my $text = new Text::Bastardize;
+     while (my $line = <>) {
+     	$text->charge($line);
+     	$text->k3wlt0k();
+     }
+
+DESCRIPTION
+===========
+
+   *Bastardize* provides an magical object into which text can be charged
+and then returned in various, slighty modified ways.
+
+   *Bastardize* has the following methods
+
+new
+     new creates the array object.
+
+charge
+     charge defines the object's value, and is the reccomended way to do
+     so.
+
+peek
+     peek returns the object's value.
+
+rdct
+     rdct converts english to hyperreductionist english.
+
+     (ex. "english" becomes "")
+
+pig
+     pig pig latin.
+
+     (ex. "hi there" becomes "ihay erethay")
+
+k3wlt0k
+     k3wlt0k a k3wlt0kizer developed originally by Fmh.
+
+     The SYNOPSIS has an example of k3wlt0k in use, try tossing that into
+     a file and running it with "sh|perl *k3wlt0k-filename*" :-)
+
+rot13
+     rot13 implements rot13 "encryption" in perl.
+
+     (ex. "foo bar" becomes "sbb one")
+
+rev
+     rev reverses the arrangement of characters.
+
+censor
+     censor attempts to censor text which might be innaproriate.
+
+n20e
+     n20e performs numerical abbreviations.
+
+     (ex. "numerical_abbreviation" becomes "n20e")
+
+
+File: pm.info,  Node: Text/Bind,  Next: Text/Boilerplate,  Prev: Text/Bastardize,  Up: Module List
+
+Bind Perl structures to text files
+**********************************
+
+NAME
+====
+
+   Text::Bind - Bind Perl structures to text files
+
+SYNOPSIS
+========
+
+     use Text::Bind;
+
+     # Create a new object
+     $text = new Text::Bind;              	# or
+     $text = new Text::Bind "page.html"		# or
+     $text = new Text::Bind \*IN;
+
+     # Bind a string value to a data site
+     $text->bind_site("astring", "Hello World!");
+
+     # Bind a function to a data site
+     $text->bind_site("form", \&generate_form);
+
+     # Bind a filehandle to a data site
+     $text->bind_site("filehandle", \*FILE);
+
+     # Bind an object to a data site
+     $some_object = new SomeClass;
+     $text->bind_site("object", $some_object);
+
+     # Read text
+     $text->read_text(\*OUT, "page.html");	# or
+     $text->read_text(\*OUT, \*IN);		# or
+     $text->read_text(\*OUT);   			# or
+     $text->read_text;
+
+DESCRIPTION
+===========
+
+   *Text::Bind* allows you to bind Perl structures (strings, routines,
+filehandles, objects) to specific locations (called *data sites*) in text
+files.
+
+   The main purpose of this module is to support HTML templates for CGI
+programs.  Therefore, HTML pages design can be kept separate from CGI
+code.  However, the class is general enough to be used in other contexts
+than CGI application development.  For example, it could be used to do
+form letters.
+
+   To create a new object, do one of the following:
+
+     $text = new Text::Bind;
+     $text = new Text::Bind $filename;
+     $text = new Text::Bind \*FILE;
+
+   If no argument is given during object instantiation, then the input
+must be specified during the *read_text* method.  Otherwise, a filename or
+a filehandle can be listed to specify the input source of the text data.
+
+   To have the data processed, use the *read_text* method in one of the
+following ways:
+
+     $text->read_text;
+     $text->read_text(\*OUT);
+     $text->read_text(\*OUT, $filename);
+     $text->read_text(\*OUT, \*FILE);
+
+   When called with no arguments, input is read from what is specified
+during object instantiation, and output goes to STDOUT.  If arguments are
+specified, the first argument is the output filehandle.  If undefined,
+STDOUT is used.  The second argument is the filename or the filehandle of
+the input.  If not defined, input is read from what is specified during
+object instantiation.
+
+   The syntax for specifying data sites in the input and how to bind Perl
+structures to those sites is covered in the following sections.
+
+Data Site Syntax
+================
+
+   To define a data site, the syntax is as follows:
+
+     ##PL_name=value##
+
+   where the components mean the following:
+
+`##PL_'
+     Start of a data site.
+
+name
+     Type name of the site, possible values:
+
+    site
+          Specifies a labeled data site where the data for the site
+          determined thru the bind_site method.
+
+    file
+          Specifies the name of file that defines the contents of the data
+          site.  Works in a similiar manner as HTTP server-side file
+          include directive.  If a trailing pipe is included in the value,
+          then the value is treated as program to invoke, and the output
+          of the program is used to fill the site.
+
+    `beginloop'
+          The start of a repeatable loop.  Text following, and up to the
+          end-of-loop data site, is treated as a repeatable segment.  See
+          `"Data Site Loops"' in this node for more information.
+
+    `endloop'
+          The end point of a repeatable loop.  See `"Data Site Loops"' in
+          this node for more information.
+
+     The name is case insensitive.
+
+=
+     Separator of name and value.
+
+value
+     String value associated with name.  Value is case sensitive.
+
+`##'
+     End of data site.
+
+   Data sites that do not have a binding during processing of text input
+are expanded to the empty string.
+
+   Duplicate sites can occur.  The binding will be reexecuted each time
+the site occurs.
+
+Example data sites
+------------------
+
+   A data site for an HTML form:
+
+     <html>
+     <body>
+     ##PL_site=inputform##
+     </body>
+     </html>
+
+   The call to bind_site may look like:
+
+     $text->bind_site("inputform", \&create_form)
+
+   The following shows how a file can bound to a site:
+
+     <html>
+     <body>
+     ...
+     <hr>
+     ##PL_file=copyright.html##
+     </body>
+     </html>
+
+   The contents of `copyright.html' will replace the site definition.
+
+   The following shows how the output of a program can be included:
+
+     ##PL_file=/bin/ls -l |##
+
+Data Site Bindings via bind_site Method
+=======================================
+
+   The *bind_site* method takes 2 arguments, the name of the site to bind
+to and a value to define the value of the site during the read_text
+method.  Example:
+
+     $text->bind_site($name, $bind);
+
+   The $name of the data site corresponds to the value of a
+##PL_site=value## data site.
+
+   The bind value can be one of the following Perl data structures:
+
+scalar string
+     The data site is replaced with the value of the scalar string.
+
+function
+     A reference to a function.  The function is invoked as follows:
+
+          &func($textobj, $outfh, $site_name);
+
+     Where, $textobj is the Text::Bind object.  $outfh is the output
+     filehandle.  The function uses $outfh to output the data that should
+     go in the location of the data site.  For example:
+
+          print $outfh "... data here ...";
+
+     $site_name is the name of the site the function is being called for.
+
+     Since the Text::Bind object is passed to the function, the function
+     can change bindings.  Any changes will affect any data sites following
+     the site being processed.
+
+     Additional arguments can be passed to the bind_site method when
+     binding a function.  For example:
+
+          $text->bind_site($site_name, \&func, $arg1, $arg2);
+
+     A copy of those arguments will be passed as extra arguments when the
+     function is invoked.  Continuing with the previous example, the
+     function would be called as follows:
+
+          &func($page_obj, $outfh, $site_name, $arg1, $arg2);
+
+     Since the function may only exist for the purpose of filling the
+     contents of a site, an anonymous function can be passed instead of a
+     named function.  For example:
+
+          $text->bind_site($site_name, sub {
+          	my($txtobj, $fh, $site) = @_;
+
+          ## ... code here ...
+              });
+
+     Note, the return value of the function is used within in data site
+     loops.  See `"Data Site Loops"' in this node for more information.
+
+filehandle
+     A reference to a filehandle (technically a reference to a glob of a
+     filehandle).  The filehandle is read until EOF and any data read goes
+     in the location of the site.
+
+object
+     An object reference.  Text::Bind will attempt to call the method
+     *fill_site* of the object.  Therefore, the object must have defined a
+     method called fill_site, or a runtime error will occur.
+
+     The method is invoked with the same arguments as in a function
+     binding:
+
+          $object->fill_site($page_obj, $outfh, $site_name);
+
+     Any additional arguments passed during the bind_site call will be
+     passed to the registered object's fill_site method like in function
+     bindings:
+
+          $object->fill_site($page_obj, $outfh, $site_name,
+          		       $arg1, $arg2, ..., $argN);
+
+     Note, the return value of the *fill_site* method is used within in
+     data site loops.  See `"Data Site Loops"' in this node for more
+     information.
+
+array
+     Actually, a reference to an array.  The values of the array are
+     iterated over each time the data site is evaluated.  The items in the
+     array can be scalar strings, functions, filehandles, or objects, as
+     defined above.
+
+     Binding an array to a site is most applicable for loops created by
+     `##PL_beginloop##'.  See `"Data Site Loops"' in this node for more
+     information.
+
+Data Site Loops
+===============
+
+   Occasionally, there is a need to have a block of text be repeatable.
+For example, lets take the following text data:
+
+     ##PL_beginloop##Item = ##PL_site=listvalue##
+     ##PL_endloop##
+
+   And the following bindings:
+
+     $text->bind_site('listvalue', [ 1, 2, 3, 4 ]);
+
+   Will generated the following output:
+
+     Item = 1
+     Item = 2
+     Item = 3
+     Item = 4
+
+   The text between the begin and end data sites is repeated until the
+evaluation of ALL data sites within the loop generate no more data.
+
+   Within a loop, types of data sites are treated as follows:
+
+scalar string
+     Will always be printed.  However, a scalar string data site will
+     always be treated to have no more data when determine end of loop
+     condition.
+
+function or object
+     Will always be invoked.  However, the return value is check to
+     determine if the last value has been generated for the data site.  A
+     return value of false tells `Text::Bind' that no more data exists for
+     this site.
+
+     WARNING: If the loop contains multiple data sites, it is possible
+     that a function, or object method, will be called again if the other
+     sites have not signified an end of data condition.  Hence, the
+     function/method should still return a false value for the duraction of
+     the loop.
+
+filehandle
+     Will always be printed.  However, a filehandle data site will always
+     be treated to have no more data when determine end of loop condition.
+     Also, since the EOF condition will be set after the first evaluation
+     of the data site, subsequent evaluation will generate no data unless
+     something resets the filehandle.
+
+array
+     The items of the array are iterated over until end of the array is
+     reached.  Once the last item is reached, the end of data condition is
+     set for the site.
+
+Loop Examples
+-------------
+
+   A good example of loops is when populating an HTML table with data:
+
+     <table>
+     ##PL_beginloop##
+     <tr>
+     <td>##PL_site=lastname##</td>
+     <td>##PL_site=firstname##</td>
+     <td>##PL_site=street##</td>
+     <td>##PL_site=city##</td>
+     <td>##PL_site=state##</td>
+     <td>##PL_site=zip##</td>
+     </tr>
+     ##PL_endloop##
+
+LIMITATIONS
+===========
+
+   * Data site loops cannot be nested.
+
+   * Multiple data site loops cannot exist on a single line.
+
+AUTHOR
+======
+
+   Earl Hood, earlhood@bigfoot.com
+
+   http://www.oac.uci.edu/indiv/ehood
+
+
+File: pm.info,  Node: Text/Boilerplate,  Next: Text/CSV,  Prev: Text/Bind,  Up: Module List
+
+format a script's output without programming
+********************************************
+
+NAME
+====
+
+   Text::Boilerplate - format a script's output without programming
+
+SYNOPSIS
+========
+
+     use Text::Boilerplate;
+
+     # Create a Boilerplate from a text string
+     $boiler = new Text::Boilerplate $text;
+
+     # Create a Boilerplate by loading a file
+     $boiler = Text::Boilerplate->load($filename);
+
+     # Create a Boilerplate by loading from a filehandle
+     $boiler = Boilerplate->load(\*FILEHANDLE);
+
+     # Fill in all tags in a Boilerplate
+     print STDOUT $boiler->fill({
+         'Tag Name'  => $value,
+         'Tag Name2' => $value,
+         'Tag Name3' => [
+             { Subtag1 => $subval, Subtag2 => $subval2 },
+             { Subtag1 => $subval3, Subtag2 => $subval4 }
+         ],
+     });
+
+     # Get the Perl code to produce the Boilerplate
+     $boiler->code();
+
+     # Get information on the tags in the Boilerplate
+     $boiler->tag_info();
+
+DESCRIPTION
+===========
+
+   Boilerplates let you separate what a script does from what its output
+looks like, using a simple mark-up language which is easy for
+non-programmers to learn.  Using Boilerplates can make creating and
+maintaining dynamic web pages and e-mail messages much easier.
+
+Using the Boilerplate Mark-Up System
+------------------------------------
+
+   The Boilerplate mark-up system is designed to allow the look and feel
+for script-generated text (i.e. dynamic HTML pages, form letters, etc.) to
+be designed by someone who doesn't know how to program.
+
+   Say, for example, that you need to develop a CGI script for a local
+bookstore that lists their top three best-selling books, plus their
+customer of the week.  If, like me, you have no real aptitude for HTML
+page design, you'd probably have someone else design the actual page,
+which, let's say, should look like this:
+
+     <HTML>
+     
+     <HEAD>
+         <TITLE>Boring Bookshop</TITLE>
+     </HEAD>
+     
+     <BODY>
+         <H1>Boring Books</H1>
+
+     <P>
+         <B>Customer Of The Week:</B> Bob Smeed
+     </P>
+
+     <P>
+         <B>Top Three Best-Selling Books</B>
+
+     1. <I>Book Title #1</I> by Author<BR>
+     2. <I>Book Title #2</I> by Author #2<BR>
+     3. <I>Book Title #3</I> by Author #3<BR>
+             </P>
+         </BODY>
+
+     </HTML>
+
+   Well, you could just hard-code the HTML into your script with print
+statements.  Sooner or later, though, Boring Books is going to want
+changes made to the HTML.  If this were an ordinary web page, they could
+simply ask a page designer to make whatever fixes they want (e.g. putting
+their logo on top, putting the top-selling books into an HTML table,
+changing the background, etc.) without bothering you, the programmer.  In
+this case, though, the HTML is buried inside a script, and even if the
+graphics person is willing to make changes to your code, there's a strong
+possibility that they might introduce errors into your script whenever
+they edit it.
+
+   That's where the Boilerplate mark-up system comes in.  Instead of
+sticking your HTML in the script, you could create a separate text file,
+consisting of:
+
+     <HTML>
+     <HEAD>
+             <TITLE>Boring Bookshop</TITLE>
+         </HEAD>
+     <BODY>
+             <H1>Boring Books</H1>
+
+     <P>
+         <B>Customer Of The Week:</B> [* "Customer" *]
+     </P>
+
+     <P>
+         <B>Top Three Best-Selling Books</B>
+         [* REPEAT NAME="Top Books" *]
+             [* "Rank" *]. <I>[* "Title" *]</I>
+             by [* "Author" *]<BR>
+         [* /REPEAT *]
+     </P>
+         </BODY>
+
+     </HTML>
+
+   Then, in your script, add a few lines to load this file from disk and
+fill it in with book titles and so forth.  Assuming you named the above
+file "boringbooks.html", the code would look something like this:
+
+     use Text::Boilerplate;
+
+     # Do whatever is necessary to figure out the top-selling
+     # books and customer of the week, print the HTML header,
+     # etc.
+
+     # Load the Boilerplate from its file
+     $boiler = Text::Boilerplate->load('./boringbooks.html');
+
+     # Print out the Boilerplate, filling in books
+     # and customer
+     print STDOUT $boiler->fill({
+         'Customer'  => $customer,
+         'Top Books' => \@books_info,      # @books_info:
+                                           # A list of hashes a la
+        });                                    # { 'Rank' => $rank,
+                                           #   'Title' => $title,
+                                           #   'Author => $author }
+
+Efficiency
+----------
+
+   The Boilerplate system is designed to fill in values extremely quickly,
+at the expense of some additional time taken during initialization.
+Therefore, to get the most out of it, try to use as few 'load's or 'new's
+as possible, and as many 'fill's as you want.  In CGI scripts, a good way
+of doing this is to use FastCGI, like so:
+
+     use CGI::Fast;
+     use Text::Boilerplate;
+
+     # Load the boilerplate for our dynamic page
+     $boiler = Boilerplate->new(<<EOF);
+     <HTML>
+     <HEAD><TITLE>Greetings</TITLE></HEAD>
+     <BODY>Hello, [* VALUE NAME="User Name" *]</BODY>
+     </HTML>
+     EOF
+
+     # Start accepting web hits
+     while ($form = new CGI::Fast) {
+     
+         # Print 'em out a personalized page, assuming that
+         # they entered 'Name' on a previous form
+         print $form->header();
+         print $boiler->fill({'User Name' => $form->param('Name')});
+     }
+
+METHODS
+=======
+
+   Text::Boilerplate encapsulates a number of different modules allowing
+you to create, learn about, and fill in boilerplate text.
+
+Static Methods
+--------------
+
+new()
+     Arguments: $text
+
+     Creates a new Text::Boilerplate from a scalar.  For example:
+
+          $form_ltr = new Text::Boilerplate("Dear [* 'Name' *],");
+
+     This would create a new Text::Boilerplate with a VALUE fill-in tag
+     named 'Name'.
+
+load()
+     Arguments: $filename
+
+     Loads in a Text::Boilerplate from a text file or filehandle.  For
+     example:
+
+          $boiler = Text::Boilerplate->load('page1.boil');
+
+     Load() croaks if it can't open the file.  I don't know if this is a
+     bug or a feature.
+
+     If you already have a filehandle open containing boilerplate text,
+     you can pass load() a filehandle reference, like this:
+
+          $boiler = Text::Boilerplate->load(\*DATA);
+
+     This could be helpful if you want to store Text::Boilerplate data at
+     the end of your script.  (Although this *would* defeat the purpose a
+     bit...)
+
+fill()
+     Fills in all of the tags in a Boilerplate with the data provided to
+     it, formatted appropriately, and returns the text of the filled-in
+     Boilerplate.  Example:
+
+          $boiler = Text::Boilerplate->new(<<EOF);
+          In Xanadu did [* VALUE NAME="Person" *]
+          A stately [* VALUE NAME="Item" *] decree...
+          EOF
+
+          $filled_boiler = $boiler->fill({
+              'Person' => 'Kubla Khan',
+              'Item'   => 'Pleasure-Dome',
+          });
+
+     $filled_boiler is now:
+
+          In Xanadu did Kubla Khan
+          A stately Pleasure-Dome decree...
+
+     See `"BOILERPLATE TAGS"' in this node for a full discussion of
+     Boilerplate tag syntax.
+
+code()
+     Behind the scenes, a Boilerplate is just a Perl subroutine compiled
+     from the text of the Boilerplate document.  If for some strange
+     reason you want to see the Perl code for this subroutine, use the
+     code() method.  Keep in mind that this code is not especially
+     human-readable.
+
+tag_info()
+     Returns a list of hashes containing the name, type, and attributes of
+     all of the tags in the Boilerplate, like so:
+
+          ( { 'Name'     => $name,
+              'Type'     => $type,
+              'Contents' => $contents }, ...)
+
+     For nested tags (such as REPEAT), the 'Contents' key will contain a
+     reference to a list of all of the tags contained between the tag
+     (i.e. `[* REPEAT NAME="fish" *]') and its terminator (i.e. `[*
+     /REPEAT *]').  Other tags will hold a reference to an empty list in
+     the 'Contents' value.  =back
+
+BOILERPLATE TAGS
+================
+
+   All of this is useless without tags to fill in.  Boilerplate tags are
+always sandwiched between '[* ' and ' *]'.  They generally consist of a
+tag type, followed by a list of attributes, e.g.:
+
+     [* TAG NAME="name of tag" ATTR2="Another" ATTR3 *]
+
+   Tag types and attribute names are case-insensitive; tag values are not.
+Therefore, THIS="that" means the same thing as this="that", but not the
+same as THIS="THAT".
+
+   There are three ways to assign a value to an attribute: using a double
+quote, using a single quote, and using no quotes.  These are all the same:
+
+     [* TAG NAME="thing" *]
+     [* TAG NAME='thing' *]
+     [* TAG NAME=thing *]
+
+   You can't use spaces in an attribute value without putting quotes
+around the value.
+
+General Tags
+------------
+
+   Tags of general utility.
+
+VALUE
+     Attributes: NAME
+
+     Description: The VALUE tag is the simplest and most commonly-used of
+     all Boilerplate tags.  It just fills in whatever data provided by the
+     script.  Since it is so frequently used, there's a shortcut for it:
+     just use the NAME attribute's value in quotes, and the Boilerplate
+     module will interpret it as though it were a VALUE tag.
+
+     (N.B.: I have since come to dislike using VALUE as a tag name, since
+     it's so frequently an attribute.  Be prepared for changes.)
+
+     Examples:
+
+          [* VALUE NAME="User Name" *] has [* VALUE NAME="time" *]
+          hours left on the system.
+
+          The quick [* "Color" *] [* "Animal" *] jumped over the
+          lazy [* "Other Animal" *]
+
+REPEAT.../REPEAT
+     Attributes: NAME
+
+     Description: The REPEAT tag fills in as many copies of whatever is
+     between it and its closing tag as are required by the data supplied
+     by the script.
+
+     If a SEPARATOR block appears within the REPEAT block, the contents of
+     SEPARATOR are filled in between every repetition of the REPEAT block.
+     Note that SEPARATOR cannot access data given to the REPEAT block by
+     the script.
+
+     Examples:
+
+          <B>The users on this system are:</B>
+          <OL>
+          [* REPEAT NAME="User List" *]
+              <LI>[* "Username" *]
+          [* /REPEAT *]
+          </OL>
+
+          <B>Your menu item choices:</B>
+          [* REPEAT NAME="Menu List" *]
+          <P>
+              [* "Menu Item" *]
+          </P>
+          [* SEPARATOR *]
+          <HR>
+          [* /SEPARATOR *]
+          [* /REPEAT *]
+
+SEPARATOR.../SEPARATOR
+     Separates the repeating items in a REPEAT block.  See `"REPEAT"' in
+     this node for details.  SEPARATOR's tags are filled in from the same
+     set of values as the block surrounding the repeat.  (Don't worry
+     about this overmuch.)
+
+ENV
+     Attributes: NAME
+
+     Returns the environment variable (or equivalent) for which it's named.
+     Probably not terribly useful on machines which don't support such
+     things.  A frequent use of ENV is to create a form that calls its
+     creating script, like so:
+
+          <FORM METHOD="post" ACTION="[* ENV NAME='SCRIPT_NAME' *]">
+
+     Since, in the CGI protocol, SCRIPT_NAME always contains the relative
+     URL of the current script, the proper URL to call the script would be
+     filled into the ACTION tag.
+
+     The ENV tag opens up potential security holes if you keep sensitive
+     data hanging around in environment variables.
+
+IF.../IF
+     Attributes: NAME
+
+     If the value for which IF is named is true, it fills that in.  If that
+     value is false, the section remains blank.  If an ELSE block appears
+     within the IF block, the ELSE block is filled in.  For example:
+
+          [* IF NAME="Items Found" *]
+              [* "Items Found" *] items were found.
+              [* ELSE *]
+                  No items were found.
+              [* /ELSE *]
+          [* /IF *]
+
+ELSE.../ELSE
+     Inside an IF.../IF block, defines what to print if the IF value is
+     false. See `"IF"' in this node.
+
+Web Tags
+--------
+
+   While you're welcome to use the following tags for any purpose, they're
+probably most useful in generating HTML pages on-the-fly.
+
+INPUT
+     Attributes: VALUE *any attribute*
+
+     The INPUT tag is used for generating a form input HTML tag with a
+     dynamic VALUE.  For example:
+
+          <FORM METHOD="post" ACTION="/cgi-bin/other_script.pl">
+
+          <P>
+              User Name: [* INPUT NAME="User Name" *]
+          </P>
+
+          <INPUT TYPE="submit">
+
+          </FORM>
+
+     If the script decided that 'User Name' should be 'Christabel', for
+     example, the filled-in boilerplate would be:
+
+          <FORM METHOD="post" ACTION="/cgi-bin/other_script.pl">
+
+          <P>
+              User Name: <INPUT NAME="User Name" VALUE="Christabel">
+          </P>
+
+          <INPUT TYPE="submit">
+
+          </FORM>
+          
+          If you wish for the input field to have a default value, you can
+          specify it using the VALUE attribute, like so:
+
+          [* INPUT NAME="User Name" VALUE="Person From Porlock" *]
+
+     That way, if the script doesn't have a value for 'User Name', it will
+     default to 'Person From Porlock'.
+
+     Any other attributes given to INPUT will be copied verbatim into the
+     filled-in tag, e.g.:
+
+          [* INPUT NAME="User Name" SIZE="20" MAXSIZE="25" *]
+
+     will become something like:
+
+          <INPUT NAME="User Name" VALUE="Christabel" SIZE="20" MAXSIZE="25">
+
+     Note that I only recommend using INPUT for simple fill-in fields, like
+     text and number input types.  See `"RADIO"' in this node and
+     `"CHECKBOX"' in this node for more complex form inputs.
+
+RADIO
+     Attributes: NAME VALUE
+
+     Used to generate HTML <INPUT TYPE="radio"> tags.  The HTML tag is
+     marked CHECKED if the value supplied by the script for this tag is
+     equal to the tag's VALUE attribute.
+
+CHECKBOX
+     Attributes: NAME VALUE
+
+     Used to generate HTML <INPUT TYPE="checkbox"> tags.  The HTML tag is
+     marked CHECKED if one of the values supplied by the script for this
+     tag is equal to the tag's VALUE attribute.
+
+     Programmer's note: takes an array reference as argument.
+
+SELECT.../SELECT
+     ATTRIBUTES: NAME *any attribute*
+
+     The SELECT tag is used to generate option lists with
+     script-controllable selections.  The options are specified in the
+     document with HTML <OPTION> tags, just as in ordinary HTML.  Values in
+     the SELECT tag are passed on into the generated HTML.  For example:
+
+          [* SELECT NAME="Poet" SIZE="4" *]
+              <OPTION>Coleridge
+          	<OPTION>Browning
+              <OPTION>Wordsworth
+          [* /SELECT *]
+
+     If the script chose a value of "Browning" for "Poet", the script would
+     return:
+
+          <SELECT NAME="Poet" SIZE="4">
+              <OPTION VALUE="Coleridge">Coleridge
+          	<OPTION VALUE="Browning" SELECTED>Browning
+          	<OPTION VALUE="Wordsworth">Wordsworth
+          </SELECT>
+
+     Programmer's note: this tag accepts an array ref, permitting multiple
+     selections that way.
+
+MENU
+     Attributes: NAME any
+
+     Used to create an HTML <SELECT> menu on-the-fly for a list of options.
+     While the Boilerplate SELECT tag chooses from a list of options
+     already present in the Boilerplate, MENU generates the appropriate tag
+     from data supplied by the script.
+
+     Programmer's note: this tag accepts a list of hashes, a la:
+
+          [ { 'Option' => $opt, 'Value' => $val, 'Selected' => $sel } ... ]
+
+SEE ALSO
+========
+
+   *Note Perl: (perl.info)perl,, *Note Text/Template: Text/Template,, and
+*Note Text/Vpp: Text/Vpp,.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997 Steve Nelson. All rights reserved. This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+AUTHOR
+======
+
+   senelson@negentropy.com (Steve Nelson)
+
+
+File: pm.info,  Node: Text/CSV,  Next: Text/CSV_XS,  Prev: Text/Boilerplate,  Up: Module List
+
+comma-separated values manipulation routines
+********************************************
+
+NAME
+====
+
+   Text::CSV - comma-separated values manipulation routines
+
+SYNOPSIS
+========
+
+     use Text::CSV;
+
+     $version = Text::CSV->version();      # get the module version
+
+     $csv = Text::CSV->new();              # create a new object
+
+     $status = $csv->combine(@columns);    # combine columns into a string
+     $line = $csv->string();               # get the combined string
+
+     $status = $csv->parse($line);         # parse a CSV string into fields
+     @columns = $csv->fields();            # get the parsed fields
+
+     $status = $csv->status();             # get the most recent status
+     $bad_argument = $csv->error_input();  # get the most recent bad argument
+
+DESCRIPTION
+===========
+
+   Text::CSV provides facilities for the composition and decomposition of
+comma-separated values.  An instance of the Text::CSV class can combine
+fields into a CSV string and parse a CSV string into fields.
+
+FUNCTIONS
+=========
+
+version
+          $version = Text::CSV->version();
+
+     This function may be called as a class or an object method.  It
+     returns the current module version.
+
+new
+          $csv = Text::CSV->new();
+
+     This function may be called as a class or an object method.  It
+     returns a reference to a newly created Text::CSV object.
+
+combine
+          $status = $csv->combine(@columns);
+
+     This object function constructs a CSV string from the arguments,
+     returning success or failure.  Failure can result from lack of
+     arguments or an argument containing an invalid character.  Upon
+     success, `string()' can be called to retrieve the resultant CSV
+     string.  Upon failure, the value returned by `string()' is undefined
+     and `error_input()' can be called to retrieve an invalid argument.
+
+string
+          $line = $csv->string();
+
+     This object function returns the input to parse() or the resultant
+     CSV string of `combine()', whichever was called more recently.
+
+parse
+          $status = $csv->parse($line);
+
+     This object function decomposes a CSV string into fields, returning
+     success or failure.  Failure can result from a lack of argument or
+     the given CSV string is improperly formatted.  Upon success, fields()
+     can be called to retrieve the decomposed fields .  Upon failure, the
+     value returned by fields() is undefined and `error_input()' can be
+     called to retrieve the invalid argument.
+
+fields
+          @columns = $csv->fields();
+
+     This object function returns the input to `combine()' or the
+     resultant decomposed fields of parse(), whichever was called more
+     recently.
+
+status
+          $status = $csv->status();
+
+     This object function returns success (or failure) of `combine()' or
+     parse(), whichever was called more recently.
+
+error_input
+          $bad_argument = $csv->error_input();
+
+     This object function returns the erroneous argument (if it exists) of
+     `combine()' or parse(), whichever was called more recently.
+
+EXAMPLE
+=======
+
+     require Text::CSV;
+
+     my $csv = Text::CSV->new;
+
+     my $column = '';
+     my $sample_input_string = '"I said, ""Hi!""",Yes,"",2.34,,"1.09"';
+     if ($csv->parse($sample_input_string)) {
+       my @field = $csv->fields;
+       my $count = 0;
+       for $column (@field) {
+         print ++$count, " => ", $column, "\n";
+       }
+       print "\n";
+     } else {
+       my $err = $csv->error_input;
+       print "parse() failed on argument: ", $err, "\n";
+     }
+
+     my @sample_input_fields = ('You said, "Hello!"',
+     			     5.67,
+     			     'Surely',
+     			     '',
+     			     '3.14159');
+     if ($csv->combine(@sample_input_fields)) {
+       my $string = $csv->string;
+       print $string, "\n";
+     } else {
+       my $err = $csv->error_input;
+       print "combine() failed on argument: ", $err, "\n";
+     }
+
+CAVEATS
+=======
+
+   This module is based upon a working definition of CSV format which may
+not be the most general.
+
+  1. Allowable characters within a CSV field include 0x09 (tab) and the
+     inclusive range of 0x20 (space) through 0x7E (tilde).
+
+  2. A field within CSV may be surrounded by double-quotes.
+
+  3. A field within CSV must be surrounded by double-quotes to contain a
+     comma.
+
+  4. A field within CSV must be surrounded by double-quotes to contain an
+     embedded double-quote, represented by a pair of consecutive
+     double-quotes.
+
+  5. A CSV string may be terminated by 0x0A (line feed) or by 0x0D,0x0A
+     (carriage return, line feed).
+
+
+AUTHOR
+======
+
+   Alan Citterman `<alan@mfgrtl.com>'
+
+SEE ALSO
+========
+
+   perl(1)
+
+
+File: pm.info,  Node: Text/CSV_XS,  Next: Text/ConvertPlatform,  Prev: Text/CSV,  Up: Module List
+
+comma-separated values manipulation routines
+********************************************
+
+NAME
+====
+
+   Text::CSV_XS - comma-separated values manipulation routines
+
+SYNOPSIS
+========
+
+     use Text::CSV_XS;
+
+     $csv = Text::CSV_XS->new();           # create a new object
+     $csv = Text::CSV_XS->new(\%attr);     # create a new object
+
+     $status = $csv->combine(@columns);    # combine columns into a string
+     $line = $csv->string();               # get the combined string
+
+     $status = $csv->parse($line);         # parse a CSV string into fields
+     @columns = $csv->fields();            # get the parsed fields
+
+     $status = $csv->status();             # get the most recent status
+     $bad_argument = $csv->error_input();  # get the most recent bad argument
+
+     $status = $csv->print($io, $columns); # Write an array of fields immediately
+                                           # to a file $io
+
+     $columns = $csv->getline($io);        # Read a line from file $io, parse it
+                                           # and return an array ref of fields
+
+     $csv->types(\@t_array);               # Set column types
+
+DESCRIPTION
+===========
+
+   Text::CSV_XS provides facilities for the composition and decomposition
+of comma-separated values.  An instance of the Text::CSV_XS class can
+combine fields into a CSV string and parse a CSV string into fields.
+
+FUNCTIONS
+=========
+
+version()
+     (Class method) Returns the current module version.
+
+new(\%attr)
+     (Class method) Returns a new instance of Text::CSV_XS. The objects
+     attributes are described by the (optional) hash ref `\%attr'.
+     Currently the following attributes are available:
+
+    quote_char
+          The char used for quoting fields containing blanks, by default
+          the double quote character (`"'). A value of undef suppresses
+          quote chars. (For simple cases only).
+
+    eol
+          An end-of-line string to add to rows, usually undef (nothing,
+          default), `"\012"' (Line Feed) or `"\015\012"' (Carriage Return,
+          Line Feed)
+
+    escape_char
+          The char used for escaping certain characters inside quoted
+          fields, by default the same character. (`"')
+
+    sep_char
+          The char used for separating fields, by default a comme. (`,')
+
+    binary
+          If this attribute is TRUE, you may use binary characters in
+          quoted fields, including line feeds, carriage returns and NUL
+          bytes. (The latter must be escaped as `"0'.) By default this
+          feature is off.
+
+    types
+          A set of column types; this attribute is immediately passed to
+          the types method below. You must not set this attribute
+          otherwise, except for using the types method. For details see
+          the description of the types method below.
+
+    always_quote
+          By default the generated fields are quoted only, if they need
+          to, for example, if they contain the separator. If you set this
+          attribute to a TRUE value, then all fields will be quoted. This
+          is typically easier to handle in external applications. (Poor
+          creatures who aren't using Text::CSV_XS. :-)
+
+     To sum it up,
+
+          $csv = Text::CSV_XS->new();
+
+     is equivalent to
+
+          $csv = Text::CSV_XS->new({
+              'quote_char'  => '"',
+              'escape_char' => '"',
+              'sep_char'    => ',',
+              'binary'      => 0
+          });
+
+combine
+          $status = $csv->combine(@columns);
+
+     This object function constructs a CSV string from the arguments,
+     returning success or failure.  Failure can result from lack of
+     arguments or an argument containing an invalid character.  Upon
+     success, `string()' can be called to retrieve the resultant CSV
+     string.  Upon failure, the value returned by `string()' is undefined
+     and `error_input()' can be called to retrieve an invalid argument.
+
+print
+          $status = $csv->print($io, $columns);
+
+     Similar to combine, but it expects an array ref as input (not an
+     array!)  and the resulting string is not really created, but
+     immediately written to the $io object, typically an IO handle or any
+     other object that offers a print method. Note, this implies that the
+     following is wrong:
+
+          open(FILE, ">whatever");
+          $status = $csv->print(\*FILE, $columns);
+
+     The glob `\*FILE' is not an object, thus it doesn't have a print
+     method. The solution is to use an IO::File object or to hide the glob
+     behind an IO::Wrap object. See `IO::File(3)' in this node and
+     `IO::Wrap(3)' in this node for details.
+
+     For performance reasons the print method doesn't create a result
+     string.  In particular the *$csv->string()*, *$csv->status()*,
+     *$csv-*fields()> and *$csv->error_input()* methods are meaningless
+     after executing this method.
+
+string
+          $line = $csv->string();
+
+     This object function returns the input to parse() or the resultant CSV
+     string of `combine()', whichever was called more recently.
+
+parse
+          $status = $csv->parse($line);
+
+     This object function decomposes a CSV string into fields, returning
+     success or failure.  Failure can result from a lack of argument or the
+     given CSV string is improperly formatted.  Upon success, fields() can
+     be called to retrieve the decomposed fields .  Upon failure, the value
+     returned by fields() is undefined and `error_input()' can be called
+     to retrieve the invalid argument.
+
+     You may use the *types()* method for setting column types. See the
+     description below.
+
+getline
+          $columns = $csv->getline($io);
+
+     This is the counterpart to print, like parse is the counterpart to
+     combine: It reads a row from the IO object $io using $io->getline()
+     and parses this row into an array ref. This array ref is returned by
+     the function or undef for failure.
+
+     The *$csv->string()*, *$csv->fields()* and *$csv->status()* methods
+     are meaningless, again.
+
+types
+          $csv->types(\@tref);
+
+     This method is used to force that columns are of a given type. For
+     example, if you have an integer column, two double columns and a
+     string column, then you might do a
+
+          $csv->types([Text::CSV_XS::IV(),
+                       Text::CSV_XS::NV(),
+                       Text::CSV_XS::NV(),
+                       Text::CSV_XS::PV()]);
+
+     Column types are used only for decoding columns, in other words by
+     the parse() and *getline()* methods.
+
+     You can unset column types by doing a
+
+          $csv->types(undef);
+
+     or fetch the current type settings with
+
+          $types = $csv->types();
+
+fields
+          @columns = $csv->fields();
+
+     This object function returns the input to `combine()' or the resultant
+     decomposed fields of parse(), whichever was called more recently.
+
+status
+          $status = $csv->status();
+
+     This object function returns success (or failure) of `combine()' or
+     parse(), whichever was called more recently.
+
+error_input
+          $bad_argument = $csv->error_input();
+
+     This object function returns the erroneous argument (if it exists) of
+     `combine()' or parse(), whichever was called more recently.
+
+EXAMPLE
+=======
+
+     require Text::CSV_XS;
+
+     my $csv = Text::CSV_XS->new;
+
+     my $column = '';
+     my $sample_input_string = '"I said, ""Hi!""",Yes,"",2.34,,"1.09"';
+     if ($csv->parse($sample_input_string)) {
+       my @field = $csv->fields;
+       my $count = 0;
+       for $column (@field) {
+         print ++$count, " => ", $column, "\n";
+       }
+       print "\n";
+     } else {
+       my $err = $csv->error_input;
+       print "parse() failed on argument: ", $err, "\n";
+     }
+
+     my @sample_input_fields = ('You said, "Hello!"',
+     			     5.67,
+     			     'Surely',
+     			     '',
+     			     '3.14159');
+     if ($csv->combine(@sample_input_fields)) {
+       my $string = $csv->string;
+       print $string, "\n";
+     } else {
+       my $err = $csv->error_input;
+       print "combine() failed on argument: ", $err, "\n";
+     }
+
+CAVEATS
+=======
+
+   This module is based upon a working definition of CSV format which may
+not be the most general.
+
+  1. Allowable characters within a CSV field include 0x09 (tab) and the
+     inclusive range of 0x20 (space) through 0x7E (tilde). In binary mode
+     all characters are accepted, at least in quoted fields:
+
+  2. A field within CSV may be surrounded by double-quotes. (The quote
+     char)
+
+  3. A field within CSV must be surrounded by double-quotes to contain a
+     comma.  (The separator char)
+
+  4. A field within CSV must be surrounded by double-quotes to contain an
+     embedded double-quote, represented by a pair of consecutive
+     double-quotes. In binary mode you may additionally use the sequence
+     `"0' for representation of a NUL byte.
+
+  5. A CSV string may be terminated by 0x0A (line feed) or by 0x0D,0x0A
+     (carriage return, line feed).
+
+
+AUTHOR
+======
+
+   Alan Citterman `<alan@mfgrtl.com>' wrote the original Perl module.
+Please don't send mail concerning Text::CSV_XS to Alan, as he's not
+involved in the C part which is now the main part of the module.
+
+   Jochen Wiedmann `<joe@ispsoft.de>' rewrote the encoding and decoding in
+C by implementing a simple finite-state machine and added the variable
+quote, escape and separator characters, the binary mode and the print and
+getline methods.
+
+SEE ALSO
+========
+
+   `perl(1)' in this node, `IO::File(3)' in this node, `IO::Wrap(3)' in
+this node
+
+
+File: pm.info,  Node: Text/ConvertPlatform,  Next: Text/Correct,  Prev: Text/CSV_XS,  Up: Module List
+
+an object class for formatting text between  			different platforms.
+********************************************************************
+
+NAME
+====
+
+   Text::ConvertPlatform - an object class for formatting text between
+different platforms.
+
+SYNOPSIS
+========
+
+     # Initialization statement
+     my $philip = new Text::ConvertPlatform; # or whatever you prefer
+
+     $philip->filename("i_love_unix.html");	# file that is to be worked on
+     $philip->filename;	# returns current FILENAME
+     $philip->convert_to("unix");	# set conversion mode - default is "unix"
+     				# there is no need to set this if you are
+     				# using the default
+     				# other modes are: "dos", "mac"
+     $philip->process_file;	# convert FILENAME
+     $philip->replace_file;	# overwrite FILENAME with NEWCONTENTS
+     $philip->backup_file;	# create a copy of FILENAME with a .bak extension
+     $philip->oldcontents;	# returns original contents of processed file
+     $philip->newcontents;	# returns results of a processed file
+
+DESCRIPTION
+===========
+
+   I've been quite bored at work lately and decided to write an easy way to
+format text between different platforms. Specifically, it converts return
+characters and optionally backs up the file it works on.
+
+AUTHOR
+======
+
+   Philip Mikal, "djphil@aztec.asu.edu". Co-authored by Phil Stracchino.
+Inspired from Adrian Scott's em.pl, which was given to me from Ken Berger.
+I'd also like to thank Randy Ray for answering questions I had when
+setting up this distribution.
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: Text/Correct,  Next: Text/DelimMatch,  Prev: Text/ConvertPlatform,  Up: Module List
+
+Module for implementing text wrapping
+*************************************
+
+NAME
+====
+
+   Text::Correct - Module for implementing text wrapping
+
+SYNOPSIS
+========
+
+     use Text::Correct qw( wrap $MAX_LEN $PARA );
+     $MAX_LEN = 60;  # 60 columns of text
+     $PARA = 0;      # condense newlines
+     print wrap($firstline_lead, $otherline_lead, @text);
+
+     use Text::Correct qw( wrap );
+     wrap("\t", "", $speech);  # "regular" paragraph formatting
+
+DESCRIPTION
+===========
+
+   This module is sort of a different approach to text wrapping than taken
+in Text::Wrap.  This module allows for condensing of newlines, to format
+long blocks of text into one, or (as the default) to format paragraphs
+(these are blocks of text separated by two or more newlines) individually.
+
+Functions
+---------
+
+wrap(INITAL_LEAD, SUBSEQUENT_LEAD, TEXT)
+     The first argument is the lead to be placed in front of the first
+     line; the second is the lead to be placed in front of each subsequent
+     line.  Following that is a list of lines of text.  The function is
+     not exported by default.
+
+expand(TEXT)
+     This converts tabs to NULL characters.  This function is used
+     internally, but is governed by the $TAB variable.
+
+unexpand(TEXT)
+     This converts series of NULL characters to tabs.  This function is
+     used internally, but is governed by the $TAB variable.
+
+Variables
+---------
+
+$Text::Correct::MAX_LEN
+     The number of characters of text (excluding a newline) per line.
+
+$Text::Correct::PARA
+     A boolean deciding whether or not to invoke paragraph mode.  If
+     paragraph mode is on, text will be split up into blocks separated by
+     two or more newlines.  If it is off, the text will be treated as a
+     single block, which means the text is condensed into one paragraph.
+
+$Text::Correct::TAB
+     This holds the number of spaces a tab is to represent.  It defaults
+     to 8, and is used in determining the length of a string with tabs in
+     it.
+
+COMING SOON
+===========
+
+   I plan to reimplement this module using formline().
+
+BUGS
+====
+
+   If text contains NULL characters, expand() and unexpand() will not work
+properly.  Fix:  don't use NULL characters. ;)
+
+AUTHOR
+======
+
+   Jeff Pinyan, japhy+perl@pobox.com, CPAN ID: PINYAN
+
+SEE ALSO
+========
+
+     Text::Wrap
+     Text::Tabs
+
+
+File: pm.info,  Node: Text/DelimMatch,  Next: Text/DoubleMetaphone,  Prev: Text/Correct,  Up: Module List
+
+Perl extension to find regexp delimited strings with proper nesting
+*******************************************************************
+
+NAME
+====
+
+   Text::DelimMatch - Perl extension to find regexp delimited strings with
+proper nesting
+
+SYNOPSIS
+========
+
+     use Text::DelimMatch;
+
+     $mc = new Text::DelimMatch, $startdelim, $enddelim;
+
+     $mc->quote('"');
+     $mc->escape("\\");
+     $mc->double_escape('"');
+     $mc->case_sensitive(1);
+
+     ($prefix, $match, $remainder) = $mc->match($string);
+     ($prefix, $nextmatch, $remainder) = $mc->match();
+
+DESCRIPTION
+===========
+
+   These routines allow you to match delimited substrings in a buffer.
+The delimiters can be specified with any regular expression and the start
+and end delimiters need not be the same.  If the delimited text is
+properly nested, entire nested groups are returned.
+
+   In addition, you may specify quoting and escaping characters that
+contribute to the recognition of start and end delimiters.
+
+   For example, if you specify the start and end delimiters as '\(' and
+'\)', respectively, and the double quote character as a quoting character,
+and the backslash as an escaping character, then the delimited substring
+in this buffer is "(ma(t)c\)h)":
+
+     'prefix text "(quoted text)" \(escaped \" text) (ma(t)c\)h) postfix text'
+
+   In order to support this rather complex interface, the matching context
+is encapsulated in an object.  The object, Text::DelimMatch, has the
+following public methods:
+
+new $start, $end, $escape, $dblesc, $qs1, $qe1, ... $qsn, $qen
+     Creates a new object.  All of the arguments are optional, and can be
+     set with other methods, but they must be passed in the specified
+     order: start delimiter, end delimiter, escape characters, double
+     escape characters, and a set of quote characters.
+
+match $string
+     In an array context, returns ($pre, $match, $post) where $pre is the
+     text preceding the first match, $match is the matched text (including
+     the delimiters), and $post is the rest of the text in the buffer.  In
+     a scalar context, returns $match.
+
+     If $string is not provided on subsequent calls, the $post from the
+     previous match is used, unless keep is false.  If keep is false, the
+     match always fails.
+
+delim $start, $end
+     Set the start and end delimiters.  Only one set of delimiters can be
+     in use at any one time.
+
+     Returns the delimters in use before this call.
+
+quote $startq, $endq
+     Specifies the start and end quote characters.  Multiple quote
+     character pairs are supported, so this function is additive.  To
+     clear the current settings, pass no arguments, e.g., $mc->quote().
+
+     If only $start is passed, $end is assumed to be the same.
+
+     In matching, quotes occur in pairs.  In other words, if (",") and
+     (',') are both specified as quote pairs and a string beginning with "
+     is found, it is ended only by another ", not by '.
+
+     Returns the quote hash in use before this call.
+
+escape $esc
+     Specifies a set of escaping characters.  This can only be a string of
+     characters.  $esc can be a regexp set or a simple string.  If it is a
+     simple string, it will be translated into the regexp set "[
+     quotemeta($esc) ]".
+
+     Returns the escape characters in use before this call.
+
+double_escape $esc
+     Specifies a set of double-escaping characters, i.e., characters that
+     are considered escaped if they occur in pairs.  For example, in some
+     languages,
+
+          'Don''t you see?'
+
+     defines a string containing a single apostrophe.
+
+     $esc can only be a string of characters.  $esc can be a regexp set or
+     a simple string.  If it is a simple string, it will be translated
+     into the regexp set "[ quotemeta($esc) ]".
+
+     Returns the double-escaping characters in use before this call.
+
+case_sensitive $bool
+     Sets case sensitivity to $bool or true if $bool is not specified.
+
+     Returns the case sensitivity in use before this call.
+
+keep $bool
+     Sets keep to $bool or true if $bool is not specified.
+
+     Keep, which is true by default, specifies whether or not the matching
+     context object keeps a local copy of the buffer used in matching.
+     Keeping a local copy allows repeated matching on the same buffer, but
+     might be a bad idea if the buffer is a terabyte long. ;-)
+
+     Returns the keep setting in use before this call.
+
+error $seterr
+     Returns the last error that occured.  If $seterr is passed, the error
+     is set to that value.  Some common kinds of bad input are detected
+     and an error condition is raised.  If an error condition is raised,
+     all matching fails until the error is cleared.
+
+     The most common error is a bad regular expression, for example
+     specifing the start delimiter as "(" instead of "\\(".  Remember,
+     these are regexps!
+
+pre_matched
+     Returns the prefix text from the last match if keep is true.  Sets an
+     error and returns an empty string if keep is false.
+
+matched
+     Returns the matched text from the last match if keep is true.  Sets
+     an error and returns an empty string if keep is false.
+
+post_matched
+     Returns the postfix text from the last match if keep is true.  Sets
+     an error and returns an empty string if keep is false.
+
+debug $bool
+     Sets debug to $bool or true if $bool is not specified.
+
+     If debug is true, informative and progress messages are printed to
+     STDOUT by some methods.
+
+     Returns the debugging setting in use before this call.
+
+dump
+     For debugging, prints all of the instance variables for a particular
+     object.
+
+slow $bool
+     For debugging.  Some classes of delimited strings can be located with
+     much faster algorithms than can be used in the most general case.  If
+     slow is true, the slower, general algorithm is always used.
+
+   For simplicity, and backward compatibility with the previous (limited
+release) incarnation of this module, the following functions are also
+available directly:
+
+nested_match ($string, $start, $end, $three)
+     If $three is true, returns ($pre, $match, $post) in an array context
+     otherwise returns ("$pre$match", $post).  In a scalar context, returns
+     "$pre$match".
+
+skip_nested_match ($string, $start, $end, $three)
+     If $three is true, returns ($pre, $match, $post) in an array context
+     otherwise returns ("$pre$match", $post).  In a scalar context, returns
+     $post.
+
+EXAMPLES
+========
+
+     $mc = new Text::DelimMatch '"';
+     $mc->('pre "match" post') == '"match"';
+
+     $mc->delim("\\(", "\\)");
+     $mc->('pre (match) post')   == ('pre ', '(match)', ' post');
+     $mc->('pre (ma(t)ch) post') == ('pre ', '(ma(t)ch)', ' post');
+     
+     $mc->quote('"');
+     $mc->escape("\\");
+     $mc->('pre (ma")"tch) post') == ('pre ', '(ma")"tch)', ' post');
+     $mc->('pre (ma(t)c\)h\") post') == ('pre ', '(ma(t)c\)h\")', ' post');
+
+   See also test.pl in the distribution.
+
+AUTHOR
+======
+
+   Norman Walsh, norm@berkshire.net
+
+COPYRIGHT
+=========
+
+   Copyright (C) Small Planet Software and Norman Walsh.  All rights
+reserved.  This program is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.
+
+WARRANTY
+========
+
+   THIS PACKAGE IS PROVIDED "AS IS" AND WITHOUT ANY EXPRESS OR IMPLIED
+WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
+MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+
+SEE ALSO
+========
+
+   perl(1).
+
+

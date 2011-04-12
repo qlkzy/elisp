@@ -1,0 +1,1742 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: MPEG/MP3Info,  Next: MQSeries,  Prev: MPEG/ID3v2Tag,  Up: Module List
+
+Manipulate / fetch info from MP3 audio files
+********************************************
+
+NAME
+====
+
+   MPEG::MP3Info - Manipulate / fetch info from MP3 audio files
+
+SYNOPSIS
+========
+
+     use MP3::Info;
+
+DESCRIPTION
+===========
+
+   This is just a wrapper around MP3::Info now.
+
+AUTHOR AND COPYRIGHT
+====================
+
+   Chris Nandor <pudge@pobox.com>, http://pudge.net/
+
+   Copyright (c) 1998-2001 Chris Nandor.  All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the terms of the Artistic License, distributed with Perl.
+
+SEE ALSO
+========
+
+   MP3::Info
+
+VERSION
+=======
+
+   v0.90, Sunday, January 14, 2001
+
+
+File: pm.info,  Node: MQSeries,  Next: MQSeries/Command,  Prev: MPEG/MP3Info,  Up: Module List
+
+Perl extension for MQSeries support
+***********************************
+
+NAME
+====
+
+   MQSeries - Perl extension for MQSeries support
+
+SYNOPSIS
+========
+
+   There are two interfaces provided by the MQSeries modules.  The first
+is a straight forward mapping to all of the individual MQI calls, and the
+second is a value-added, OO interface, which provides a simpler interface
+to a subset of the full MQI functionality.
+
+   The straight MQI mapping is:
+
+     use MQSeries;
+
+     $Hconn = MQCONN($Name,$CompCode,$Reason);
+     MQDISC($Hconn,$CompCode,$Reason);
+
+     $Hobj = MQOPEN($Hconn,$ObjDesc,$Options,$CompCode,$Reason);
+     MQCLOSE($Hconn,$Hobj,$Options,$CompCode,$Reason);
+
+     MQBACK($Hconn,$CompCode,$Reason);
+     MQCMIT($Hconn,$CompCode,$Reason);
+
+     $Buffer = MQGET($Hconn,$Hobj,$MsgDesc,$GetMsgOpts,$BufferLength,$CompCode,$Reason);
+     MQPUT($Hconn,$Hobj,$MsgDesc,%PutMsgOpts,$Msg,$CompCode,$Reason);
+     MQPUT1($Hconn,$ObjDesc,$MsgDesc,$PutMsgOpts,$Msg,$CompCode,$Reason);
+
+     ($Attr1,...) = MQINQ($Hconn,$Hobj,$CompCode,$Reason,$Selector1,...);
+     MQSET($Hconn,$Hobj,$CompCode,$Reason,$Selector1,$Attr1,...);
+
+   If the perl5 API is compiled with the version 5 headers and libraries,
+then the following MQI calls are also available:
+
+     MQBEGIN($Hconn,$BeginOpts,$CompCode,$Reason);
+     $Hconn = MQCONNX($Name,$ConnectOpts,$CompCode,$Reason);
+
+   There are also some additional utility routines provided which are not
+part of the MQI, but specific to the perl5 API:
+
+     ($ReasonText,$ReasonMacro) = MQReasonToStrings($Reason);
+     ($ReasonText) = MQReasonToText($Reason);
+     ($ReasonMacro) = MQReasonToMacro($Reason);
+
+   The OO interface is provided in several optional modules.  Three of
+these make up the core OO interface:
+
+     MQSeries::QueueManager
+     MQSeries::Queue
+     MQSeries::Message
+
+   There are several subclasses of MQSeries::Message which handle special
+message formats:
+
+     MQSeries::Message::Storable
+     MQSeries::Message::Event
+     MQSeries::Message::PCF
+     MQSeries::Message::RulesFormat
+     MQSeries::Message::XML-Dumper
+     MQSeries::Message::DeadLetter
+
+   There is also a set of modules which provide an interface to the
+optional Publish/Subscribe system, which is available as a support pack
+for the distributed platforms using Version 5 of MQSeries.
+
+     MQSeries::PubSub::Broker
+     MQSeries::PubSub::Stream
+     MQSeries::PubSub::Command (docs only, not used directly)
+     MQSeries::PubSub::Message
+     MQSeries::PubSub::AdminMessage
+
+   There is also a module which provides an interface to the command
+server PCF messages for MQSeries administration:
+
+     MQSeries::Command
+
+   There are two sets of classes that help you follow (tail -f style) and
+parse the two kinds of log-files written by MQSeries: the FDC files and
+the error-logs.  These classes allow you to write a log monitoring daemon
+that feeds into syslog or your system management tools.
+
+     MQSeries::ErrorLog::Tail
+     MQSeries::ErrorLog::Parser
+     MQSeries::ErrorLog::Entry
+     MQSeries::FDC::Tail
+     MQSeries::FDC::Parser
+     MQSeries::FDC::Entry
+
+   There is a set of classes that parses configuration and authority files
+(/var/mqm/mqs.ini, /var/mqm/qmgrs/*/qm.ini, /var/mqm/qmgrs/*/auth/*/*).
+
+     MQSeries::Config::Authority
+     MQSeries::Config::Machine
+     MQSeries::Config::QMgr
+
+   Some internal helper functions are stored in the module:
+
+     MQSeries::Utils
+
+   See the documentation for each of these individual modules for more
+information.
+
+DESCRIPTION
+===========
+
+   This module provides a perl language interface to MQSeries functions.
+It uses the standard MQSeries interface except where a perl convention is
+required or just more useful.
+
+   Where data structures are required, this interface uses a hash
+reference. The keys in the hash are structure element names. If an element
+is not specified in the hash, a default value will be used. Output
+elements are updated in the hash as necessary.
+
+SUBROUTINES
+===========
+
+   For complete details on each of the following subroutines, please
+consult the "MQSeries Application Programming Guide" and "MQSeries
+Application Programming Reference".  This documentation will merely
+document how the perl API and the underlying C API calling and return code
+conventions vary.
+
+   One way in which all of these calls are identical to the C API is in
+the use of the '$CompCode' and '$Reason' conventions.  All of the API
+calls take these as positional arguments, and the completion code and
+reason code are written to those variables, respecitively.
+
+   In general, all of the C data structures used to pass or return values
+to each API call are passed or returned as a perl hash reference,
+specified as a positional argument in the relavent API call.
+
+MQCONN
+------
+
+     $Hconn = MQCONN($Name,$CompCode,$Reason);
+
+   This call returns the Hconn value, to be used in subsequent MQI calls.
+The C API took the $Hconn as a positional parameter, whereas the perl API
+returns it.
+
+MQCONNX
+-------
+
+     $Hconn = MQCONNX($Name,$ConnectOpts,$CompCode,$Reason);
+
+   NOTE: This MQI call is only available if the perl5 API is compiled
+against MQSeries version 5 headers and libraries.
+
+   This call returns the Hconn value, to be used in subsequent MQI calls.
+The C API took the $Hconn as a positional parameter, whereas the perl API
+returns it.
+
+   The $ConnectOpts value is a hash reference, with keys corresponding to
+the fields of the MQCO structure.  This is an input value only.
+
+MQDISC
+------
+
+     MQDISC($Hconn,$CompCode,$Reason);
+
+   The calling convention of this subroutine is identical to the C API.
+
+MQOPEN
+------
+
+     $Hobj = MQOPEN($Hconn,$ObjDesc,$Options,$CompCode,$Reason);
+
+   In the same way that MQCONN loses one positional parameter, and returns
+it to the caller, so does MQOPEN remove the $Hobj parameter from the
+argument list and returns the value.
+
+   The $ObjDesc parameter should be a hash reference, for example:
+
+     $ObjDesc = {
+                 ObjectName 	=> 'SOME.MODEL.QUEUE',
+                 DynamicQName 	=> 'FOOBAR*',
+                };
+
+   The $Options parameter should be a set of ORed options, for example:
+
+     $Options = MQOO_INPUT_AS_Q_DEF | MQOO_FAIL_IF_QUIESCING;
+
+   If a distribution list is being opened, then the list of queues can be
+specified in one of three ways.  The list is given via a new key
+"ObjectRecs", used to identify the list.  This is different from the
+C-centric approach in the C API, namely to specify the list using the
+RecsPresent, ObjectRecPtr, etc.
+
+   The first method is to specify an array of plain queue names:
+
+     $ObjDesc = {
+                 ObjectRecs	=> [qw( QUEUE1 QUEUE2 QUEUE3 )],
+                };
+
+   The second method is to specify an array or array references, each
+giving the QName and QMgrName:
+
+     $ObjDesc = {
+                 ObjectRecs	=> [
+                                       [qw( QUEUE1 QM1 )],
+                                       [qw( QUEUE2 QM2 )],
+                                       [qw( QUEUE3 QM3 )],
+                                      ],
+                };
+
+   Finally, an array of hash references can be specified, each giving the
+QName and QMgrName via specific keys:
+
+     $ObjDesc = {
+                 ObjectRecs	=> [
+                                       {
+                                        ObjectName		=> 'QUEUE1',
+                                        ObjectQMgrName	=> 'QM1',
+                                       },
+                                       {
+                                        ObjectName		=> 'QUEUE2',
+                                        ObjectQMgrName	=> 'QM2',
+                                       },
+                                       {
+                                        ObjectName		=> 'QUEUE3',
+                                        ObjectQMgrName	=> 'QM3',
+                                       },
+                                      ],
+                };
+
+   In the second and third cases, the queue manager names are always
+optional.  Which method to use is largely a matter of style.
+
+   When the Reason Code returned by the API is MQRC_MULTIPLE_REASONS, then
+these are encoded into an array of hash references, and that array is
+returned as a new key in the ObjDesc hash, "ResponseRecs".  The order of
+the CompCode/Reason pair in the array corresponds to the order of the
+queues listed in the ObjectRecs array.
+
+   This is best explained in an example.  In this case, we used the first,
+simple list of queue names for our distribution list.
+
+     if ( $Reason == MQRC_MULTIPLE_REASONS ) {
+         for ( $index = 0 ; $index <= scalar @{$ObjDesc->{ObjectRecs}} ; $index++ ) {
+             next if $ObjDesc->{ResponseRecs}->[$index]->{Reason} == MQRC_NONE;
+             print "QName: " . $ObjDesc->{ObjectRecs}->[$index] . "\n";
+             print "Reason: " . $ObjDesc->{ResponseRecs}->[$index]->{Reason} . "\n";
+             print "CompCode: " . $ObjDesc->{ResponseRecs}->[$index]->{CompCode} . "\n";
+         }
+     }
+
+MQCLOSE
+-------
+
+     MQCLOSE($Hconn,$Hobj,$Options,$CompCode,$Reason);
+
+   The calling convention of this subroutine is identical to the C API.
+
+   The $Options value is a set of ORed options, for example:
+
+     $Options = MQCO_DELETE_PURGE;
+
+MQBEGIN
+-------
+
+     MQBEGIN($Hconn,$BeginOpts,$CompCode,$Reason)
+
+   NOTE: This MQI call is only available if the perl5 API is compiled
+against MQSeries version 5 headers and libraries.
+
+   The calling convention of this subroutine is identical to the C API.
+
+   The $BeginOpts value is a hash reference, with keys corresponding to
+the fields of the MQBO structure.  This is both an input and output value.
+
+MQBACK
+------
+
+     MQBACK($Hconn,$CompCode,$Reason);
+
+   The calling convention of this subroutine is identical to the C API.
+
+MQCMIT
+------
+
+     MQCMIT($Hconn,$CompCode,$Reason);
+
+   The calling convention of this subroutine is identical to the C API.
+
+MQGET
+-----
+
+     $Buffer = MQGET($Hconn,$Hobj,$MsgDesc,$GetMsgOpts,$BufferLength,$CompCode,$Reason);
+
+   One positional parameter, the $Buffer, is removed from the argument
+list.  This is the return value of this subroutine.  The $MsgDesc and
+$GetMsgOpts values are hash references.  The $MsgDesc will be populated
+with the MQMD structure returned by the MQGET call.  This is also an input
+value, and the $MsgDesc data can be populated, for example, with a
+specific 'CorrelId'.
+
+     $MsgDesc = {
+                 CorrelId => $correlid,
+                };
+
+   The $GetMsgOpts hash reference contains the MQGMO data structure
+fields, for example:
+
+     $GetMsgOpts = {
+                    Options => MQGMO_FAIL_IF_QUIESCING | MQGMO_SYNCPOINT | MQGMO_WAIT,
+                    WaitInterval => MQWI_UNLIMITED,
+                   };
+
+MQPUT, MQPUT1
+-------------
+
+     MQPUT($Hconn,$Hobj,$MsgDesc,$PutMsgOpts,$Msg,$CompCode,$Reason);
+     MQPUT1($Hconn,$ObjDesc,$MsgDesc,$PutMsgOpts,$Msg,$CompCode,$Reason);
+
+   Both of these calls differ from the C API in the same way as MQGET.
+Likewise, the $MsgDesc and $PutMsgOpts values are hash references for the
+appropriate data structures.
+
+   If MQPUT1() is being used to put a message to a distribution list, then
+the $ObjDesc is used in the same way as documented above for MQOPEN().  In
+addition, there is a special key to the $PutMsgOpts hash which can be
+specified, and the rest of this discussion applies equally to both MQPUT()
+and MQPUT1().
+
+   The $PutMsgOpts->{PutMsgRecs} value must be an array of hash
+references, one for each queue opened in the distribution list,
+interpreted in the same order.  Each individual hash reference is
+interpreted as a single put message record.  The keys of each record can
+be any of:
+
+     MsgId
+     CorrelId
+     GroupId
+     Feedback
+     AccountingToken
+
+   For example, the following sets the CorrelId the same across all of the
+messages in a distribution list of three queues.
+
+     $PutMsgOpts = {
+                    PutMsgRecs => [
+                                   {
+                                    MsgId		=> MQPMO_NEW_MSG_ID,
+                                    CorrelId       => $SomeCorrelId,
+                                   },
+                                   {
+                                    MsgId		=> MQPMO_NEW_MSG_ID,
+                                    CorrelId       => $SomeCorrelId,
+                                   },
+                                   {
+                                    MsgId		=> MQPMO_NEW_MSG_ID,
+                                    CorrelId       => $SomeCorrelId,
+                                   },
+                                  ],
+                   };
+
+   Note that the following fields of the $PutMsgOpts hash do not need to
+be specified:
+
+     PutMsgRecFields (calculated automatically)
+     PutMsgRecOffset
+     PutMsgRecPtr
+     ResponseRecPtr
+     ResponseRecOffset
+
+   For the MQPUT() call, if the Reason code returned is
+MQRC_MULTIPLE_REASONS, then these are returned as part of the $PutMsgOpts
+hash, in the key ResponseRecs.  For the MQPUT1() call, these are returned
+as part of the $ObjDesc hash.
+
+   See the MQOPEN() documentation above for the format of this value.
+
+MQINQ
+-----
+
+     ($Attr1,...) = MQINQ($Hconn,$Hobj,$CompCode,$Reason,$Selector1,...);
+
+   This call differs from the C API significantly.  Rather than passing a
+list of pairs of selectors and attributes, only a list of selectors is
+passed.  The return value is a list of attributed.  The C API convention
+was simply to pass the address for each answer in the arguments, but in
+perl, it makes more sense to return this as a list.
+
+MQSET
+-----
+
+     MQSET($Hconn,$Hobj,$CompCode,$Reason,$Selector1,$Attr1,...);
+
+   This call also differs from the C API significantly.  The C API took a
+pointer to an array of selectors, with an argument indicating the length
+of the array, and a similar pair of values for the attribute values
+themselves.  The perl convention is to list the selectors and attributes
+in pairs, rather than by passing in an array reference.
+
+MQParseEvent (deprecated in 1.06)
+---------------------------------
+
+   This routine has been deprecated, and is no longer supported.  The next
+release will remove it from the documentation altogether.
+
+   Equivalent functionality is available via the MQDecodePCF subroutine,
+which is optionally exported from the MQSeries::Message::PCF module.
+
+   The author highly recommends using the OO abstraction via
+MQSeries::Message::Event, and interface which is supported and will remain
+part of this API permanently.
+
+MQReasonToStrings
+-----------------
+
+     ($ReasonText,$ReasonMacro) = MQReasonToStrings($Reason);
+
+   This subroutine is specific to the perl API, although similar
+functionality is desperately needed in the other programming languages as
+well.  This takes an MQSeries Reason code, and returns the English
+language text explaining the reason code, and the macro name.  These
+strings are compiled into the perl module, encoded in the XS routines,
+after having been extracted from the IBM HTML documentation.
+
+   For example, a reason code of 2009 (MQRC_CONNECTION_BROKEN) will return:
+
+     "Connection to queue manager lost."
+
+   which looks a lot better in error logs and alerts than 2009.
+
+   The macro name itself is also returned as a string, so one could use
+"MQRC_CONNECTION_BROKEN" in logs, error messages, etc.
+
+   In this release, only English language text is returned, but in a
+future release, these messages will be locale specific.  This will almost
+certainly be implemented with locale-specific DBM files, but you probably
+do not need to know this just yet....
+
+MQReasonToText
+--------------
+
+     ($ReasonText) = MQReasonToText($Reason);
+
+   This is nothing more than a trivial interface to MQReasonToStrings,
+returning just the one value (the reason text).
+
+MQReasonToMacro
+---------------
+
+     ($ReasonMacro) = MQReasonToMacro($Reason);
+
+   This is nothing more than a trivial interface to MQReasonToStrings,
+returning just the one value (the MQRC_* macro as a string).
+
+
+File: pm.info,  Node: MQSeries/Command,  Next: MQSeries/Config/Authority,  Prev: MQSeries,  Up: Module List
+
+OO interface to the Programmable Commands
+*****************************************
+
+NAME
+====
+
+   MQSeries::Command - OO interface to the Programmable Commands
+
+SYNOPSIS
+========
+
+     use MQSeries;
+     use MQSeries::Command;
+
+     #
+     # Simplest usage
+     #
+     my $command = MQSeries::Command->new
+       (
+        QueueManager => 'some.queue.manager',
+       )
+       or die("Unable to instantiate command object\n");
+
+     @qnames = $command->InquireQueueNames()
+       or die "Unable to list queue names\n";
+
+     foreach my $qname ( @qnames ) {
+
+     $attr = $command->InquireQueue
+     	(
+     	 QName		=> $qname,
+     	 QAttrs		=> [qw(
+     			       OpenInputCount
+     			       OpenOutputCount
+     			       CurrentQDepth
+     			      )],
+     	) or die "InquireQueue: " . MQReasonToText($command->Reason()) . "\n";
+
+     print "QName = $qname\n";
+
+     foreach my $key ( sort keys %$attr ) {
+     	  print "\t$key => $attr->{$key}\n";
+     }
+
+     }
+
+     #
+     # High-level wrapper method: CreateObject
+     #
+     $command->CreateObject
+       (
+        Attrs		=>
+        {
+         QName		=> 'FOO.BAR.REQUEST',
+         QType		=> 'Local',
+         MaxQDepth		=> '50000',
+         MaxMsgLength	=> '20000',
+        }
+       ) || die "CreateObject: " . MQReasonToText($command->Reason()) . "\n";
+
+     $command->CreateObject
+       (
+        Clear		=> 1,
+        Attrs		=>
+        {
+         QName		=> 'FOO.BAR.REPLY',
+         QType		=> 'Remote',
+         RemoteQName	=> 'FOO.BAR.REPLY',
+         RemoteQMgrName	=> 'SAT1',
+        }
+       ) || die "CreateObject: " . MQReasonToText($command->Reason()) . "\n";
+
+DESCRIPTION
+===========
+
+   The MQSeries::Command class implements an interface to the Programmable
+Command Format messages documented in the:
+
+     "MQSeries Programmable System Management"
+
+   section of the MQSeries documentation.  In particular, this document
+will primarily explain how to interpret the above documentation, and thus
+use this particular implementation in perl.  Please read and understand
+the following sections of the above document:
+
+     Part 2. Programmable Command Formats
+       Chapter 8. Definitions of the Programmable Command Formats
+       Chapter 9. Structures used for commands and responses
+
+   This interface also supports the text-based MQSC format messages used
+by the queue manager of some platforms, particularly MVS.  Using the same
+interface, either PCF or MQSC command server can be queried, with the
+results translated into the same format for responses as well.  Note that
+there are limits to how transparent this is (see MQSC NOTES), but the code
+tries quite hard to hide as many of the differences as possible.
+
+COMMAND ARGUMENTS
+-----------------
+
+   Before we discuss the specific arguments and return values of each of
+the methods supported by the MQSeries::Command module, we must explain how
+the keys and values used by the interface were chosen, as this will allow
+the developer to understand how to take advantage of the very complete
+documentation provided by IBM (which will not be reproduced here).
+
+   For each command documented in 'Definitions of the Programmable Command
+Formats' (there is a specific page listing all of the commands, grouped by
+type), there is a corresponding method in this class.  For example, there
+is a method named 'InquireQueueManager', for the obvious (I hope) PCF
+command.
+
+   All of these methods take a hash of key/value pairs as an argument,
+with the keys being those defined in the documentation for each command.
+When writing C code to produce PCF messages, the parameter names are
+macros, such as:
+
+     MQIACF_Q_MGR_ATTRS
+
+   to specify a list of queue manager attributes.  Rather than use these
+names directly, the key strings are taken from the IBM documentation.  In
+this example, the string used for this key is:
+
+     QMgrAttrs
+
+   The values depend on the structure type of the parameter.  If the
+structure is a string (MQCFST) or an integer (MQCFIN) then the value of
+the key is simply a scalar string or integer in perl.  If it either a
+string list (MQCFSL) or an integer list (MQCFIL), then the value of the
+key is an array reference (see the InquireQueueManager example in the
+SYNOPSIS) of scalar strings or integers.
+
+RETURN VALUES
+-------------
+
+   Most of the individual methods map to underlying commands which do not
+return any data.  For all of these, the return value is simply Boolean;
+true or false.  That is, the command either worked or failed.
+
+   Only the methods associated with those commands documented as producing
+data responses:
+
+     Escape
+     Inquire Channel
+     Inquire Channel Names
+     Inquire Channel Status
+     Inquire Cluster Queue Manager
+     Inquire Namelist
+     Inquire Namelist Names
+     Inquire Process
+     Inquire Process Names
+     Inquire Queue
+     Inquire Queue Manager
+     Inquire Queue Names
+     Reset Queue Statistics
+
+   return interesting information.  Most of these will return an array of
+hash references, one for each object matching the query criteria.  For
+example.  The specific keys are documented in the section of the IBM
+documentation which discusses the "Data responses to commands", on the
+summary page "PCF commands and responses in groups".  If you have read the
+IBM documentation as requested above, you should have found this page.
+
+   Note that in an array context, the entire list is returned, but in a
+scalar context, only the first item in the list is returned.
+
+   Four of these commands, however, have a simplified return value.  All
+four of:
+
+     Inquire Channel Names
+     Inquire Namelist Names
+     Inquire Process Names
+     Inquire Queue Names
+
+   simply return an array of strings, containing the names which matched
+the query criteria.
+
+METHODS
+=======
+
+new
+---
+
+   The arguments to the constructor are a hash, with the following
+key/value pairs:
+
+     Key                Value
+     ===                =====
+     QueueManager       String or MQSeries::QueueManager object
+     ProxyQueueManager  String or MQSeries::QueueManager object
+     ReplyToQ           String or MQSeries::Queue object
+     CommandQueueName   String
+     DynamicQName       String
+     ModelQName	     String
+     Type               String ("PCF" or "MQCS")
+     Expiry	     Numeric
+     Wait               Numeric
+     ReplyToQMgr        String
+     Carp               CODE Reference
+     StrictMapping      Boolean
+     CompCode           Reference to Scalar Variable
+     Reason             Reference to Scalar Variable
+
+QueueManager
+     The name of the QueueManager (or alternatively, a previously
+     instantiated MQSeries::QueueManager object) to which commands are to
+     be sent.
+
+     This can be omitted, in which case the "default queue manager" is
+     therefore assumed.
+
+ProxyQueueManager
+     The name of the queue manager to which to MQCONN(), and submit
+     messages on the QueueManagers behalf.  This is to be used if a direct
+     connection to the QueueManager is not possible, for example MVS queue
+     managers with support for direct client access.
+
+     The messages will be put to what is assumed to be a remote queue
+     definition which routes to the command queue on the desired
+     QueueManager.
+
+     In order to specify the "default" queue manager as the
+     ProxyQueueManager, an empty string must be explicitly given.
+
+ReplyToQ
+     The ReplyToQ can be opened by the application, and the MQSeries::Queue
+     object passed in to the MQSeries::Command constructor, if so desired,
+     os, a fixed queue name can be given.  This is a somewhat advanced
+     usage of the API, since the default behavior of opening a temporary
+     dynamic queue under the covers is usually prefered, and much simpler.
+
+     The responses are retreived from the reply queue using gets by
+     CorrelId, so there should be no issue with using a pre-defined, shared
+     queue for this, if so desired.
+
+CommandQueueName
+     This specifies the queue to which the command messages will be put.
+     The defaults are usually reasonable, and depend on the command message
+     Type (PCF or MQSC).
+
+          PCF   => SYSTEM.ADMIN.COMMAND.QUEUE
+          MQSC  => SYSTEM.COMMAND.INPUT
+
+     If the ProxyQueueManager has been specified, then we assume the
+     messages are being written to a remote queue definition, and the
+     defaults are then:
+
+          PCF   => SYSTEM.ADMIN.COMMAND.QUEUE."QueueManager"
+          MQSC  => SYSTEM.COMMAND.INPUT."QueueManager"
+
+     See "MQSC NOTES" for some examples of how to use this in practice.
+
+Type
+     This argument indicates whether the command server on the QueueManager
+     supports either PCF or MQSC messages.  The default is PCF.  See the
+     section "MQSC NOTES" for the Ugly Truth about the MQSC support.
+
+Expiry
+     This value is used as the MQMD.Expiry field on all requests sent to
+     the command server.  The value is passed to the MQSeries::Message
+     constructor, and should specify the time in *tenths of a second*.
+     The default is 600, or 60 seconds.
+
+     A symbolic value ending on 's' for seconds or 'm' for minutes may
+     also be specified, e.g. the symbolic value '45s' will have the same
+     meaning as the number 450.
+
+Wait
+     This value is used as the Wait argument to the MQSeries::Queue->Get()
+     method call made against the ReplyToQ (a dynamic reply queue). and
+     should be a time specified in *milliseconds*.  The default is 60000,
+     or 60 seconds.
+
+     A symbolic value ending on 's' for seconds or 'm' for minutes may
+     also be specified, e.g. the symbolic value '45s' will have the same
+     meaning as the number 45000.
+
+     NOTE: Both the Expiry and Wait defaults may be too slow for heavily
+     loaded queue managers.  Tune them appropriately.
+
+ReplyToQMgr
+     The ReplyToQMgr normally defaults to the QueueManager, but it can be
+     overridden, perhaps as a means of specifying an alternate return path
+     over a specific channel.  For example, the author uses special
+     channels for SYSTEM related traffic, over which we forward MQSeries
+     events from one queue manager to another, and also over which we wish
+     the command server queries to flow.
+
+     The "default" path between QMA and QMB flows over a channel called
+     QMA.QMB, but this traffic is application data, not administrative
+     system data.  The system queries flow over QMA.QMB.SYSTEM, and we need
+     to ensure that replies to queries follow a similar reverse path.
+     Specifying the ReplyToQMgr as "QMB.SYSTEM" accomplishes this.
+
+Carp
+     This key specifies a code reference to a routine to replace all of the
+     carp() calls in the API, allowing the user of the API to trap and
+     handle all of the error message generated internally, or simply
+     redirect how they get logged.
+
+     For example, one might want everything to be logged via syslog:
+
+          sub MyLogger {
+              my $message = @_;
+              foreach my $line ( split(/\n+/,$message) ) {
+                  syslog("err",$message);
+              }
+          }
+
+     Then, one tells the object to use this routine:
+
+          my $command = MQSeries::Command->new(
+          				       QueueManager => 'some.queue.manager',
+          				       Carp => \&MyLogger,
+          				      )
+              or die("Unable to connect to queue manager.\n");
+
+     The default, as one might guess, is Carp::carp();
+
+StrictMapping
+     If this argument has a true value, then strict mapping of PCF
+     parameters and values will be enforced.  Normally, if you feed a bogus
+     string into the API, it will attempt to map it to the underlying PCF
+     macro value, and if the mapping fails, it will quietly forgive you,
+     and ignore the parameter.  Enabling this feature will cause the
+     translation of an encoded PCF message into the data structure for a
+     Response, or the translation of a Request into an encoded PCF message,
+     to fail if any of the mappings fail.
+
+     Usually, the command server will generate errors if you feed bogus
+     data into the API. but that will only occur after the data has been
+     encoded and sent to the command server.  This feature will allow you
+     to detect this error before the data is ever sent.
+
+CompCode
+     Normally the CompCode and Reason are access via the methods of the
+     same name.  However, that obviously is not possible if the constructor
+     fails.  If you want to perform special handling of the error codes in
+     this case, you will have tell the constructor where to write the
+     CompCode and Reason, by providing a SCALAR reference.
+
+     For example:
+
+          my $CompCode = MQCC_FAILED;
+          my $Reason   = MQRC_NONE;
+
+          my $command = MQSeries::Command->new
+            (
+             QueueManager => 'some.queue.manager',
+             CompCode     => \$CompCode,
+             Reason       => \$Reason,
+            );
+
+     Now, the CompCode and Reason are available, even if the constructor
+     fails, in which case it would normally return nothing.
+
+Reason
+     See CompCode above.
+
+CompCode
+--------
+
+   This method will return the MQI CompCode for the most recent MQI call
+made by the API.
+
+Reason
+------
+
+   This method will return the MQI Reason for the most recent MQI call
+made by the API.
+
+Responses
+---------
+
+   Normally, the data of interest is returned from the method in question,
+but the individual responses are available via this method.  This returns
+a list of MQSeries::Command::Response objects, one for each individual
+message recieved.
+
+   NOTE: In previous releases, this method was named "Response", but due
+to a namespace conflict between the class "MQSeries::Command::Response",
+and the method "MQSeries::Command->Response", and the headaches this
+causes, it has been renamed.
+
+DataParameters
+--------------
+
+   This method will return a list of parameters structures from all of the
+responses messages sent back which were not error responses.  Some errors
+will send back responses with parameters, and these could easily be
+confused with real data (until you start looking at the actual data, of
+course).
+
+ErrorParameters
+---------------
+
+   This method will return a list of parameters structures from all of the
+responses messages sent back which *were* error responses.  If a command
+fails, the Reason() will usually tell you enough about the cause of the
+failure, but if the reason is MQRCCF_CFIN_PARM_ID_ERROR, then the
+parameters in the error message will indicate which Parameter key was
+invalid.
+
+CreateObject
+------------
+
+   This is a generic "wrapper" method for creating any generic MQSeries
+object.  The arguments to this method are a hash, with the following
+key/value pairs:
+
+     Key                Value
+     ===                =====
+     Attrs		     HASH reference
+     Verify	     Boolean
+     Clear              Boolean
+     Quiet              Boolean
+
+   The key/value pairs in the Attrs argument are passed directly to the
+corresponding CreateQueue(), CreateChannel(), or CreateProcess() method.
+However, there is more to this than just creating the object.  For
+clarity, this discussion will use creation of a queue as an example.
+
+   First, InquireQueue is called to see if the object already exists.  If
+it does not exist, then the object is simply created, with the specified
+attributes.
+
+   If it does exist, and the QType matches, then the actual object
+attributes are compared against those passed to the CreateObject method,
+and if they match, then no action is taken, and the object is not modified.
+
+   If it does exist, but of a different QType, then the existing object is
+deleted, and the new object created as requested.
+
+   The idea here is to match the modification of the object conditional on
+the need for modifying the object.  If the same CreateObject method call,
+with the same arguments, is called twice, then the second method
+invocation should be a noop, as far as the actual MQSeries object is
+concerned.
+
+Attrs
+     As discussed above, this is a HASH reference, whose key/value pairs
+     are used to determine what type of object is being created or updated,
+     and those key/value pairs are passed as-is to the appropriate Create*
+     method call for the specified MQSeries object type.
+
+Verify
+     If this key has a true value, then no changes will actually be
+     implemented.  They will merely be reported via test messages on
+     stdout.
+
+Quiet
+     CreateObject is by default rather chatty about what it is doing, but
+     all of the messages, other than errors, can be suppressed if this key
+     has a true value.
+
+Clear
+     Normally, when a Local queue is being replaced with another QType
+     (eg. Remote or Alias), then the Local queue is not cleared before
+     being deleted.  If there are messages on the queue, this will cause an
+     error.  If the queue needs to be cleared, then this key must be passed
+     with a true value.
+
+     This is a seperate option due to the inherit danger of destroying data
+     accidentally.  If you really want to clear the queues before
+     recreating them as another QType, you will have to be explicitl about
+     it.
+
+COMMAND REQUESTS
+================
+
+   This section is *NOT* intended to replace the IBM "MQSeries
+Programmable System Management" documentation, and it merely serves to
+document the specific keys and values used by the perl implementation of
+the API.
+
+   In all cases, the keys which can be passed to the command are identical
+to the strings found in the documentation.  However, some of the values
+also have more convenient string mapping as well, as these are not easily
+intuited by reading IBMs docs, thus these are clarified here.
+
+   The IBM docs list the possible values for each key as a list of
+MQSeries C macros (eg. MQCHT_SENDER), and if given, these will be
+respected.  It will be faster to use the strings given, since these map
+directly to the actual macro values via a hash lookup, rather than a
+function call (all of the various C macros are implemented as function
+calls via an AUTOLOAD).  Also, the author finds the replacement strings
+far more readable.  YMMV.
+
+   For each key shown, the format of value is one of the following:
+
+(string)
+     The value given must be a scalar value, interpretable as a text
+     string.
+
+(string list)
+     The value must be an ARRAY reference of scalar values, all of which
+     must be interpretable as strings.
+
+     NOTE: Some of the parameters (for example, the MsgExit parameter for
+     the various Channel commands) can take either a string or string list.
+     In this case, the API will be forgiving, and try to determine what you
+     meant automatically.  If you pass a reference, it will create a string
+     list parameter, and if you pass a plain scalar, it will create a
+     string.
+
+     ANOTHER NOTE: if you pass a simple scalar string where a string list
+     is explicitly required (as opposed to optional), then the API will
+     create a list of one string for you.
+
+(integer)
+     The value given must be a scalar value, interpretable as an integer.
+     In some cases, a table will show a mapping from more readable text
+     strings to the macros documented in the IBM manuals.
+
+(integer list)
+     The value must be an ARRAY reference of scalar values, all of which
+     must be interpretable as integers.  As with the integer format, in
+     some cases, a table will show a mapping from more readable text
+     strings to the macros documented in the IBM manuals.
+
+(Boolean)
+     The value given need only be 0 or 1.  This was done for some of the
+     integer types which are documented to take a pair of macros, whose
+     values were simply zero or one, and when the true/false nature of the
+     key was considered to be intiuitive.  For example, "DataConversion" is
+     either on (true) or off (false).
+
+   In order to reduce needless redundancy, only the keys which have
+special value mappings, or which have Boolean values will be listed here.
+For all others, the IBM documentation is sufficient.
+
+Channel Commands
+----------------
+
+   Subsets of the these keys are applicable to the following commands.
+See the documentation for each of the for the specific list.
+
+     Change Channel
+     Copy Channel
+     Create Channel
+     Delete Channel
+     Inquire Channel
+     Inquire Channel Names
+     Inquire Channel Status
+     Ping Channel
+     Reset Channel
+     Resolve Channel
+     Start Channel
+     Start Channel Initiator
+     Start Channel Listener
+     Stop Channel
+
+   The following keys have special value mappings:
+
+ChannelType 		(integer)
+          Key				Macro
+          ===				=====
+          Clntconn                    MQCHT_CLNTCONN
+          ClusterReceiver             MQCHT_CLUSRCVR
+          ClusterSender               MQCHT_CLUSSDR
+          Receiver                    MQCHT_RECEIVER
+          Requester                   MQCHT_REQUESTER
+          Sender                      MQCHT_SENDER
+          Server                      MQCHT_SERVER
+          Svrconn                     MQCHT_SVRCONN
+
+TransportType		(integer)
+          Key				Macro
+          ===				=====
+          DECnet                      MQXPT_DECNET
+          LU62                        MQXPT_LU62
+          NetBIOS                     MQXPT_NETBIOS
+          SPX                         MQXPT_SPX
+          TCP                         MQXPT_TCP
+          UDP                         MQXPT_UDP
+
+PutAuthority 		(integer)
+          Key				Macro
+          ===				=====
+          Context                     MQPA_CONTEXT
+          Default                     MQPA_DEFAULT
+
+MCAType 			(integer)
+          Key				Macro
+          ===				=====
+          Process                     MQMCAT_PROCESS
+          Thread                      MQMCAT_THREAD
+
+NonPersistentMsgSpeed	(integer)
+          Key				Macro
+          ===				=====
+          Normal                      MQNPMS_NORMAL
+          Fast                        MQNPMS_FAST
+
+ChannelTable		(integer)
+          Key				Macro
+          ===				=====
+          Clntconn                    MQCHTAB_CLNTCONN
+          QMgr                        MQCHTAB_Q_MGR
+
+ChannelInstanceAttrs	(integer list)
+     Same as ChannelAttrs:
+
+ChannelAttrs		(integer list)
+          Key				Macro
+          ===				=====
+          All                         MQIACF_ALL
+          AlterationDate              MQCA_ALTERATION_DATE
+          AlterationTime              MQCA_ALTERATION_TIME
+          BatchInterval               MQIACH_BATCH_INTERVAL
+          BatchSize                   MQIACH_BATCH_SIZE
+          Batches                     MQIACH_BATCHES
+          BuffersReceived             MQIACH_BUFFERS_RCVD
+          BuffersSent                 MQIACH_BUFFERS_SENT
+          BytesReceived               MQIACH_BYTES_RCVD
+          BytesSent                   MQIACH_BYTES_SENT
+          ChannelDesc                 MQCACH_DESC
+          ChannelInstanceType         MQIACH_CHANNEL_INSTANCE_TYPE
+          ChannelName                 MQCACH_CHANNEL_NAME
+          ChannelNames                MQCACH_CHANNEL_NAMES
+          ChannelStartDate            MQCACH_CHANNEL_START_DATE
+          ChannelStartTime            MQCACH_CHANNEL_START_TIME
+          ChannelStatus               MQIACH_CHANNEL_STATUS
+          ChannelType                 MQIACH_CHANNEL_TYPE
+          ClusterName                 MQCA_CLUSTER_NAME
+          ClusterNamelist             MQCA_CLUSTER_NAMELIST
+          ConnectionName              MQCACH_CONNECTION_NAME
+          CurrentLUWID                MQCACH_CURRENT_LUWID
+          CurrentMsgs                 MQIACH_CURRENT_MSGS
+          CurrentSequenceNumber       MQIACH_CURRENT_SEQ_NUMBER
+          DataConversion              MQIACH_DATA_CONVERSION
+          DiscInterval                MQIACH_DISC_INTERVAL
+          HeartbeatInterval           MQIACH_HB_INTERVAL
+          InDoubtStatus               MQIACH_INDOUBT_STATUS
+          LastLUWID                   MQCACH_LAST_LUWID
+          LastMsgDate                 MQCACH_LAST_MSG_DATE
+          LastMsgTime                 MQCACH_LAST_MSG_TIME
+          LastSequenceNumber          MQIACH_LAST_SEQ_NUMBER
+          LongRetriesLeft             MQIACH_LONG_RETRIES_LEFT
+          LongRetryCount              MQIACH_LONG_RETRY
+          LongRetryInterval           MQIACH_LONG_TIMER
+          MCAJobName                  MQCACH_MCA_JOB_NAME
+          MCAName                     MQCACH_MCA_NAME
+          MCAStatus                   MQIACH_MCA_STATUS
+          MCAType                     MQIACH_MCA_TYPE
+          MCAUserIdentifier           MQCACH_MCA_USER_ID
+          MaxMsgLength                MQIACH_MAX_MSG_LENGTH
+          ModeName                    MQCACH_MODE_NAME
+          MsgExit                     MQCACH_MSG_EXIT_NAME
+          MsgRetryCount               MQIACH_MR_COUNT
+          MsgRetryExit                MQCACH_MR_EXIT_NAME
+          MsgRetryInterval            MQIACH_MR_INTERVAL
+          MsgRetryUserData            MQCACH_MR_EXIT_USER_DATA
+          MsgUserData                 MQCACH_MSG_EXIT_USER_DATA
+          Msgs                        MQIACH_MSGS
+          NetworkPriority             MQIACH_NETWORK_PRIORITY
+          NonPersistentMsgSpeed       MQIACH_NPM_SPEED
+          Password                    MQCACH_PASSWORD
+          PutAuthority                MQIACH_PUT_AUTHORITY
+          QMgrName                    MQCA_Q_MGR_NAME
+          ReceiveExit                 MQCACH_RCV_EXIT_NAME
+          ReceiveUserData             MQCACH_RCV_EXIT_USER_DATA
+          SecurityExit                MQCACH_SEC_EXIT_NAME
+          SecurityUserData            MQCACH_SEC_EXIT_USER_DATA
+          SendExit                    MQCACH_SEND_EXIT_NAME
+          SendUserData                MQCACH_SEND_EXIT_USER_DATA
+          SeqNumberWrap               MQIACH_SEQUENCE_NUMBER_WRAP
+          ShortRetriesLeft            MQIACH_SHORT_RETRIES_LEFT
+          ShortRetryCount             MQIACH_SHORT_RETRY
+          ShortRetryInterval          MQIACH_SHORT_TIMER
+          StopRequested               MQIACH_STOP_REQUESTED
+          TpName                      MQCACH_TP_NAME
+          TransportType               MQIACH_XMIT_PROTOCOL_TYPE
+          UserIdentifier              MQCACH_USER_ID
+          XmitQName                   MQCACH_XMIT_Q_NAME
+
+ChannelInstanceType  	(integer)
+          Key				Macro
+          ===				=====
+          Current                     MQOT_CURRENT_CHANNEL
+          Saved                       MQOT_SAVED_CHANNEL
+
+InDoubt			(integer)
+          Key				Macro
+          ===				=====
+          Backout                     MQIDO_BACKOUT
+          Commit                      MQIDO_COMMIT
+
+   The following keys have Boolean values:
+
+Replace
+DataConversion
+Quiesce
+Namelist Commands
+-----------------
+
+   Subsets of the these keys are applicable to the following commands.
+See the documentation for each of the for the specific list.
+
+     Change Namelist
+     Copy Namelist
+     Create Namelist
+     Delete Namelist
+     Inquire Namelist
+     Inquire Namelist Names
+
+   The following keys have special value mappings:
+
+NamelistAttrs		(integer list)
+          Key				Macro
+          ===				=====
+          AlterationDate              MQCA_ALTERATION_DATE
+          AlterationTime              MQCA_ALTERATION_TIME
+          NamelistDesc                MQCA_NAMELIST_DESC
+          NamelistName                MQCA_NAMELIST_NAME
+          Names                       MQCA_NAMES
+
+   The following keys have Boolean values:
+
+Replace
+Process Commands
+----------------
+
+   Subsets of the these keys are applicable to the following commands.
+See the documentation for each of the for the specific list.
+
+     Change Process
+     Copy Process
+     Create Process
+     Delete Process
+     Inquire Process
+     Inquire ProcessNames
+
+   The following keys have special value mappings:
+
+ApplType    		(integer)
+          Key				Macro
+          ===				=====
+          AIX                         MQAT_AIX
+          CICS                        MQAT_CICS
+          DOS                         MQAT_DOS
+          Default                     MQAT_UNIX
+          IMS                         MQAT_IMS
+          MVS                         MQAT_MVS
+          NSK                         MQAT_NSK
+          OS2                         MQAT_OS2
+          OS400                       MQAT_OS400
+          UNIX                        MQAT_UNIX
+          VMS                         MQAT_VMS
+          Win16                       MQAT_WINDOWS
+          Win32                       MQAT_WINDOWS_NT
+
+ProcessAttrs		(interger list)
+          Key				Macro
+          ===				=====
+          All                         MQIACF_ALL
+          AlterationDate              MQCA_ALTERATION_DATE
+          AlterationTime              MQCA_ALTERATION_TIME
+          ApplId                      MQCA_APPL_ID
+          ApplType                    MQIA_APPL_TYPE
+          EnvData                     MQCA_ENV_DATA
+          ProcessDesc                 MQCA_PROCESS_DESC
+          ProcessName                 MQCA_PROCESS_NAME
+          ProcessNames                MQCACF_PROCESS_NAMES
+          UserData                    MQCA_USER_DATA
+
+   The following keys have Boolean values:
+
+Replace
+Queue Commands
+--------------
+
+   Subsets of the these keys are applicable to the following commands.
+See the documentation for each of the for the specific list.
+
+     Change Queue
+     Clear Queue
+     Copy Queue
+     Create Queue
+     Delete Queue
+     Inquire Queue
+     Inquire Queue Names
+     Reset Queue Statistics
+
+   The following keys have special value mappings:
+
+DefBind  			(integer)
+          Key				Macro
+          ===				=====
+          OnOpen                      MQBND_BIND_ON_OPEN
+          NotFixed                    MQBND_BIND_NOT_FIXED
+
+DefinitionType		(integer)
+          Key				Macro
+          ===				=====
+          Permanent                   MQQDT_PERMANENT_DYNAMIC
+          Temporary                   MQQDT_TEMPORARY_DYNAMIC
+
+DefInputOpenOption    	(integer)
+          Key				Macro
+          ===				=====
+          Exclusive                   MQOO_INPUT_EXCLUSIVE
+          Shared                      MQOO_INPUT_SHARED
+
+MsgDeliverySequence    	(integer)
+          Key				Macro
+          ===				=====
+          FIFO                        MQMDS_FIFO
+          Priority                    MQMDS_PRIORITY
+
+QAttrs			(integer list)
+          Key				Macro
+          ===				=====
+          All                         MQIACF_ALL
+          AlterationDate              MQCA_ALTERATION_DATE
+          AlterationTime              MQCA_ALTERATION_TIME
+          BackoutRequeueName          MQCA_BACKOUT_REQ_Q_NAME
+          BackoutThreshold            MQIA_BACKOUT_THRESHOLD
+          BaseQName                   MQCA_BASE_Q_NAME
+          ClusterDate                 MQCA_CLUSTER_DATE
+          ClusterName                 MQCA_CLUSTER_NAME
+          ClusterNamelist             MQCA_CLUSTER_NAMELIST
+          ClusterQType                MQIA_CLUSTER_Q_TYPE
+          ClusterTime                 MQCA_CLUSTER_TIME
+          CreationDate                MQCA_CREATION_DATE
+          CreationTime                MQCA_CREATION_TIME
+          CurrentQDepth               MQIA_CURRENT_Q_DEPTH
+          DefBind                     MQIA_DEF_BIND
+          DefInputOpenOption          MQIA_DEF_INPUT_OPEN_OPTION
+          DefPersistence              MQIA_DEF_PERSISTENCE
+          DefPriority                 MQIA_DEF_PRIORITY
+          DefinitionType              MQIA_DEFINITION_TYPE
+          DistLists                   MQIA_DIST_LISTS
+          HardenGetBackout            MQIA_HARDEN_GET_BACKOUT
+          HighQDepth                  MQIA_HIGH_Q_DEPTH
+          InhibitGet                  MQIA_INHIBIT_GET
+          InhibitPut                  MQIA_INHIBIT_PUT
+          InitiationQName             MQCA_INITIATION_Q_NAME
+          MaxMsgLength                MQIA_MAX_MSG_LENGTH
+          MaxQDepth                   MQIA_MAX_Q_DEPTH
+          MsgDeliverySequence         MQIA_MSG_DELIVERY_SEQUENCE
+          MsgDeqCount                 MQIA_MSG_DEQ_COUNT
+          MsgEnqCount                 MQIA_MSG_ENQ_COUNT
+          OpenInputCount              MQIA_OPEN_INPUT_COUNT
+          OpenOutputCount             MQIA_OPEN_OUTPUT_COUNT
+          ProcessName                 MQCA_PROCESS_NAME
+          QDepthHighEvent             MQIA_Q_DEPTH_HIGH_EVENT
+          QDepthHighLimit             MQIA_Q_DEPTH_HIGH_LIMIT
+          QDepthLowEvent              MQIA_Q_DEPTH_LOW_EVENT
+          QDepthLowLimit              MQIA_Q_DEPTH_LOW_LIMIT
+          QDepthMaxEvent              MQIA_Q_DEPTH_MAX_EVENT
+          QDesc                       MQCA_Q_DESC
+          QMgrIdentifier              MQCA_Q_MGR_IDENTIFIER
+          QMgrName                    MQCA_CLUSTER_Q_MGR_NAME
+          QName                       MQCA_Q_NAME
+          QNames                      MQCACF_Q_NAMES
+          QServiceInterval            MQIA_Q_SERVICE_INTERVAL
+          QServiceIntervalEvent       MQIA_Q_SERVICE_INTERVAL_EVENT
+          QType                       MQIA_Q_TYPE
+          RemoteQMgrName              MQCA_REMOTE_Q_MGR_NAME
+          RemoteQName                 MQCA_REMOTE_Q_NAME
+          RetentionInterval           MQIA_RETENTION_INTERVAL
+          Scope                       MQIA_SCOPE
+          Shareability                MQIA_SHAREABILITY
+          TimeSinceReset              MQIA_TIME_SINCE_RESET
+          TriggerControl              MQIA_TRIGGER_CONTROL
+          TriggerData                 MQCA_TRIGGER_DATA
+          TriggerDepth                MQIA_TRIGGER_DEPTH
+          TriggerMsgPriority          MQIA_TRIGGER_MSG_PRIORITY
+          TriggerType                 MQIA_TRIGGER_TYPE
+          Usage                       MQIA_USAGE
+          XmitQName                   MQCA_XMIT_Q_NAME
+
+QServiceIntervalEvent    	(integer)
+          Key				Macro
+          ===				=====
+          High                        MQQSIE_HIGH
+          None                        MQQSIE_NONE
+          OK                          MQQSIE_OK
+
+QType    			(integer)
+          Key				Macro
+          ===				=====
+          Alias                       MQQT_ALIAS
+          All                         MQQT_ALL
+          Cluster                     MQQT_CLUSTER
+          Local                       MQQT_LOCAL
+          Model                       MQQT_MODEL
+          Remote                      MQQT_REMOTE
+
+Scope    			(integer)
+          Key				Macro
+          ===				=====
+          Cell                        MQSCO_CELL
+          QMgr                        MQSCO_Q_MGR
+
+TriggerType    		(integer)
+          Key				Macro
+          ===				=====
+          Depth                       MQTT_DEPTH
+          Every                       MQTT_EVERY
+          First                       MQTT_FIRST
+          None                        MQTT_NONE
+
+Usage    			(integer)
+          Key				Macro
+          ===				=====
+          Normal                      MQUS_NORMAL
+          XMITQ                       MQUS_TRANSMISSION
+
+   The following keys have Boolean values:
+
+Replace
+Force
+InhibitPut
+DefPersistence
+InhibitGet
+Shareability
+HardenGetBackout
+DistLists
+TriggerControl
+QDepthMaxEvent
+QDepthHighEvent
+QDepthLowEvent
+Purge
+Queue Manager Commands
+----------------------
+
+   Subsets of the these keys are applicable to the following commands.
+See the documentation for each of the for the specific list.
+
+     Change Queue Manager
+     Inquire Queue Manager
+     Ping Queue Manager
+
+   The following keys have special value mappings:
+
+QMgrAttrs			(integer list)
+          Key				Macro
+          ===				=====
+          All                         MQIACF_ALL
+          AlterationDate              MQCA_ALTERATION_DATE
+          AlterationTime              MQCA_ALTERATION_TIME
+          AuthorityEvent              MQIA_AUTHORITY_EVENT
+          ChannelAutoDef              MQIA_CHANNEL_AUTO_DEF
+          ChannelAutoDefEvent         MQIA_CHANNEL_AUTO_DEF_EVENT
+          ChannelAutoDefExit          MQCA_CHANNEL_AUTO_DEF_EXIT
+          ClusterWorkLoadData         MQCA_CLUSTER_WORKLOAD_DATA
+          ClusterWorkLoadExit         MQCA_CLUSTER_WORKLOAD_EXIT
+          ClusterWorkLoadLength       MQIA_CLUSTER_WORKLOAD_LENGTH
+          CodedCharSetId              MQIA_CODED_CHAR_SET_ID
+          CommandInputQName           MQCA_COMMAND_INPUT_Q_NAME
+          CommandLevel                MQIA_COMMAND_LEVEL
+          DeadLetterQName             MQCA_DEAD_LETTER_Q_NAME
+          DefXmitQName                MQCA_DEF_XMIT_Q_NAME
+          DistLists                   MQIA_DIST_LISTS
+          InhibitEvent                MQIA_INHIBIT_EVENT
+          LocalEvent                  MQIA_LOCAL_EVENT
+          MaxHandles                  MQIA_MAX_HANDLES
+          MaxMsgLength                MQIA_MAX_MSG_LENGTH
+          MaxPriority                 MQIA_MAX_PRIORITY
+          MaxUncommittedMsgs          MQIA_MAX_UNCOMMITTED_MSGS
+          PerformanceEvent            MQIA_PERFORMANCE_EVENT
+          Platform                    MQIA_PLATFORM
+          QMgrDesc                    MQCA_Q_MGR_DESC
+          QMgrIdentifier              MQCA_Q_MGR_IDENTIFIER
+          QMgrName                    MQCA_Q_MGR_NAME
+          RemoteEvent                 MQIA_REMOTE_EVENT
+          RepositoryName              MQCA_REPOSITORY_NAME
+          RepositoryNamelist          MQCA_REPOSITORY_NAMELIST
+          StartStopEvent              MQIA_START_STOP_EVENT
+          SyncPoint                   MQIA_SYNCPOINT
+          TriggerInterval             MQIA_TRIGGER_INTERVAL
+
+   The following keys have Boolean values:
+
+Force
+AuthorityEvent
+InhibitEvent
+LocalEvent
+RemoteEvent
+StartStopEvent
+PerformanceEvent
+ChannelAutoDef
+ChannelAutoDefEvent
+Cluster Commands
+----------------
+
+   Subsets of the these keys are applicable to the following commands.
+See the documentation for each of the for the specific list.
+
+     Inquire Cluster Queue Manager
+     Refresh Cluster
+     Reset Cluster
+     Resume Queue Manager Cluster
+     Suspend Queue Manager Cluster
+
+   The following keys have special value mappings:
+
+ClusterQMgrAttrs		(integer list)
+          Key				Macro
+          ===				=====
+          AlterationDate              MQCA_ALTERATION_DATE
+          AlterationTime              MQCA_ALTERATION_TIME
+          BatchInterval               MQIACH_BATCH_INTERVAL
+          BatchSize                   MQIACH_BATCH_SIZE
+          ChannelStatus               MQIACH_CHANNEL_STATUS
+          ClusterDate                 MQCA_CLUSTER_DATE
+          ClusterName                 MQCA_CLUSTER_NAME
+          ClusterTime                 MQCA_CLUSTER_TIME
+          ConnectionName              MQCACH_CONNECTION_NAME
+          DataConversion              MQIACH_DATA_CONVERSION
+          Description                 MQCACH_DESC
+          DiscInterval                MQIACH_DISC_INTERVAL
+          HeartbeatInterval           MQIACH_HB_INTERVAL
+          LongRetryCount              MQIACH_LONG_RETRY
+          LongRetryInterval           MQIACH_LONG_TIMER
+          MCAName                     MQCACH_MCA_NAME
+          MCAType                     MQIACH_MCA_TYPE
+          MCAUserIdentifier           MQCACH_MCA_USER_ID
+          MaxMsgLength                MQIACH_MAX_MSG_LENGTH
+          ModeName                    MQCACH_MODE_NAME
+          MsgExit                     MQCACH_MSG_EXIT_NAME
+          MsgRetryCount               MQIACH_MR_COUNT
+          MsgRetryExit                MQCACH_MR_EXIT_NAME
+          MsgRetryInterval            MQIACH_MR_INTERVAL
+          MsgRetryUserData            MQCACH_MR_EXIT_USER_DATA
+          MsgUserData                 MQCACH_MSG_EXIT_USER_DATA
+          NetworkPriority             MQIACH_NETWORK_PRIORITY
+          NonPersistentMsgSpeed       MQIACH_NPM_SPEED
+          Password                    MQCACH_PASSWORD
+          PutAuthority                MQIACH_PUT_AUTHORITY
+          QMgrDefinitionType          MQIACF_Q_MGR_DEFINITION_TYPE
+          QMgrIdentifier              MQCA_Q_MGR_IDENTIFIER
+          QMgrType                    MQIACF_Q_MGR_TYPE
+          ReceiveExit                 MQCACH_RCV_EXIT_NAME
+          ReceiveUserData             MQCACH_RCV_EXIT_USER_DATA
+          SecurityExit                MQCACH_SEC_EXIT_NAME
+          SecurityUserData            MQCACH_SEC_EXIT_USER_DATA
+          SendExit                    MQCACH_SEND_EXIT_NAME
+          SendUserData                MQCACH_SEND_EXIT_USER_DATA
+          SeqNumberWrap               MQIACH_SEQUENCE_NUMBER_WRAP
+          ShortRetryCount             MQIACH_SHORT_RETRY
+          ShortRetryInterval          MQIACH_SHORT_TIMER
+          Suspend                     MQIACF_SUSPEND
+          TpName                      MQCACH_TP_NAME
+          TransportType               MQIACH_XMIT_PROTOCOL_TYPE
+          UserIdentifier              MQCACH_USER_ID
+          XmitQName                   MQCACH_XMIT_Q_NAME
+
+Action			(integer)
+          Key				Macro
+          ===				=====
+          ForceRemove                 MQACT_FORCE_REMOVE
+
+   The following keys have Boolean values:
+
+Quiesce
+Escape Command
+--------------
+
+   This command is not really part of a grouping, so its all by itself
+here.
+
+   The following keys have special value mappings:
+
+EscapeType 		(integer)
+          Key				Macro
+          ===				=====
+          MQSC                        MQET_MQSC
+
+COMMAND RESPONSES
+=================
+
+   There are several commands which return data.  The return value of the
+actual command methods depends on the specific command.  All of the
+"Inquire*Names" commands return a list of the actual names returned, which
+greatly simplifies the parsing of the return value.
+
+   The commands which return a list of names are:
+
+     Inquire Channel Names
+     Inquire Namelist Names
+     Inquire Process Names
+     Inquire Queue Names
+
+   For example:
+
+     @qnames = $command->InquireQueueNames( QName => 'FOO.*' );
+
+   will result in @qnames containing a list of strings of all of the queue
+names starting with FOO.
+
+   The rest of the commands return a list of Parameters HASH references,
+extracted from each of the messages sent back from the command server.  In
+a scalar context, only the first Parameters HASH reference is returned.
+This applies to all of the following commands:
+
+     Escape
+     Inquire Channel
+     Inquire Channel Status
+     Inquire Cluster Queue Manager
+     Inquire Namelist
+     Inquire Process
+     Inquire Queue
+     Inquire Queue Manager
+     Reset Queue Statistics
+
+   For example:
+
+     @queues = $command->InquireQueue( QName => 'FOO.*', QAttrs => 'All' );
+
+   will result in @queues containing a list of HASH references, each of
+which has key/value pairs for the attributes of one of the queues starting
+with FOO.
+
+   The keys in the Parameters HASH references are mapped from the numeric
+macro values back into the same strings described above for simplifying
+the input Parameters.
+
+   However, there are a few keys in the responses which are not supported
+as keys in the inquiry.  In general, the return values are left
+unmolested, with the exception of the keys documented above for each
+command type, as well as the following:
+
+Inquire Channel Status Response
+-------------------------------
+
+   The following keys have special value mappings:
+
+ChannelStatus			(integer)
+          Macro				Key
+          =====				===
+          MQCHS_BINDING                       Binding
+          MQCHS_INACTIVE                      Inactive
+          MQCHS_INITIALIZING                  Initializing
+          MQCHS_PAUSED                        Paused
+          MQCHS_REQUESTING                    Requesting
+          MQCHS_RETRYING                      Retrying
+          MQCHS_RUNNING                       Running
+          MQCHS_STARTING                      Starting
+          MQCHS_STOPPED                       Stopped
+          MQCHS_STOPPING                      Stopping
+
+MCAStatus				(integer)
+          Macro				Key
+          =====				===
+          MQMCAS_RUNNING                      Running
+          MQMCAS_STOPPED                      Stopped
+
+   The following keys can be interpreted in a Boolean context:
+
+InDoubtStatus
+StopRequested
+Inquire Cluster Queue Manager Response
+--------------------------------------
+
+   The following keys have special value mappings:
+
+QMgrDefinitionType 		(integer)
+          Macro				Key
+          =====				===
+          MQQMDT_AUTO_CLUSTER_SENDER          AutoClusterSender
+          MQQMDT_AUTO_EXP_CLUSTER_SENDER      AutoExplicitClusterSender
+          MQQMDT_CLUSTER_RECEIVER             ClusterReceiver
+          MQQMDT_EXPLICIT_CLUSTER_SENDER      ExplicitClusterSender
+
+QMgrType				(integer)
+          Macro				Key
+          =====				===
+          MQQMT_NORMAL                        Normal
+          MQQMT_REPOSITORY                    Repository
+
+ChannelStatus			(integer)
+          Macro				Key
+          =====				===
+          MQCHS_BINDING                       Binding
+          MQCHS_INACTIVE                      Inactive
+          MQCHS_INITIALIZING                  Initializing
+          MQCHS_PAUSED                        Paused
+          MQCHS_REQUESTING                    Requesting
+          MQCHS_RETRYING                      Retrying
+          MQCHS_RUNNING                       Running
+          MQCHS_STARTING                      Starting
+          MQCHS_STOPPED                       Stopped
+          MQCHS_STOPPING                      Stopping
+
+   The following keys can be interpreted in a Boolean context:
+
+Suspend
+Inquire Queue Response
+----------------------
+
+   The following keys have special value mappings:
+
+ClusterQType			(integer)
+          Macro				Key
+          =====				===
+          MQCQT_ALIAS_Q                       Alias
+          MQCQT_LOCAL_Q                       Local
+          MQCQT_Q_MGR_ALIAS                   QMgrAlias
+          MQCQT_REMOTE_Q                      Remote
+
+Inquire Queue Manager Response
+------------------------------
+
+   The following keys have special value mappings:
+
+Platform				(integer)
+          Macro				Key
+          =====				===
+          MQPL_MVS                            MVS
+          MQPL_NSK                            NSK
+          MQPL_OS2                            OS2
+          MQPL_OS400                          OS400
+          MQPL_UNIX                           UNIX
+          MQPL_WINDOWS                        Win16
+          MQPL_WINDOWS_NT                     Win32
+
+   The following keys can be interpreted in a Boolean context:
+
+DistLists
+SyncPoint
+SEE ALSO
+========
+
+   MQSeries(3), MQSeries::Queue(3), MQSeries::Message(3),
+MQSeries::Command::Request(3), MQSeries::Command::Response(3)
+
+   In addition, the MQSeries documentation is the primary source of
+documentation for the commands and their arguments, especially the
+following sections.
+
+     "MQSeries Programmable System Management"
+     Part 2. Programmable Command Formats
+       Chapter 8. Definitions of the Programmable Command Formats
+       Chapter 9. Structures used for commands and responses
+
+

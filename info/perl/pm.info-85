@@ -1,0 +1,1684 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: CGI/WML,  Next: CGI/WeT,  Prev: CGI/Validate,  Up: Module List
+
+Subclass LDS's "CGI.pm" for WML output and WML methods
+******************************************************
+
+NAME
+====
+
+   CGI::WML - Subclass LDS's "CGI.pm" for WML output and WML methods
+
+SYNOPSIS
+========
+
+     use CGI::WML;
+
+     $query = new CGI::WML;
+
+     print
+        $query->header(),
+        $query->start_wml(),
+        $query->template(-content=>$query->prev()),
+        $query->card(-id=>"first_card",
+                 -title=>"First card",
+                 -content=>"<p>Hello WAP world!</p>"),
+        $query->end_wml();
+
+     print
+        $query->wml_to_wmlc(-wml=>$wml_buffer,
+                            -errorcontext=>2);
+
+     ($page_title,$content) = $query->html_to_wml($buffer);
+
+
+DESCRIPTION
+===========
+
+   This is a library of perl functions to allow CGI.pm-style programming
+to be applied to WAP/WML. Since this is a subclass of Lincoln Stein's
+CGI.pm all the normal CGI.pm methods are available. See *perldoc CGI* if
+you are not familiar with CGI.pm
+
+   The most up to date version of this module is available at
+http://wap.z-y-g-o.com/tools/
+
+FUNCTIONS
+=========
+
+   The library provides an object-oriented method of creating correct WML,
+together with some canned methods for often-used tasks. As this module is
+a subclass of CGI.pm, the same argument-passing method is used, and
+arguments may be passed in any order.
+
+CREATING A WML DECK
+-------------------
+
+header()
+     This function now overrides the default CGI.pm 'Content-type: ' header
+     to be 'text/vnd.wap.wml' by default. All the standard CGI.pm header
+     functions are still available for use.
+
+     print $query->header();
+
+          -or-
+          print $query->header(-expires=>"+1m",
+                               -Refresh=>'20; URL='/newplace.wml');
+
+start_wml() Use the start_wml method to create the start of a WML deck, if you wish you can pass paramaters to the method to define a custom DTD, XML language value and any 'META' information. If a DTD is not specified then the default is to use `WML 1.1'
+     $query->start_wml(-dtd      => '-//WAPFORUM//DTD WML 5.5//EN',
+               -dtd_url  => 'http://www.wapforum.org/DTD/wml_5.5.xml',
+                   -lang     => 'en-gb',                   -encoding =>
+     'iso-8859-1',                   -meta     => {'scheme'=>'foobar',
+                                'name'  =>'mystuff'} );
+
+     There is no direct support for the HTTP-EQUIV type of <meta> tag.
+     This is because you can modify the HTTP header directly with the
+     header() method.  For example, if you want to send the Cache-control:
+     header, do it in the header() method:
+
+     $q->header(-cache_control=>'No-cache; forua=true');
+
+end_wml()
+     Use end_wml() to end the WML deck. Just included for completeness.
+
+CREATING WML CARDS
+------------------
+
+card()
+     Cards are created whole, by passing paramaters to the card() method,
+     as well as the card attributes, a timer may be added to the start of
+     the card.
+
+     $query->card(-id=>"card_id",              -title=>"First Card",
+           -ontimer=>"#next_card",
+     -timer=>$query->timer(-name=>"timer1",-value=>"30"),
+     -newcontext=>"true",              -onenterforward=>"#somecard",
+           -onenterbackward=>"#othercard",
+     -content=>"<p>Hello WAP world</p>");
+
+     The 'ID' and 'Content' elements are manditory, and have no defaults.
+     All other parameters are optional.
+
+TEMPLATES
+---------
+
+   The template() method creates a template for placing at the start of a
+card. If you just need to add a back link, use the prev() method.
+
+   $query->template(-content=>$query->prev(-label=>"Go Back"));
+
+TIMERS
+------
+
+   A card timer is used with the card() method to trigger an action, the
+function takes two arguments, the name of the timer and it's value in
+milliseconds.
+
+   $query->timer(-name=>"mytimer",               -value=>"30");
+
+GO BLOCKS
+---------
+
+   A <go block is created either as a single line
+
+   $query->go(-method=>"get",
+-href=>"http://www.example.com/"); ` <go href="http://www.example.com/"
+method="get"/> ' or as a block
+
+   %pfs = ('var1'=>'1',         'var2'=>'2',         'varN'=>'N');
+
+   $query->go(-method=>"post",            -href=>"http://www.example.com/",
+          -postfields=>\%pfs);
+
+   <go href="http://www.example.com/" method="get">   <postfield
+name="var1" value="1"/>   <postfield name="var2" value="2"/>   <postfield
+name="varN" value="N"/> </go>
+
+   depending on wether it is passed a hash of postfields.
+
+DO
+--
+
+   $query->do(-type=>"options",               -label=>"Menu",
+-content=>qq(go href="#menu"/>)); gives
+
+   <do type="options" label="Menu" >   <go href="#menu"/> </do>
+
+PREV
+----
+
+   A canned 'back' link, takes an optional label argument. Default label
+is 'Back'. For use in *templates*
+
+   $query->prev(-label=>"Reverse");
+
+   <do type="accept" label="Reverse"><prev/></do>
+
+INPUT
+-----
+
+   Create an input entry field. No defaults, although not all arguments
+need to be specified.
+
+   $query->input(-name=>"pin",               -value=>"1234",
+-type=>"text",               -size=>4,               -title=>"Enter PIN",
+            -format=>"4N",               -maxlength=>4,
+-emptyok=>"false");
+
+ONEVENT
+-------
+
+   An *onevent* element may contain one of 'go','prev','noop' or 'refresh'
+and be of type 'onenterforward', 'onenterbackward' or 'ontimer'.
+
+   $query->onevent(-type=>"onenterforward",
+-content=>qq(<refresh>                               <setvar name="x"
+value="1"/>                              </refresh>));
+
+IMG
+---
+
+   An image can be created with the following attributes:
+
+     alt       Text to display in case the image is not displayed
+     align     can be top, middle, bottom
+     src       The absolute or relative URI to the image
+     localsrc  a variable (set using the setvar tag) that refers to an image
+               this attribute takes precedence over the B<src> tag
+     vspace
+     hspace    amount of white space to inserted to the left and right
+               of the image [hspace] or above and below the image [vspace]
+     height
+     width     These attributes are a hint to the user agent to leave space
+               for the image while the page is rendering the page.  The
+               user agent may ignore the attributes.  If the number length
+               is passed as a percent the resulting image size will be
+               relative to the amount of available space, not the image size.
+
+   my $img = $query->img(                  -src      =>
+'/icons/blue_boy.wbmp',                  -alt      => 'Blue Boy',
+       -localsrc => '$var',                  -vspace   => '25',
+      -hspace   => '30                  -align    => 'bottom',
+     -height   => '15',                  -width    => '10');
+
+   NOTE the *localsrc* element, and formatting elements are not supported
+consistently by the current generation of terminals, however they should
+simply ignore the attributes they do not understand.
+
+Dial Tags
+---------
+
+   When using cell phones in WAP you can make calls.  When a dial tag is
+selected the phone drops out of the WAP stack and into what ever is the
+protocol used for phone calls.  At the conclusion of the call the phone
+should return to the WAP stack in the same place that you linked to the
+phone number.
+
+   The tag looks much like a regular link, but has some special syntax.
+
+   $query->dialtag(-label =>"Joe's Pizza",
+-number=>"12125551212");
+
+   The recieving terminal must support WTAI for this link to work.
+
+WML SHORTCUTS
+=============
+
+   p b *br* table etc. etc. Just like the original CGI.pm, this module
+includes functions for creating correct WML by calling methods of a query
+object.
+
+   WML Shortcuts may be called in two ways;
+
+   With a single parameter, which will be the content of the tag, for
+example;
+
+     Perl code                           WML Result
+          ---------------------            ---------------------
+          $query->b("Bold text);               <b>bold</b>
+          $query->p("Hello");                  <p>Hello</p>
+
+     $query->p($query->b("Hello"));       <p><b>Hello</b></p>
+
+     $query->br();                        <br/> # "No-close" tags are
+                                                # automatically dealt with
+
+   Alternatively, they can be called with a list of arguments, specifying
+content and attibutes.
+
+     Perl code                           WML Result
+     ---------------------            ---------------------
+     $query->p(-align=>"left",        <p align="left">Hi there</p>
+               -content=>"Hi there");
+
+     When being called with the second syntax, the 'content' parameter
+      specifies the content of tags.
+
+     All WML 1.1 tags are available via this method.
+
+COMPILING WML DECKS
+===================
+
+   $query->wml_to_wmlc(-wml=>$buffer,
+-errorcontext=>2);  # default 0
+
+   A WML to WBXML converter/compiler is included for convinience purposes,
+although it is not intended to replace the compiler on the WAP gateway it
+may prove useful, for example measuring what the compiled document size
+will be.
+
+     $size = length($query->wml_to_wmlc(-wml=>$wml,
+                                        -errorcontext=>0));
+
+   NOTE WBXML string tables are used to compress the document size down as
+small as possible, giving excellent document size performance. Because of
+this though, the size returned by the function may be smaller than the size
+of the WBXML document created by the WAP gateway. Turning this feature off
+will be an option in future releases.
+
+   The function takes two arguments, a buffer of textual WML and an
+optional argument specifiying that should the XML parser fail then X many
+lines of the buffer before and after the point where the error occured
+will be printed to show the context of the error.
+
+ERRORCONTEXT WARNING Setting this to any non-zero value will cause your program to exit if the routine is passed WML which is not "well formed" this is due to the fact that XML::Parser calls die() upon such events.
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+   If you wish to test wether a WML document is well formed, then set this
+value to zero and check the return value of the function. The function
+returns undef upon failiure and issues a warning, anything other than
+undef indicates success.
+
+HTML TO WML CONVERSION
+======================
+
+   ($title,$content) = $query->html_to_wml($buffer);
+
+   -or-
+
+   ($title,$content) = $query->html_to_wml(\*FILEHANDLE);
+
+   A limited HTML to WML converter is included in this package. Be warned
+that only pretty well marked-up HTML will convert cleanly to WML.  Dave
+Ragget's excellent *tidy* utility [ see
+http://www.w3.org/People/Raggett/tidy/ ] will clean up most HTML into a
+parseable state.
+
+   The main purpose of this function is for converting server error
+messages and the "Compact HTML" used on "I-Mode" systems to readable WML,
+not for general page translation.
+
+   Potential users of this function are encouraged to read the source to
+this module to gain a better understanding of the underlying mechanics of
+the translation.
+
+AUTHOR
+======
+
+   Angus Wood <angus@z-y-g-o.com>, with loads of additions and
+improvements by Andy Murren <amurren@oven.com>
+
+CREDITS
+=======
+
+Wilbert Smits <wilbert@telegraafnet.nl> for the header() function content-type override.
+SEE ALSO
+========
+
+   perl(1), perldoc CGI, tidy(1)
+
+
+File: pm.info,  Node: CGI/WeT,  Next: CGI/WeT/Chooser,  Prev: CGI/WML,  Up: Module List
+
+Suite of modules to themeify a website
+**************************************
+
+NAME
+====
+
+   CGI::WeT - Suite of modules to themeify a website
+
+SYNOPSIS
+========
+
+     use CGI::WeT ();
+
+   Additional packages may be installed and used.  Please check with CPAN
+for the latest collections.
+
+DESCRIPTION
+===========
+
+   The collection of CGI::WeT::* modules allows a site to be built from
+three major components: (1) static themed html files, (2) theme
+definitions, (3) CGI scripts.
+
+   This package (CGI::WeT) will load in the following packages only.  No
+symbols are imported.
+
+     CGI
+     CGI::WeT::Engine
+     CGI::WeT::Theme
+     CGI::WeT::Modules::Basic
+
+Themed HTML
+===========
+
+   Static files are built with no navigation or other theme-dependent
+information.  The file consists of a set of header lines followed by the
+body of the file separated by a blank line.  For example
+
+     Title: This is an example file
+
+     <p>This file is an example of themed HTML</p>
+
+   This will produce a page with `This is an example file' as part of the
+title in the head and the rest of the file as the body placed on the page
+according to the theme in force.
+
+   CGI::WeT::Engine provides the mod_perl handler for static pages.
+
+Theme Definitions
+=================
+
+   This part of the package depends on which theme loader is being used.
+A theme definition provides the engine with the information it needs to
+produce a well formed page.  See the appropriate
+CGI::WeT::Theme::Loader::*(3) page.
+
+CGI Scripts
+===========
+
+   CGI::WeT can be used in place of CGI with minor modifications.  Replace
+the *use CGI* statement with *use CGI::WeT* at the top of the script and
+add a line to the close of the script: *CGI::WeT-*show_page>.
+
+   The following is an example based on the CGI.pm book:
+
+     #!/usr/bin/perl
+     # Script: plaintext2.pl
+     use CGI::WeT ':standard';
+
+     print header('text/html');
+     print start_html(-title => 'PlainText2.CGI');
+     print "Jabberwock\n\n";
+     print "'Twas brillig, and the slithy toves\n";
+     print "Did gyre and gimbol in the wave.\n";
+     print "All mimsy were the borogroves,\n";
+     print "And the mome raths outgrabe....\n";
+     print end_html();
+
+     CGI::WeT->show_page;
+
+SEE ALSO
+========
+
+   perl(1), CGI::WeT::*(3),
+
+   CGI::WeT notes at `http://www.jamesmith.com/cgi-wet/'
+
+SUPPORT
+=======
+
+   Please send any questions or comments about CGI::WeT to me at
+jsmith@jamesmith.com
+
+AUTHORS
+=======
+
+     Written by James G. Smith.
+     Copyright (C) 1999.  Released under the Artistic License.
+
+
+File: pm.info,  Node: CGI/WeT/Chooser,  Next: CGI/WeT/Engine,  Prev: CGI/WeT,  Up: Module List
+
+Cookie setter for theme selection
+*********************************
+
+NAME
+====
+
+   CGI::WeT::Chooser - Cookie setter for theme selection
+
+SYNOPSIS
+========
+
+     <Location "/Chooser">
+       SetHandler perl-script
+       PerlHandler CGI::WeT::Chooser
+     </Location>
+
+DESCRIPTION
+===========
+
+   CGI::WeT::Chooser replaces the scripts/chooser.cgi script in version
+0.70 and earlier.  The theme selector provided in distributions with
+CGI::WeT::Chooser will refer to @@TOP@@/Chooser.
+
+SEE ALSO
+========
+
+   perl(1), CGI::WeT::*(3),
+
+   CGI::WeT notes at `http://www.jamesmith.com/cgi-wet/'
+
+SUPPORT
+=======
+
+   Please send any questions or comments about CGI::WeT to me at
+jsmith@jamesmith.com.
+
+AUTHORS
+=======
+
+     Written by James G. Smith.
+     Copyright (C) 1999.  Released under the Artistic License.
+
+
+File: pm.info,  Node: CGI/WeT/Engine,  Next: CGI/WeT/Modules/Basic,  Prev: CGI/WeT/Chooser,  Up: Module List
+
+Theme engine for the CGI::WeT package
+*************************************
+
+NAME
+====
+
+   CGI::WeT::Engine - Theme engine for the CGI::WeT package
+
+SYNOPSIS
+========
+
+     use CGI::WeT::Engine ();
+
+DESCRIPTION
+===========
+
+   This module provides a web site with the ability to provide themes.  It
+is designed to work seamlessly with mod_perl but can be made to work
+without mod_perl without too much difficulty.
+
+NOT USING MOD_PERL
+==================
+
+   To use this module without mod_perl, a script must be written to handle
+all themed page requests.  A sample script might be
+
+     #!/usr/bin/perl
+
+     use CGI::WeT::Engine;
+     use CGI::WeT::Theme;
+     use CGI::WeT::Modules::Basic;
+
+     my $filename = $ENV{'PATH_TRANSLATED'};
+     my $url = $ENV{'PATH_INFO'};
+
+     my($key, $val);
+
+     my $engine = new CGI::WeT::Engine;
+
+     if($inputfile) {
+
+     #
+     # get the title and other headers out of the themed page
+     #
+
+     open IN, "<$inputfile";
+
+     while(<IN>) {
+
+     last if /^\s*$/;
+     next if /^\s*\#/;
+
+     chomp;
+
+     if(/^[A-Za-z_]+:/) {
+         ($key, $val) = split(/:/,$_,2);
+     } else {
+         $val = $_;
+     }
+
+     $engine->headers_push($key, $val);
+             }
+     
+             #
+             # slurp up the rest of the file
+             #
+
+     $engine->print((<IN>));
+     close IN;
+         }
+     
+         # page is rendered when $engine is destroyed...
+
+   Apache must then be configured to call the CGI script for all files that
+are themed.
+
+USING MOD_PERL
+==============
+
+   To use this module with mod_perl, a handler must be set using the engine
+to filter the themed pages.  The following is an example of the changes
+needed by the Apache configuration files.
+
+     <Files "*.thtml">
+         AddHandler perl-script .thtml
+         PerlHandler CGI::WeT::Engine
+         PerlSendHeader On
+         PerlSetupEnv   On
+     </Files>
+
+   All required modules must be loaded in at server startup.  No code is
+loaded during rendering.  The minimum modules are CGI::WeT::Engine,
+CGI::WeT::Theme, and CGI::WeT::Modules::Basic.
+
+USING TIED HANDLES
+==================
+
+   CGI::WeT::Engine now supports tied handles.  This makes themeing of
+older code much easier:
+
+     use CGI::WeT;
+     tie *STDOUT, 'CGI::WeT::Engine';
+
+     print "Title: <title of page>\nAuthor: A. U. Thor\n\n";
+
+     .
+     .  Old script here printing to STDOUT
+     .
+
+     untie *STDOUT;
+
+   The resulting page will have the scripts output as the body.  When
+using this method, do not use the CGI::start_html function - this is taken
+care of by the CGI::WeT::Engine code.
+
+CGI::WeT::Engine API
+====================
+
+$engine = new CGI::WeT::Engine;
+     Returns a reference to a new rendering engine.  The returned object
+     will have parsed the arguments to the URL (if GET or POST).  The
+     returned object will need to be set up before a page can be rendered.
+
+     When the object returned by new is destroyed, the page is rendered to
+     STDOUT.
+
+     If using mod_perl, the following variables may be set using
+     PerlSetVar:
+
+          WeT_SiteName - prefix for page titles to identify the site
+          WeT_SiteRoot - prefix for URLs for this site - defaults to '/'
+          WeT_DocumentRoot - Defaults to Apache's DocumentRoot
+          WeT_Top - location of the top page of the site relative to the SiteRoot
+                    (this allows splash pages)
+          WeT_Email - email of the administrator
+          WeT_ProblemsEmail - email for bug reports and other problems
+          WeT_DefaultTheme - initial theme people will see
+                             this can be overridden with the environment variable
+                             `WET_THEME'
+          WeT_UseSSLURLs - whether to add :SSL and :NOSSL to the
+                           end of URLs generated by the engine or not. (This
+                           is considered true if defined.)  This is still
+                           experimental and will most likely break graphical
+                           navigation.
+          WeT_AnonymousCoward - in a bow to slashdot.org, this is what the site
+                                names anonymous contributors.  This is not
+                                retroactive (yet).
+
+     Otherwise, the function *CGI::WeT::site_config* must be defined
+     expecting a reference to the engine object.  The following members of
+     the object need to be defined:
+
+          $engine->{'SITENAME'}  -- corresponds to WeT_SiteName
+          $engine->{'URLBASES'}->{'URLBASE'}  -- corresponds to WeT_DocumentRoot
+          $engine->{'URLBASES'}->{'TOP'}  -- corresponds to WeT_Top
+          $engine->{'EMAIL'} -- corresponds to WeT_Email
+          $engine->{'PROBLEMS_EMAIL'} -- corresponds to WeT_ProblemsEmail
+          $engine->{'DEFAULT_THEME'} -- corresponds to WeT_DefaultTheme
+          $engine->{'SSL_URLS'} -- corresponds to WeT_UseSSLURLs
+          $engine->{'AC'} -- corresponds tp WeT_AnonymousCoward
+          =cut
+          # ' for Emacs
+          # ` for Emacs
+
+     sub DESTROY {   my $engine = shift;   my $r;
+
+          return if $engine->{'INTERNAL_USE_ONLY'};
+
+          if($engine->{'doing_headers'}) {
+            $engine->print("\n\n");
+          }
+          
+          if($engine->{'MOD_PERL'} ) {
+            $r = Apache->request;
+            my $fh = $engine->{'STDOUT'};
+          
+          #    $r->content_type('text/html');
+          
+          #    $r->cgi_headers_out unless $engine->{'FILTERED'};
+          
+            $fh->print($engine->render_page);
+          } else {
+          #    print "Content-type: text/html\n\n";
+            print $engine->render_page;
+          }
+          }
+
+$engine->internal_use_only
+     This function will mark the $engine object as being for internal use
+     only (hence its name).  That is, it will not output a page to output
+     upon destruction.  Returns the previous value.  If an argument is
+     present, the internal flag is set to that value.
+
+     This function is valuable if a CGI script decides it needs to
+     redirect instead of outputing HTML.  Calling this function will
+     disable automatic HTML output.
+
+$engine->content_pop
+     This function returns the item on the top of the content stack.  Used
+     primarily in the rendering code and the *CGI::WeT::Modules*
+     extensions to the engine.  An optional argument specifies how many
+     elements to pop.
+
+$engine->content_push(*array ref*)
+     This function pushes the *array ref*erence onto the top of the content
+     stack.  Used primarily in the rendering code and the
+     *CGI::WeT::Modules* extensions to the engine.
+
+$engine->content_peek
+     This function returns a reference to the item on the top of the stack
+     without removing it.  Used primarily in the rendering code and the
+     *CGI::WeT::Modules* extensions to the engine.
+
+$engine->arguments_pop
+     This function returns the item on the top of the argument stack.
+     Used primarily in the rendering code and the *CGI::WeT::Modules*
+     extensions to the engine.  Caveat coder.
+
+$engine->arguments_push(*hash ref*)
+     This function pushes the *hash ref*erence onto the top of the argument
+     stack.  Used primarily in the rendering code and the
+     *CGI::WeT::Modules* extensions to the engine.  Caveat coder.
+
+$engine->argument(key)
+     This function descends the argument stack looking for a definition of
+     key.  If one is found, it is cached at the top of the stack and
+     returned.  Use this function to retrieve values passed through a GET
+     or POST.  Cookies may also be retrieved through this method but will
+     be overridden by any definitions in the GET or POST data.
+
+     The calling context determines if the function returns an array or a
+     scalar.  This is only significant if the key appeared multiple times
+     in the cookie, GET, or POST data.
+
+$engine->headers_push(key => value, ...)
+     This function will place value associated with key in the header
+     hash.  Multiple values are placed in arrays similar to the arguments.
+     Several keys are meaningful to the rendering code:
+
+     Title - Denotes the page title.  This is placed in the document head.
+
+     Type - Document type.  This is used to determine which layout to use
+     in a theme.  The first is highest priority.  The `DEFAULT' type is
+     implied as the lowest priority layout.
+
+     Author, Keywords, Date - These three are placed verbatim in META tags
+     in the header.  Useful information for search engines.
+
+$engine->header(key)
+     This function retrieves the values associated with key.  The calling
+     context determines if the function returns an array or a scalar.
+     This is only significant if the key appeared in multiple calls to
+     *headers_push*.
+
+$engine->print(array)
+     This function places array at the end of the body content caching it
+     for later use by the rendering code.  Text placed in the body cannot
+     be removed by a provided method.
+
+$engine->url(array)
+     This function forms a string from array prefixing it with the base URL
+     for the themed site.  Any strings of the form *@@var@@* are
+     interpolated from a hash of base URLs.  This provides for locations
+     based on the theme or site configuration.  Multiple `/'s are
+     collapsed.  This function will not be able to return theme dependent
+     URLs except during the actual rendering of a page.
+
+     If the url built from array begins with `/', then the link is
+     absolute with respect to the top of the site.  Otherwise, it is
+     relative to the page being produced.
+
+     If this function is called without arguments, it will return the URI
+     of the current request.
+
+$engine->filename(URL)
+     This function will return the location of URL in the filesystem.  This
+     will use Apache's URl->filename translation code if running under
+     mod_perl.  Otherwise, tacks the document root on the beginning.  If
+     no arguments are passed, it will return the filename of the current
+     page.
+
+$engine->smarttext(array)
+     This function will accept the array of plain text and return a string
+     of HTML formatted text.
+
+     HTML character entities are preserved.  Also, &star; and &under; are
+     translated to `*' and `_' respectively.  Paragraphs beginning with
+     whitespace are quoted as preformatted text.  The ampersand,
+     greater-than and less-than are translated to character entities.
+     Therefore, no HTML may be included in the input text.  Text may be
+     _underlined_ or made *bold*.
+
+$engine->render_content
+     This function is the main workhorse returning an array resulting from
+     rendering the top of the content stack.  Used primarily in the
+     rendering code and the *CGI::WeT::Modules* extensions to the engine.
+     Caveat coder.
+
+$engine->render_page([*theme*])
+     This function returns the rendered page constructed with the object
+     using *theme* if supplied.  Otherwise the argument stack is consulted
+     to determine which theme to use.  If *theme* is supplied, it must be
+     an object returned by *new CGI::WeT::Theme* or a derived class of
+     *CGI::WeT::Theme*.
+
+SEE ALSO
+========
+
+   perl(1), CGI(3), CGI::WeT(3), CGI::WeT::Theme(3), CGI::WeT::Modules(3),
+
+   CGI::WeT notes at `http://www.jamesmith.com/cgi-wet/'
+
+AUTHORS
+=======
+
+     Written by James G. Smith.
+     Copyright (C) 1999.  Released under the Artistic License.
+
+
+File: pm.info,  Node: CGI/WeT/Modules/Basic,  Next: CGI/WeT/Modules/Calendar,  Prev: CGI/WeT/Engine,  Up: Module List
+
+Basic rendering engine extensions
+*********************************
+
+NAME
+====
+
+   CGI::WeT::Modules::Basic - Basic rendering engine extensions
+
+SYNOPSIS
+========
+
+     use CGI::WeT::Modules::Basic ();
+
+DESCRIPTION
+===========
+
+   This module provides basic rendering constructs for the engine.  Please
+be aware that the code supersedes the documentation.  While I have tried
+to be accurate there are times that words fail me and a look at the code
+is far more enlightening than anything I could cobble together.  This is
+especially true when trying to write a theme.  Download a theme and see
+how someone else did it.  Then try making modifications and see what
+happens.
+
+EXTENSIONS
+==========
+
+   sub initialize { 1; }
+
+BODY
+     This extension will insert the body of the themed HTML into the
+     rendered page.
+
+HBOX
+     This extension builds a box on the page by placing the contents in a
+     <table>...</table> construct.  Available arguments are: width,
+     cellspacing, cellpadding, border, height, and bgcolor.
+
+VBOX
+     This extension places its contents in a smaller box which is
+     contained in a LINE.  Available arguments are: width, valign,
+     colspan, rowspan, height, align, background, bgcolor.
+
+LINE
+     This extension puts together a set of VBOXs for inclusion in a HBOX.
+
+CONTENT
+     This extension renders the top of the content stack and places the
+     results in the page.
+
+TEXT
+     This extension interprets the top of the content stack as plain text
+     and places it in the page.
+
+GRAPHIC
+     This extension will place a theme dependent graphic image in the page.
+     Available arguments are `location' (relative to the theme's base
+     image URL), `height,' `width,' `align,' `valign,' and `name.'
+
+HEADERS
+     This extension places the text of a header line in the page.
+     Available arguments are: key, align, size, and color.
+
+LINK
+     This extension places a link relative to the top of the site around
+     the content at the top of the content stack.  The argument needed is
+     `location.'
+
+DUP
+     This extension duplicates the top of the content stack.
+
+ROT
+     This extension takes the third element of the stack to the top of the
+     stack.
+
+SWAP
+     This extension swaps the top two elements of the content stack
+
+POP
+     This extension discards the top of the content stack.
+
+IF
+     This extension will leave either the second or the third element on
+     the top of the content stack depending on whether or not the top
+     element is true or false (non-blank or blank).
+
+QIF
+     Given three elements on the top of the content stack, it will render
+     the top element by the second or leave the third depending on whether
+     the top is true or false (non-blank or blank).
+
+IFMODULE
+     Operates the same as IF except the conditional is a list of modules
+     given as arguments.  For example
+
+          '[IFMODULE module=NEWS_SUMMARY module=HELP_URL]'
+
+     will leave the top of the content stack if and only if both
+     NEWS_SUMMARY and HELP_URL are available under in CGI::WeT::Modules::
+     .  Otherwise, it will leave the next to the top of the content stack
+     on top.  In either case, the content stack will have one less element
+     afterwards.
+
+NAVIGATION
+     This extension will render the navigation for the particular page.
+     Several arguments are available to customize the look.
+
+     type - if 'text' then rendering is done with text.  Otherwise, the
+     value is used to determine the directory in which the graphics images
+     reside.  This depends on the theme.
+
+     bullet - defines a graphical element to prefix the navigational
+     elements with.  Arguments that help define the image are:
+     bullet_width, bullet_height.
+
+     align - if this is 'center' then the navigational element is centered.
+
+     begin - defines the initial HTML to use in building the navigation.
+
+     end - defines the final HTML to use in building the navigation.
+
+     top - if 'yes' will place a link to the top of the site.
+
+     up - if 'yes' will place a link to the level above the current level.
+
+     join - determins the HTML used between navigational elements.
+
+     level - if 'current' only places navigation for the current level.
+     Otherwise, renders an outline from the top to the current level.
+
+NAVPATH
+     This extension renders a path of links from the top of the site to the
+     current level.  Currently only supports a type of `text.'  Other
+     arguments are:
+
+     join - the code to join to elements in the path.
+
+     *ellipses* - the code to indicate absence of intervening levels
+
+     depth - the number of levels to include in the path before dropping
+     elements.
+
+THEME_CHOOSER
+     This extension will place a form on the page allowing the user to
+     choose a different theme.  Requires a CGI script '/chooser.cgi' in
+     the root of the site.  The value of join is placed between the
+     selection list and the submit button.
+
+ALTERNATE_THEME
+     This extension duplicates LINK except that the location is the current
+     page URL and the value of the *theme* argument is appended as part of
+     the URL.
+
+INCLUDE
+     This extension will read in a file given by the location argument and
+     return the contents.  The file is interpreted as a local URI.
+
+
+File: pm.info,  Node: CGI/WeT/Modules/Calendar,  Next: CGI/WeT/Modules/Documentation,  Prev: CGI/WeT/Modules/Basic,  Up: Module List
+
+Extensions to engine to allow calendar management
+*************************************************
+
+NAME
+====
+
+   CGI::WeT::Modules::Calendar - Extensions to engine to allow calendar
+management
+
+SYNOPSIS
+========
+
+     use CGI::WeT::Modules::Calendar ();
+
+DESCRIPTION
+===========
+
+   This module provides rendering constructs to allow navigation through a
+set of calendars.  Support is provided for multiple types of events in
+multiple calendars, both public and private (general and user specific).
+
+EXTENSIONS
+==========
+
+CGI::WeT::Modules::Calendar::initialize($engine, $r)
+     This subroutine will initialize the engine passed as $engine with
+     information from Apache (passed as $r).  The base URL for calendars
+     is set with the following.
+
+          PerlSetVar WeT_CalendarURL /baseURL/
+
+     This is available for building URLs as @@CALENDAR@@.  For example,
+     the top level calendar can be viewed at the URL returned by
+
+          $engine->url('@@CALENDAR@@/general/');
+
+     A list of available calendars might be found at
+
+          $engine->url('@@CALENDAR@@/');
+
+
+File: pm.info,  Node: CGI/WeT/Modules/Documentation,  Next: CGI/WeT/Modules/News,  Prev: CGI/WeT/Modules/Calendar,  Up: Module List
+
+Extensions to engine to allow documentation management
+******************************************************
+
+NAME
+====
+
+   CGI::WeT::Modules::Documentation - Extensions to engine to allow
+documentation management
+
+SYNOPSIS
+========
+
+     use CGI::WeT::Modules::Documentation ();
+
+DESCRIPTION
+===========
+
+   This module provides rendering constructs to allow navigation through a
+set of pages.  Support is provided for a doubly linked list of pages.
+
+EXTENSIONS
+==========
+
+CGI::WeT::Modules::Documentation::initialize($engine, $r)
+     This subroutine will initialize the engine passed as $engine with
+     information from Apache (passed as $r).  There is no significant code.
+
+DOC_NEXT
+     This extension is like CGI::WeT::Modules::Basic's LINK in that the
+     top of the content stack is made into a link.  The location is
+     determined by the values of the arguments.
+
+    sequence
+          This can be either `next' or `prev.'
+
+
+File: pm.info,  Node: CGI/WeT/Modules/News,  Next: CGI/WeT/Theme,  Prev: CGI/WeT/Modules/Documentation,  Up: Module List
+
+Extensions to engine to allow article management
+************************************************
+
+NAME
+====
+
+   CGI::WeT::Modules::News - Extensions to engine to allow article
+management
+
+SYNOPSIS
+========
+
+     use CGI::WeT::Modules::News ();
+
+DESCRIPTION
+===========
+
+   This module provides rendering constructs to allow navigation through a
+set of articles.  Support is provided for multiple types of articles in
+multiple groupings (or channels).
+
+EXTENSIONS
+==========
+
+CGI::WeT::Modules::News::initialize($engine, $r)
+     This subroutine will initialize the engine passed as $engine with
+     information from Apache (passed as $r).  The base URL for articles is
+     set with the following.
+
+          PerlSetVar WeT_NewsURL /baseURL/
+
+     This is available for building URLs as @@NEWS@@.  For example,
+     general articles are under the URL returned by
+
+          $engine->url('@@NEWS@@/general/');
+
+     The directory may likewise be found by using
+
+          $engine->filename($engine->url('@@NEWS@@/general/'));
+
+NEWS_SUMMARY
+     This extension will insert a summary of available news items starting
+     with the most recent (ordered by submission time).  The top of the
+     content stack is applied to each item as a template.
+
+     The template used is called with four elements on the content stack:
+     Title, Date, Author, and Summary (Title on top of stack).  The
+     available arguments for controlling NEWS_SUMMARY are
+
+    channel
+          This argument specifies which channel to collect items from.
+          This defaults to `general.'
+
+    category
+          This argument specifies which category to collect items from.
+          Only one category may be specified at this time.  There is no
+          way to block items marked as `all.'  The default category is
+          `all.'
+
+    link
+          If this is set to `title,' the title will be made a link.  No
+          other value has an effect.
+
+    number
+          This tells NEWS_SUMMARY how many items to put in the list.
+          There is no default for this argument, so one must be supplied.
+
+NEWS_NEXT
+     This extension is like CGI::WeT::Modules::Basic's LINK in that the
+     top of the content stack is made into a link.  The location is
+     determined by the values of the arguments.
+
+    channel
+          See NEWS_SUMMARY
+
+    type
+          This can be either `story' or `response.'  If `story,' then the
+          articles in the top level are looked at.  Otherwise, the
+          articles in the current directory are examined.
+
+    sequence
+          This can be either `next' or `prev.'
+
+
+File: pm.info,  Node: CGI/WeT/Theme,  Next: CGI/WeT/Theme/Loader/HTML,  Prev: CGI/WeT/Modules/News,  Up: Module List
+
+Theme loader for the CGI::WeT package
+*************************************
+
+NAME
+====
+
+   CGI::WeT::Theme - Theme loader for the CGI::WeT package
+
+SYNOPSIS
+========
+
+     use CGI::WeT::Theme ();
+
+DESCRIPTION
+===========
+
+   This module provides a well-defined interface between the rendering
+engine and the theme definition loaders.  It is designed to work with or
+without mod_perl.  All theme loader classes must be defined in the
+CGI::WeT::Theme::Loader namespace during the construction of a
+CGI::WeT::Theme object.
+
+   This module is used by the rendering engine and should not be needed
+outside of that engine.  This documentation is to aid those building a
+theme loader.
+
+   All theme loaders need the following method defined:
+
+factory(*theme*)
+     This will produce a properly blessed object which represents the
+     definition for *theme*.  If such an object can not be produced
+     (*theme* not defined by that particular loader), this will return
+     undef.
+
+   The object returned by the factory method must provide the following
+methods:
+
+page_type(list)
+     This function will return an object representing the information
+     needed to layout a page of the type in list.  Since this is a list,
+     the first item is most desired while the last is least desired.  It
+     will return the information for the best desired match it can find.
+     If none can be returned, it must return undef.
+
+     The object returned by this function must provide *LAYOUT* and may
+     provide  BODY, *CSS*, and *JAVASCRIPT*.  *LAYOUT* provides an
+     anonymous array describing the layout of the page.  BODY returns a
+     hash reference describing various body attributes.  BODY is
+     deprecated in favor of *CSS* which returns a reference to an array
+     with the Cascading Style Sheet to use for this layout.  *JAVASCRIPT*
+     returns a reference to an array with any JavaScript required for this
+     layout.
+
+
+File: pm.info,  Node: CGI/WeT/Theme/Loader/HTML,  Next: CGI/WeT/Theme/Loader/WeT,  Prev: CGI/WeT/Theme,  Up: Module List
+
+Module to load HTML theme definitions
+*************************************
+
+NAME
+====
+
+   CGI::WeT::Theme::Loader::HTML - Module to load HTML theme definitions
+
+SYNOPSIS
+========
+
+     use CGI::WeT::Theme::Loader::HTML ();
+
+DESCRIPTION
+===========
+
+
+File: pm.info,  Node: CGI/WeT/Theme/Loader/WeT,  Next: CGI/WeT/User,  Prev: CGI/WeT/Theme/Loader/HTML,  Up: Module List
+
+Module to load pre-0.6 themes
+*****************************
+
+NAME
+====
+
+   CGI::WeT::Theme::Loader::WeT - Module to load pre-0.6 themes
+
+SYNOPSIS
+========
+
+     use CGI::WeT::Theme::Loader::WeT ();
+
+DESCRIPTION
+===========
+
+
+File: pm.info,  Node: CGI/WeT/User,  Next: CGI/WeT/User/DBI/LDAP,  Prev: CGI/WeT/Theme/Loader/WeT,  Up: Module List
+
+User database interface for CGI::WeT
+************************************
+
+NAME
+====
+
+   CGI::WeT::User - User database interface for CGI::WeT
+
+SYNOPSIS
+========
+
+     use CGI::WeT::User ();
+
+DESCRIPTION
+===========
+
+   This module provides the CGI::WeT package with access to the user
+database used for authentication.  This allows other scripts and modules
+to interact with user information when pages have been authenticated.
+
+   To make full use of this module, one of the various
+CGI::WeT::User::DBI::* modules must be compiled also. (Here
+CGI::WeT::User::DBI is not a reference to the more well known DBI::
+package though work is progressing on CGI::WeT::User::DBI::DBI.)
+
+   CGI::WeT::User will query each available module under
+CGI::WeT::User::DBI:: in turn until one returns a defined reference.  To
+only use a particular database when several might be available, use the
+
+     PerlSetVar WeT_UserDB <DBI Module>
+
+   configuration directive.  This will cause CGI::WeT::User to only query
+the CGI::WeT::User::DBI::<DBI Module> module.
+
+   See the documentation for the particular database interface being used
+for more requirements or configuration directives.
+
+   To retrieve information on a user, use the following call:
+
+     $user = new CGI::WeT::User ($engine, 'username' => $ENV{'REMOTE_USER'});
+
+   where $engine is the CGI::WeT::Engine object being used to render the
+page.
+
+
+File: pm.info,  Node: CGI/WeT/User/DBI/LDAP,  Next: CGI/Wrap,  Prev: CGI/WeT/User,  Up: Module List
+
+interface between CGI::WeT::User and Net::LDAP
+**********************************************
+
+NAME
+====
+
+   CGI::WeT::User::DBI::LDAP - interface between CGI::WeT::User and
+Net::LDAP
+
+SYNOPSIS
+========
+
+     use CGI::WeT::User::DBI::LDAP ();
+
+DESCRIPTION
+===========
+
+   This package provides CGI::WeT::User with access to an LDAP database.
+This module requires Net::LDAP.  Use of another LDAP package should only
+require trivial changes to the code.
+
+   Three variables are required in the Apache configuration file
+(httpd.conf or equivalent).
+
+PerlSetVar WeT_UserDB_LDAP_Host <host>
+PerlSetVar WeT_UserDB_LDAP_Service <port>
+PerlSetVar WeT_UserDB_LDAP_Base <base_dn>
+
+File: pm.info,  Node: CGI/Wrap,  Next: CGI/XML,  Prev: CGI/WeT/User/DBI/LDAP,  Up: Module List
+
+buffer output when building CGI programs
+****************************************
+
+NAME
+====
+
+   CGI::Wrap - buffer output when building CGI programs
+
+SYNOPSIS
+========
+
+     use CGI;
+     use CGI::Croak;
+     use CGI::Wrap;
+
+     $query = new CGI;
+     savequery $query;		# to reconstruct input
+     $CGI::Out::mailto = 'fred';	# override default of $<
+
+     run \&myfunc, @myargs		# a function
+     run sub { code }		# an inline function
+     run 'code'			# something to eval
+
+     sub myfunc {
+     	out $query->header();
+     	out $query->start_html(
+     		-title=>'A test',
+     		-author=>'muir@idiom.com');
+     }
+     $CGI::Out::$out			# is the buffer
+
+DESCRIPTION
+===========
+
+   This is a helper routine for building CGI programs.  It buffers stdout
+until you're completed building your output.  If you should get an error
+before you are finished, then it will display a nice error message (in
+HTML), log the error, and send email about the problem.
+
+   To use it, you must condense your program down to a single function
+call and then use CGI::Wrap::run to call it.
+
+   Instead of print, use out.
+
+AUTHOR
+======
+
+   David Muir Sharnoff <muir@idiom.com>
+
+SEE ALSO
+========
+
+   Carp, CGI::Carp, CGI::Out,  CGI
+
+BUGS
+====
+
+   No support for formats is provided by CGI::Wrap.
+
+
+File: pm.info,  Node: CGI/XML,  Next: CGI/XMLForm,  Prev: CGI/Wrap,  Up: Module List
+
+Perl extension for converting CGI.pm variables to/from XML
+**********************************************************
+
+NAME
+====
+
+   XML::CGI - Perl extension for converting CGI.pm variables to/from XML
+
+SYNOPSIS
+========
+
+     use XML::CGI;
+     $q = new XML::CGI;
+
+     # convert CGI.pm variables to XML
+     $xml = $q->toXML;
+     $xml = $q->toXML($root);
+     
+     # convert XML to CGI.pm variables
+     $q->toCGI($xml);
+
+DESCRIPTION
+===========
+
+   The XML::CGI module converts CGI.pm variables to XML and vice versa.
+
+   *XML::CGI* is a subclass of *CGI.pm*, so it reads the CGI variables
+just as CGI.pm would.
+
+METHODS
+=======
+
+$q = new XML::CGI
+     creates a new instance of XML::CGI. You also have access to all of
+     the methods in CGI.pm.
+
+$q->toXML([$root])
+     where $root is an optional parameter that specifies the root element.
+     By default, toXML will not return a root element.
+
+$q->toCGI($xml)
+     where $xml is the XML you would like to convert to CGI.pm parameters.
+     Values in the XML will overwrite any existing values if they exist.
+
+NOTE
+====
+
+   *XML::CGI* does not currently handle multiple selections passed from
+HTML forms. This will be added in a future release.
+
+AUTHOR
+======
+
+   Jonathan Eisenzopf <eisen@pobox.com>
+
+CONTRIBUTORS
+============
+
+   David Black <dblack@candle.superlink.net>
+
+SEE ALSO
+========
+
+   perl(1), XML::Parser(3).
+
+
+File: pm.info,  Node: CGI/XMLForm,  Next: CGI_Lite,  Prev: CGI/XML,  Up: Module List
+
+Extension of CGI.pm which reads/generates formated XML.
+*******************************************************
+
+NAME
+====
+
+   CGI::XMLForm - Extension of CGI.pm which reads/generates formated XML.
+
+   NB: This is a subclass of CGI.pm, so can be used in it's place.
+
+SYNOPSIS
+========
+
+     use CGI::XMLForm;
+
+     my $cgi = new CGI::XMLForm;
+
+     if ($cgi->param) {
+     	print $cgi->header, $cgi->pre($cgi->escapeHTML($cgi->toXML));
+     }
+     else {
+     	open(FILE, "test.xml") or die "Can't open: $!";
+     	my @queries = ('/a', '/a/b*', '/a/b/c*', /a/d');
+       print $cgi->header,
+     	      $cgi->pre($cgi->escapeHTML(
+     		  join "\n", $cgi->readXML(*FILE, @queries)));
+     }
+
+DESCRIPTION
+===========
+
+   This module can either create form field values from XML based on
+XQL/XSL style queries (full XQL is _not_ supported - this module is
+designed for speed), or it can create XML from form values. There are 2
+key functions: toXML and readXML.
+
+toXML
+-----
+
+   The module takes form fields given in a specialised format, and outputs
+them to XML based on that format. The idea is that you can create forms
+that define the resulting XML at the back end.
+
+   The format for the form elements is:
+
+     <input name="/body/p/ul/li">
+
+   which creates the following XML:
+
+     <body>
+       <p>
+     	  <ul>
+     	    <li>Entered Value</li>
+     	  </ul>
+     	</p>
+     </body>
+
+   It's the user's responsibility to design appropriate forms to make use
+of this module. Details of how come below...
+
+   Also supported are attribute form items, that allow creation of element
+attributes. The syntax for this is:
+
+     <input name="/body/p[@id='mypara' and @onClick='someFunc()']/@class">
+
+   Which creates the following XML:
+
+     <body>
+       <p id="mypara" onClick="someFunc()" class="Entered Value"></p>
+     </body>
+
+   Also possible are relative paths. So the following form elements:
+
+     <input type="hidden" name="/table/tr">
+     <input type="text" name="td">
+     <input type="text" name="td">
+     <input type="text" name="../tr/td">
+
+   Will create the following XML:
+
+     <table>
+       <tr>
+     	  <td>value1</td>
+     	  <td>value2</td>
+     	</tr>
+     	<tr>
+     	  <td>value3</td>
+     	</tr>
+     </table>
+
+SYNTAX
+======
+
+   The following is a brief syntax guideline
+
+   Full paths start with a "/" :
+
+     "/table/tr/td"
+
+   Relative paths start with either ".." or just a tag name.
+
+     "../tr/td"
+     "td"
+
+   *Relative paths go at the level above the previous path, unless the
+previous path was also a relative path, in which case it goes at the same
+level.* This seems confusing at first (you might expect it to always go at
+the level above the previous element), but it makes your form easier to
+design. Take the following example: You have a timesheet (see the example
+supplied in the archive) that has monday,tuesday,etc. Our form can look
+like this:
+
+     <input type="text" name="/timesheet/projects/project/@Name">
+     <input type="text" name="monday">
+     <input type="text" name="tuesday">
+     ...
+
+   Rather than:
+
+     <input type="text" name="/timesheet/projects/project/@Name">
+     <input type="text" name="monday">
+     <input type="text" name="../tuesday">
+     <input type="text" name="../wednesday">
+     ...
+
+   If unsure I recommend using full paths, relative paths are great for
+repeating groups of data, but weak for heavily structured data. Picture
+the following paths:
+
+     /timesheet/employee/name/forename
+     ../surname
+     title
+     ../department
+
+   This actually creates the following XML:
+
+     <timesheet>
+       <employee>
+     	  <name>
+     	    <forename>val1</forname>
+     		<surname>val2</surname>
+     		<title>val3></title>
+     	  </name>
+     	  <department>val4</department>
+     	</employee>
+     </timesheet>
+
+   Confusing eh? Far better to say:
+
+     /timesheet/employee/name/forename
+     /timesheet/employee/name/surname
+     /timesheet/employee/name/title
+     /timesheet/employee/department
+
+   Or alternatively, better still:
+
+     /timesheet/employee/name (Make hidden and no value)
+     forename
+     surname
+     title
+     ../department
+
+   Attributes go in square brackets. Attribute names are preceded with an
+"@", and attribute values follow an "=" sign and are enclosed in quotes.
+Multiple attributes are separated with " and ".
+
+     /table[@bgcolor="blue" and @width="100%"]/tr/td
+
+   If setting an attribute, it follows after the tag that it is associated
+with, after a "/" and it's name is preceded with an "@".
+
+     /table/@bgcolor
+
+readXML
+-------
+
+   readXML takes either a file handle or text as the first parameter and a
+list of queries following that. The XML is searched for the queries and it
+returns a list of tuples that are the query and the match.
+
+   It's easier to demonstrate this with an example. Given the following
+XML:
+
+     <a>Foo
+       <b>Bar
+     	  <c>Fred</c>
+     	  <c>Blogs</c>
+     	</b>
+     	<b>Red
+     	  <c>Barbara</c>
+     	  <c>Cartland</c>
+     	</b>
+     	<d>Food</d>
+     </a>
+
+   And the following queries:
+
+     /a
+     /a/b*
+     c*
+     /a/d
+
+   it returns the following result as a list:
+
+     /a
+     Foo
+     /a/b
+     Bar
+     c
+     Fred
+     c
+     Blogs
+     /a/b
+     Red
+     c
+     Barbara
+     c
+     Cartland
+     /a/d
+     Food
+
+   (NB: This is slightly incorrect - for /a and /a/b it will return "Foo\n
+  " and "Bar\n      " respectively).
+
+   The queries support relative paths like toXML (including parent paths),
+and they also support wildcards using ".*" or ".*?" (preferably ".*?" as
+it's probably a better match). If a wildcard is specified the results will
+have the actual value substituted with the wildcard. Wildcards are a bit
+experimental, so be careful ;-)
+
+Caveats
+-------
+
+   There are a few caveats to using this module:
+
+AUTHOR
+======
+
+   Matt Sergeant msergeant@ndirect.co.uk, sergeant@geocities.com
+
+   Based on an original concept, and discussions with, Jonathan Eisenzopf.
+Thanks to the Perl-XML mailing list for suggesting the XSL syntax.
+
+   Special thanks to Francois Belanger (francois@sitepak.com) for his
+mentoring and help with the syntax design.
+
+SEE ALSO
+========
+
+   CGI(1), CGI::XML
+
+

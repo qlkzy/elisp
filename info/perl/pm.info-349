@@ -1,0 +1,1880 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Statistics/Distributions,  Next: Statistics/LTU,  Prev: Statistics/Descriptive,  Up: Module List
+
+Perl module for calculating critical values of common statistical distributions
+*******************************************************************************
+
+NAME
+====
+
+   Statistics::Distributions - Perl module for calculating critical values
+of common statistical distributions
+
+SYNOPSIS
+========
+
+     use Statistics::Distributions;
+
+     $chis=chisqrdistr (2,.05);
+     print "Chi-squared-crit (2 degrees of freedom, 95th percentile = 0.05 level) = $chis\n";
+     $u=udistr (.05);
+     print "u-crit (95th percentile = 0.05 level) = $u\n";
+     $t=tdistr (1,.005);
+     print "t-crit (1 degree of freedom, 99.5th percentile = 0.005 level) =$t\n";
+     $f=fdistr (1,3,.01);
+     print "F-crit (1 degree of freedom in numerator, 3 degrees of freedom in denominator, 99th percentile = 0.01 level) = $f\n";
+     $uprob=Statistics::Distributions::uprob (-0.85);
+     print "upper probability of the u distribution: Q(u) = 1-G(u) (u=1.43) = $uprob\n";
+     $chisprob=Statistics::Distributions::chisqrprob (3,6.25);
+     print "upper probability of the chi-square distribution: Q = 1-G (3 degrees of freedom, chi-squared = 6.25) = $chisprob\n";
+     $tprob=Statistics::Distributions::tprob (3,6.251);
+     print "upper probability of the t distribution: Q = 1-G (3 degrees of freedom  , t = 6.251) = $tprob\n";
+     $fprob=Statistics::Distributions::fprob (3,5,.625);
+     print "upper probability of the F distribution: Q = 1-G (3 degrees of freedom  in numerator, 5 degrees of freedom in denominator, F = 6.25) = $fprob\n";
+
+DESCRIPTION
+===========
+
+   This Perl module calulates percentage points (5 significant digits) of
+the u (standard normal) distribution, the student's t distribution, the
+chi-square distribution and the F distribution. It can also calculate the
+upper probability (5 significant digits) of the u (standard normal), the
+chi-square, the t and the F distribution.  These critical values are
+needed to perform statistical tests, like the u test, the t test, the F
+test and the chi-squared test, and to calculate confidence intervals.  If
+you are interested in more precise algorithms you could look at:  StatLib:
+http://lib.stat.cmu.edu/apstat/  Applied Statistics Algorithms by
+Griffiths, P. and Hill, I.D., Ellis Horwood: Chichester (1985)
+
+AUTHOR
+======
+
+   Michael Kospach, mike.perl@gmx.at Nice formating, simplification and
+bug repair by Matthias Trautner Kromann, mtk@id.cbs.dk
+
+SEE ALSO
+========
+
+   Statistics::ChiSquare, Statistics::Table::t, Statistics::Table::F,
+perl(1).
+
+
+File: pm.info,  Node: Statistics/LTU,  Next: Statistics/MaxEntropy,  Prev: Statistics/Distributions,  Up: Module List
+
+An implementation of Linear Threshold Units
+*******************************************
+
+NAME
+====
+
+   Statistics::LTU -  An implementation of Linear Threshold Units
+
+SYNOPSIS
+========
+
+     use Statistics::LTU;
+
+     my $acr_ltu = new Statistics::LTU::ACR(3, 1);    # 3 attributes, scaled
+
+     $ltu->train([1,3,2],  $LTU_PLUS);
+     $ltu->train([-1,3,0], $LTU_MINUS);
+     ...
+     print "LTU looks like this:\n";
+     $ltu->print;
+
+     print "[1,5,2] is in class ";
+     if ($ltu->test([1,5,2]) > $LTU_THRESHOLD) { print "PLUS" }
+     	                                 else { print "MINUS" };
+
+     $ltu->save("ACR.saved") or die "Save failed!";
+     $ltu2 = restore Statistics::LTU("ACR.saved");
+
+EXPORTS
+=======
+
+   For readability, LTU.pm exports three scalar constants: $LTU_PLUS (+1),
+$LTU_MINUS (-1) and $LTU_THRESHOLD (0).
+
+DESCRIPTION
+===========
+
+   Statistics::LTU defines methods for creating, destroying, training and
+testing Linear Threshold Units.  A linear threshold unit is a 1-layer
+neural network, also called a perceptron.  LTU's are used to learn
+classifications from examples.
+
+   An LTU learns to distinguish between two classes based on the data
+given to it.  After training on a number of examples, the LTU can then be
+used to classify new (unseen) examples.  Technically, LTU's learn to
+distinguish two classes by fitting a hyperplane between examples; if the
+examples have n features, the hyperplane will have n dimensions.  In
+general, the LTU's weights will converge to a define the separating
+hyperplane.
+
+   The LTU.pm file defines an uninstantiable base class, LTU, and four
+other instantiable classes built on top of LTU.  The four individual
+classes differs in the training rules used:
+
+ACR - Absolute Correction Rule
+TACR - Thermal Absolute Correction Rule (thermal annealing)
+LMS - Least Mean Squares rule
+RLS - Recursive Least Squares rule
+   Each of these training rules behaves somewhat differently.  Exact
+details of how these work are beyond the scope of this document; see the
+additional documentation file (`ltu.doc') for discussion.
+
+SCALARS
+=======
+
+   $LTU_PLUS and $LTU_MINUS (+1 and -1, respectively) may be passed to the
+*train* method.  $LTU_THRESHOLD (set to zero) may be used to compare
+values returned from the test method.
+
+METHODS
+=======
+
+   Each LTU has the following methods:
+
+*new TYPE(n_features, scaling)*
+     Creates an LTU of the given TYPE.  TYPE must be one of:
+
+    Statistics::LTU::ACR,
+    Statistics::LTU::TACR,
+    Statistics::LTU::LMS,   =item Statistics::LTU::RLS.
+     `n_features' sets the number of attributes in the examples.  If
+     scaling is 1, the LTU will automatically scale the input features to
+     the range (-1, +1).  For example:
+
+          $ACR_ltu = new Statistics::LTU::ACR(5, 1);
+
+     creates an LTU that will train using the absolute correction rule.  It
+     will have 5 variables and scale features automatically.
+
+copy
+     Copies the LTU and returns the copy.
+
+destroy
+     Destroys the LTU (undefines its substructures).  This method is kept
+     for compatibility; it's probably sufficient simply to call
+     *undef($ltu)*.
+
+print
+     Prints a human-readable description of the LTU, including the weights.
+
+save(filename)
+     Saves the LTU to the file filename.  All the weights and necessary
+     permanent data are saved.  Returns 1 if the LTU was saved
+     successfully, else 0.
+
+*restore LTU(filename)*
+     Static method.  Creates and returns a new LTU from filename.  The new
+     LTU will be of the same type.
+
+test(instance)
+     Tests the LTU on instance, the instance vector, which must be a
+     reference to an array.  Returns the raw (non-thresholded) result.  A
+     typical use of this is:
+
+          if ($ltu->test($instance) >= $LTU_PLUS) {
+             # instance is in class 1
+          } else {
+             # instance is in class 2
+          }
+
+*correctly_classifies(instance, realclass)*
+     Tests the LTU against an instance vector instance, which must be a
+     reference to an array.  *realclass* must be a number.  Returns 1 if
+     the LTU classifies instance in the same class as *realclass*.
+     Technically: Returns 1 iff instance is on the *realclass* side of the
+     LTU's hyperplane.
+
+weights
+     Returns a reference to a copy of the LTU's weights.
+
+set_origin_restriction(orig)
+     Sets LTU's origin restriction to orig, which should be 1 or 0.  If an
+     LTU is origin-restricted, its hyperplane must pass through the origin
+     (ie, so its intercept is zero).  This is usually used for preference
+     predicates, whose classifications must be symmetrical.
+
+is_cycling(n)
+     Returns 1 if the LTU's weights seem to be cycling.  This is a
+     heuristic test, based on whether the LTU's weights have been pushed
+     out in the past n training instances.  See comments with the code.
+
+version
+     Returns the version of the LTU implementation.
+
+   In addition to the methods above, each of the four classes of LTU
+defines a *train* method.  The *train* method "trains" the LTU that an
+instance belongs in a particular class.  For each *train* method, instance
+must be a reference to an array of numbers, and value must be a number.
+For convenience, two constants are defined: `$LTU_PLUS' and `$LTU_MINUS',
+set to +1 and -1 respectively.  These can be given as arguments to the
+*train* method.  A typical *train* call looks like:
+
+     $ltu->train([1,3,-5], $Statistics_LTU_PLUS);
+
+   which trains the LTU that the instance vector (1,3,-5) should be in the
+PLUS class.
+
+   * For ACR: 	*train(instance, value)*
+
+     Returns 1 iff the LTU already classified the instance correctly, else
+     0.
+
+   * For RLS: 	*train(instance, value)*
+
+     Returns undef.
+
+   * For LMS: 	*train(instance, value, rho)*
+
+     Returns 1 if the LTU already classified the instance correctly, else
+     0.  *Rho* determines how much the weights are adjusted on each
+     training instance.  It must be a positive number.
+
+   * For TACR: 	*train(instance, value, temperature, rate)*
+
+     Uses the thermal perceptron (absolute correction) rule to train the
+     specified linear threshold unit on a particular instance_vector.  The
+     instance_vector is a vector of numbers; each number is one attribute.
+     The desired_value should be either $LTU_PLUS (for positive instances)
+     or $LTU_MINUS (for negative instances).  The *temperature* and rate
+     must be floating point numbers.
+
+     This method returns 1 if the linear threshold unit already classified
+     the instance correctly, otherwise it returns 0.  The TACR rule only
+     trains on instances that it does not already classify correctly.
+
+AUTHOR
+======
+
+   fawcett@nynexst.com (Tom Fawcett)
+
+   LTU.pm is based on a C implementation by James Callan at the University
+of Massachusetts.  His version has been in use for a long time, is stable,
+and seems to be bug-free.  This Perl module was created by Tom Fawcett,
+and any bugs you find were probably introduced in translation.  Send bugs,
+comments and suggestions to *fawcett@nynexst.com*.
+
+BUGS
+====
+
+   None known.  This Perl module has been moderately exercised but I don't
+guarantee anything.
+
+
+File: pm.info,  Node: Statistics/MaxEntropy,  Next: Statistics/OLS,  Prev: Statistics/LTU,  Up: Module List
+
+Perl5 module for Maximum Entropy Modeling and Feature Induction
+***************************************************************
+
+NAME
+====
+
+   MaxEntropy - Perl5 module for Maximum Entropy Modeling and Feature
+Induction
+
+SYNOPSIS
+========
+
+     use Statistics::MaxEntropy;
+
+     # debugging messages; default 0
+     $Statistics::MaxEntropy::debug = 0;
+
+     # maximum number of iterations for IIS; default 100
+     $Statistics::MaxEntropy::NEWTON_max_it = 100;
+
+     # minimal distance between new and old x for Newton's method;
+     # default 0.001
+     $Statistics::MaxEntropy::NEWTON_min = 0.001;
+
+     # maximum number of iterations for Newton's method; default 100
+     $Statistics::MaxEntropy::KL_max_it = 100;
+
+     # minimal distance between new and old x; default 0.001
+     $Statistics::MaxEntropy::KL_min = 0.001;
+
+     # the size of Monte Carlo samples; default 1000
+     $Statistics::MaxEntropy::SAMPLE_size = 1000;
+
+     # creation of a new event space from an events file
+     $events = Statistics::MaxEntropy::new($file);
+
+     # Generalised Iterative Scaling, "corpus" means no sampling
+     $events->scale("corpus", "gis");
+
+     # Improved Iterative Scaling, "mc" means Monte Carlo sampling
+     $events->scale("mc", "iis");
+
+     # Feature Induction algorithm, also see Statistics::Candidates POD
+     $candidates = Statistics::Candidates->new($candidates_file);
+     $events->fi("iis", $candidates, $nr_to_add, "mc");
+
+     # writing new events, candidates, and parameters files
+     $events->write($some_other_file);
+     $events->write_parameters($file);
+     $events->write_parameters_with_names($file);
+
+     # dump/undump the event space to/from a file
+     $events->dump($file);
+     $events->undump($file);
+
+DESCRIPTION
+===========
+
+   This module is an implementation of the Generalised and Improved
+Iterative Scaling (GIS, IIS) algorithms and the Feature Induction (FI)
+algorithm as defined in (*Darroch and Ratcliff 1972*) and (*Della Pietra
+et al. 1997*). The purpose of the scaling algorithms is to find the
+maximum entropy distribution given a set of events and (optionally) an
+initial distribution. Also a set of candidate features may be specified;
+then the FI algorithm may be applied to find and add the candidate
+feature(s) that give the largest `gain' in terms of Kullback Leibler
+divergence when it is added to the current set of features.
+
+   Events are specified in terms of a set of feature functions
+(properties) f_1...f_k that map each event to {0,1}: an event is a string
+of bits. In addition of each event its frequency is given. We assume the
+event space to have a probability distribution that can be described by
+
+     p(x) = 1/Z e^{sum_i alpha_i f_i(x)}
+
+     p(x) = 1/Z e^{sum_i alpha_i f_i(x)}
+
+   \begin{equation*}     p(x) = \frac{1}{Z} \exp[\sum_i \alpha_i f_i(x)]
+\end{equation*} where $Z$ is a normalisation factor given by
+\begin{equation*}     Z = \sum_x \exp[\sum_i \alpha_i f_i(x)]
+\end{equation*}
+
+   where Z is a normalisation factor. The purpose of the IIS algorithm is
+the find alpha_1..alpha_k such that D(p~||p), defined by
+
+     D(p~||p) =
+        sum_x p~ . log(p~(x) / p(x)),
+
+   is minimal under the condition that p~[f_i] = p[f_i], for all i.
+
+   The purpose of the scaling algorithms IIS GIS is the find
+$\alpha_1..\alpha_k$ such that $D(\tilde{p}||p)$, defined by
+\begin{equation*}     D(\tilde{p}||p) =        \sum_x \tilde{p} \log
+(\frac{\tilde{p}(x)}{p(x)}), \end{equation*} is minimal under the
+condition that for all $i$ $\tilde{p}[f_i]=p[f_i]$.
+
+   The module requires the `Bit::SparseVector' module by Steffen Beyer and
+the Data::Dumper module by Gurusamy Sarathy. Both can be obtained from
+CPAN just like this module.
+
+CONFIGURATION VARIABLES
+-----------------------
+
+`$Statistics::MaxEntropy::debug'
+     If set to 1, lots of debug information, and intermediate results will
+     be output. Default: 0
+
+`$Statistics::MaxEntropy::NEWTON_max_it'
+     Sets the maximum number of iterations in Newton's method. Newton's
+     method is applied to find the new parameters \alpha_i of the features
+     `f_i'. Default: 100.
+
+`$Statistics::MaxEntropy::NEWTON_min'
+     Sets the minimum difference between x' and x in Newton's method (used
+     for computing parameter updates in IIS); if either the maximum number
+     of iterations is reached or the difference between x' and x is small
+     enough, the iteration is stopped. Default: `0.001'. Sometimes
+     features have Infinity or -Infinity as a solution; these features are
+     excluded from future iterations.
+
+`$Statistics::MaxEntropy::KL_max_it'
+     Sets the maximum number of iterations applied in the IIS algorithm.
+     Default: 100.
+
+`$Statistics::MaxEntropy::KL_min'
+     Sets the minimum difference between KL divergences of two
+     distributions in the IIS algorithm; if either the maximum number of
+     iterations is reached or the difference between the divergences is
+     enough, the iteration is stopped. Default: `0.001'.
+
+`$Statistics::MaxEntropy::SAMPLE_size'
+     Determines the number of (unique) events a sample should contain. Only
+     makes sense if for sampling "mc" is selected (see below). Its default
+     is `1000'.
+
+METHODS
+-------
+
+new
+          $events = Statistics::MaxEntropy::new($events_file);
+
+     A new event space is created, and the events are read from $file. The
+     events file is required, its syntax is described in `FILE SYNTAX' in
+     this node.
+
+write
+          $events->write($file);
+
+     Writes the events to a file. Its syntax is described in `FILE SYNTAX'
+     in this node.
+
+scale
+          $events->scale($sample, $scaler);
+
+     If `$scaler' equals `"gis"', the Generalised Iterative Scaling
+     algorithm (*Darroch and Ratcliff 1972*) is applied on the event
+     space; `$scaler' equals `"iis"', the Improved Iterative Scaling
+     Algorithm (*Della Pietra et al. 1997*) is used. If `$sample' is
+     `"corpus"', there is no sampling done to re-estimate the parameters
+     (the events previously read are considered a good sample); if it
+     equals `"mc"' Monte Carlo (Metropolis-Hastings) sampling is performed
+     to obtain a random sample; if `$sample' is `"enum"' the complete
+     event space is enumerated.
+
+`fi'
+          fi($scaler, $candidates, $nr_to_add, $sampling);
+
+     Calls the Feature Induction algorithm. The parameter `$nr_to_add' is
+     for the number of candidates it should add. If this number is greater
+     than the number of candidates, all candidates are added. Meaningfull
+     values for `$scaler' are `"gis"' and `"iis"'; default is `"gis"' (see
+     previous item). `$sampling' should be one of `"corpus"', `"mc"',
+     `"enum"'.  `$candidates' should be in the `Statistics::Candidates'
+     class:
+
+          $candidates = Statistics::Candidates->new($file);
+
+     See *Note Statistics/Candidates: Statistics/Candidates,.
+
+`write_parameters'
+          $events->write_parameters($file);
+
+`write_parameters_with_names'
+          $events->write_parameters_with_names($file);
+
+dump
+          $events->dump($file);
+
+     `$events' is written to $file using Data::Dumper.
+
+`undump'
+          $events = Statistics::MaxEntropy->undump($file);
+
+     The contents of file $file is read and eval'ed into `$events'.
+
+FILE SYNTAX
+===========
+
+   Lines that start with a `#' and empty lines are ignored.
+
+   Below we give the syntax of in and output files.
+
+EVENTS FILE (input/output)
+--------------------------
+
+   Syntax of the event file (n features, and m events); the following
+holds for features:
+
+   * each line is an event;
+
+   * each column represents a feature function; the co-domain of a feature
+     function is {0,1};
+
+   * no space between feature columns;
+
+   * constant features (i.e. columns that are completely 0 or 1) are
+     forbidden;
+
+   * 2 or more events should be specified (this is in fact a consequence of
+     the previous requirement;
+
+   The frequency of each event precedes the feature columns. Features are
+indexed from right to left. This is a consequence of how
+`Bit::SparseVector' reads bit strings. Each `f_ij' is a bit and `freq_i'
+an integer in the following schema:
+
+     name_n <tab> name_n-1 ... name_2 <tab> name_1 <newline>
+     freq_1 <white> f_1n ... f_13 f_12 f_11 <newline>
+       .                     .
+       .                     .
+       .                     .
+     freq_i <white> f_in ... f_i3 f_i2 f_i1 <newline>
+       .                     .
+       .                     .
+       .                     .
+     freq_m <white> f_mn ... f_m3 f_m2 f_m1
+
+   (m events, n features) The feature names are separated by tabs, not
+white space. The line containing the feature names will be split on tabs;
+this implies that (non-tab) white space may be part of the feature names.
+
+PARAMETERS FILE (input/output)
+------------------------------
+
+   Syntax of the initial parameters file; one parameter per line:
+
+     par_1 <newline>
+      .
+      .
+      .
+     par_i <newline>
+      .
+      .
+      .
+     par_n
+
+   The syntax of the output distribution is the same. The alternative
+procedure for saving parameters to a file `write_parameters_with_names'
+writes files that have the following syntax
+
+     n <newline>
+     name_1 <tab> par_1 <newline>
+      .
+      .
+      .
+     name_i <tab> par_i <newline>
+      .
+      .
+      .
+     name_n <tab> par_n <newline>
+     bitmask
+
+   where bitmask can be used to tell other programs what features to use
+in computing probabilities. Features that were ignored during scaling or
+because they are constant functions, receive a 0 bit.
+
+DUMP FILE (input/output)
+------------------------
+
+   A dump file contains the event space (which is a hash blessed into
+class `Statistics::MaxEntropy') as a Perl expression that can be evaluated
+with eval.
+
+BUGS
+====
+
+   It's slow.
+
+SEE ALSO
+========
+
+   `perl(1)' in this node, *Note Statistics/Candidates:
+Statistics/Candidates,, *Note Statistics/SparseVector:
+Statistics/SparseVector,, *Note Bit/Vector: Bit/Vector,, *Note
+Data/Dumper: Data/Dumper,, *Note POSIX: POSIX,, *Note Carp: Carp,.
+
+DIAGNOSTICS
+===========
+
+   The module dies with an appropriate message if
+
+   * it cannot open a specified events file;
+
+   * if you specified a constant feature function (in the events file or
+     the candidates file);
+
+   * if the events file, candidates file, or the parameters file is not
+     consistent; possible causes are (a.o.): insufficient or too many
+     features for some event; inconsistent candidate lines; insufficient,
+     or to many event lines in the candidates file.
+
+   The module captures `SIGQUIT' and `SIGINT'. On a `SIGINT' (typically
+<CONTROL-C> it will dump the current event space(s) and die. If a
+`SIGQUIT' (<CONTROL-BACKSLASH>) occurs it dumps the current event space as
+soon as possible after the first iteration it finishes.
+
+REFERENCES
+==========
+
+(Abney 1997)
+     Steven P. Abney, Stochastic Attribute Value Grammar, Computational
+     Linguistics 23(4).
+
+(Darroch and Ratcliff 1972)
+     J. Darroch and D. Ratcliff, Generalised Iterative Scaling for
+     log-linear models, Ann. Math. Statist., 43, 1470-1480, 1972.
+
+(Jaynes 1983)
+     E.T. Jaynes, Papers on probability, statistics, and statistical
+     physics. Ed.: R.D. Rosenkrantz. Kluwer Academic Publishers, 1983.
+
+(Jaynes 1997)
+     E.T. Jaynes, Probability theory: the logic of science, 1997,
+     unpublished manuscript.
+     `URL:http://omega.math.albany.edu:8008/JaynesBook.html'
+
+(Della Pietra et al. 1997)
+     Stephen Della Pietra, Vincent Della Pietra, and John Lafferty,
+     Inducing features of random fields, In: Transactions Pattern Analysis
+     and Machine Intelligence, 19(4), April 1997.
+
+VERSION
+=======
+
+   Version 0.8.
+
+AUTHOR
+======
+
+   Hugo WL ter Doest, terdoest@cs.utwente.nl
+
+   Hugo WL ter Doest, terdoest@cs.utwente.nl
+
+   Hugo WL ter Doest, \texttt{terdoest\symbol{'100}cs.utwente.nl}
+
+COPYRIGHT
+=========
+
+   Copyright (C) 1998 Hugo WL ter Doest, terdoest@cs.utwente.nl Univ. of
+Twente, Dept. of Comp. Sc., Parlevink Research, Enschede, The Netherlands.
+
+   Copyright (C) 1998 Hugo WL ter Doest,
+\texttt{terdoest\symbol{'100}cs.utwente.nl} Univ. of Twente, Dept. of
+Comp. Sc., Parlevink Research, Enschede, The Netherlands.
+
+   `Statistics::MaxEntropy' comes with ABSOLUTELY NO WARRANTY and may be
+copied only under the terms of the GNU Library General Public License
+(version 2, or later), which may be found in the distribution.
+
+
+File: pm.info,  Node: Statistics/OLS,  Next: Statistics/SparseVector,  Prev: Statistics/MaxEntropy,  Up: Module List
+
+perform ordinary least squares and associated statistics, v 0.07.
+*****************************************************************
+
+NAME
+====
+
+   Statistics::OLS - perform ordinary least squares and associated
+statistics, v 0.07.
+
+SYNOPSIS
+========
+
+     use Statistics::OLS;
+     
+     my $ls = Statistics::OLS->new();
+     
+     $ls->setData (\@xydataset) or die( $ls->error() );
+     $ls->setData (\@xdataset, \@ydataset);
+     
+     $ls->regress();
+     
+     my ($intercept, $slope) = $ls->coefficients();
+     my $R_squared = $ls->rsq();
+     my ($tstat_intercept, $tstat_slope) = $ls->tstats();
+     my $sigma = $ls->sigma();
+     my $durbin_watson = $ls->dw();
+     
+     my $sample_size = $ls->size();
+     my ($avX, $avY) = $ls->av();
+     my ($varX, $varY, $covXY) = $ls->var();
+     my ($xmin, $xmax, $ymin, $ymax) = $ls->minMax();
+     
+     # returned arrays are x-y or y-only data
+     # depending on initial call to setData()
+     my @predictedYs = $ls->predicted();
+     my @residuals = $ls->residuals();
+
+DESCRIPTION
+===========
+
+   I wrote *Statistics::OLS* to perform Ordinary Least Squares (linear
+curve fitting) on two dimensional data: y = a + bx. The other simple
+statistical module I found on CPAN (Statistics::Descriptive) is designed
+for univariate analysis. It accomodates OLS, but somewhat inflexibly and
+without rich bivariate statistics. Nevertheless, it might make sense to
+fold OLS into that module or a supermodule someday.
+
+   *Statistics::OLS* computes the estimated slope and intercept of the
+regression line, their T-statistics, R squared, standard error of the
+regression and the Durbin-Watson statistic. It can also return the
+residuals.
+
+   It is pretty simple to do two dimensional least squares, but much
+harder to do multiple regression, so OLS is unlikely ever to work with
+multiple independent variables.
+
+   This is a beta code and has not been extensively tested. It has worked
+on a few published datasets. Feedback is welcome, particularly if you
+notice an error or try it with known results that are not reproduced
+correctly.
+
+USAGE
+=====
+
+Create a regression object: new()
+---------------------------------
+
+     use Statistics::OLS;
+     my $ls = Statistics::OLS->new;
+
+Register a dataset: setData()
+-----------------------------
+
+     $ls->setData (\@xydata);
+     $ls->setData (\@xdata, \@ydata);
+
+   The setData() method registers a two-dimensional dataset with the
+regression object.  You can pass the dataset either as a reference to one
+flat array containing the paired x,y data or as references to two arrays,
+one each for the x and y data. [In either case, the data arrays in your
+script are not cached (copied into the object). If you alter your data,
+you may optionally call setData() again (if you want error checking-see
+below) but you should at least call the regress() method (see below) to
+recompute statistics for the new data. Or more simply, do not alter your
+data.]
+
+   As a single array, in your script, construct a flat array of the form
+(x0, y0, ..., xn, yn) containing n+1 x,y data points.  Then pass a
+reference to the data array to the setData() method. (If you do not know
+what a reference is, just put a backslash (\) in front of the name of your
+data array when you pass it as an argument to setData().)  Like this:
+
+     my @xydata = qw( -3 9   -2 4   -1 1   0 0   1 1  2 4  3 9);
+     $ls->setData (\@xydata);
+
+   Or, you may find it more convenient to construct two equal length
+arrays, one for the horizontal and one for the corresponding vertical
+data. Then pass references to both arrays (horizontal first) to setData():
+
+     my @xdata = qw( -3  -2  -1  0  1  2  3 );
+     my @ydata = qw(  9   4   1  0  1  4  9 );
+     $ls->setData (\@xdata, \@ydata);
+
+   *Error checking:* The setData() method returns a postive integer on
+success and 0 on failure. If setData() fails, you can recover an error
+message about the failure with the error() method. The error string
+returned will either be one of
+
+     The data set does not contain an equal number of x and y values.
+     The data element ... is non-numeric.
+     The data set must contain at least three points.
+
+   In your script, you could test for errors like:
+
+     $ls->setData (\@data) or die( $ls->error() );
+
+   In the current version, only numerals, decimal points (apologies to
+Europeans), scientific notation (1.7E10) and minus signs are permitted.
+Currencies ($), time (11:23am) or dates (23/05/98) are not yet supported
+and will generate errors. I may figure these out someday.
+
+Perform the regression: regress()
+---------------------------------
+
+     $ls->regress() or die ( $ls->error() );
+
+   This performs most of the calculations. Call this method after setting
+the data, but before asking for any regressions results. If you change
+your data, previous calculations will generallly be inaccurate, so you
+should call this method again. The regress() method returns 1 on success,
+The only error message is
+
+     No datset has been registered.
+
+   although a number of undef results (due to divide by zero errors) may
+be returned in specific statistics below.
+
+Obtain regression results: coefficients(), rsq(), tstats(), etc.
+----------------------------------------------------------------
+
+     my ($intercept, $slope) = $ls->coefficients();
+     my $R_squared = $ls->rsq();
+     my ($tstat_intercept, $tstat_slope) = $ls->tstats();
+     my $sigma = $ls->sigma();
+     my $durbin_watson = $ls->dw();
+
+     my $sample_size = $ls->size();
+     my ($avX, $avY) = $ls->av();
+     my ($varX, $varY, $covXY) = $ls->var();
+     my ($xmin, $xmax, $ymin, $ymax) = $ls->minMax();
+
+   Call these methods only after you have called regress().  Most of these
+should be familiar from any econometrics text. If the slope is infinite
+(variance of X is zero) it is set to undef. R-squared is 1.0 if the sample
+variances of either X or Y are zero (or the data are colinear). If the
+variance of X is zero, both T statistics are set to undef. sigma is an
+estimate of the homoscedastic standard deviation of the error term, also
+known as the standard error of the estimate. The variances use n-1.
+Durbin-Watson returns undef if the data are colinear.
+
+Obtain predicted or residual data: predicted() and residuals()
+--------------------------------------------------------------
+
+     my @predictedYs = $ls->predicted();
+     my @residuals = $ls->residuals();
+
+   Call these methods only after you have called regress().  Both methods
+return data arrays, in the same format you used in setData(). If the data
+was passed to setData() as a reference to an @xydata array of the form
+(x0, y0, ..., xn, yn), then the results of these methods will be of this
+same form, except that the y values will either be the predicted y based
+on the coefficient estimates, or the residual error of that predicted y
+from the observed value of y.
+
+   If the data was passed as references to two arrays, @xdata = (x0 ...
+xn) and @ydata = (y0 ... yn), then the results of these two methods will
+be a single array of y type data, either the predicted y or residual
+error. The original x data array will still correspond to these result
+arrays.
+
+BUGS AND TO DO
+==============
+
+   This module is beta code, so it is not guaranteed to work right.  I
+have not exhaustively tested it.
+
+   Possible future work includes support for other data formats, such as
+date, time and currency.
+
+   Generalization to multiple regression is probably not in the cards,
+since it is more than an order of magnitude more difficult. Better to use
+something Fortran based or maybe the Perl Data Language.
+
+   It would make sense to fold this into Statistics::Descriptive as a more
+comprehensive library, perhaps called `libstats'. But that might not
+happen soon, since it sounds like a big project.
+
+   Comments and bug reports are welcome.
+
+AUTHOR
+======
+
+   Copyright (c) 1998 by Sanford Morton, smorton@pobox.com.  All rights
+reserved.  This program is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.
+
+   This work is dedicated to the memory of Dr. Andrew Morton, who
+requested it.  *Requiescat in pace*, my friend.
+
+SEE ALSO
+========
+
+   The Statistics::Descriptive(1) module performs useful univariate
+statistics and is well tested. The Perl Data Language (see CPAN) may also
+prove useful for statistics.
+
+   Simple linear regression is discussed in all econometrics and most
+probablility and statistics texts. I used E<Basic Econometrics> 2nd ed.,
+by Gujaratii, New York: McGraw-Hill,1988, for most of the formulas and the
+test example (appendix 3A.6, page 87).
+
+
+File: pm.info,  Node: Statistics/SparseVector,  Next: StatsView/Graph,  Prev: Statistics/OLS,  Up: Module List
+
+Perl5 extension for manipulating sparse bitvectors
+**************************************************
+
+NAME
+====
+
+   Statistics::SparseVector - Perl5 extension for manipulating sparse
+bitvectors
+
+SYNOPSIS
+========
+
+     use Statistics::SparseVector;
+
+     # methods that create new bitvectors
+     $vec = Statistics::SparseVector->new($n);
+     $vec2 = $vec1->Clone();
+     $vec = Statistics::SparseVector->new_Enum($s, $n);
+     $vec = Statistics::SparseVector->new_Bin($s, $n);
+
+     # miscellaneous
+     $vec2->Substitute_Vector($vec1, $of22, $len2, $off1, $len1);
+     $vec->Size();
+     $vec->to_Enum();
+     $vec->to_Bin();
+     $vec->Fill();
+     $vec->Empty();
+     $vec->increment();
+     $n = $vec->Norm();
+     @list = $vec->indices();
+
+     # manipulation on the bit level
+     $vec->Bit_Off($i);
+     $vec->Bit_On($i);
+     $vec->bit_flip($i);
+     $vec->bit_test($i);
+
+     # overloaded operators
+     # increment
+     $vec++;
+     # stringify
+     "$vec"
+
+DESCRIPTION
+===========
+
+   This module implements sparse bitvectors. Several methods for
+manipulating bitvectors are implemented. On purpose the naming of the
+methods is identical to the Bit::Vector package by Stephen Beyer; if you
+find your vectors to be sparse (have little bits that are on) you can
+easily switch to a less memory consuming representation.
+
+Creation of bitvectors
+----------------------
+
+new
+          $vec = Statistics::BitVector->new($n);
+
+     A bitvector of length $n is created. All bits are zero.
+
+Clone
+          $clone = $vec->Clone();
+
+     A copy of `$vec' is returned.
+
+`new_Enum'
+          $vec = Statistics::BitVector->new_Enum($enumstring, $n);
+
+     A new bitvector of length $n is created from the comma-separated list
+     of in `$enumstring'.
+
+`new_Bin'
+          $vec = Statistics::BitVector->new_Bin($bitstring, $n);
+
+     A new bitvector of length $n is created from bitstring `$bitstring'.
+
+Vector-wide manipulation of bits
+--------------------------------
+
+`Substitute_Vector'
+          $vec2->Substitute_Vector($vec1, $off2, $len2, $off1, $len1);
+
+     `$len2' contiguous bits in target vector `$vec2' starting from
+     `$off2' are replaced by `$len1' contiguous bits from source vector
+     `$vec1' starting at bit `$off1'. If `$off2' equals the length of
+     `$vec2' the bits from `$vec1' are appended. If `$len1' is zero the
+     `$len2' bits from `$vec2' are deleted.
+
+`Fill'
+          $vec->Fill();
+
+     All bits of `$vec' are set to one.
+
+Empty
+          $vec->Empty();
+
+     All bits of `$vec' are set to zero.
+
+`increment'
+          $vec->increment(); $vec++;
+
+     The integer value of the bitvector is increased by one.
+
+`Bit_Off'
+          $vec->Bit_Off($i);
+
+     Bit $i is set to zero.
+
+`Bit_On'
+          $vec->Bit_On($i);
+
+     Bit $i is set to one.
+
+`bit_flip'
+          $vec->bit_flip($i);
+
+     Bit $i is flipped.
+
+`bit_test'
+          $vec->bit_test($i);
+
+     Returns 1 if bit $i is one, 0 otherwise.
+
+Miscellany
+----------
+
+Size
+          $n = $vec->Size();
+
+     Returns the size of the vector.
+
+`to_Enum'
+          $enumstring = $vec->to_Enum();
+
+     Returns a comma-separated list of bits that are set.
+
+`indices'
+     Returns an array of indices of bits that are set.
+
+`to_Bin'
+          $bitstring = $vec->to_Bin();
+
+     Returns a bitstring; bits should be read from right to left.
+
+`Norm'
+     Returns the number of set bits.
+
+Overloaded operators
+--------------------
+
+`++'
+          $vec++;
+
+     Same as method `increment'.
+
+Double quotes
+          $string = "$vec";
+
+     Data::Dumper wants to stringify vectors. Probably because
+     `Statistics::SparseVector' is an overloaded package it expects double
+     quotes to be overloaded as well.
+
+Remarks about the implementation
+--------------------------------
+
+   * Internally sparse vectors are represented by hashes.
+
+   * Only a few methods from Bit::Vector are implemented. Maybe new ones
+     will follow in the future.
+
+   * Method `Substitute_Vector' is not thorougly debugged.
+
+VERSION
+=======
+
+   Version 0.1.
+
+AUTHOR
+======
+
+   Hugo WL ter Doest, terdoest@cs.utwente.nl
+
+   Hugo WL ter Doest, \texttt{terdoest\symbol{'100}cs.utwente.nl}
+
+SEE ALSO
+========
+
+   `perl(1)' in this node, `Bit::Vector(3)' in this node,
+`Statistics::MaxEntropy(3)' in this node, `Statistics::ME.wrapper.pl(3)'
+in this node, `Statistics::Candidates(3)' in this node.
+
+COPYRIGHT
+=========
+
+   Copyright (C) 1998 Hugo WL ter Doest, terdoest@cs.utwente.nl Univ. of
+Twente, Dept. of Comp. Sc., Parlevink Research, Enschede, The Netherlands.
+
+   Copyright (C) 1998 Hugo WL ter Doest,
+\texttt{terdoest\symbol{'100}cs.utwente.nl} Univ. of Twente, Dept. of
+Comp. Sc., Parlevink Research, Enschede, The Netherlands.
+
+   `Statistics::MaxEntropy' comes with ABSOLUTELY NO WARRANTY and may be
+copied only under the terms of the GNU Library General Public License
+(version 2, or later), which may be found in the distribution.
+
+
+File: pm.info,  Node: StatsView/Graph,  Next: Stone,  Prev: Statistics/SparseVector,  Up: Module List
+
+Solaris performance data collection and graphing package
+********************************************************
+
+NAME
+====
+
+   StatsView - Solaris performance data collection and graphing package
+
+SYNOPSIS
+========
+
+     use StatsView::Graph;
+     my $graph = StatsView::Graph->new("sar.txt");
+     $graph->read("CPU usage");
+     $graph->define(columns => [ "%idle" ]);
+     $graph->save(file => "sar_idle_cpu.gif", format => "gif");
+
+DESCRIPTION
+===========
+
+   StatsView::Graph is a package that was originally written for internal
+use within the Sun UK Performance Centre.  It allows the display of the
+output of the standard Solaris utilities sar, iostat, mpstat and vmstat,
+as well as the output of vxstat if Veritas Volume Manager is in use.  It
+also supports the iost+ utility (available as part of the CPAN
+Solaris::Kstat package), and the output of the Oracle monitoring provided
+by the sv script. The sv script is merely a GUI front-end around this
+pakage.
+
+PREREQUISITES
+=============
+
+   This package requires gnuplot, at least version beta 340.  If you wish
+to produce GIF plots you will also need a gnuplot that is built with
+support for the GD GIF library.
+
+TERMINOLOGY
+===========
+
+     category   - A class of related data, for applications that
+                  collect more than one type of data at a time
+                  eg for sar, CPU utilisation, Disk IO etc
+     column     - A time-series of data, eg %busy
+     instance   - An entity for which data is collected
+                  eg disk drive, Oracle tablespace
+     sample     - All data collected at a given point in time
+     data point - An individual statistic value
+                  eg reads/sec for disk c0t0d0 at 10:35:04
+
+   Data of 2 types can be displayed by StatsView - 2d or 3d.  2d data does
+not have any instance information, eg for CPU usage, total idle, usr, sys,
+wio.  3d data has instance information, eg for Disk usage, reads/sec,
+writes/sec by disk.
+
+METHODS
+=======
+
+new()
+-----
+
+   This takes a single argument, the name of a statistics file to open.
+This can be the output of one of the following commands:
+
+     iost+                      - see the Solaris::Kstats module
+     iostat -x                  - extended device statistics format
+     Built-in Oracle monitoring - collected via sv
+     sar                        - binary or text format
+     vmstat                     - standard format
+     mpstat                     - standard format
+     vxstat                     - Veritas VM statistics
+
+   Note that iostat, mpstat and vmstat don't put timestamps in their
+output, thus making it impossible to decide hown the data should be
+graphed.  To circumvent this problem it is necessary to add a header line
+to the start of the data files of the form:
+
+     Start: 01/01/1998 12:00:00 Interval: 10
+
+   Giving the start of the sampling period in dd/mm/yyyy hh:mm:ss format
+and the interval between samples in seconds.  This is done automatically
+if the data is collected via the sv script.
+
+read()
+------
+
+   This reads in the data from the file.  For data files that contain more
+than one category of data, the name of the category to read should be
+given as an argument, eg for sar "CPU usage" or "Disk IO".  The
+get_categories() method can be used to find out all the available
+categories - see below.
+
+define()
+--------
+
+   This defines the parameters of the graph that is to be drawn.  It takes
+a list of key-value parameter pairs.  Different parameters are supported
+depending on whether the data is 2d or 3d.  Parameters allowed for both 2d
+and 3d data are:
+
+     scale => "normal" | "logarithmic"
+
+   The default is "normal".
+
+   For 2d data the expected parameter is:
+
+     columns => [ <list of columns to plot> ]
+
+   For 3d data the expected parameters are:
+
+     column    => <column name>
+     instances => [ <list of instances to plot> ]
+
+   The available columns and instances can be retrieved via the
+get_columns() and get_instances() methods - see below.
+
+plot()
+------
+
+   This takes no arguments, and plots the currently defined graph to the
+screen.
+
+print()
+-------
+
+   This prints the currently defined graph. It takes a list of key-value
+parameter pairs.  Allowed parameters are:
+
+     orientation => "landscape" | "portrait"   default: landscape
+     color       => "monochrome" | "color"     default: color
+     printer     => <printer command>          Eg "lp", "lp -d myprinter"
+     type        => "postscript" | "laserjet ii" | "laserjet iii"
+
+save()
+------
+
+   This saves the currently defined graph to a file.  It takes a list of
+key-value parameter pairs.  Allowed parameters are:
+
+     orientation => "landscape" | "portrait"   default: landscape
+     color       => "monochrome" | "color"     default: color
+     file        => <output filename>
+     format      => "csv"          comma-separated text
+                  | "postscript"   postscript format
+                  | "cgm"          Computer Graphics Metafile
+                                   - For M$ Word, etc
+                  | "mif"          Framemaker
+                  | "gif"          requires gnuplot built with GD support
+
+get_data_type()
+---------------
+
+   This returns the type of the data in the file - either "2d" or "3d" (see
+TERMINOLOGY above).  For data files that contain more than obe category of
+data, the name of a catogory should be supplied as an argument.
+
+get_columns()
+-------------
+
+   This returns a list of the available columns.
+
+get_instances()
+---------------
+
+   This returns a list of the available instances, for 3d data.  For 2d
+data it will return an empty list.
+
+get_times()
+-----------
+
+   This returns a 3 element list of (start time, sampling interval, end
+time).  Start and end time are expressed as a standard Unix 32-bit time
+value, and the sampling interval is expressed in seconds.
+
+get_title()
+-----------
+
+   This returns the title that will be displayed at the top of the graph.
+
+get_categories()
+----------------
+
+   This will return a list of all the available categories, for files that
+contain several categories of data.  For files that only contain 1
+category of data it will return an empty list.
+
+get_file()
+----------
+
+   This returns the name of the data file that has been read in.
+
+AUTHOR
+======
+
+   Support questions and suggestions can be directed to
+Alan.Burlison@uk.sun.com
+
+COPYRIGHT AND DISCLAIMER
+========================
+
+   Copyright (c) 1998 Alan Burlison
+
+   You may distribute under the terms of either the GNU General Public
+License or the Artistic License, as specified in the Perl README file,
+with the exception that it cannot be placed on a CD-ROM or similar media
+for commercial distribution without the prior approval of the author.
+
+   This code is provided with no warranty of any kind, and is used
+entirely at your own risk.
+
+   This code was written by the author as a private individual, and is in
+no way endorsed or warrantied by Sun Microsystems.
+
+
+File: pm.info,  Node: Stone,  Next: Stone/Cursor,  Prev: StatsView/Graph,  Up: Module List
+
+In-memory storage for hierarchical tag/value data structures
+************************************************************
+
+NAME
+====
+
+   Stone - In-memory storage for hierarchical tag/value data structures
+
+SYNOPSIS
+========
+
+     use Stone;
+     my $stone = Stone->new( Jim => { First_name => 'James',
+     				  Last_name  => 'Hill',
+     				  Age        => 34,
+     				  Address    => {
+     					 Street => ['The Manse',
+     						    '19 Chestnut Ln'],
+     					 City  => 'Garden City',
+     					 State => 'NY',
+     					 Zip   => 11291 }
+     				},
+     			  Sally => { First_name => 'Sarah',
+     				     Last_name  => 'James',
+     				     Age        => 30,
+     				     Address    => {
+     					 Street => 'Hickory Street',
+     					 City  => 'Katonah',
+     					 State => 'NY',
+     					 Zip  => 10578 }
+     				}
+     			 );
+
+     @tags    = $stone->tags;          # yields ('James','Sally');
+     $address = $stone->Jim->Address;  # gets the address subtree
+     @street  = $address->Street;      # yeilds ('The Manse','19 Chestnut Ln')
+
+     $address = $stone->get('Jim')->get('Address'); # same as $stone->Jim->Address
+     $address = $stone->get('Jim.Address'); # another way to express same thing
+
+     # first Street tag in Jim's address
+     $address = $stone->get('Jim.Address.Street[0]');
+     # second Street tag in Jim's address
+     $address = $stone->get('Jim.Address.Street[1]');
+     # last Street tag in Jim's address
+     $address = $stone->get('Jim.Address.Street[#]');
+
+     # insert a tag/value pair
+     $stone->insert(Martha => { First_name => 'Martha', Last_name => 'Steward'} );
+
+     # find the first Address
+     $stone->search('Address');
+
+     # change an existing subtree
+     $martha = $stone->Martha;
+     $martha->replace(Last_name => 'Stewart');  # replace a value
+
+     # iterate over the tree with a cursor
+     $cursor = $stone->cursor;
+     while (my ($key,$value) = $cursor->each) {
+       print "$value: Go Bluejays!\n" if $key eq 'State' and $value eq 'Katonah';
+     }
+
+     # various format conversions
+     print $stone->asTable;
+     print $stone->asString;
+     print $stone->asHTML;
+     print $stone->asXML('Person');
+
+DESCRIPTION
+===========
+
+   A *Note Stone: Stone, consists of a series of tag/value pairs.  Any
+given tag may be single-valued or multivalued.  A value can be another
+Stone, allowing nested components.  A big Stone can be made up of a lot of
+little stones (pebbles?).  You can obtain a Stone from a *Note
+Boulder/Stream: Boulder/Stream, or *Note Boulder/Store: Boulder/Store,
+persistent database.  Alternatively you can build your own Stones bit by
+bit.
+
+   Stones can be exported into string, XML and HTML representations.  In
+addition, they are flattened into a linearized representation when reading
+from or writing to a *Note Boulder/Stream: Boulder/Stream, or one of its
+descendents.
+
+   *Note Stone: Stone, was designed for subclassing.  You should be able
+to create subclasses which create or require particular tags and data
+formats.  Currently only *Note Stone/GB_Sequence: Stone/GB_Sequence,
+subclasses *Note Stone: Stone,.
+
+CONSTRUCTORS
+============
+
+   Stones are either created by calling the new() method, or by reading
+them from a *Note Boulder/Stream: Boulder/Stream, or persistent database.
+
+$stone = Stone->new()
+---------------------
+
+   This is the main constructor for the Stone class.  It can be called
+without any parameters, in which case it creates an empty Stone object (no
+tags or values), or it may passed an associative array in order to
+initialize it with a set of tags.  A tag's value may be a scalar, an
+anonymous array reference (constructed using [] brackets), or a hash
+references (constructed using {} brackets).  In the first case, the tag
+will be single-valued.  In the second, the tag will be multivalued. In the
+third case, a subsidiary Stone will be generated automatically and placed
+into the tree at the specified location.
+
+   Examples:
+
+     $myStone = new Stone;
+     $myStone = new Stone(Name=>'Fred',Age=>30);
+     $myStone = new Stone(Name=>'Fred',
+                                  Friend=>['Jill','John','Jerry']);
+     $myStone = new Stone(Name=>'Fred',
+                                  Friend=>['Jill',
+     			      'John',
+     		              'Gerald'
+     			      ],
+     		     Attributes => { Hair => 'blonde',
+     		                     Eyes => 'blue' }
+                                  );
+
+   In the last example, a Stone with the following structure is created:
+
+     Name        Fred
+     Friend      Jill
+     Friend      John
+     Friend      Gerald
+     Attributes  Eyes    blue
+                 Hair    blonde
+
+   Note that the value corresponding to the tag "Attributes" is itself a
+Stone with two tags, "Eyes" and "Hair".
+
+   The XML representation (which could be created with asXML()) looks like
+this:
+
+     <?xml version="1.0" standalone="yes"?>
+     <Stone>
+        <Attributes>
+           <Eyes>blue</Eyes>
+           <Hair>blonde</Hair>
+        </Attributes>
+        <Friend>Jill</Friend>
+        <Friend>John</Friend>
+        <Friend>Gerald</Friend>
+        <Name>Fred</Name>
+     </Stone>
+
+   More information on Stone initialization is given in the description of
+the insert() method.
+
+OBJECT METHODS
+==============
+
+   Once a Stone object is created or retrieved, you can manipulate it with
+the following methods.
+
+$stone->insert(%hash)
+---------------------
+
+$stone->insert(\%hash)
+----------------------
+
+   This is the main method for adding tags to a Stone.  This method
+expects an associative array as an argument or a reference to one.  The
+contents of the associative array will be inserted into the Stone.  If a
+particular tag is already present in the Stone, the tag's current value
+will be appended to the list of values for that tag.  Several types of
+values are legal:
+
+   * A scalar value
+
+     The value will be inserted into the `Stone'.
+
+          $stone->insert(name=>Fred,
+                         age=>30,
+                         sex=>M);
+          $stone->dump;
+          
+          name[0]=Fred
+          age[0]=30
+          sex[0]=M
+
+   * An ARRAY reference
+
+     A multi-valued tag will be created:
+
+          $stone->insert(name=>Fred,
+          	       children=>[Tom,Mary,Angelique]);
+          $stone->dump;
+          
+          name[0]=Fred
+          children[0]=Tom
+          children[1]=Mary
+          children[2]=Angelique
+
+   * A HASH reference
+
+     A subsidiary `Stone' object will be created and inserted into the
+     object as a nested structure.
+
+          $stone->insert(name=>Fred,
+                                 wife=>{name=>Agnes,age=>40});
+          $stone->dump;
+
+          name[0]=Fred
+          wife[0].name[0]=Agnes
+          wife[0].age[0]=40
+
+   * A `Stone' object or subclass
+
+     The `Stone' object will be inserted into the object as a nested
+     structure.
+
+          $wife = new Stone(name=>agnes,
+                                    age=>40);
+          $husband = new Stone;
+          $husband->insert(name=>fred,
+                                   wife=>$wife);
+          $husband->dump;
+          
+          name[0]=fred
+          wife[0].name[0]=agnes
+          wife[0].age[0]=40
+
+$stone->replace(%hash)
+----------------------
+
+$stone->replace(\%hash)
+-----------------------
+
+   The replace() method behaves exactly like insert() with the exception
+that if the indicated key already exists in the *Stone*, its value will be
+replaced.  Use replace() when you want to enforce a single-valued
+tag/value relationship.
+
+$stone->insert_list($key,@list) =head2 $stone->insert_hash($key,%hash) =head2 $stone->replace_list($key,@list) =head2 $stone->replace_hash($key,%hash)
+------------------------------------------------------------------------------------------------------------------------------------------------------
+
+   These are primitives used by the insert() and replace() methods.
+Override them if you need to modify the default behavior.
+
+$stone->delete($tag)
+--------------------
+
+   This removes the indicated tag from the Stone.
+
+@values = $stone->get($tag [,$index])
+-------------------------------------
+
+   This returns the value at the indicated tag and optional index.  What
+you get depends on whether it is called in a scalar or list context.  In a
+list context, you will receive all the values for that tag.  You may
+receive a list of scalar values or (for a nested record) or a list of
+Stone objects. If called in a scalar context, you will either receive the
+first or the last member of the list of values assigned to the tag.  Which
+one you receive depends on the value of the package variable
+`$Stone::Fetchlast'.  If undefined, you will receive the first member of
+the list. If nonzero, you will receive the last member.
+
+   You may provide an optional index in order to force get() to return a
+particular member of the list.  Provide a 0 to return the first member of
+the list, or '#' to obtain the last member.
+
+   If the tag contains a period (.), get() will call index() on your
+behalf (see below).
+
+   If the tag begins with an uppercase letter, then you can use the
+autogenerated method to access it:
+
+     $stone->Tag_name([$index])
+
+   This is exactly equivalent to:
+
+     $stone->get('Teg_name' [,$index])
+
+@values = $stone->search($tag)
+------------------------------
+
+   Searches for the first occurrence of the tag, traversing the tree in a
+breadth-first manner, and returns it.  This allows you to retrieve the
+value of a tag in a deeply nested structure without worrying about all the
+intermediate nodes.  For example:
+
+     $myStone = new Stone(Name=>'Fred',
+     	 	      Friend=>['Jill',
+     			       'John',
+     			       'Gerald'
+     			      ],
+     		      Attributes => { Hair => 'blonde',
+     				      Eyes => 'blue' }
+     		    );
+
+     $hair_colour = $stone->search('Hair');
+
+   The disadvantage of this is that if there is a tag named "Hair" higher
+in the hierarchy, this tag will be retrieved rather than the lower one.
+In an array context this method returns the complete list of values from
+the matching tag.  In a scalar context, it returns either the first or the
+last value of multivalued tags depending as usual on the value of
+`$Stone::Fetchlast'.
+
+   `$Stone::Fetchlast' is also consulted during the depth-first traversal.
+If `$Fetchlast' is set to a true value, multivalued intermediate tags
+will be searched from the last to the first rather than the first to the
+last.
+
+   The Stone object has an AUTOLOAD method that invokes get() when you
+call a method that is not predefined.  This allows a very convenient type
+of shortcut:
+
+     $name        = $stone->Name;
+     @friends     = $stone->Friend;
+     $eye_color   = $stone->Attributes->Eyes
+
+   In the first example, we retrieve the value of the top-level tag Name.
+In the second example, we retrieve the value of the Friend tag..  In the
+third example, we retrieve the attributes stone first, then the Eyes value.
+
+   NOTE: By convention, methods are only autogenerated for tags that begin
+with capital letters.  This is necessary to avoid conflict with hard-coded
+methods, all of which are lower case.
+
+@values = $stone->index($indexstr)
+----------------------------------
+
+   You can access the contents of even deeply-nested *Stone* objects with
+the index method.  You provide a *tag path*, and receive a value or list
+of values back.
+
+   Tag paths look like this:
+
+     tag1[index1].tag2[index2].tag3[index3]
+
+   Numbers in square brackets indicate which member of a multivalued tag
+you're interested in getting.  You can leave the square brackets out in
+order to return just the first or the last tag of that name, in a scalar
+context (depending on the setting of *$Stone::Fetchlast*).  In an array
+context, leaving the square brackets out will return all multivalued
+members for each tag along the path.
+
+   You will get a scalar value in a scalar context and an array value in
+an array context following the same rules as get().  You can provide an
+index of '#' in order to get the last member of a list or a [?] to obtain
+a randomly chosen member of the list (this uses the rand() call, so be
+sure to call srand() at the beginning of your program in order to get
+different sequences of pseudorandom numbers.  If there is no tag by that
+name, you will receive undef or an empty list.  If the tag points to a
+subrecord, you will receive a *Stone* object.
+
+   Examples:
+
+     # Here's what the data structure looks like.
+     $s->insert(person=>{name=>Fred,
+     		    age=>30,
+     		    pets=>[Fido,Rex,Lassie],
+     		    children=>[Tom,Mary]},
+     	   person=>{name=>Harry,
+     		    age=>23,
+     		    pets=>[Rover,Spot]});
+
+     # Return all of Fred's children
+     @children = $s->index('person[0].children');
+
+     # Return Harry's last pet
+     $pet = $s->index('person[1].pets[#]');
+
+     # Return first person's first child
+     $child = $s->index('person.children');
+
+     # Return children of all person's
+     @children = $s->index('person.children');
+
+     # Return last person's last pet
+     $Stone::Fetchlast++;
+     $pet = $s->index('person.pets');
+
+     # Return any pet from any person
+     $pet = $s->index('person[?].pet[?]');
+
+   Note that *index()* may return a *Stone* object if the tag path points
+to a subrecord.
+
+$array = $stone->at($tag)
+-------------------------
+
+   This returns an ARRAY REFERENCE for the tag.  It is useful to prevent
+automatic dereferencing.  Use with care.  It is equivalent to:
+
+     $stone->{'tag'}
+
+   at() will always return an array reference.  Single-valued tags will
+return a reference to an array of size 1.
+
+@tags = $stone->tags()
+----------------------
+
+   Return all the tags in the Stone.  You can then use this list with
+get() to retrieve values or recursively traverse the stone.
+
+$string = $stone->asTable()
+---------------------------
+
+   Return the data structure as a tab-delimited table suitable for
+printing.
+
+$string = $stone->asXML([$tagname])
+-----------------------------------
+
+   Return the data structure in XML format.  The entire data structure
+will be placed inside a top-level tag called <Stone>.  If you wish to
+change this top-level tag, pass it as an argument to asXML().
+
+   An example follows:
+
+     print $stone->asXML('Address_list');
+     # yields:
+     <?xml version="1.0" standalone="yes"?>
+
+     <Address_list>
+        <Sally>
+           <Address>
+              <Zip>10578</Zip>
+              <City>Katonah</City>
+              <Street>Hickory Street</Street>
+              <State>NY</State>
+           </Address>
+           <Last_name>Smith</Last_name>
+           <Age>30</Age>
+           <First_name>Sarah</First_name>
+        </Sally>
+        <Jim>
+           <Address>
+              <Zip>11291</Zip>
+              <City>Garden City</City>
+              <Street>The Manse</Street>
+              <Street>19 Chestnut Ln</Street>
+              <State>NY</State>
+           </Address>
+           <Last_name>Hill</Last_name>
+           <Age>34</Age>
+           <First_name>James</First_name>
+        </Jim>
+     </Address_list>
+
+$hash = $stone->attributes([$att_name, [$att_value]]])
+------------------------------------------------------
+
+   attributes() returns the "attributes" of a tag.  Attributes are a
+series of unique tag/value pairs which are associated with a tag, but are
+not contained within it.  Attributes can only be expressed in the XML
+representation of a Stone:
+
+     <Sally id="sally_tate" version="2.0">
+       <Address type="postal">
+            <Zip>10578</Zip>
+            <City>Katonah</City>
+            <Street>Hickory Street</Street>
+            <State>NY</State>
+         </Address>
+     </Sally>
+
+   Called with no arguments, attributes() returns the current attributes
+as a hash ref:
+
+     my $att = $stone->Address->attributes;
+     my $type = $att->{type};
+
+   Called with a single argument, attributes() returns the value of the
+named attribute, or undef if not defined:
+
+     my $type = $stone->Address->attributes('type');
+
+   Called with two arguments, attributes() sets the named attribute:
+
+     my $type = $stone->Address->attributes(type => 'Rural Free Delivery');
+
+   You may also change all attributes in one fell swoop by passing a hash
+reference as the single argument:
+
+     $stone->attributes({id=>'Sally Mae',version=>'2.1'});
+
+$string = $stone->toString()
+----------------------------
+
+   toString() returns a simple version of the Stone that shows just the
+topmost tags and the number of each type of tag.  For example:
+
+     print $stone->Jim->Address;
+         #yields => Zip(1),City(1),Street(2),State(1)
+
+   This method is used internally for string interpolation.  If you try to
+print or otherwise manipulate a Stone object as a string, you will obtain
+this type of string as a result.
+
+$string = $stone->asHTML([\&callback])
+--------------------------------------
+
+   Return the data structure as a nicely-formatted HTML 3.2 table,
+suitable for display in a Web browser.  You may pass this method a
+callback routine which will be called for every tag/value pair in the
+object.  It will be passed a two-item list containing the current tag and
+value.  It can make any modifications it likes and return the modified tag
+and value as a return result.  You can use this to modify tags or values
+on the fly, for example to turn them into HTML links.
+
+   For example, this code fragment will turn all tags named "Sequence"
+blue:
+
+     my $callback = sub {
+           my ($tag,$value) = @_;
+     	return ($tag,$value) unless $tag eq 'Sequence';
+     	return ( qq(<FONT COLOR="blue">$tag</FONT>),$value );
+     }
+     print $stone->asHTML($callback);
+
+Stone::dump()
+-------------
+
+   This is a debugging tool.  It iterates through the *Stone* object and
+prints out all the tags and values.
+
+   Example:
+
+     $s->dump;
+     
+     person[0].children[0]=Tom
+     person[0].children[1]=Mary
+     person[0].name[0]=Fred
+     person[0].pets[0]=Fido
+     person[0].pets[1]=Rex
+     person[0].pets[2]=Lassie
+     person[0].age[0]=30
+     person[1].name[0]=Harry
+     person[1].pets[0]=Rover
+     person[1].pets[1]=Spot
+     person[1].age[0]=23
+
+$cursor = $stone->cursor()
+--------------------------
+
+   Retrieves an iterator over the object.  You can call this several times
+in order to return independent iterators. The following brief example is
+described in more detail in *Note Stone/Cursor: Stone/Cursor,.
+
+     my $curs = $stone->cursor;
+     while (my($tag,$value) = $curs->next_pair) {
+       print "$tag => $value\n";
+     }
+     # yields:
+       Sally[0].Address[0].Zip[0] => 10578
+       Sally[0].Address[0].City[0] => Katonah
+       Sally[0].Address[0].Street[0] => Hickory Street
+       Sally[0].Address[0].State[0] => NY
+       Sally[0].Last_name[0] => James
+       Sally[0].Age[0] => 30
+       Sally[0].First_name[0] => Sarah
+       Jim[0].Address[0].Zip[0] => 11291
+       Jim[0].Address[0].City[0] => Garden City
+       Jim[0].Address[0].Street[0] => The Manse
+       Jim[0].Address[0].Street[1] => 19 Chestnut Ln
+       Jim[0].Address[0].State[0] => NY
+       Jim[0].Last_name[0] => Hill
+       Jim[0].Age[0] => 34
+       Jim[0].First_name[0] => James
+
+AUTHOR
+======
+
+   Lincoln D. Stein <lstein@cshl.org>.
+
+COPYRIGHT
+=========
+
+   Copyright 1997-1999, Cold Spring Harbor Laboratory, Cold Spring Harbor
+NY.  This module can be used and distributed on the same terms as Perl
+itself.
+
+SEE ALSO
+========
+
+   *Note Boulder/Blast: Boulder/Blast,, *Note Boulder/Genbank:
+Boulder/Genbank,, *Note Boulder/Medline: Boulder/Medline,, *Note
+Boulder/Unigene: Boulder/Unigene,, *Note Boulder/Omim: Boulder/Omim,,
+`Boulder::SwissProt' in this node
+
+

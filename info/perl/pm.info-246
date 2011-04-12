@@ -1,0 +1,1612 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: NDBM_File,  Next: NIS/DBM,  Prev: Mysql,  Up: Module List
+
+Tied access to ndbm files
+*************************
+
+NAME
+====
+
+   NDBM_File - Tied access to ndbm files
+
+SYNOPSIS
+========
+
+     use NDBM_File;
+     use Fcntl;       # for O_ constants
+
+     tie(%h, 'NDBM_File', 'Op.dbmx', O_RDWR|O_CREAT, 0640);
+
+     untie %h;
+
+DESCRIPTION
+===========
+
+   See `tie', *Note Perlfunc: (perl.info)perlfunc,, `tie', *Note
+Perldbmfilter: (perl.info)perldbmfilter,
+
+
+File: pm.info,  Node: NIS/DBM,  Next: NNML/Server,  Prev: NDBM_File,  Up: Module List
+
+Perl module implementing a NIS daemon.
+**************************************
+
+NAME
+====
+
+   NIS::DBM - Perl module implementing a NIS daemon.
+
+SYNOPSIS
+========
+
+     use NIS::DBM;
+
+DESCRIPTION
+===========
+
+   NIS::DBM trivializes the implementation of daemons and other scripts
+which maintain the NIS databases by presenting them as a hash keyed by
+both username and user id.  If a numeric username exists in the byname
+databases, the number associated with that username will be used as the
+user id.  This is the same behavior as chown and *chgrp*.
+
+   NIS::DBM maintains three caches of information to construct an accurate
+view of the NIS databases as modified by the program.  The caches are for
+actual records from the database, modifications to the database, and
+deletions from the database.  The caches have the following precedence:
+deletions, modifications, and general cache.  The caches may be flushed to
+the database files at any time or upon object destruction.
+
+NIS::DBM API
+============
+
+NIS::DBM constructor
+     This will construct a new NIS::DBM object.  The arguments may be given
+     in a variaty of ways:
+
+          tie %nis, NIS::DBM, ( 'config filename' );
+          tie %nis, NIS::DBM, ( { config_file => 'filename',
+                                  sections   => [ 'sec1', ... ],
+                                  default_keys => { keys1 => value1, ... },
+                                  required_keys => [ key1, key2, ... ]
+                                } );
+          tie %nis, NIS::DBM, ( config_file => 'filename',
+                                sections   => [ 'sec1', ... ],
+                                default_keys => { keys1 => value1, ... },
+                                required_keys => [ key1, key2, ... ]
+                                );
+          tie %nis, NIS::DBM, ( filename => '/path/to/conf/file'
+                                program_tag => 'string'
+                                defaults => { keys1 => value1, ... },
+                                required => [ key1, key2, ... ]
+                                );
+
+FETCH
+     Given a username or user id, FETCH will return the NIS record as a
+     hash reference.  FETCH will first consult any caches maintained by the
+     tied object to provide current information that may not be available
+     in the database files.
+
+STORE
+     Given a username or user id, STORE will make any modifications to the
+     caches necessary for the databases to reflect the changes when
+     flushed.  These same chaches are consulted by FETCH.
+
+DELETE
+     Given a username or user id, DELETE marks the record for deletion.
+     The record is not available for FETCHing or testing for *EXIST*ance.
+
+CLEAR
+     This is called when the hash is assigned an empty hash or array.  This
+     function is not implemented.  You cannot remove the NIS user databases
+     using this module.
+
+EXISTS
+     Given a username or user id, will return true if the key exists in the
+     modification, addition, or general cache or in the actual database.
+     Will return false regardless of the existance in any database or
+     cache if the record is marked for deletion.
+
+FIRSTKEY
+     This function will initialize an array of keys and return the first.
+     The keys are unordered.
+
+NEXTKEY
+     This function will return the next key in the array of keys.
+
+DESTROY
+     Flushes any changes in the chaches to the database files and closes
+     them.  This behavior may be overridden by the *set_option(FLUSH=*0)>
+     method.
+
+get_options
+     Returns a list of options currently set for the object.
+
+get_option
+     Given a key, returns the value of the option.
+
+set_option
+     Given a key/value pair, sets the option to the value.  The following
+     options are currently used:
+
+flush
+     If FLUSH is set, any changes in the caches will be written out to the
+     database files.  The caches will be cleared after a flush if data is
+     actually written.
+
+OPTIONS
+=======
+
+CLOBBER
+          0 -> databases are read only
+          1 -> STORE but not DELETE
+          2 -> STORE and DELETE enabled
+
+FLUSH
+          0 -> do not flush changes from the caches to the databases
+          1 -> flush changes from the caches to the databases
+               (by either the flush or DESTROY methods)
+
+PUSH
+          0 -> do not push changes to other machines
+          1 -> push changes if needed to other machines
+
+key_set
+     If this is set to either *byuid* or byname then only the keys in the
+     respective files (i.e., uids or usernames) are available as keys.
+     Otherwise, the default behavior is to assume username first and uid
+     last.
+
+name_db_files
+uid_db_files
+use_adjunct
+     If this is set, the difference between adjunct and non-adjunct files
+     is recognized.  Otherwise, the normal NIS behavior is used.  If a
+     file is in the list of dbm files with the string `adjunct' in the
+     name, then the preparation phase of tieing the hash to the dbm files
+     will set this flag.
+
+yp_top
+yp_src
+yp_push_cmd
+IDIOMS
+======
+
+   The following are some idioms using the NIS::DBM tied hash.  The
+username and user id are available via $username and $uid respectively.
+
+Delete User
+          my $userinfo = $nishash{$username || $uid};
+          delete $nishash{$$userinfo{'username'}};
+          delete $nishash{$$userinfo{'uid'}};
+
+Change User's Username
+          my $userinfo = $nishash{$username || $uid};
+          delete $nishash{$$userinfo{'username'}};
+          $$userinfo{'username'} = $new_username;
+          $$nishash{$new_username} = $userinfo;
+          $$nishash{$$userinfo{'uid'}} = $userinfo;
+
+Change User's UID
+          my $userinfo = $nishash{$username || $uid};
+          delete $nishash{$$userinfo{'uid'}};
+          $$userinfo{'username'} = $new_uid;
+          $$nishash{$new_uid} = $userinfo;
+          $$nishash{$$userinfo{'username'}} = $userinfo;
+
+Add New User
+          my $userinfo = { username => $username,
+                           uid      => $uid,
+                           gid      => $gid,
+                           gecos    => $gecos,
+                           home     => $home,
+                           shell    => $shell,
+                           password => crypt($password, $salt)
+                         };
+          $nishash{$username} = $userinfo;
+          $nishash{$uid} = $userinfo;
+
+AUTHORS
+=======
+
+   James G. Smith, <jgsmith@tamu.edu> Philip C. Kizer, <pckizer@tamu.edu>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1999, Texas A&M University.  All rights reserved.
+
+   Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+     1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+     2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+     3. Neither the name of the University nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTERS "AS
+IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+SEE ALSO
+========
+
+   perl(1), Net::NIS(3).
+
+
+File: pm.info,  Node: NNML/Server,  Next: NVDefined,  Prev: NIS/DBM,  Up: Module List
+
+a minimal NNTP server
+*********************
+
+NAME
+====
+
+   NNML::Server - a minimal NNTP server
+
+SYNOPSIS
+========
+
+     perl -MNNML::Server -e server
+     perl -MNNML::Server -e unspool
+
+DESCRIPTION
+===========
+
+   *NNML::Server* server implements a minimal NNTP server. It is (hope-)
+fully conformant to rfc977. In addition the commands `XOVER' and
+`AUTHINFO' are implemented.
+
+   Supported commands:
+
+     ARTICLE, AUTHINFO, BODY, GROUP, HEAD, HELP, IHAVE, LAST, LIST,
+     MODE, NEWGROUPS, NEWNEWS, NEXT, POST, QUIT, SLAVE, STAT
+
+     XOVER, XHDR, LIST NEWSGROUPS ng-spec
+     
+     The main reason for writing this was to synchronize my mail directories
+     across different hosts. The Mail directories are MH-Style with a F<.overview>
+     file in each folder and an F<active> file in the base
+     directory. These are maintained by the B<Emacs> B<Gnus> backend
+     B<NNML>. To get started, you can generate/update this files using the
+     B<overview> program. Upon C<POST> and C<IHAVE> commands this files
+     will also be updated.
+
+   To start from scratch use:
+
+     touch /tmp/active;
+     perl -MNNML::Server -e 'server(base => "/tmp", port => 3000)'
+
+   To export your mh-Mail use:
+
+     perl overview -base ~/Mail
+     perl -MNNML::Server -e 'server(base => "$ENV{HOME}/Mail", port => 3000)'
+
+   The command POST and *IHAVE* honour the `Newsgroups' header if not
+overwritten by the `X-Nnml-Groups' header. Articles will contain an
+appropriate `X-Nnml-Groups' header when retrieved by message-id.
+
+   When the client submits the `SLAVE' command, all forther post requests
+are spooled in `$Config-'spool> (usually `~/Mail/NNML.spool') for
+performance reasons. You can process the spooled articles by submitting
+the `XUNSPOOL' command or by calling
+
+     perl -MNNML::Server -e unspool
+
+   Rejected articles will be saven in `$Config-'bad> (usually
+`~/Mail/NNML.bad')
+
+AUTHORIZATION
+=============
+
+   To enable access restrictions use:
+
+     perl -MNNML::Auth -e "NNML::Auth::add_user($ENV{LOGANME}, 'passwd', \
+       'read', 'write', 'admin')"
+
+   If base`/passwd' exists, three levels of authorization are recognized:
+
+admin
+     Users with permission admin may shut down the server using `SHUT'.
+     Also these users may create new groups simply by posting to them.
+     Permission admin is also required for the `XUNSPOOL' command.
+
+write
+     Users with permission write may use the POST and *IHAVE* commands.
+
+read
+     All other commands require the read permission.
+
+FEATURES
+========
+
+   Version 1.06 implements the `MODE GZIP' command. After submiting this
+commands, all articles, heads and bodies will be piped through `gzip -cf |
+mimencode'. The server will recognize post requeste using the same pipe
+automatically. This will speed up *nnmirror* if the line is sufficiant
+slow.
+
+BUGS
+====
+
+   The server handles multiple connections in a single thread. So a hung
+POST or `IHAVE' would block all connections. Therfore a post request is
+interrupted if the server could not read any bytes for 30 seconds. The
+Client is notified by message 441. If the client continues to send the
+article, it is interpreted by the command loop.
+
+SEE ALSO
+========
+
+   The overview(1) and *nnmirror*(1) manpages.
+
+AUTHOR
+======
+
+   Ulrich Pfeifer <`pfeifer@ls6.informatik.uni-dortmund.de'>
+
+
+File: pm.info,  Node: NVDefined,  Next: Net/AIM,  Prev: NNML/Server,  Up: Module List
+
+Perl extension for non-vivifying exists and defined functions
+*************************************************************
+
+NAME
+====
+
+   NVDefined - Perl extension for non-vivifying exists and defined
+functions
+
+SYNOPSIS
+========
+
+     use NVDefined;
+
+     ...
+
+     if (NVExists(\%hash, qw(key1 key2 ... keyn ))) {
+         ...
+     }
+
+     if (NVDefined(\%hash, qw(key1 key2 ... keyn))) {
+         ...
+     }
+
+DESCRIPTION
+===========
+
+   This module has been superseded by Hash::NoVivify, qv.
+
+AUTHOR
+======
+
+   Brent B. Powers (B2Pi), Powers@B2Pi.com
+
+   Copyright(c) 1999 Brent B. Powers. All rights reserved. This program is
+free software, you may redistribute it and/or modify it under the same
+terms as Perl itself.
+
+SEE ALSO
+========
+
+   perl(1), perlfunc(1).
+
+
+File: pm.info,  Node: Net/AIM,  Next: Net/AIM/Connection,  Prev: NVDefined,  Up: Module List
+
+   Net::AIM - Perl extension for AOL Instant Messenger TOC protocol
+
+SYNOPSIS
+========
+
+     use Net::AIM;
+
+     $aim = new Net::AIM;
+     $conn = $aim->newconn(Screenname   => 'Perl AIM',
+                           Password     => 'ilyegk');
+     $aim->start;
+
+DESCRIPTION
+===========
+
+   This module implements an OO interface to the Aol Instant Messenger TOC
+protocol.
+
+   This version contains not much more than hacked code that merely
+connects to the aol TOC servers and acts on instant messages.
+
+METHODS
+=======
+
+Net::AIM->new()
+     This is the Net::AIM constructor.  No arguments needed.
+
+$aim->debug($debug)
+     Set whether to print DEBUGGING information to STDERRR.  Accepts
+     $debug which should be a boolean value.
+
+$aim->set($key, $val)
+     This method is simply sets $key to $val in an internal hash for
+     variables
+
+$aim->get($key)
+     This method is simply gets the value of $key from the  internal hash
+
+$aim->newconn()
+     This method creates a new AIM::Connection object
+
+$aim->getconn()
+     This method returns a pointer to the AIM::Connection object
+
+$aim->do_one_loop()
+     This executes one read off the socket.
+
+$aim->start()
+     This just starts an infinte loop of $aim->do_one_loop;
+
+$aim->timeout($secs);
+     This sets or returns the current timeout in seconds for the select
+     loop.  Takes 1 optional argument.  Fractional timeout values are ok.
+
+$aim->add_buddy($send_bool, $group, @buddies);
+     This adds @buddies to your buddy list, under the group $group.  if
+     $send_bool evaluates to TRUE then the toc_add_buddy command is sent
+     to the server.  Otherwise it is not sent out.  This function will
+     also save the list internally.
+
+$aim->add_permit($send_bool, $group, @buddies);
+     This adds @buddies to your permit list, under the group $group.  if
+     $send_bool evaluates to TRUE then the toc_add_permit command is sent
+     to the server.  Otherwise it is not sent out.  This function will
+     also save the list internally.
+
+$aim->add_deny($send_bool, $group, @buddies);
+     This adds @buddies to your deny list, under the group $group.  if
+     $send_bool evaluates to TRUE then the toc_add_deny command is sent to
+     the server.  Otherwise it is not sent out.  This function will also
+     save the list internally.
+
+$aim->remove_buddy($send_bool, $group, @buddies);
+     This removes @buddies from your buddy list. $group must be the group
+     they were orginally set with for them to be deleted from the internal
+     $aim memory and prevent them from getting added again incase a
+     set_config method is called.
+
+     if $send_bool evaluates to TRUE then the toc_add_deny command is sent
+     to the server.  Otherwise it is not sent out.  This function will
+     also save the list internally.
+
+$aim->set_idle($idle_time)
+     This method sets our idle time to `$idle_time'.  If $idle_time is
+     omitted it will be set to 0.
+
+$aim->get_info($screen_name)
+     Sends an info request to the server for $screen_name. The server
+     should reply with a URL which will contain the info requested about
+     the user.
+
+$aim->set_info($info)
+     This method sets your info or profile information to $info on the
+     server.
+
+$aim->evil($user, $anon)
+     Warn `$screen_name'.  `$anon': boolean value which will determine
+     whether to warn the user anonymously or normally.  Anonymous warnings
+     are less severe.
+
+$aim->send($message)
+     Send $message to the server.  This is used internally by other
+     functions to send commands to the server.
+
+          $aim->send('toc_add_buddy perlaim')
+
+$aim->chat_invite($room, $msg, @buddies)
+     Invite @buddies to $room with the message $msg
+
+$aim->chat_accept($room_id)
+     This will accept an invitation that was sent to us for $room_id
+
+$aim->chat_leave($room_id)
+     This method instructs the server to take you out of the room $room_id
+
+$aim->chat_whisper($room_id,$user,$msg)
+     Whisper $msg to $user in the room $room_id
+
+$aim->chat_send($room_id, $message)
+     Send $message in chat room $room_id
+
+$aim->chat_join($roomname)
+     Send a request to enter the room $roomname
+
+$aim->send_im($screen_name, $message)
+     This method sends `$message' to `$screen_name'.
+
+$aim->list_rooms();
+     This method returns an @array of rooms each consisting of
+     ID:ROOM_NAME. For instance:    '235236:Perl AIM Chat12'
+     '234323:Perl AIM Chat13'    '235832:Perl AIM Chat14'    '125082:Perl
+     AIM Chat15'
+
+$aim->get_roomname($id)
+     This method returns the name of the room with id $id.
+
+$aim->set_roomname($id, $roomname)
+     This saves $roomname in the $aim object in a %hash keyed on $id.
+
+$aim->del_roomname($id)
+     Deletes $id and it's associate value from our roomname hash in $aim
+
+$aim->encode($str)
+     This method returns $str encoded as per the TOC specs: escaped
+     special chars ({}[]$) and enclosed in quotes (")
+
+$aim->send_config()
+     This method instructs the module to send our configurations which are
+     the mode (permit/deny/all) and our buddy list to the server and to
+     set it as our saved config on the server
+
+$aim->send_buddies()
+     This method instructs the module to send all our current buddies to
+     the AOL server.
+
+$set_config_str($config_str, add_bool)
+     This parses a config string of the form:       g Buddies       p
+     permit1       p permit2       d deny1       d deny2       b budd1
+      b budd2
+
+     Key:     g - Buddy Group (All Buddies until the next g or the end of
+     config are in this group.)      b - A Buddy     p - Person on permit
+     list     d - Person on deny list     m - Permit/Deny Mode.  Possible
+     values are         1 - Permit All         2 - Deny All         3 -
+     Permit Some         4 - Deny Some
+
+$aim->normalize($data)
+     This method normalizes $data by killing all but strict alphnumeric
+     characters.  Typically used for screen_names.
+
+AUTHOR
+======
+
+   * Written by Aryeh Goldsmith <perlaim@aryeh.net>, AIM:Perl AIM
+
+URL
+===
+
+   The Net::AIM project: http://www.aryeh.net/Net-AIM/
+
+   The Net::AIM bot list: http://www.nodoubtyo.com/aimbots/
+
+SEE ALSO
+========
+
+   perl(1)
+
+
+File: pm.info,  Node: Net/AIM/Connection,  Next: Net/AIM/Event,  Prev: Net/AIM,  Up: Module List
+
+Interface to an AIM connection
+******************************
+
+NAME
+====
+
+   Net::AIM::Connection - Interface to an AIM connection
+
+DESCRIPTION
+===========
+
+   This module handles the connection and communications between us and
+the server.  It parses the incoming data and hands it off to handler
+methods if they are defined.  It currently supports and follows the TOC
+protocol and contains methods to send out our information and messages.
+
+METHODS
+=======
+
+Net::AIM::Connection->new($hash_ref)
+          Net::AIM::Connection-Greater_Than_Special_Sequencenew( {
+          	 Screenname => 'perlaim',
+          	 Password => 'ilyegk',
+          	 TocServer => 'toc.oscar.aol.com',
+          	 TocPort => 9898,
+          	 AuthServer => 'login.oscar.aol.com',
+          	 AuthPort => 1234
+               }
+
+     Creates a new Connection object and tries to connect to the  AIM TOC
+     server.  This method creates and objet and calls connect with all the
+     arguments passed to it.
+
+$aim_conn->new($hash_ref)
+          $aim_conn-Greater_Than_Special_Sequencenew( {
+          	 Screenname => 'perlaim',  #required
+          	 Password => 'ilyegk',  #required
+          	 TocServer => 'toc.oscar.aol.com'
+          	 TocPort => 9898
+          	 AuthServer => 'login.oscar.aol.com'
+          	 AuthPort => 1234
+            } );
+
+     Sets up a connection to the AOL TOC server.
+
+$aim->normalize($data)
+     This method normalizes $data by killing all but strict alphnumeric
+     characters.  Typically used for screen_names.
+
+$aim_conn->send_im($screen_name, $message)
+     This method sends $message to $screen_name.
+
+$aim_conn->set_idle($idle_time)
+     This method sets our idle time to `$idle_time'.  If $idle_time is
+     omitted it will be set to 0.
+
+$aim_conn->add_buddy(@buddies)
+     This method adds `@buddies' to our buddy list that is set on the
+     server.
+
+$aim_conn->add_permit(@buddies)
+     This method adds `@buddies' to our permit list that is set on the
+     server.
+
+$aim_conn->add_deny(@buddies)
+     This method adds `@buddies' to our deny list that is set on the
+     server.
+
+$aim_conn->remove_buddy(@buddies)
+     This method removes `@buddies' from our buddy list that is set on the
+     server.
+
+$aim_conn->set_away($message)
+     This method sets our idle time to $idle_time.  If $idle_time is
+     omitted it will be set to 0.
+
+$aim_conn->get_info($screen_name)
+     Sends an info request to the server for $screen_name. The server
+     should reply with a URL which will contain the info requested about
+     the user.
+
+$aim_conn->set_info($info)
+     This method sets your info or profile information to $info on the
+     server.
+
+$aim_conn->evil($user, $anon)
+     Warn $screen_name.  $anon: boolean value which will determine whether
+     to warn the user anonymously or normally.  Anonymous warnings are
+     less severe.
+
+$aim_conn->send($message)
+     Send $message to the server.  This is used internally by other
+     functions to send commands to the server.
+
+          $aim_conn->send('toc_add_buddy perlaim')
+
+$aim_conn->chat_invite($room, $msg, @buddies)
+     Invite @buddies to $room with the message $msg
+
+$aim_conn->chat_accept($room_id)
+     This will accept an invitation that was sent to us for $room_id
+
+$aim_conn->chat_leave($room_id)
+     This method instructs the server to take you out of the room $room_id
+
+$aim_conn->chat_whisper($room_id,$user,$msg)
+     Whisper $msg to $user in the room $room_id
+
+$aim_conn->chat_send($room_id, $message)
+     Send $message in chat room $room_id
+
+$aim_conn->chat_join($roomname)
+     Send a request to enter the room $roomname
+
+$aim_conn->connected()
+     Returns a boolean value based on the state of the object's socket.
+
+$aim->debug($debug)
+     Set whether to print DEBUGGING information to STDERRR.  Accepts
+     $debug which should be a boolean value.
+
+$aim_conn->set_handler($evttype, \&coderef)
+     Set a sub routine to be called when $event is encountered:
+     $aim_conn->set_handler('error', \&on_errror);
+     $aim_conn->set_handler('im_in', \&on_im);
+
+$aim_conn->encode($str)
+     This method returns $str encoded as per the TOC specs: escaped
+     special chars ({}[]$) and enclosed in quotes (")
+
+$aim_conn->encodePass($password)
+     This method roasts $password according to the TOC specs. The roasted
+     password is returned.
+
+$aim_conn->send_confg($cfg_str)
+     Sends $cfg_str to the server to be used as configuration values for
+     the account.
+
+$aim_conn->read_and_parse()
+     Read a chunk of data off the connection to the server parse it and
+     send it off to any defined handlers.
+
+AUTHOR
+======
+
+   Aryeh Goldsmith <perlaim@aryeh.net>.
+
+URL
+===
+
+   The Net::AIM project: http://www.aryeh.net/Net-AIM/
+
+   The Net::AIM bot list: http://www.nodoubtyo.com/aimbots/
+
+SEE ALSO
+========
+
+   perl(1)
+
+
+File: pm.info,  Node: Net/AIM/Event,  Next: Net/AOLIM,  Prev: Net/AIM/Connection,  Up: Module List
+
+Object to hold event data
+*************************
+
+NAME
+====
+
+   Net::AIM::Event - Object to hold event data
+
+DESCRIPTION
+===========
+
+   This module holds data about an event which is any instruction we get
+from the server.
+
+METHODS
+=======
+
+Net::AIM::Event->new($type, $from, $to, @args)
+     Net::AIM::Event constructor.  Takes 4 args    * The type of event
+     * The originator (screenname or server)    * To/Destination (us -
+     remnants from IRC module days...)     * @ARGS
+
+$aim_event->dump()
+     Print the event to STDERR good for debugging
+
+$aim_event->args(@args)
+     Sets the event's argument list to @args if it is provided.  Otherwise
+     it returns the event's argument list.
+
+$aim_event->from($from)
+     Sets the originator of this event if $from is provided.  Otherwise it
+     returns the event's originator.  Usually either a ScreenName|Server
+
+$aim_event->to(@to)
+     Sets the recipients of this event if @to is provided.  Otherwise it
+     returns the event's recipient list.
+
+$aim_event->trans($error_code)
+     This method takes a numeric $error_code and returns a string
+     representing the definition of the error code, or undef if the
+     $error_code is unknown.
+
+$aim_event->type($type)
+     Sets the type of this event if $type is provided.  Otherwise it
+     returns the event's type.
+
+AUTHOR
+======
+
+   Aryeh Goldsmith <perlaim@aryeh.net>.
+
+URL
+===
+
+   The Net::AIM project: http://www.aryeh.net/Net-AIM/
+
+   The Net::AIM bot list: http://www.nodoubtyo.com/aimbots/
+
+SEE ALSO
+========
+
+   perl(1)
+
+
+File: pm.info,  Node: Net/AOLIM,  Next: Net/APP,  Prev: Net/AIM/Event,  Up: Module List
+
+Object-Oriented interface to the AOL Instant Messenger TOC client protocol
+**************************************************************************
+
+NAME
+====
+
+   Net::AOLIM - Object-Oriented interface to the AOL Instant Messenger TOC
+client protocol
+
+SYNOPSIS
+========
+
+   The really short form:
+
+     use Net::AOLIM;
+     $aim = Net::AOLIM->new('username' => $user,
+     			   'password' => $pass,
+     			   'callback' => \&handler);
+
+     $aim->signon;
+
+     $aim->toc_send_im($destuser, $message);
+
+NOTES
+=====
+
+   Error conditions will be stored in $main::IM_ERR, with any arguments to
+the error condition stored in $main::IM_ERR_ARGS.
+
+   The hash %Net::AOLIM::ERROR_MSGS contains english translations of all of
+the error messages that are either internal to the module or particular to
+the TOC protocol.
+
+   Errors may take arguments indicating a more specific failure condition.
+In this case, they will either be stored in $main::IM_ERR_ARGS or they
+will come from the server ERROR message.  To insert the arguments in the
+proper place, use a construct similar to:
+
+     $ERROR = $Net::AOLIM::ERROR_MSGS{$IM_ERR};
+     $ERROR =~ s/\$ERR_ARG/$IM_ERR_ARGS/g;
+
+   This assumes that the error code is stored in $IM_ERR and the error
+argument is stored in $IM_ERR_ARGS.
+
+   All methods will return undef on error, and will set $main::IM_ERR and
+$main::IM_ERR_ARGS as appropriate.
+
+DESCRIPTION
+===========
+
+   This section documents every member function of the Net::AOLIM class.
+
+$Net::AOLIM->new()
+------------------
+
+   This is the Net::AOLIM Constructor.
+
+   It should be called with following arguments (items with default values
+are optional):
+
+     'username' => login
+     'password' => password
+     'callback' => \&callbackfunction
+     'server' => servername (default toc.oscar.aol.com)
+     'port' => port number (default 1234)
+     'allow_srv_settings' => <1 | 0> (default 1)
+     'login_server' => login server (default login.oscar.aol.com)
+     'login_port' => login port (default 5198)
+     'aim_agent' => agentname (max 200 char) (default 'TOC1.0' where
+     		X is the version number)  There have been some reports
+     		that changing this may cause TOC servers to stop
+     		responding to signon requests
+
+   callback is the callback function that handles incoming data from the
+server (already digested into command plus args).  This is the meat of the
+client program.
+
+   allow_srv_settings is a boolean that dictates whether the object should
+modify the user configuration on the server.  If allow_srv_settings is
+false, the server settings will be ignored and will not be modified.
+Otherwise, the server settings will be read in and parsed, and will be
+modified by calls that modify the buddy list.
+
+   aim_agent is the name of the client program as reported to the TOC
+server
+
+   Returns a blessed instantiation of Net::AOLIM.
+
+$aim->signon()
+--------------
+
+   Call this after calling new() and after setting initial buddy listings
+with `add_buddies()', `im_permit()', `im_deny()', `im_permit_all()', and
+`im_deny_all()' as necessary.
+
+   Returns undef on failure, setting $main::IM_ERR and $main::IM_ERR_ARGS
+as appropriate.  Returns 0 on success.
+
+   This function is also called every time we receive a SIGN_ON packet
+from the server.  This is because we are required to react in a specific
+way to the SIGN_ON packet, and this method contains all necessary
+functionality.  We should only receive SIGN_ON while connected if we have
+first received a PAUSE (see the *TOC(7)* documentation included with this
+package for details of how PAUSE works).
+
+$aim->read_sflap_packet()
+-------------------------
+
+   This method returns data from a single waiting SFLAP packet on the
+server socket.  The returned value is the payload section of the SFLAP
+packet which is completely unparsed.
+
+   Most users will never need to call this method.
+
+   For more information, see ROLLING YOUR OWN below and the *TOC(7)*
+manpage.
+
+$aim->send_sflap_packet($type, $data, $formatted, $noterm)
+----------------------------------------------------------
+
+   This method sends an SFLAP packet to the server.
+
+   $type is one of the SFLAP types (see *TOC(7)*).
+
+   $data is the payload to send.
+
+   If `$formatted' evaluates to true, the data is assumed to be the
+completely formed payload of the SFLAP packet; otherwise, the payload will
+be packed as necessary.  This defaults to 0.  In either case, the header
+is prepended to the payload.
+
+   If `$noterm' evaluates to true, the payload will not be terminated with
+a '\0'.  Otherwise, it will be terminated.  If `$formatted' is true, this
+option is ignored and no null is appended.  This defaults to 0.
+
+   Most users will never need to use this method.
+
+   For more information, see *TOC(7)* and ROLLING YOUR OWN below.
+
+$aim->srv_socket()
+------------------
+
+   This method returns a reference to the socket to which the server is
+connected.  It must be dereferenced before it can be used.  Thus:
+
+   `$foo = $aim->srv_socket();' `recv($$foo, $recv_buffer, $length,
+$flags);'
+
+   Most users will never need to directly access the server socket.
+
+   For more information, see the *TOC(7)* manpage and *ROLLING YOUR OWN*
+below.
+
+$aim->pw_roast($password)
+-------------------------
+
+   This method returns the 'roasted' version of a password.  A roasted
+password is the original password XORed with the roast string 'Tic/Toc'
+(which is repeated until the length is the same as the password length).
+
+   This method is called automatically in $aim->signon.  Most users will
+never need this method.
+
+   For more information, see the *TOC(7)* manpage and *ROLLING YOUR OWN*
+below.
+
+$aim->norm_uname($username)
+---------------------------
+
+   This method returns the 'normalized' version of a username.  A
+normalized username has all spaces removed and is all lowercase.  All
+usernames sent to the server should be normalized first if they are an
+argument to a TOC command.
+
+   All methods in this class automatically normalize username arguments to
+the server; thus, most users will never use this method.
+
+   For more information, see the *TOC(7)* manpage and *ROLLING YOUR OWN*
+below.
+
+$aim->toc_format_msg($command[, $arg1[, arg2[, ...]]])
+------------------------------------------------------
+
+   This method formats a message properly for sending to the TOC server.
+That is, it is escaped and quoted, and the fields are appended with spaces
+as specified by the protocol.
+
+   Note that all methods in this class automatically format messages
+appropriately; most users will never need to call this method.
+
+   See *TOC(7)* and ROLLING YOUR OWN below.
+
+$aim->toc_send_im($uname, $msg, $auto)
+--------------------------------------
+
+   This method sends an IM message $msg to the user specified by `$uname'.
+The third argument indicates whether or not this IM should be sent as an
+autoreply, which may produce different behavior from the remote client
+(but has no direct effect on the content of the IM).
+
+$aim->add_buddies($group, $buddy1[, $buddy2[, ...]])
+----------------------------------------------------
+
+   This method, which should only be called *before signon()*, adds
+buddies to the initial local buddy list in group `$group'.  Once
+`signon()' is called, use add_online_buddies instead.
+
+$aim->add_online_buddies($group, $buddy1[, $buddy2[, ...]])
+-----------------------------------------------------------
+
+   This method takes the same arguments as `add_buddies()', but is
+intended for use after `signon()' has been called.
+
+   If allow_srv_settings is true (see new()), it will also set the
+settings on the server to the new settings.
+
+$aim->remove_online_buddies($buddy1[, $buddy2[, ...]])
+------------------------------------------------------
+
+   Removes all arguments from the buddy list (removes from all groups).
+
+   If allow_srv_settings is true (see new()), it will also set the
+settings on the server to the new settings.
+
+$aim->current_buddies(\%buddyhash)
+----------------------------------
+
+   This method fills the hash referenced by `\%buddyhash' with the
+currently stored buddy information.  Each key in the returned hash is the
+name of a buddy group, and the corresponding value is a list of the
+members of that group.
+
+$aim->current_permits()
+-----------------------
+
+   This method takes no arguments.  It returns the current 'permit' list.
+
+$aim->current_denies()
+----------------------
+
+   This method takes no arguments.  It returns the current 'deny' list.
+
+$aim->im_permit($user1[, $user2[, ...]])
+----------------------------------------
+
+   This method should only be called *before signon()*.  It adds all
+arguments to the current permit list and deletes the current deny list.
+It also sets the permit mode to 'permit some'.
+
+   If you would like to do this while online, use the `add_im_permit()'
+method instead.
+
+$aim->im_deny($user1[, $user2[, ...]])
+--------------------------------------
+
+   This method should only be called *before signon()*.  It adds all
+arguments to the current deny list and deletes the current permit list.
+It also sets the permit mode to 'deny some'.
+
+   If you would like to do this while online, use the `add_im_permit()'
+method instead.
+
+$aim->add_im_permit($user1[, $user2[, ...]])
+--------------------------------------------
+
+   This is the method that should be called if you are online and wish to
+add users to the permit list.  It will, as a consequence, delete the
+current deny list and set the current mode to 'permit some'.
+
+$aim->add_im_deny($user1[, $user2[, ...]])
+------------------------------------------
+
+   This is the method that should be used if you are online and wish to
+add users to the deny list.  It will, as a consequence, delete the current
+permit list and set the current mode to 'deny some'.
+
+$aim->im_deny_all()
+-------------------
+
+   This method should be called only *before signon()*.  It will delete
+both the permit and deny list and set the mode to 'deny all'.
+
+$aim->im_permit_all()
+---------------------
+
+   This method should be called only *before signon()*.  It will delete
+both the permit and deny list and set the mode to 'permit all'.
+
+$aim->add_im_deny_all()
+-----------------------
+
+   This is the method that should be used if you are online and wish to go
+into 'deny all' mode.  It will also delete both the permit and deny lists.
+
+$aim->add_im_permit_all()
+-------------------------
+
+   This is the method that should be used if you are online and wish to go
+into 'permit all' mode.  It will also delete both the permit and deny
+lists.
+
+$aim->toc_evil($user, $anon)
+----------------------------
+
+   This method will apply 'evil' to the specified user `$user'.  If
+`$anon' evaluates to true, the evil will be done anonymously.
+
+$aim->toc_chat_join($exchange, $room_name)
+------------------------------------------
+
+   This method will join the chat room specified by `$exchange' and
+`$room_name'.  Currently, the only valid value for `$exchange' is 4.
+
+   See the *TOC(7)* manpage included with this package for more
+information on chatting.
+
+$aim->toc_chat_send($roomid, $message)
+--------------------------------------
+
+   This method will send the message `$message' to the room `$roomid'
+(which should be the room ID provided by the server in response to a
+toc_chat_join or toc_accept_invite).
+
+   You will receive this message back from the server as well, so your UI
+does not have to handle this message in a special way.
+
+$aim->toc_chat_whisper($roomid, $dstuser, $message)
+---------------------------------------------------
+
+   This method sends the message `$message' to `$dstuser' in the room
+`$roomid'.
+
+   The server will not send you a copy of this message, so your user
+interface should have a special case for displaying outgoing whispers.
+
+$aim->toc_chat_evil($roomid, $dstuser, $anon)
+---------------------------------------------
+
+   This will apply evil to the user `$dstuser' in room `$room'.  If
+`$anon' evaluates to true, it will be applied anonymously.
+
+   Please note that this functionality is currently disabled by the TOC
+servers.
+
+$aim->toc_chat_invite($roomid, $msgtext, $buddy1[, $buddy2[, ...]])
+-------------------------------------------------------------------
+
+   This method will invite all users `$buddy1..$buddyN' to room `$roomid'
+with invitation text `$msgtext'.
+
+$aim->toc_chat_leave($roomid)
+-----------------------------
+
+   This method will notify the server that you have left room `$roomid'.
+
+$aim->toc_chat_accept($roomid)
+------------------------------
+
+   This method accepts a chat invitation to room `$roomid'.  You do not
+have to send a `toc_chat_join()' message if you have been invited and
+accept with this method.
+
+$aim->toc_get_info($username)
+-----------------------------
+
+   This method requests info on user $username.  See *TOC(7)* for more
+information on what the server returns.
+
+$aim->toc_set_info($info)
+-------------------------
+
+   This method sets the information for the current user to the ASCII text
+(HTML formatted) contained in $info.
+
+$aim->toc_set_away($msg)
+------------------------
+
+   This method sets or unsets the away message.  If $msg is undefined,
+away is unset.  Otherwise, away is set with the message in $msg.
+
+$aim->toc_get_dir($username)
+----------------------------
+
+   This method sends a request to the server for directory information on
+$username.  See *TOC(7)* for information on what the server will return.
+
+$aim->toc_set_dir($userinfo)
+----------------------------
+
+   This method sets the information on the current user to the string
+provided as `$userinfo'.  See *TOC(7)* for more information on the format
+of the `$userinfo' string.
+
+$aim->toc_dir_search($searchstr)
+--------------------------------
+
+   This method will search the directory using `$searchstr'.  See *TOC(7)*
+for more information on how this string should look.
+
+$aim->toc_set_idle($seconds)
+----------------------------
+
+   This method sets the number of seconds that the client has been idle.
+If it is 0, the idle is cleared.  Otherwise, the idle is set and the
+server will continue to count up the idle time (thus, you need only call
+`idle()' once in order to become idle).
+
+$aim->ui_add_fh($filehandle, \&callback)
+----------------------------------------
+
+   This method will add a filehandle to the select() loop that will be
+called with `ui_dataget()'.  If information is found to be on that
+filehandle, the callback will be executed.  It is the responsibility of
+the callback to read the data off the socket.
+
+   *Please be sure to set autoflushing on all filehandles passed to this
+method!*
+
+$aim->ui_del_fh($filehandle)
+----------------------------
+
+   The filehandle `$filehandle' will be removed from the select() loop and
+it will no longer be checked for input nor its callback activated.
+
+$aim->ui_all_fh()
+-----------------
+
+   This method returns a list of all filehandles currently in the select()
+loop.
+
+$aim->ui_exists_fh($filehandle)
+-------------------------------
+
+   This method will return true if `$filehandle' is in the select loop.
+Otherwise, it will return undefined.
+
+$aim->ui_set_callback(\&callback)
+---------------------------------
+
+   This method will change the callback function for the server socket to
+the method referenced by \&callback.  This allows you to change the
+callback from the one specified when the object was created.  (Imagine the
+possibilities-dynamically created callback functions using `eval()'...
+mmmm...)
+
+$aim->ui_get_callback($filehandle)
+----------------------------------
+
+   This method returns a reference to the callback associated with
+$filehandle, or the callback associated with the server socket if
+$filehandle is undefined.
+
+$aim->ui_dataget($timeout)
+--------------------------
+
+   This is the workhorse method in this object.  When this method is
+called, it will go through a single select() loop to find if any
+filehandles are ready for reading.  If $timeout is defined, the select()
+timeout will be that number of seconds (fractions are OK).  Otherwise,
+select() will block.
+
+   For each filehandle that is ready for reading, this function will call
+the appropriate callback function.  It is the responsibility of the
+callback to read the data off the filehandle and handle it appropriately.
+The exception to this rule is the server socket, whose data will be read
+and passed to the server socket callback function.  All pasrsing of data
+from the server into edible chunks will be done for you before the server
+socket callback function is called.  From there, it is up to to the client
+program to parse the server responses appropriately.  They will be passed
+such that each field in the server response is one argument to the
+callback (the number of arguments will be correct).  For more information
+on the information coming from the server, see *TOC(7)*.
+
+   This method returns undef on an error (including errors from callbacks,
+which should be signified by returning undef) and returns the number of
+filehandles that were read otherwise.
+
+ROLLING YOUR OWN
+================
+
+   This section deals with usage that deals directly with the server
+connection and bypasses the ui_* interface and/or the toc_* interface.  If
+you are happy calling ui_dataget et al., do not bother reading this
+section.  If, however, you plan not to use the provided interfaces, or if
+you want to know more of what is going on, continue on.
+
+   First of all, if you do not plan to use the provided interface to the
+server socket, you will need to be able to access the server socket
+directly.  In order to do this, use $aim->srv_socket:
+
+     $srv_sock = $aim->srv_socket;
+
+   This will return a pointer to the socket.  You will need to dereference
+it in order to use it.
+
+   In general, however, even if you are rolling your own, you will
+probably not need to use `recv()' or the like.  `read_sflap_packet()' will
+handle unwrapping the data coming from the server and will return the
+payload of the packet as a single scalar.  Using this will give you the
+data coming from the server in a form that you can `split()' to get the
+message and its arguments.  In order to facilitate such splitting,
+`%Net::AOLIM::SERVER_MSG_ARGS' is supplied.  For each valid server message,
+`$Net::AOLIM::SERVER_MSG_ARGS{$msg}' will return one less than the proper
+number of splits to perform on the data coming from the server.  The
+intended use is such:
+
+     ($msg, $rest) = split(/:/, $aim->read_sflap_packet(), 2);
+     @msg_args = split(/:/, $rest, $Net::AOLIM::SERVER_MSG_ARGS{$msg});
+
+   Now you have the server message in $msg and the arguments in
+`@msg_args'.
+
+   To send packets to the server without having to worry about making
+SFLAP packets, use `send_sflap_packet()'.  If you have a string to send to
+the server (which is not formatted), you would use:
+
+     $aim->send_sflap_packet($SFLAP_TYPE_DATA, $message, 0, 0);
+
+   The SFLAP types (listed in *TOC(7)* are:
+
+     $SFLAP_TYPE_SIGNON
+     $SFLAP_TYPE_DATA
+     $SFLAP_TYPE_ERROR
+     $SFLAP_TYPE_SIGNOFF
+     $SFLAP_TYPE_KEEPALIVE
+
+   Most of the time you will use $SFLAP_TYPE_DATA.
+
+   If you want to roll your own messages, read the code for
+`send_sflap_packet()' and you should be able to figure it out.  Note that
+the header is always supplied by `send_sflap_packet()'.  Specifying
+`formatted' will only make `send_sflap_data()' assume that `$message' is a
+preformatted payload.  Specifying `$noterm' will prevent
+`send_sflap_packet()' from adding a trailing '\0' to the payload.  If it
+is already formatted, `send_sflap_packet' will ignore `$noterm'.
+
+   Messages sent to the server should be escaped and formatted properly as
+defined in *TOC(7)*.  `$aim->toc_format_msg' will do just this; supply it
+with the TOC command and the arguments to the TOC command (each as
+separate strings) and it will return a single string that is formatted
+appropriately.
+
+   All usernames sent as TOC command arguments must be normalized (see
+*TOC(7)*).  `$aim->norm_uname()' will do just this.  Make sure to
+normalize usernames before passing them as arguments to
+`$aim->toc_format_msg()'.
+
+   `pw_roast' performs roasting as defined in *TOC(7)*.  It is not very
+exciting.  I do not see why it is that you would ever need to do this, as
+`$aim->signon()' handles this for you (and the roasted password is stored
+in `$aim->{'roastedp'}').  However, if you want to play with it, there it
+is.
+
+EXAMPLES
+========
+
+   See the file `example.pl' for an example of how to interact with this
+class.
+
+FILES
+=====
+
+   `example.pl'
+
+   A sample client that demonstrates how this object could be used.
+
+SEE ALSO
+========
+
+   See also *TOC(7)*.
+
+AUTHOR
+======
+
+   Copyright (C) 2000 Riad Wahby <*rsw@mit.edu*> All rights reserved This
+program is free software.  You may redistribute it and/or modify it under
+the same terms as Perl itself.
+
+HISTORY
+=======
+
+   0.01     Initial Beta Release. (7/7/00)
+
+   *0.1*     First public (CPAN) release. (7/14/00)
+
+   *0.11*     Re-release under a different name with minor changes to the
+  documentation. (7/16/00)
+
+   *0.12*     Minor modification to fix a condition in which the server's
+  connection closing could cause an infinite loop.
+
+   *1.0*     Changed the client agent string to TOC1.0 to fix a problem
+where     connections were sometimes ignored.  Also changed the default
+signon     port to 5198 and the login port to 1234.
+
+
+File: pm.info,  Node: Net/APP,  Next: Net/Bind,  Prev: Net/AOLIM,  Up: Module List
+
+Critical Path Account Provisioning Protocol
+*******************************************
+
+NAME
+====
+
+   Net::APP - Critical Path Account Provisioning Protocol
+
+SYNOPSIS
+========
+
+     use Net::APP;
+
+     #constructor
+     $app = new Net::APP ( 'host:port',
+                           User     => $user,
+                           Domain   => $domain,
+                           Password => $password,
+                           Timeout  => 60,
+                           Debug    => 1,
+                         ) or die $@;
+
+     #commands
+     $app->ver( 'ver' => $Net::APP::APP_VERSION );
+     $app->login ( User     => $user,
+                   Domain   => $domain,
+                   Password => $password,
+                 );
+
+     $app->create_domain ( Domain => $domain );
+     $app->delete_domain ( Domain => $domain );
+     #etc. (see the Account Provisioning Protocol Developer's Guide, section 3.3)
+
+     #command status
+     $message = $app->message;
+     $code = $app->code;
+     $bool = $app->ok();
+
+     #destructor
+     $app->close();
+
+DESCRIPTION
+===========
+
+   This module implements a client interface to Critical Path's Account
+Provisioning Protocol, enabling a perl application to talk to APP servers.
+This documentation assumes that you are familiar with the APP protocol
+documented in the Account Provisioning Protocol Developer's Guide.
+
+   A new Net::APP object must be created with the new method.  Once this
+has been done, all APP commands are accessed via method calls on the
+object.
+
+METHODS
+=======
+
+new ( HOST:PORT [ , OPTIONS ] )
+     This is the constructor for a new Net::APP object.  `HOST' and `PORT'
+     specify the host and port to connect to in cleartext.  Typically this
+     connection is proxied via Safe Passage Secure Tunnel to Critical Path.
+
+     This method will connect to the APP server and execute the ver method.
+
+     OPTIONS are passed in a hash like fastion, using key and value pairs.
+     Possible options are:
+
+     Timeout - Set a timeout value (defaults to 120)
+
+     Debug - Enable debugging information (see the debug method in *Note
+     Net/Cmd: Net/Cmd,)
+
+     User, Domain, Password - if these exist, the new method will also
+     execute the login method automatically.
+
+     If the constructor fails undef will be returned and an error message
+     will be in $@.
+
+ver
+login
+create_domain
+delete_domain
+etc.
+     See the Account Provisioning Protocol Developer's Guide for details.
+     Commands need not be in upper case, and options are passed in a
+     hash-like fashion, as a list of key-value pairs.
+
+     All options return a reference to a list containing the lines of the
+     reponse, or undef upon failure.  The first line is parsed for the
+     status code and message.  You can check the status code and message
+     using the normal Net::Cmd message, code, ok, and status methods.
+
+     Only the get_num_domain_mailboxes, get_mailbox_availability and
+     get_mailbox_status methods currently return any additional response
+     information.  No attempt is (yet) made to parse this data.
+
+message
+     Returns the text message returned from the last command.
+
+code
+     Returns the response code from the last command (see the Account
+     Provisioning Protcol Developer's Guide, chapter 4).  The code `-1' is
+     used to represent unparsable output from the APP server, in which
+     case the entire first line of the response is returned by the
+     *messsage* method.
+
+ok
+     Returns true if the last code was an acceptable response.
+
+status
+     Since the APP protocol has no concept of a "most significant digit"
+     (see `status', *Note Net/Cmd: Net/Cmd,), this is a noisy synonym for
+     code.
+
+INTERNAL METHODS
+================
+
+   These methods are not intended to be called by the user.
+
+_app_command ( COMMAND [ , OPTIONS ] )
+     Sends *COMMAND*, encoded as per the Account Provisioning Protocol
+     Developer's Guide, section 3.2.  OPTIONS are passed in a hash like
+     fashion, using key and value pairs.
+
+_app_response
+     Gets a response from the server.  Returns a reference to a list
+     containing the lines, or undef upon failure.  You can check the
+     status code and message using the normal Net::Cmd message, code, ok,
+     and status methods.
+
+INTERNAL SUBROUTINES
+====================
+
+   These subroutines are not intended to be called by the user.
+
+_quote
+     Doubles double quotes.
+
+     This is untested for strings containing consecutive double quotes.
+
+AUTHOR
+======
+
+   Ivan Kohler <ivan-netapp@sisd.com>.
+
+   This module is not sponsored or endorsed by Critical Path.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1999 Ivan Kohler.  Copyright (c) 1999 Silicon Interactive
+Software Design.  All rights reserved.  This program is free software; you
+can redistribute it and/or modify it under the same terms as Perl itself.
+
+VERSION
+=======
+
+   $Id: APP.pm,v 1.1.1.1 1999/06/21 10:11:11 ivan Exp $
+
+   This module currently implements APP v2.1, as documented in the Account
+Provisioning Protocol Developers Guide v2.1.
+
+BUGS
+====
+
+   The Account Provisioning Protocol Developer's Guide is not publicly
+available.
+
+   It appears that Safe Passage Secure Tunnel establishes a standard SSL
+connection.  It should be possible to use Net::SSLeay and connect to the
+APP server directly.
+
+   Sending values with consecutive double quote characters is untested.
+
+   The get_num_domain_mailboxes, get_mailbox_availability and
+get_mailbox_status methods currently return response information.  No
+attempt is (yet) made to parse this data.
+
+SEE ALSO
+========
+
+   Critical Path <http://www.cp.net/>, Safe Passage Secure Tunnel
+<http://www.c2.net/products/spst>, `Net::SSLeay' in this node, *Note
+Net/Cmd: Net/Cmd,, perl(1).
+
+HISTORY
+=======
+
+   $Log: APP.pm,v $ Revision 1.1.1.1  1999/06/21 10:11:11  ivan new project
+
+

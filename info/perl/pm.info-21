@@ -1,0 +1,1269 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Apache/GD/Graph,  Next: Apache/GTopLimit,  Prev: Apache/Filter,  Up: Module List
+
+Generate Graphs in an Apache handler.
+*************************************
+
+NAME
+====
+
+   Apache::GD::Graph - Generate Graphs in an Apache handler.
+
+SYNOPSIS
+========
+
+   In httpd.conf:
+
+     <Location /chart>
+     SetHandler	perl-script
+     PerlHandler	+Apache::GD::Graph
+     # These are optional.
+     #PerlSetVar	Expires		30	# days default.
+     #PerlSetVar	CacheSize	5242880	# 5 megs default.
+     #PerlSetVar	ImageType	png	# Default.
+     # The default image type that graphs should be.
+     # png is default, gif requires <= GD 1.19.
+     # Any type supported by the installed version of GD will work.
+     #
+     # The next specifies the quality of generated JPEG images, best not to
+     # specify this one and let GD figure it out.
+     #PerlSetVar	JpegQuality	75 # 0 to 100
+     # TTFFontPath tells GD::Text where to look for true type fonts. The
+     # example here is the default value used.
+     #PerlSetVar	TTFFontPath	/usr/ttfonts:/var/ttfonts:/usr/X11R6/lib/X11/fonts/ttf/:/usr/X11R6/lib/X11/fonts/truetype/:/usr/share/fonts/truetype
+     </Location>
+
+   Then send requests to:
+
+     http://www.server.com/chart?type=lines&x_labels=[1st,2nd,3rd,4th,5th]&
+     data1=[1,2,3,4,5]&data2=[6,7,8,9,10]&dclrs=[blue,yellow,green]>
+
+   Options can also be sent as x-www-form-urlencoded data (ie., a form).
+This works better for large data sets, and allows simple charting forms to
+be set up. IE, for example, does not allow query strings larger than a
+kilobyte.  Parameters in the query string take precedence over a form if
+specified.
+
+INSTALLATION
+============
+
+   Like any other CPAN module, if you are not familiar with CPAN modules,
+see: http://www.cpan.org/doc/manual/html/pod/perlmodinstall.html
+
+   MAKE SURE TO RESTART YOUR APACHE SERVER using `apachectl graceful' after
+upgrading this or any other Apache Perl module.
+
+DESCRIPTION
+===========
+
+   The primary purpose of this module is to allow a very easy to use,
+lightweight and fast charting capability for static pages, dynamic pages
+and CGI scripts, with the chart creation process abstracted and placed on
+any server.
+
+   For example, embedding a pie chart can be as simple as:
+
+     <img src="http://www.some-server.com/chart?type=pie&
+     x_labels=[greed,pride,wrath]&data1=[10,50,20]&dclrs=[green,purple,red]"
+     alt="pie chart of a few deadly sins">
+     <!-- Note that all of the above options are optional except for data1!  -->
+
+   And it gets cached both server side, and along any proxies to the
+client, and on the client's browser cache. Not to mention, chart
+generation is very fast.
+
+   Of course, more complex things will be better done directly in your own
+Perl handlers, but this module allows a non-Perl environment to have
+access to the capabilities of GD::Graph.
+
+   Another solution is to use ASP scripting with Microsoft Excel, which of
+course requires a Windows NT server and I have no idea how easy this is to
+do, or how fast.
+
+   There are also many other ways to connect programs with charting
+capabilities, such as GNUPlot, or rrdtool to a web server. These may or
+may not be faster/more featureful etc.
+
+TIPS
+====
+
+   Most more complicated things depend on knowing the GD::Graph interface.
+
+   Firstly, *make sure you are not using any spaces!* If you want to pass
+a space in a parameter in a URL-encoded string, use `%20', in a form use a
++.
+
+   Make sure to use `cache=0' or `PerlSetVar CacheSize 0' when debugging,
+otherwise you will spend hours being very confused.
+
+FONTS
+=====
+
+   GD::Graph has some options that take a font description, such as
+title_font, legend_font, etc. (these map to the appropriate set_FOO
+methods in GD::Graph, see that manpage). See the TTFFontPath variable
+under SYNOPSIS for how to set the search path for fonts. MAKE SURE your
+fonts are readable by the user the Apache server runs under, this is
+usually "www-data" or "nobody". Otherwise your fonts will mysteriously
+fail with no notice.
+
+   Sizes can be specified by using a list with the name and size. For
+example, if arial.ttf can be found somewhere in your TTFFontPath, you can
+do:
+
+     ...title_font=(arial.ttf,20)
+
+   To get a title using font Arial, in 20 points.
+
+   Note that GD::Text does not parse out the names of fonts and such, you
+have to give it an actual filename, in the right case. So if using the
+Microsoft Windows core fonts, Arial Bold would be `arialbd.ttf'. Here's an
+example:
+
+     http://server/chart?data1=[1,2,3,4,5]&title_font=(arialbd.ttf,20)&title=Just%20A%20Line
+
+IMAGES
+======
+
+   You can place a logo in any corner of the graph using the logo,
+`logo_resize' and `logo_position' options. See *Note GD/Graph: GD/Graph,.
+If you just want a background image that is resized to fit your graph, see
+the background_image option herein.
+
+TEXT/CAPTIONS
+=============
+
+   The following GD::Graph options control placing text on the graph:
+title, x_label and y_label. *Note GD/Graph: GD/Graph, for those and
+related options. In addition, this modules allows you to use the captionN
+option(s), to draw arbitrary strings on the graph. See below.
+
+IMPLEMENTATION
+==============
+
+   This module is implemented as a simple Apache mod_perl handler that
+generates and returns a png format graph (using Martien Verbruggen's
+GD::Graph module) based on the arguments passed in via a query string. It
+responds with the content-type "image/png" (or whatever is set via
+`PerlSetVar ImageType'), and sends a Expires: header of 30 days (or
+whatever is set via `PerlSetVar Expires', or expires in the query string,
+in days) ahead.
+
+   In addition, it keeps a server-side cache in the file system using
+DeWitt Clinton's File::Cache module, whose size can be specified via
+`PerlSetVar CacheSize' in bytes.
+
+OPTIONS
+=======
+
+type
+     Type of graph to generate, can be lines, bars, points, linespoints,
+     area, mixed, pie. For a description of these, see `GD::Graph(3)' in
+     this node. Can also be one of the 3d types if GD::Graph3d is
+     installed, or anything else with prefix GD::Graph::.
+
+width
+     Width of graph in pixels, 400 by default.
+
+height
+     Height of graph in pixels, 300 by default.
+
+expires
+     Date of Expires header from now, in days. Same as `PerlSetVar
+     Expires'.
+
+image_type
+     Same as `PerlSetVar ImageType'. "png" by default, but can be anything
+     supported by GD.
+
+     If not specified via this option or in the config file, the image
+     type can also be deduced from a single value in the 'Accept' header
+     of the request.
+
+jpeg_quality
+     Same as `PerlSetVar JpegQuality'. A number from 0 to 100 that
+     determines the jpeg quality and the size. If not set at all, the GD
+     library will determine the optimal setting. Changing this value
+     doesn't seem to do much as far as line graphs go, but YMMV.
+
+background_image
+     Set an image as the background for the graph. You are responsible for
+     choosing a sane image to go with your graph, the background should be
+     either transparent or the same color you will use. This is the same
+     as using the logo parameter with an image of the same size as the
+     graph, except this option will resize the image if necessary, making
+     it more convenient for this purpose. The file or URL can be of any
+     type your copy of GD supports.
+
+captionN
+     Draws a character string using a TrueType font at an arbitrary
+     location.  Takes an array of
+     `($fgcolor,$fontname,$ptsize,$angle,$x,$y,$string)' where $fgcolor is
+     the foreground color, $fontname is the name of a TTF font see `' in
+     this node , $ptsize is the point size, $x and $y are the coordinates,
+     and $string is the actual characters to draw.
+
+     N is an integer from 1 onward, like for the dataN option. This lets
+     you specify multiple strings to draw.
+
+     This follows exactly the GD stringTTF method, see *Note GD: GD,.
+
+     Angle is in degrees, you will primarily use angle 0 for normal
+     left-to-right text. $x and $y are pixel coordinates from the upper
+     left corner. $fontname is the name of a true-type font that will be
+     found in the font path (see FONTS).  Example:
+
+          http://isis/chart?data1=[1,2,3,4,5]&caption1=(1,arial.ttf,9,0,30,30,Hello)
+
+cache
+     Boolean value which determines whether or not the image will get
+     cached server-side (for client-side caching, use the "expires"
+     parameter). It is true (1) by default. Setting `PerlSetVar CacheSize
+     0' in the config file will achieve the same affect as `cache=0' in
+     the query string.
+
+to_file
+     The graph will not be sent back, but instead saved to the file
+     indicated on the server. Apache will need permission to write to that
+     directory. The result will not be cached. This is basically the same
+     as making an RPC call to a Perl process to make a graph and store it
+     to a file.
+
+no_axes
+     This sets x_labels to an empty lists and sets y_number_format to "",
+     effectively disabling axes labels.
+
+   For the following, look at the plot method in `GD::Graph(3)' in this
+node.
+
+x_labels
+     Labels used on the X axis, the first array given to the plot method of
+     GD::Graph. If unspecified or undef, no labels will be drawn.
+
+dataN
+     Values to plot, where N is a number starting with 1. Can be given any
+     number of times with N increasing.
+
+   ALL OTHER OPTIONS are passed to the corresponding set_<option> method,
+or the set(<option hash>) method using the following rules for the values:
+
+undef
+     Becomes a real undef.
+
+[one,two,3]
+     Becomes an array reference.
+
+(one,two,3)
+     This becomes a list, you can pass lists to set_SOMETHING methods of
+     GD::Graph, if there is no corresponding set_ method, the list will be
+     silently converted to an anonymous array and used in an ordinary
+     option.
+
+*{one,1,two,2}*
+     Becomes a hash reference.
+
+http://somewhere/file.png
+     Is pulled into a file and the file name is passed to the respective
+     option.  (Can be any scheme besides http:// that LWP::Simple
+     supports.)
+
+*[undef,something,undef] or {key,undef}*
+     You can create an array or hash with undefs.
+
+*['foo',bar] or 'baz' or {'key','value'}*
+     Single and double quoted strings are supported, either as singleton
+     values or inside arrays and hashes.
+
+     DON'T USE SPACES, this is a common mistake. A space in a URL-encoded
+     string is %20, or a + in a form.
+
+     Nested structures are still not supported, maybe later.
+
+AUTHOR
+======
+
+   Rafael Kitover (caelum@debian.org)
+
+COPYRIGHT
+=========
+
+   This program is Copyright (c) 2000 by Rafael Kitover. This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+ACKNOWLEDGEMENTS
+================
+
+   This module owes its existance, obviously, to the availability of the
+wonderful GD::Graph module from Martien Verbruggen <mgjv@comdyn.com.au>.
+
+   Thanks to my employer, Gradience, Inc., for allowing me to work on
+projects as free software.
+
+   Thanks to Vivek Khera (khera@kciLink.com) and Scott Holdren
+<scott@monsterlabs.com> for the bug fixes.
+
+BUGS
+====
+
+   Probably a few.
+
+   We should probably just let people set up their own PerlFixupHandlers
+for errors, but this makes it more difficult to set up. At least, it
+should be an option.
+
+TODO
+====
+
+   Boxed captions.  Variable mapping of x-labels to data points.  If
+possible, a comprehensive test suite.  Make it faster?
+
+SEE ALSO
+========
+
+   *Note Perl: (perl.info)perl,, *Note GD/Graph: GD/Graph,, *Note GD: GD,
+
+
+File: pm.info,  Node: Apache/GTopLimit,  Next: Apache/Gateway,  Prev: Apache/GD/Graph,  Up: Module List
+
+Limit Apache httpd processes
+****************************
+
+NAME
+====
+
+   Apache::GTopLimit - Limit Apache httpd processes
+
+SYNOPSIS
+========
+
+   This module allows you to kill off Apache httpd processes if they grow
+too large or have too little of shared memory.  You can choose to set up
+the process size limiter to check the process size on every request:
+
+     # in your startup.pl:
+     use Apache::GTopLimit;
+
+     # Control the life based on memory size
+     # in KB, so this is 10MB
+     $Apache::GTopLimit::MAX_PROCESS_SIZE = 10000;
+
+     # Control the life based on Shared memory size
+     # in KB, so this is 4MB
+     $Apache::GTopLimit::MIN_PROCESS_SHARED_SIZE = 4000;
+
+     # watch what happens
+     $Apache::GTopLimit::DEBUG = 1;
+
+     # in your httpd.conf:
+     PerlFixupHandler Apache::GTopLimit
+     # you can set this up as any Perl*Handler that handles
+     # part of the request, even the LogHandler will do.
+
+   Or you can just check those requests that are likely to get big or
+unshared.  This way of checking is also easier for those who are mostly
+just running Apache::Registry scripts:
+
+     # in your CGI:
+     use Apache::GTopLimit;
+       # Max Process Size in KB
+     Apache::GTopLimit->set_max_size(10000);
+
+   and/or
+
+     use Apache::GTopLimit;
+        # Min Shared process Size in KB
+     Apache::GTopLimit->set_min_shared_size(4000);
+
+   Since accessing the process info might add a little overhead, you may
+want to only check the process size every N times.  To do so, put this in
+your startup.pl or CGI:
+
+     $Apache::GTopLimit::CHECK_EVERY_N_REQUESTS = 2;
+
+   This will only check the process size every other time the process size
+checker is called.
+
+   Note: The *MAX_PROCESS_SIZE* and *MIN_PROCESS_SHARED_SIZE* are
+standalone, and each will be checked if only set. So if you set both - the
+process can be killed if it grows beyond the limit or its shared memory
+goes below the limit.
+
+DESCRIPTION
+===========
+
+   This module will run on platforms supported by *GTop.pm* a Perl
+interface to libgtop (which in turn needs *libgtop* : See
+http://home-of-linux.org/gnome/libgtop/ ).
+
+   This module was written in response to questions on the mod_perl mailing
+list on how to tell the httpd process to exit if:
+
+   * its memory size goes beyond a specified limit
+
+   * its shared memory size goes below a specified limit
+
+Limiting memory size
+--------------------
+
+   Actually there are two big reasons your httpd children will grow.
+First, it could have a bug that causes the process to increase in size
+dramatically, until your system starts swapping.  Second, your process just
+does stuff that requires a lot of memory, and the more different kinds of
+requests your server handles, the larger the httpd processes grow over
+time.
+
+   This module will not really help you with the first problem.  For that
+you should probably look into Apache::Resource or some other means of
+setting a limit on the data size of your program.  BSD-ish systems have
+setrlimit() which will croak your memory gobbling processes.  However it
+is a little violent, terminating your process in mid-request.
+
+   This module attempts to solve the second situation where your process
+slowly grows over time.  The idea is to check the memory usage after every
+request, and if it exceeds a threshold, exit gracefully.
+
+   By using this module, you should be able to discontinue using the
+Apache configuration directive *MaxRequestsPerChild*, although for some
+folks, using both in combination does the job.  Personally, I just use the
+technique shown in this module and set my *MaxRequestsPerChild* value to
+6000.
+
+Limiting shared memory size
+---------------------------
+
+   We want the reverse the above limit for a shared memory limitation and
+kill the process when its hs too little of shared memory.
+
+   When the same memory page is being shared between many processes, you
+need less physical memory relative to the case where the each process will
+have its own copy of the memory page.
+
+   If your OS supports shared memory you will get a great benefit when you
+deploy this feature. With mod_perl you enable it by preloading the modules
+at the server startup. When you do that, each child uses the same memory
+page as the parent does, after it forks. The memory pages get unshared
+when a child modifies the page and it can no longer be shared, that's when
+the page is being copied to the child's domain and then modified as it
+pleased to. When this happens a child uses more real memory and less
+shared.
+
+   Because of Perl's nature memory pages get unshared pretty fast, when
+the code is being executed and it's internal data is being modified.
+That's why as the child gets older the size of the shared memory goes down.
+
+   You can tune your server to kill off the child when its shared memory
+is too low, but it demands a constant retuning of the configuration
+directives if you do any heavy updates in the code the server executes.
+This module allows you to save up the time to make this tuning and
+retuning, by simply specifying the minimum size of the shared memory for
+each process. And when it crosses the line, to kill it off.
+
+AUTHOR
+======
+
+   Stas Bekman <sbekman@iname.com>:
+
+   An almost complete rewrite of Apache::SizeLimit toward using GTop
+module (based on crossplatfom glibtop). The moment glibtop will be ported
+on all the platforms Apache::SizeLimit runs at (I think only Solaris is
+missing) Apache::SizeLimit will become absolete.
+
+   Doug Bagley wrote the original Apache::SizeLimit
+
+CHANGES
+=======
+
+   See external file 'Changes'.
+
+
+File: pm.info,  Node: Apache/Gateway,  Next: Apache/GzipChain,  Prev: Apache/GTopLimit,  Up: Module List
+
+A Bloated Gateway Module
+************************
+
+NAME
+====
+
+   Apache::Gateway - A Bloated Gateway Module
+
+SYNOPSIS
+========
+
+   Example Apache configuration:
+
+     <Location /CPAN/>
+     SetHandler perl-script
+     PerlHandler Apache::Gateway
+     PerlSetVar GatewayConfig /etc/apache/gateway/CPAN
+     PerlSetupEnv Off
+     </Location>
+
+   Example GatewayConfig file:
+
+     GatewayRoot /CPAN/
+     
+     <LocationMatch ".*">
+     Site    ftp://ftp.perl.org/pub/perl/CPAN/
+     MuxSite ftp://ftp.cdrom.com/pub/perl/CPAN/
+     MuxSite ftp://ftp.digital.com/pub/plan/perl/CPAN/
+     Site 	  ftp://ftp.orst.edu/pub/packages/CPAN/
+     Site 	  ftp://ftp.funet.fi/pub/languages/perl/CPAN/
+     </LocationMatch>
+     
+     ClockBroken ftp://ftp.cdrom.com	EET	PST8PDT
+     ClockBroken ftp://ftp.digital.com	EET	PST8PDT
+     ClockBroken ftp://ftp.orst.edu	EET	PST8PDT
+     ClockBroken ftp://ftp.perl.org	CST	CST6CDT
+
+   See the examples directory for commented examples.
+
+DESCRIPTION
+===========
+
+   The `Apache::Gateway' module implements a gateway with assorted
+optional features.
+
+FEATURES
+========
+
+Standard Gateway Features
+     `Apache::Gateway' services requests using `LWP' and, hence, can
+     gateway to any protocol that `LWP' understands.  It also makes
+     foreign URIs appear to be local URIs.
+
+     `Apache::Gateway' does not include a cache, but it can be used in
+     combination with a proxy cache to cache what the gateway retrieves.
+     For example, Apache can provide caching for the gateway by setting up
+     a proxy cache virtual host and a gateway virtual host and then using
+     the proxy to access the gateway.
+
+Automatic Failover with Mirrored Instances
+     Multiple mirrors can provide an instance.  Requests which fail will
+     automatically be retried with the next mirror.  This capability is
+     very useful when some mirrors are busy or erratic.
+
+Multiplexing
+     Like the CPAN multiplexer, `Apache::Gateway' can multiplex requests
+     amongst several mirrors.
+
+Pattern-dependent Gatewaying
+     The origin server to contact can vary depending upon the URL.  This
+     capability is particularly useful when dealing with partial mirrors.
+     A common situation is that some files may be available at all mirrors,
+     but less commonly used files will only be available at a few mirrors.
+
+FTP Directory Gatewaying
+     (Need to think of a better name for this feature.)  Remote FTP
+     directory listings can be modified to refer to the gateway.  This
+     feature is somewhat similar to the ProxyPassReverse directive.
+
+     This feature was especially complicated and problematical.  It has now
+     been removed.
+
+Timestamp Correction
+     `Apache::Gateway' can try to correct incorrect timestamps generated
+     by popular mirroring software.  In particular, it can try to
+     compensate for the way the Perl *mirror* program sets timestamps.
+
+CONFIGURATION
+=============
+
+   Most configuration is done in the GatewayConfig files.  The regular
+Apache configuration files only need to include the handler directives and
+set the `GatewayConfig' filename.  Environment variables are not used, so
+`PerlSetupEnv' can be Off.
+
+   GatewayConfig directives purposely look like Apache config directives
+so that the syntax will be familiar.  However, GatewayConfig directives
+are not Apache config directives.  They cannot be used in Apache config
+files (and vice versa)!
+
+GatewayRoot path
+     Sets the root of the gatewayed area on the local server.  Generally
+     matches the Location setting in the Apache config files.  Defaults to
+     "/".
+
+GatewayTimeout timeout
+     Passes timeout (in seconds) to `LWP::UserAgent'.
+
+LocationMatch regexp
+     Begins a LocationMatch section.  Works similarly to the ApacheLocation
+     match directive except that the pattern is a Perl regexp.  Note: there
+     are no Location or other style sections, only LocationMatch.
+
+     LocationMatch sections are tried in order until a regexp is matched.
+
+Site URI
+     Sets an upstream server to contact for this URI.  In case of failure,
+     requests are automatically retried with successive sites in the order
+     they appear.  Failures can include anything from the upstream server
+     being down or flaky to a file not being present because the upstream
+     mirror is out of synch with its primary site.
+
+MuxSite URI
+     Sets an upstream server to contact for this URI.  Adjacent MuxSite
+     servers are tried in round robin order.
+
+     For example, here again is the default portion of the sample
+     GatewayConfig file above:
+
+          <LocationMatch ".*">
+          Site    ftp://ftp.perl.org/pub/perl/CPAN/
+          MuxSite ftp://ftp.cdrom.com/pub/perl/CPAN/
+          MuxSite ftp://ftp.digital.com/pub/plan/perl/CPAN/
+          Site 	  ftp://ftp.orst.edu/pub/packages/CPAN/
+          Site 	  ftp://ftp.funet.fi/pub/languages/perl/CPAN/
+          </LocationMatch>
+
+     With the Site and MuxSite directives here, the first request will be
+     forwarded to ftp.perl.org.  If it fails, the request will be retried
+     with cdrom, digital, orst, and funet, in that order.  The next
+     request for that process will be tried with ftp.perl.org first again.
+     If it fails, retries then go to digital, cdrom, orst, and finally
+     funet.
+
+     A good general strategy for packages with multiple mirrors might be
+     to specify one or two nearby sites to try first.  Then specify some
+     multiplexed sites slightly further away in case the nearby sites
+     fail.  Finally, fall back to the primary site if all else fails.
+
+ClockBroken server-URL upstream^2-TZ upstream-TZ
+     When caching is employed and requests can be gatewayed to multiple
+     mirrors, timestamp correctness becomes more important.  Unfortunately,
+     timestamps on mirrored files are usually wrong.  For example, the
+     popular Perl *mirror* program is generally configured to match
+     timestamps using the local timezone both locally and on the server it
+     is mirroring.  This strategy is only guaranteed to work if both
+     servers are in the same timezone.
+
+     Example:   ClockBroken ftp://ftp.cdrom.com	EET	PST8PDT
+
+     cdrom gets files from funet, which seems always to use the EET
+     timezone (which is two hours off from GMT) for purposes of mirroring.
+     cdrom, however, uses the PST8PDT timezone, so that 00:00 on funet
+     differs from 00:00 on cdrom by 9 or 10 hours, depending upon whether
+     or not Daylight Savings Time is in effect.  The example ClockBroken
+     line corrects for this disparity.
+
+     Note: timezones are those understood by Time::Zone.
+
+FUNCTIONS
+=========
+
+   The following internal functions are documented (mostly useful for
+hackers):
+
+$gw = Apache::Gateway->new( [$ua] )
+     Construct a new Apache::Gateway object describing a gateway.  If a
+     LWP::UserAgent is not provided, a new one will be created.  Note: the
+     user agent is modified for seach request; it is not constant and is
+     probably not shareable.
+
+$gw->user_agent( [$ua] )
+     Get/set the user agent.
+
+$gw->request( [$r] )
+     Get/set the Apache request currently being gatewayed.  To send the
+     request, see the send_request method.
+
+$gw->location_config( [$config] )
+     Get/set the configuration information for this gateway location.  Can
+     be overridden to provide dynamic per location information
+
+clear_headers_for_redirect($r)
+     Clear request headers in $r in preparation for a redirect.
+
+canonicalized_server_URL($scheme, $hostname, $port, $default_port)
+     Return semicanonicalized server URL (without trailing slash).
+
+server_name_from_URL($url)
+     Return the (somewhat canonicalized) "server name" portion of the URL.
+     The "server name" is defined as the leading scheme://authority portion
+     of the URL.
+
+server_name($r)
+     Return the (somewhat canonicalized) "server name" portion of the URL
+     of this server.  The "server name" is defined as the leading
+     scheme://authority portion of the URL.  Currently assumes server
+     access is via HTTP.
+
+diff_TZ($origin_TZ, $mirror_TZ)
+     Get the usual time difference (in seconds) between the two time zones.
+     Will yield the wrong results in the midst of a change to/from daylight
+     savings time.  Specifically, as used in this module, this function
+     will return the wrong results when applied to files retrieved by the
+     mirror during the two hours of the year when one server is in Daylight
+     Savings Time and the other is not.
+
+$gw->update_via_header_field($response)
+     Update Via header in HTTP::Response with information about this hop.
+     Hop information combines protocol information from the message with
+     server information from the Apache server.  The server name returned
+     is hardcoded as '`apache''.
+
+     Eventually, options should be provided to control hostname suppression
+     and comment customization.
+
+copy_header_to_Apache_request($r, $headers)
+     Copy the headers from an `HTTP::Headers' object to an
+     `Apache::Request'.  Hope that the Apache request object will later
+     print out the headers in "Good Practice" order (there appears to be no
+     way of controlling this).
+
+     The only tricky item is the Content-Type header, which needs special
+     handling.
+
+redirect($allow_abort);
+     Try a redirect.  We do this via `LWP::UserAgent' because
+     `internal_redirect_handler' does not provide hooks for detecting and
+     recovering from errors.
+
+$gw->site( [$site] )
+     Get/set the site tried.  Can be used to determine which upstream
+     server actually fields a request.
+
+$gw->try_URI($allow_abort)
+     Try the site $gw->site.  Ideally, we could use
+     `Apache::internal_redirect_handler' to try the redirects.  However,
+     it provides no hook for detecting an error and aborting output.
+     That's not mod_perl's fault-Apache source would need to be modified
+     to support such a hook.
+
+try_sites($allow_last_site_abort, @site)
+     Try sites in order until one succeeds.  $allow_last_site_abort
+     indicates if the last site can/should be aborted after examing the
+     head for its error code.  All other sites always allow premature
+     abortion.
+
+     Abortion is needed because only one request can be allowed to run to
+     completion and produce a message body.
+
+$gw->site_list
+     Get the list of sites to try for this request.  Can be overridden to
+     customize the list of sites to try.
+
+     By default, this method looks through the LocationMatch sections in
+     the GatewayConfig file in order and returns the sites in the first
+     section matched.
+
+$gw->send_request( [$r] )
+     Send the Apache request to the upstream server.  Optionally sets it
+     first.
+
+CAVEATS
+=======
+
+   `Apache::Gateway' is a big, complicated module that loads many other
+modules.  As such, it pushes mod_perl to its limits, especially when used
+with DSO/APXS.
+
+   The current version of `LWP' (5.35) only supports If-Modified-Since for
+file and ftp URLs.  Thus, gatewaying to ftp servers will actually be
+better than gatewaying to http servers for cached responses.
+
+BUGS
+====
+
+   A ProxyRemote-like capability is needed for origin servers which must
+be accessed through a proxy.
+
+   A ProxyPassReverse analogue might be useful, too.
+
+   `Apache::Gateway' assumes it is being accessed using HTTP.  Ought to
+handle cases where this gateway is accessed using https (SSL).
+
+   There is no way to tell LWP to use a proxy.
+
+   The Server response header field should contain information about the
+origin server, not this server.  Unfortunately, Apache overrides any
+existing origin server information in this field.
+
+AUTHOR
+======
+
+   Charles C. Fu, ccwf@bacchus.com
+
+SEE ALSO
+========
+
+   perl(1), Apache(3pm), LWP(3pm).
+
+
+File: pm.info,  Node: Apache/GzipChain,  Next: Apache/HeavyCGI,  Prev: Apache/Gateway,  Up: Module List
+
+compress HTML (or anything) in the OutputChain
+**********************************************
+
+NAME
+====
+
+   Apache::GzipChain - compress HTML (or anything) in the OutputChain
+
+SYNOPSIS
+========
+
+   In the configuration of your apache add something like
+
+     <Files *.html>
+     SetHandler perl-script
+     PerlHandler Apache::OutputChain Apache::GzipChain Apache::PassFile
+     </Files>
+
+STATUS
+======
+
+   *This module is alpha software. Occasional SEGV have been observed.
+Use with caution!*
+
+   You currently cannot mix perl's own print statements that print to
+STDOUT and the print or `write_client' methods in Apache.pm. If you do
+that, you will very likely encounter empty documents and probably core
+dumps too.
+
+DESCRIPTION
+===========
+
+   This module compresses any output from another perl handler if and only
+if the browser understands gzip encoding. To determine if the browser is
+able to understand us we check both its *Accept-Encoding* header and its
+*User-Agent* header. We check the latter because too few browsers send the
+*Accept-Encoding* header currently. Instead I have set up an enquiry form
+at http://www.kulturbox.de/perl/test/content-encoding-gzip where many
+users already have checked their browsers' abilities and left a message.
+Thus we can test a regular expression against the *User-Agent* header.
+
+   The module seems to work without influencing the other handlers. The
+only thing that can be noticed by the other handler is that the response
+header 'Content-Encoding' has been set. If GzipChain decides not to do any
+compression, it just declines and doesn't even register itself for the
+output chain.
+
+   GzipChain compresses every single buffer content it receives via the
+output chain separately according to the GZIP specification (RFC 1952).
+The compression ratio therefore suffers if the other module sends its data
+in very small chunks. It is recommended that you use as few print
+statements as possible in conjunction with the GzipChain.  The
+Apache::PassFile module is an example of an efficient file reader for this
+purpose.
+
+PREREQUISITES
+=============
+
+   Compress::Zlib, Apache::OutputChain
+
+AUTHOR
+======
+
+   Andreas Koenig, koenig@kulturbox.de based on code by Jan Pazdziora,
+adelton@fi.muni.cz
+
+
+File: pm.info,  Node: Apache/HeavyCGI,  Next: Apache/HeavyCGI/Date,  Prev: Apache/GzipChain,  Up: Module List
+
+Framework to run complex CGI tasks on an Apache server
+******************************************************
+
+NAME
+====
+
+   Apache::HeavyCGI - Framework to run complex CGI tasks on an Apache
+server
+
+SYNOPSIS
+========
+
+     use Apache::HeavyCGI; # see eg/ directory of the distribution
+                           # for a complete example/template
+
+WARNING UNSUPPORTED ALPHA CODE RELEASED FOR DEMO ONLY
+=====================================================
+
+   The release of this software is only for evaluation purposes to people
+who are actively writing code that deals with Web Application Frameworks.
+This package is probably just another Web Application Framework and may be
+worth using or may not be worth using. As of this writing (July 1999) it
+is by no means clear if this software will be developed further in the
+future. The author has written it over many years and is deploying it in
+several places, e.g.  http://www.stadtplandienst.de,
+http://netlexikon.akademie.de and really soon on http://pause.perl.org
+too. It has turned out to be useful for him. YMMV.
+
+   There is no official support for this software. If you find it useful
+or even if you find it useless, please mail the author directly.
+
+   But please make sure you remember: THE RELEASE IS FOR DEMONSTRATION
+PURPOSES ONLY.
+
+DESCRIPTION
+===========
+
+   The Apache::HeavyCGI framework is intended to provide a couple of
+simple tricks that make it easier to write complex CGI solutions. It has
+been developed on a site that runs all requests through a single mod_perl
+handler that in turn uses CGI.pm or Apache::Request as the query
+interface. So Apache::HeavyCGI is - as the name implies - not merely for
+multi-page CGI scripts (for which there are other solutions), but it is
+for the integration of many different pages into a single solution. The
+many different pages can then conveniently share common tasks.
+
+   The approach taken by Apache::HeavyCGI is a components-driven one with
+all components being pure perl. So if you're not looking for yet another
+embedded perl solution, and aren't intimidated by perl, please read on.
+
+Stacked handlers suck
+---------------------
+
+   If you have had a look at stacked handlers, you might have noticed that
+the model for stacking handlers often is too primitive. The model supposes
+that the final form of a document can be found by running several passes
+over a single entity, each pass refining the entity, manipulating some
+headers, maybe even passing some notes to the next handler, and in the
+most advanced form passing pnotes between handlers. A lot of Web pages may
+fit into that model, even complex ones, but it doesn't scale well for
+pages that result out of a structure that's more complicated than adjacent
+items. The more complexity you add to a page, the more overhead is
+generated by the model, because for every handler you push onto the stack,
+the whole document has to be parsed and recomposed again and headers have
+to be re-examined and possibly changed.
+
+Why not subclass Apache
+-----------------------
+
+   Inheritance provokes namespace conflicts. Besides this, I see little
+reason why one should favor inheritance over a using relationship.  The
+current implementation of Apache::HeavyCGI is very closely coupled with
+the Apache class anyway, so we could do inheritance too. No big deal I
+suppose. The downside of the current way of doing it is that we have to
+write
+
+     my $r = $obj->{R};
+
+   very often, but that's about it. The upside is, that we know which
+manpage to read for the different methods provided by `$obj-'{R}>,
+`$obj-'{CGI}>, and $obj itself.
+
+Composing applications
+----------------------
+
+   Apache::HeavyCGI takes an approach that is more ambitious for handling
+complex tasks. The underlying model for the production of a document is
+that of a puzzle. An HTML (or XML or SGML or whatever) page is regarded as
+a sequence of static and dynamic parts, each of which has some influence
+on the final output. Typically, in today's Webpages, the dynamic parts are
+filled into table cells, i.e. contents between some `<TD></TD>' tokens.
+But this is not necessarily so. The static parts in between typically are
+some HTML markup, but this also isn't forced by the model. The model
+simply expects a sequence of static and dynamic parts. Static and dynamic
+parts can appear in random order. In the extreme case of a picture you
+would only have one part, either static or dynamic. HeavyCGI could handle
+this, but I don't see a particular advantage of HeavyCGI over a simple
+single handler.
+
+   In addition to the task of generating the contents of the page, there
+is the other task of producing correct headers. Header composition is an
+often neglected task in the CGI world. Because pages are generated
+dynamically, people believe that pages without a Last-Modified header are
+fine, and that an If-Modified-Since header in the browser's request can go
+by unnoticed. This laissez-faire principle gets in the way when you try to
+establish a server that is entirely driven by dynamic components and the
+number of hits is significant.
+
+Header Composition, Parameter Processing, and Content Creation
+--------------------------------------------------------------
+
+   The three big tasks a CGI script has to master are Headers, Parameters
+and the Content. In general one can say, content creation SHOULD not start
+before all parameters are processed. In complex scenarios you MUST expect
+that the whole layout may depend on one parameter.  Additionally we can
+say that some header related data SHOULD be processed very early because
+they might result in a shortcut that saves us a lot of processing.
+
+   Consequently, Apache::HeavyCGI divides the tasks to be done for a
+request into four phases and distributes the four phases among an
+arbitrary number of modules. Which modules are participating in the
+creation of a page is the design decision of the programmer.
+
+   The perl model that maps (at least IMHO) ideally to this task
+description is an object oriented approach that identifies a couple of
+phases by method names and a couple of components by class names. To
+create an application with Apache::HeavyCGI, the programmer specifies the
+names of all classes that are involved. All classes are singleton classes,
+i.e. they have no identity of their own but can be used to do something
+useful by working on an object that is passed to them.  Singletons have an
+@ISA relation to *Note Class/Singleton: Class/Singleton, which can be
+found on CPAN. As such, the classes can only have a single instance which
+can be found by calling the `CLASS->instance' method. We'll call these
+objects after the mod_perl convention handlers.
+
+   Every request maps to exactly one Apache::HeavyCGI object. The
+programmer uses the methods of this object by subclassing. The HeavyCGI
+constructor creates objects of the AVHV type (pseudo-hashes).  If the
+inheriting class needs its own constructor, this needs to be an AVHV
+compatible constructor. A description of AVHV can be found in *Note
+Fields: fields,. An Apache::HeavyCGI object usually is constructed with the
+new method and after that the programmer calls the dispatch method on this
+object. HeavyCGI will then perform various initializations and then ask
+all nominated handlers in turn to perform the header method and in a
+second round to perform the parameter method. In most cases it will be the
+case that the availability of a method can be determined at compile time
+of the handler. If this is true, it is possible to create an execution
+plan at compile time that determines the sequence of calls such that no
+runtime is lost to check method availability. Such an execution plan can
+be created with the *Note Apache/HeavyCGI/ExePlan:
+Apache/HeavyCGI/ExePlan, module. All of the called methods will get the
+HeavyCGI request object passed as the second parameter.
+
+   There are no fixed rules as to what has to happen within the header and
+parameter method. As a rule of thumb it isf recommended to determine and
+set the object attributes LAST_MODIFIED and EXPIRES (see below) within the
+header() method. It is also recommended to inject the *Note
+Apache/HeavyCGI/IfModified: Apache/HeavyCGI/IfModified, module as the last
+header handler, so that the application can abort early with an Not
+Modified header. I would recommend that in the header phase you do as
+little as possible parameter processing except for those parameters that
+are related to the last modification date of the generated page.
+
+Terminating the handler calls or triggering errors.
+---------------------------------------------------
+
+   Sometimes you want to stop calling the handlers, because you think that
+processing the request is already done. In that case you can do a
+
+     die Apache::HeavyCGI::Exception->new(HTTP_STATUS => status);
+
+   at any point within prepare() and the specified status will be returned
+to the Apache handler. This is useful for example for the
+Apache::HeavyCGI::IfModified module which sends the response headers and
+then dies with HTTP_STATUS set to Apache::Constants::DONE.  Redirectors
+presumably would set up their headers and set it to
+Apache::Constants::HTTP_MOVED_TEMPORARILY.
+
+   Another task for Perl exceptions are errors: In case of an error within
+the prepare loop, all you need to do is
+
+     die Apache::HeavyCGI::Exception->new(ERROR=>[array_of_error_messages]);
+
+   The error is caught at the end of the prepare loop and the anonymous
+array that is being passed to $@ will then be appended to
+`@{$self->{ERROR}}'. You should check for $self->{ERROR} within your
+layout method to return an appropriate response to the client.
+
+Layout and Text Composition
+---------------------------
+
+   After the header and the parameter phase, the application should have
+set up the object that is able to characterize the complete application
+and its status. No changes to the object should happen from now on.
+
+   In the next phase Apache::HeavyCGI will ask this object to perform the
+`layout' method that has the duty to generate an Apache::HeavyCGI::Layout
+(or compatible) object. Please read more about this object in *Note
+Apache/HeavyCGI/Layout: Apache/HeavyCGI/Layout,. For our HeavyCGI object
+it is only relevant that this Layout object can compose itself as a string
+in the as_string() method. As a layout object can be composed as an
+abstraction of a layout and independent of request-specific contents, it
+is recommended to cache the most important layouts. This is part of the
+reponsibility of the programmer.
+
+   In the next step HeavyCGI stores a string representation of current
+request by calling the as_string() method on the layout object and passing
+itself to it as the first argument. By passing itself to the Layout object
+all the request-specific data get married to the layout-specific data and
+we reach the stage where stacked handlers usually start, we get at a
+composed content that is ready for shipping.
+
+   The last phase deals with setting up the yet unfinished headers,
+eventually compressing, recoding and measuring the content, and delivering
+the request to the browser. The two methods finish() and deliver() are
+responsible for that phase. The default deliver() method is pretty
+generic, it calls finish(), then sends the headers, and sends the content
+only if the request method wasn't a HEAD. It then returns Apache's
+constant DONE to the caller, so that Apache won't do anything except
+logging on this request. The method finish is more apt to being
+overridden. The default finish() method sets the content type to
+text/html, compresses the content if the browser understands compressed
+data and Compress::Zlib is available, it also sets the headers Vary,
+Expires, Last-Modified, and Content-Length. You most probably will want to
+override the finish method.
+
+   head2 Summing up
++------------------+                                         | sub handler
+{...} |  +-------------------+                 | (sub init {...})  |
+|Your::Class         |--defines----->|                   |  |ISA
+Apache::HeavyCGI|                 | sub layout {...}  |
++-------------------+                 | sub finish {...}  |
+                        +------------------+
+
+     +-------------------+
+     | sub new {...}     |
+      +--------------------+                 | sub dispatch {...}|
+      |Apache::HeavyCGI    |---defines------>| sub prepare {...} |
+      +--------------------+                 | sub deliver {...} |
+     +-------------------+
+
+     +----------------------+               +--------------------+
+     |Handler_1 .. Handler_N|               | sub header {...}   |
+     |ISA Class::Singleton  |---define----->| sub parameter {...}|
+     +----------------------+               +--------------------+
+
+     +----+
+     |Your|
+     |Duty|
+      +----------------------------+----------------------------------------+----+
+      |Apache                      | calls Your::Class::handler()           |    |
+      +----------------------------+----------------------------------------+----+
+      |                            | nominates the handlers,                |    |
+      |Your::Class::handler()      | constructs $self,                      | ** |
+      |                            | and calls $self->dispatch              |    |
+      +----------------------------+----------------------------------------+----+
+      |                            |        $self->init     (does nothing)  | ?? |
+      |                            |        $self->prepare  (see below)     |    |
+      |Apache::HeavyCGI::dispatch()| calls  $self->layout   (sets up layout)| ** |
+      |                            |        $self->finish   (headers and    | ** |
+      |                            |                         gross content) |    |
+      |                            |        $self->deliver  (delivers)      | ?? |
+      +----------------------------+----------------------------------------+----+
+      |Apache::HeavyCGI::prepare() | calls HANDLER->instance->header($self) | ** |
+      |                            | and HANDLER->instance->parameter($self)| ** |
+      |                            | on all of your nominated handlers      |    |
+      +----------------------------+----------------------------------------+----+
+
+Object Attributes
+=================
+
+   As already mentioned, the HeavyCGI object is a pseudo-hash, i.e. can be
+treated like a HASH, but all attributes that are being used must be
+predeclared at compile time with a `use fields' clause.
+
+   The convention regarding attributes is as simple as it can be:
+uppercase attributes are reserved for the Apache::HeavyCGI class, all
+other attribute names are at your disposition if you write a subclass.
+
+   The following attributes are currently defined. The module author's
+production environment has a couple of attributes more that seem to work
+well but most probably need more thought to be implemented in a generic
+way.
+
+CAN_GZIP
+     Set by the can_gzip method. True if client is able to handle gzipped
+     data.
+
+CAN_PNG
+     Set by the can_png method. True if client is able to handle PNG.
+
+CAN_UTF8
+     Set by the can_utf8 method. True if client is able to handle UTF8
+     endoded data.
+
+CGI
+     An object that handles GET and POST parameters and offers the method
+     param() and upload() in a manner compatible with Apache::Request.
+     Needs to be constructed and set by the user typically in the
+     contructor.
+
+CHARSET
+     Optional attribute to denote the charset in which the outgoing data
+     are being encoded. Only used within the finish method. If it is set,
+     the finish() method will set the content type to text/html with this
+     charset.
+
+CONTENT
+     Scalar that contains the content that should be sent to the user
+     uncompressed. During te finish() method the content may become
+     compressed.
+
+DOCUMENT_ROOT
+     Unused.
+
+ERROR
+     Anonymous array that accumulates error messages. HeavyCGI doesn't
+     handle the error though. It is left to the user to set up a proper
+     response to the user.
+
+EXECUTION_PLAN
+     Object of type *Note Apache/HeavyCGI/ExePlan:
+     Apache/HeavyCGI/ExePlan,. It is recommended to compute the object at
+     startup time and always pass the same execution plan into the
+     constructor.
+
+EXPIRES
+     Optional Attribute set by the expires() method. If set, HeavyCGI will
+     send an Expires header. The EXPIRES attribute needs to contain an
+     *Note Apache/HeavyCGI/Date: Apache/HeavyCGI/Date, object.
+
+HANDLER
+     If there is an EXECUTION_PLAN, this attribute is ignored. Without an
+     EXECUTION_PLAN, it must be an array of package names. HeavyCGI treats
+     the packages as Class::Singleton classes. During the prepare() method
+     HeavyCGI calls HANDLER->instance->header($self) and
+     HANDLER->instance->parameter($self) on all of your nominated handlers.
+
+LAST_MODIFIED
+     Optional Attribute set by the last_modified() method. If set, HeavyCGI
+     will send a Last-Modified header of the specified time, otherwise it
+     sends a Last-Modified header of the current time. The attribute needs
+     to contain an *Note Apache/HeavyCGI/Date: Apache/HeavyCGI/Date,
+     object.
+
+MYURL
+     The URL of the running request set by the myurl() method. Contains an
+     URI::URL object.
+
+R
+     The Apache Request object for the running request. Needs to be set up
+     in the constructor by the user.
+
+REFERER
+     Unused.
+
+SERVERROOT_URL
+     The URL of the running request's server-root set by the
+     serverroot_url() method. Contains an URI::URL object.
+
+SERVER_ADMIN
+     Unused.
+
+TIME
+     The time when this request started set by the time() method. Please
+     note, that the time() system call is considerable faster than the
+     method call to Apache::HeavyCGI::time. The advantage of calling using
+     the TIME attribute is that it is self-consistent (remains the same
+     during a request).
+
+TODAY
+     Today's date in the format 9999-99-99 set by the today() method, based
+     on the time() method.
+
+Performance
+-----------
+
+   Don't expect Apache::HeavyCGI to serve 10 million page impressions a
+day. The server I have developed it for is a double processor machine with
+233 MHz, and each request is handled by about 30 different handlers: a few
+trigonometric, database, formatting, and recoding routines. With this
+overhead each request takes about a tenth of a second which in many
+environments will be regarded as slow. On the other hand, the server is
+well respected for its excellent response times. YMMV.
+
+BUGS
+====
+
+   The fields pragma doesn't mix very well with Apache::StatINC. When
+working with HeavyCGI you have to restart your server quite often when you
+change your main class. I believe, this could be fixed in fields.pm, but I
+haven't tried. A workaround is to avoid changing the main class, e.g. by
+delegating the layout() method to a different class.
+
+AUTHOR
+======
+
+   Andreas Koenig <andreas.koenig@anima.de>. Thanks to Jochen Wiedmann for
+heavy debates about the code and crucial performance enhancement
+suggestions. The development of this code was sponsered by
+www.speed-link.de.
+
+

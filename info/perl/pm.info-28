@@ -1,0 +1,1664 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Apache/SSIChain,  Next: Apache/Sandwich,  Prev: Apache/SSI,  Up: Module List
+
+do SSI on other modules' output
+*******************************
+
+NAME
+====
+
+   Apache::SSIChain - do SSI on other modules' output
+
+SYNOPSIS
+========
+
+   In the conf/access.conf file of your Apache installation add lines like
+
+     <Files *.html>
+     SetHandler perl-script
+     PerlHandler Apache::OutputChain Apache::SSIChain Apache::PassHtml
+     </Files>
+
+DESCRIPTION
+===========
+
+   This module uses *Apache::SSI* and *Apache::OutputChain* modules to
+create a filtering module that takes output from other modules
+(*Apache::PassHtml*, *Apache::PassExec*), parses SSI tags and sends the
+result to Apache, or maybe to other module (*Apache::GzipChain* by Andreas
+Koenig):
+
+     <Files *.html>
+     SetHandler perl-script
+     PerlHandler Apache::OutputChain Apache::GzipChain Apache::SSIChain Apache::PassHtml
+     </Files>
+
+   Or you can do SSI on CGI's:
+
+     <Files *.cgi>
+     PerlSendHeader On
+     SetHandler perl-script
+     PerlHandler Apache::OutputChain Apache::SSIChain Apache::PassExec
+     Options ExecCGI
+     </Files>
+
+   or even on modules processed by Apache::Registry:
+
+     <Files *.pl>
+     PerlSendHeader On
+     SetHandler perl-script
+     PerlHandler Apache::OutputChain Apache::SSIChain Apache::Registry
+     Options ExecCGI
+     </Files>
+
+VERSION
+=======
+
+   0.07
+
+AUTHOR
+======
+
+   (c) 1998-1999 Jan Pazdziora, adelton@fi.muni.cz,
+http://www.fi.muni.cz/~adelton/ at Faculty of Informatics, Masaryk
+University, Brno, Czech Republic
+
+SEE ALSO
+========
+
+   Apache::SSI(3); Apache::GzipChain(3); mod_perl(1); www.apache.org,
+www.perl.com.
+
+
+File: pm.info,  Node: Apache/Sandwich,  Next: Apache/Scoreboard,  Prev: Apache/SSIChain,  Up: Module List
+
+Layered document (sandwich) maker
+*********************************
+
+NAME
+====
+
+   Apache::Sandwich - Layered document (sandwich) maker
+
+SYNOPSIS
+========
+
+     SetHandler  perl-script
+     PerlHandler Apache::Sandwich
+     PerlSetVar SandwichHandler default-handler
+
+DESCRIPTION
+===========
+
+   The *Apache::Sandwich* module allows you to add a per-directory custom
+"header" and/or "footer" content to a given uri.  Only works with "GET"
+requests.  Output of combined parts is forced to *text/html*.  The handler
+for the sandwiched document is specified by the SandwichHandler
+configuration variable.  If it is not set, "default-handler" is used.
+
+   The basic concept is that the concatenation of the HEADER and FOOTER
+parts with the sandwiched file inbetween constitute a complete valid HTML
+document.
+
+   Here's a configuration example:
+
+     #in httpd.conf or .htaccess
+
+     <Location /foo>
+      #any request for /foo and it's document tree
+      #are run through our Apache::Sandwich::handler
+      SetHandler  perl-script
+      PerlHandler Apache::Sandwich
+
+     #we send this file first
+     PerlSetVar HEADER "/my_header.html"
+
+     #requested uri (e.g. /foo/index.html) is sent in the middle
+
+     #we send output of this mod_perl script last
+     PerlSetVar FOOTER "/perl/footer.pl"
+      </Location>
+
+   With the above example, one must be careful not to put graphics within
+the same directory, otherwise they will be Sandwiched also.
+
+   Here's another example which only Sandwiches the files we want (using
+Apache 1.3 syntax).  In this example, all *.brc files are sandwiched using
+the defined HEADER and FOOTER parts, with the file itself assumed to be a
+plain text file (or static HTML file).  All *.sbrc files are similarly
+sandwiched, except that the file itself is assumed to be an "shtml" file,
+i.e., it is given to the SSI handler for server side includes to be
+processed.
+
+     # filter *.brc files through Sandwich maker, but define
+     # HEADER/FOOTER per section below
+     
+     <FilesMatch "\.brc$">
+      SetHandler  perl-script
+      PerlHandler Apache::Sandwich
+     </FilesMatch>
+     
+     <FilesMatch "\.sbrc$">
+      SetHandler  perl-script
+      PerlHandler Apache::Sandwich
+      PerlSetVar SandwichHandler server-parsed
+     </FilesMatch>
+     
+     # now specify the header and footer for each major section
+     #
+     <Location /misc>
+       PerlSetVar HEADER "/misc/HEADER.shtml ADS.shtml"
+       PerlSetVar FOOTER "/misc/FOOTER.html"
+     </Location>
+     
+     <Location /getting_started>
+       PerlSetVar HEADER "/getting_started/HEADER.shtml ADS.shtml"
+       PerlSetVar FOOTER "/misc/FOOTER.html"
+     </Location>
+
+   Note that in this example, the file `ADS.shtml' is included from the
+same directory as the requested file.
+
+   The files referenced in the HEADER and FOOTER variables are fetched
+using the "GET" method and may be of any type file the server can process.
+
+Sandwiching mod_perl Programs
+-----------------------------
+
+   The helper function insert_parts() can be used to make your CGI
+programs look like the rest of your pages.  A simple script would be:
+
+     #! /usr/local/bin/perl
+     use strict;
+
+     use CGI;
+     use Apache::Sandwich;
+
+     use vars qw($query);
+
+     $query = new CGI or die "Something failed";
+
+     print $query->header();
+     Apache::Sandwich::insert_parts('HEADER');
+
+     print $query->p("Hello, world!");
+
+     Apache::Sandwich::insert_parts('FOOTER');
+
+KNOWN BUGS
+==========
+
+   Headers printed by mod_perl scripts used as a HEADER, FOOTER or
+in-the-middle uri need to use CGI.pm version 2.37 or higher or headers
+will show up in the final document (browser window).  Suggested
+work-around (if you don't want to upgrade CGI.pm):
+
+     if($ENV{MOD_PERL} and Apache->request->is_main) {
+        #send script headers
+        print "Content-type: text/html\n\n";
+     } else {
+        #we're part of a sub-request, don't send headers
+     }
+
+   Setting $Apache::Sandwich::Debug to 1 will log debugging information
+into the Apache ErrorLog.
+
+AUTHOR
+======
+
+   Doug MacEachern.  Modifications and cleanup by Vivek Khera.
+
+
+File: pm.info,  Node: Apache/Scoreboard,  Next: Apache/Session,  Prev: Apache/Sandwich,  Up: Module List
+
+Perl interface to the Apache scoreboard structure
+*************************************************
+
+NAME
+====
+
+   Apache::Scoreboard - Perl interface to the Apache scoreboard structure
+
+SYNOPSIS
+========
+
+     use Apache::Scoreboard ();
+
+     #inside httpd
+     my $image = Apache::Scoreboard->image;
+
+     #outside httpd
+     my $image = Apache::Scoreboard->fetch("http://localhost/scoreboard");
+
+DESCRIPTION
+===========
+
+   Apache keeps track of server activity in a structure known as the
+*scoreboard*.  There is a slot in the scoreboard for each child server,
+containing information such as status, access count, bytes served and cpu
+time.  This same information is used by *mod_status* to provide current
+server statistics in a human readable form.
+
+METHODS
+=======
+
+image
+     This method returns an object for accessing the scoreboard structure
+     when running inside the server:
+
+          my $image = Apache::Scoreboard->image;
+
+fetch
+     This method fetches the scoreboard structure from a remote server,
+     which must contain the following configuration:
+
+          PerlModule Apache::Scoreboard
+          <Location /scoreboard>
+             SetHandler perl-script
+             PerlHandler Apache::Scoreboard::send
+             order deny,allow
+             deny from all
+             #same config you have for mod_status
+             allow from 127.0.0.1 ...
+          </Location>
+
+     If the remote server is not configured to use mod_perl or simply for a
+     smaller footprint, see the *apxs* directory for *mod_scoreboard_send*:
+
+          LoadModule scoreboard_send_module libexec/mod_scoreboard_send.so
+
+          <Location /scoreboard>
+             SetHandler scoreboard-send-handler
+             order deny,allow
+             deny from all
+             allow from 127.0.0.1 ...
+          </Location>
+
+     The image can then be fetched via http:
+
+          my $image = Apache::Scoreboard->fetch("http://remote-hostname/scoreboard");
+
+fetch_store
+retrieve
+     The fetch_store method is used to fetch the image once from and
+     remote server and save it to disk.  The image can then be read by
+     other processes with the retrieve function.  This way, multiple
+     processes can access a remote scoreboard with just a single request
+     to the remote server.  Example:
+
+          Apache::Scoreboard->fetch_store($url, $local_filename);
+
+          my $image = Apache::Scoreboard->retrieve($local_filename);
+
+parent
+     This method returns a reference to the first parent score entry in the
+     list, blessed into the *Apache::ParentScore* class:
+
+          my $parent = $image->parent;
+
+     Iterating over the list of scoreboard slots is done like so:
+
+          for (my $parent = $image->parent; $parent; $parent = $parent->next) {
+              my $pid = $parent->pid; #pid of the child
+
+          my $server = $parent->server; #Apache::ServerScore object
+
+          ...
+           }
+
+pids
+     Returns an array reference of all child pids:
+
+          my $pids = $image->pids;
+
+The Apache::ParentScore Class
+-----------------------------
+
+pid
+     The parent keeps track of child pids with this field:
+
+          my $pid = $parent->pid;
+
+server
+     Returns a reference to the corresponding *Apache::ServerScore*
+     structure:
+
+          my $server = $parent->server;
+
+next
+     Returns a reference to the next *Apache::ParentScore* object in the
+     list:
+
+          my $p = $parent->next;
+
+The Apache::ServerScore Class
+-----------------------------
+
+status
+     This method returns the status of child server, which is one of:
+
+          "_" Waiting for Connection
+          "S" Starting up
+          "R" Reading Request
+          "W" Sending Reply
+          "K" Keepalive (read)
+          "D" DNS Lookup
+          "L" Logging
+          "G" Gracefully finishing
+          "." Open slot with no current process
+
+access_count
+     The access count of the child server:
+
+          my $count = $server->access_count;
+
+request
+     The first 64 characters of the HTTP request:
+
+          #e.g.: GET /scoreboard HTTP/1.0
+          my $request = $server->request;
+
+client
+     The ip address or hostname of the client:
+
+          #e.g.: 127.0.0.1
+          my $client = $server->client;
+
+bytes_served
+     Total number of bytes served by this child:
+
+          my $bytes = $server->bytes_served;
+
+conn_bytes
+     Number of bytes served by the last connection in this child:
+
+          my $bytes = $server->conn_bytes;
+
+conn_count
+     Number of requests served by the last connection in this child:
+
+          my $count = $server->conn_count;
+
+times
+     In a list context, returns a four-element list giving the user and
+     system times, in seconds, for this process and the children of this
+     process.
+
+          my($user, $system, $cuser, $csystem) = $server->times;
+
+     In a scalar context, returns the overall CPU percentage for this
+     server:
+
+          my $cpu = $server->times;
+
+start_time
+     In a list context this method returns a 2 element list with the
+     seconds and microseconds since the epoch, when the request was
+     started.  In scalar context it returns floating seconds like
+     Time::HiRes::time()
+
+          my($tv_sec, $tv_usec) = $server->start_time;
+
+          my $secs = $server->start_time;
+
+stop_time
+     In a list context this method returns a 2 element list with the
+     seconds and microseconds since the epoch, when the request was
+     finished.  In scalar context it returns floating seconds like
+     Time::HiRes::time()
+
+          my($tv_sec, $tv_usec) = $server->stop_time;
+
+          my $secs = $server->stop_time;
+
+req_time
+     Returns the time taken to process the request in microseconds:
+
+          my $req_time = $server->req_time;
+
+SEE ALSO
+========
+
+   Apache::VMonitor(3), GTop(3)
+
+AUTHOR
+======
+
+   Doug MacEachern
+
+
+File: pm.info,  Node: Apache/Session,  Next: Apache/Session/Counted,  Prev: Apache/Scoreboard,  Up: Module List
+
+A persistence framework for session data
+****************************************
+
+NAME
+====
+
+   Apache::Session - A persistence framework for session data
+
+SYNOPSIS
+========
+
+     use Apache::Session::MySQL;
+     
+     my %session;
+     
+     #make a fresh session for a first-time visitor
+     tie %session, 'Apache::Session::MySQL';
+
+     #stick some stuff in it
+     $session{visa_number} = "1234 5678 9876 5432";
+     
+     #get the session id for later use
+     my $id = $session{_session_id};
+     
+     #...time passes...
+     
+     #get the session data back out again during some other request
+     my %session;
+     tie %session, 'Apache::Session::MySQL', $id;
+     
+     &validate($session{visa_number});
+     
+     #delete a session from the object store permanently
+     tied(%session)->delete;
+
+DESCRIPTION
+===========
+
+   Apache::Session is a persistence framework which is particularly useful
+for tracking session data between httpd requests.  Apache::Session is
+designed to work with Apache and mod_perl, but it should work under CGI
+and other web servers, and it also works outside of a web server
+altogether.
+
+   Apache::Session consists of five components: the interface, the object
+store, the lock manager, the ID generator, and the serializer.  The
+interface is defined in Session.pm, which is meant to be easily
+subclassed.  The object store can be the filesystem, a Berkeley DB, a
+MySQL DB, an Oracle DB, or a Postgres DB. Locking is done by lock files,
+semaphores, or the locking capabilities of MySQL and Postgres.
+Serialization is done via Storable, and optionally  ASCII-fied via MIME or
+pack().  ID numbers are generated via MD5.  The reader is encouraged to
+extend these capabilities to meet his own requirements.
+
+   A derived class of Apache::Session is used to tie together the three
+components.  The derived class inherits the interface from
+Apache::Session, and specifies which store and locker classes to use.
+Apache::Session::MySQL, for instance, uses the MySQL storage class and
+also the MySQL locking class. You can easily plug in your own object store
+or locker class.
+
+INTERFACE
+=========
+
+   The interface to Apache::Session is very simple: tie a hash to the
+desired class and use the hash as normal.  The constructor takes two
+optional arguments.  The first argument is the desired session ID number,
+or undef for a new session.  The second argument is a hash of options that
+will be passed to the object store and locker classes.
+
+tieing the session
+------------------
+
+   Get a new session using DBI:
+
+     tie %session, 'Apache::Session::MySQL', undef,
+        { DataSource => 'dbi:mysql:sessions' };
+     
+     Restore an old session from the database:
+
+     tie %session, 'Apache::Session::MySQL', $session_id,
+        { DataSource => 'dbi:mysql:sessions' };
+
+Storing and retrieving data to and from the session
+---------------------------------------------------
+
+   Hey, how much easier could it get?
+
+     $session{first_name} = "Chuck";
+     $session{an_array_ref} = [ $one, $two, $three ];
+     $session{an_object} = new Some::Class;
+
+Reading the session ID
+----------------------
+
+   The session ID is the only magic entry in the session object, but
+anything beginning with a "_" is considered reserved for future use.
+
+     my $id = $session{_session_id};
+
+Permanently removing the session from storage
+---------------------------------------------
+
+     tied(%session)->delete;
+
+BEHAVIOR
+========
+
+   Apache::Session tries to behave the way the author believes that you
+would expect.  When you create a new session, Session immediately saves
+the session to the data store, or calls die() if it cannot.  It also
+obtains an exclusive lock on the session object.  If you retrieve an
+existing session, Session immediately restores the object from storage, or
+calls die() in case of an error.  Session also obtains an non-exclusive
+lock on the session.
+
+   As you put data into the session hash, Session squirrels it away for
+later use.  When you untie() the session hash, or it passes out of scope,
+Session checks to see if anything has changed. If so, Session gains an
+exclusive lock and writes the session to the data store.  It then releases
+any locks it has acquired.
+
+   Note that Apache::Session does only a shallow check to see if anything
+has changed.  If nothing changes in the top level tied hash, the data will
+not be updated in the backing store.  You are encouraged to timestamp the
+session hash so that it is sure to be updated.
+
+   When you call the delete() method on the session object, the object is
+immediately removed from the object store, if possible.
+
+   When Session encounters an error, it calls die().  You will probably
+want to wrap your session logic in an eval block to trap these errors.
+
+LOCKING AND TRANSACTIONS
+========================
+
+   By default, most Apache::Session implementations only do locking to
+prevent data corruption.  The locking scheme does not provide transactional
+consistency, such as you might get from a relational database.  If you
+desire transactional consistency, you must provide the Transaction
+argument with a true value when you tie the session hash.  For example:
+
+     tie %s, 'Apache::Session::File', $id {
+        Directory     => '/tmp/sessions',
+        LockDirectory => '/var/lock/sessions',
+        Transaction   => 1
+     };
+
+   Note that the Transaction argument has no practical effect on the MySQL
+and Postgres implementations.  The MySQL implementation only supports
+exclusive locking, and the Postgres implementation uses the transaction
+features of that database.
+
+IMPLEMENTATION
+==============
+
+   The way you implement Apache::Session depends on what you are trying to
+accomplish.  Here are some hints on which classes to use in what situations
+
+STRATEGIES
+==========
+
+   Apache::Session is mainly designed to track user session between http
+requests.  However, it can also be used for any situation where data
+persistence is desirable.  For example, it could be used to share global
+data between your httpd processes.  The following examples are short
+mod_perl programs which demonstrate some session handling basics.
+
+Sharing data between Apache processes
+-------------------------------------
+
+   When you share data between Apache processes, you need to decide on a
+session ID number ahead of time and make sure that an object with that ID
+number is in your object store before starting you Apache.  How you
+accomplish that is your own business.  I use the session ID "1".  Here is
+a short program in which we use Apache::Session to store out database
+access information.
+
+     use Apache;
+     use Apache::Session::File;
+     use DBI;
+
+     use strict;
+     
+     my %global_data;
+     
+     eval {
+         tie %global_data, 'Apache::Session::File', 1,
+            {Directory => '/tmp/sessiondata'};
+     };
+     if ($@) {
+        die "Global data is not accessible: $@";
+     }
+
+     my $dbh = DBI->connect($global_data{datasource},
+        $global_data{username}, $global_data{password}) || die $DBI::errstr;
+
+     undef %global_data;
+     
+     #program continues...
+     
+     As shown in this example, you should undef or untie your session hash
+     as soon as you are done with it.  This will free up any locks associated
+     with your process.
+
+Tracking users with cookies
+---------------------------
+
+   The choice of whether to use cookies or path info to track user IDs is
+a rather religious topic among Apache users.  This example uses cookies.
+The implementation of a path info system is left as an exercise for the
+reader.
+
+     use Apache::Session::MySQL;
+     use Apache;
+
+     use strict;
+
+     #read in the cookie if this is an old session
+
+     my $r = Apache->request;
+     my $cookie = $r->header_in('Cookie');
+     $cookie =~ s/SESSION_ID=(\w*)/$1/;
+
+     #create a session object based on the cookie we got from the browser,
+     #or a new session if we got no cookie
+
+     my %session;
+     tie %session, 'Apache::Session::MySQL', $cookie, {
+          DataSource => 'dbi:mysql:sessions', #these arguments are
+          UserName   => 'mySQL_user',         #required when using
+          Password   => 'password',           #MySQL.pm
+          LockDataSource => 'dbi:mysql:sessions',
+          LockUserName   => 'mySQL_user',
+          LockPassword   => 'password'
+     };
+
+     #Might be a new session, so lets give them their cookie back
+
+     my $session_cookie = "SESSION_ID=$session{_session_id};";
+     $r->header_out("Set-Cookie" => $session_cookie);
+
+     #program continues...
+
+SEE ALSO
+========
+
+   Apache::Session::MySQL, Apache::Session::Postgres,
+Apache::Session::File, Apache::Session::DB_File
+
+   The O Reilly book "Apache Modules in Perl and C", by Doug MacEachern and
+Lincoln Stein, has a chapter on keeping state.
+
+AUTHORS
+=======
+
+   Jeffrey Baker <jwbaker@acm.org> is the author of Apache::Session.
+
+   Erik Rantapaa <rantapaa@fanbuzz.com> found errors in both Lock::File
+and Store::File
+
+   Bart Schaefer <schaefer@zanshin.com> notified me of a bug in Lock::File.
+
+   Chris Winters <cwinters@intes.net> contributed the Sybase code.
+
+   Michael Schout <mschout@gkg.net> fixed a commit policy bug in 1.51.
+
+   Andreas J. Koenig <andreas.koenig@anima.de> contributed valuable CPAN
+advice and also Apache::Session::Tree and Apache::Session::Counted.
+
+   Gerald Richter <richter@ecos.de> had the idea for a tied hash interface
+and provided the initial code for it.  He also uses Apache::Session in his
+Embperl module and is the author of Apache::Session::Embperl
+
+   Jochen Wiedmann <joe@ipsoft.de> contributed patches for bugs and
+improved performance.
+
+   Steve Shreeve <shreeve@uci.edu> squashed a bug in 0.99.0 whereby a
+cleared hash or deleted key failed to set the modified bit.
+
+   Peter Kaas <Peter.Kaas@lunatech.com> sent quite a bit of feedback with
+ideas for interface improvements.
+
+   Randy Harmon <rjharmon@uptimecomputers.com> contributed the original
+storage-independent object interface with input from:
+
+     Bavo De Ridder <bavo@ace.ulyssis.student.kuleuven.ac.be>
+     Jules Bean <jmlb2@hermes.cam.ac.uk>
+     Lincoln Stein <lstein@cshl.org>
+
+
+File: pm.info,  Node: Apache/Session/Counted,  Next: Apache/Session/DBI,  Prev: Apache/Session,  Up: Module List
+
+Session management via a File::CounterFile
+******************************************
+
+NAME
+====
+
+   Apache::Session::Counted - Session management via a File::CounterFile
+
+SYNOPSIS
+========
+
+     tie %s, 'Apache::Session::Counted', $sessionid, {
+                                    Directory => <root of directory tree>,
+                                    DirLevels => <number of dirlevels>,
+                                    CounterFile => <filename for File::CounterFile>,
+                                    AlwaysSave => <boolean>
+                                                     }
+
+DESCRIPTION
+===========
+
+   This session module is based on Apache::Session, but it persues a
+different notion of a session, so you probably have to adjust your
+expectations a little.
+
+   The dialog that is implemented within an HTTP based application is a
+nonlinear chain of events. The user can decide to use the back button at
+any time without informing the application about it. A proper session
+management must be prepared for this and must maintain the state of every
+single event. For handling the notion of a session and the notion of a
+registered user, the application has to differentiate carefully between
+global state of user data and a user's session related state. Some data
+may expire after a day, others may be regarded as unexpirable. This module
+is solely responsible for handling session related data. Saving
+unexpirable user related data must be handled by the calling application.
+
+   In Apache::Session::Counted, a session-ID only lasts from one request
+to the next at which point a new session-ID is computed by the
+File::CounterFile module. Thus what you have to treat differently than in
+Apache::Session are those parts that rely on the session-ID as a fixed
+token per user. Accordingly, there is no option to delete a session. The
+remove method is simply disabled as old session data will be overwritten
+as soon as the counter is reset to zero.
+
+   The usage of the module is via a tie as described in the synopsis. The
+arguments have the following meaning:
+
+Directory, DirLevels
+     Works similar to filestore but as most file systems are slow on large
+     directories, works in a tree of subdirectories.
+
+CounterFile
+     A filename to be used by the File::CounterFile module. By changing
+     that file or the filename periodically, you can achieve arbitrary
+     patterns of key generation.
+
+AlwaysSave
+     A boolean which, if true, forces storing of session data in any case.
+     If false, only a STORE, DELETE or CLEAR trigger that the session file
+     will be written when the tied hash goes out of scope. This has the
+     advantage that you can retrieve an old session without storing its
+     state again.
+
+HostID
+     A string that serves as an identifier for the host we are running on.
+     This string will become part of the session-ID and must not contain a
+     colon. This can be used in a cluster environment so that a load
+     balancer or other interested parties can retrieve the session data
+     again.
+
+HostURL
+     A callback that returns the service URL that can be called to get at
+     the session data from another host. This is needed in a cluster
+     environment. Two arguments are passed to this callback: HostID and
+     Session-ID. The URL must return the serialized data in Storable's
+     nfreeze format. The Apache::Session::Counted module can be used to set
+     such an URL up. If HostURL is not defined, the default is
+
+          sprintf "http://%s/?SESSIONID=%s", <host>, <session-ID>;
+
+What this model buys you
+------------------------
+
+storing state selectively
+     You need not store session data for each and every request of a
+     particular user. There are so many CGI requests that can easily be
+     handled with two hidden fields and do not need any session support on
+     the server side, and there are others where you definitely need
+     session support. Both can appear within the same application.
+     Apache::Session::Counted allows you to switch session writing on and
+     off during your application without effort. (In fact, this advantage
+     is shared with the clean persistence model of Apache::Session)
+
+keeping track of transactions
+     As each request of a single user remains stored until you restart the
+     counter, there are all previous states of a single session close at
+     hand. The user presses the back button 5 times and changes a decision
+     and simply opens a new branch of the same session. This can be an
+     advantage and a disadvantage. I tend to see it as a very strong
+     feature. Your milage may vary.
+
+counter
+     You get a counter for free which you can control just like
+     File::CounterFile (because it *is* File::CounterFile).
+
+cleanup
+     Your data storage area cleans up itself automatically. Whenever you
+     reset your counter via File::CounterFile, the storage area in use is
+     being reused. Old files are being overwritten in the same order they
+     were written, giving you a lot of flexibility to control session
+     storage time and session storage disk space.
+
+performance
+     The notion of daisy-chained sessions simplifies the code of the
+     session handler itself quite a bit and it is likely that this
+     simplification results in an improved performance (not tested yet due
+     to lack of benchmarking apps for sessions). There are less file stats
+     and less sections that need locking, but without real world figures,
+     it's hard to tell what's up.
+
+   As with other modules in the Apache::Session collection, the tied hash
+contains a key <_session_id>. You must be aware that the value of this
+hash entry is not the same as the one you passed in when you retrieved the
+session (if you retrieved a session at all). So you have to make sure that
+you send your users a new session-id in each response, and that this is
+never the old one.
+
+   As an implemenation detail it may be of interest to you, that the
+session ID in Apache::Session::Counted consists of two or three parts: an
+optional host alias given by the HostID paramter, followed by a colon.
+Then an ordinary number which is a simple counter which is followed by an
+underscore. And finally a session-ID like the one in Apache::Session. The
+number part is used as an identifier of the session and the ID part is
+used as a password. The number part is easily predictable, but the second
+part is reasonable unpredictable.  We use the first part for
+implementation details like storage on the disk and the second part to
+verify the ownership of that token.
+
+PREREQUISITES
+=============
+
+   Apache::Session::Counted needs Apache::Session and File::CounterFile,
+all available from the CPAN. The HostID and HostURL paramters for a
+cluster solution need LWP installed.
+
+EXAMPLES
+========
+
+   The following example resets the counter every 24 hours and keeps the
+totals of every day as a side effect:
+
+     my(@t) = localtime;
+     tie %session, 'Apache::Session::Counted', $sid,
+     {
+      Directory => ...,
+      DirLevels => ...,
+      CounterFile => sprintf("/some/dir/%04d-%02d-%02d", $t[5]+1900,$t[4]+1,$t[3])
+     };
+
+   The same effect can be accomplished with a fixed filename and an
+external cronjob that resets the counter like so:
+
+     use File::CounterFile;
+     $c=File::CounterFile->new("/usr/local/apache/data/perl/sessiondemo/counter");
+     $c->lock;
+     $c-- while $c>0;
+     $c->unlock;
+
+AUTHOR
+======
+
+   Andreas Koenig <andreas.koenig@anima.de>
+
+COPYRIGHT
+=========
+
+   This software is copyright(c) 1999,2000 Andreas Koenig. It is free
+software and can be used under the same terms as perl, i.e. either the GNU
+Public Licence or the Artistic License.
+
+
+File: pm.info,  Node: Apache/Session/DBI,  Next: Apache/Session/DBIBase64Store,  Prev: Apache/Session/Counted,  Up: Module List
+
+Session persistence via DBI
+***************************
+
+NAME
+====
+
+   Apache::Session::DBI - Session persistence via DBI
+
+SYNOPSIS
+========
+
+DESCRIPTION
+===========
+
+   Apache::Session::DBI is wrapper for the Apache::Session::DBIStore and
+Apache::Session::PosixFileLocker modules.  Please consult the documentation
+for those modules.
+
+
+File: pm.info,  Node: Apache/Session/DBIBase64Store,  Next: Apache/Session/DBIStore,  Prev: Apache/Session/DBI,  Up: Module List
+
+Session persistence via DBI with  ASCII  encoding of session data.
+******************************************************************
+
+NAME
+====
+
+   Apache::Session::DBIBase64Store - Session persistence via DBI with
+ASCII encoding of session data.
+
+SYNOPSIS
+========
+
+     package MySession;
+
+     use Apache::Session;
+     use Apache::Session::DBIBase64Store;
+     use Apache::Session::NullLocker;
+
+     @ISA = ( Apache::Session );
+
+     sub get_object_store {
+     	my $self = shift;
+
+     return new Apache::Session::DBIBase64Store $self;
+         }
+
+     sub get_lock_manager {
+     	my $self = shift;
+
+     return new Apache::Session::NullLocker $self;
+         }
+
+DESCRIPTION
+===========
+
+   Apache::Session::DBIBase64Store is a session data persistent store for
+`Apache::Session|Apache::Session' in this node. This module should be used
+instead of DBIStore in database that don't support binary data in table
+fields (like PostgreSQL for instance).
+
+   This store also store the creation time of the session and the timestamp
+of the last update.
+
+SCHEMA
+======
+
+   This modules expect a table created with the following schema :
+
+     CREATE TABLE sessions (
+     	id	    CHAR(32) PRIMARY KEY,
+     	length	    INT,
+     	a_session   TEXT,
+     	created	    TIMESTAMP DEFAULT 'now()',
+     	last_update TIMESTAMP DEFAULT 'now()'
+     	locked_by   INT
+     );
+
+   The previous SQL statement is valid for PostgreSQL. Adapt for your
+specific DBMS.
+
+   NOTE: The id length can be fine tuned for specific application. By
+default, `Apache::Session|Apache::Session' in this node uses 16 char
+length ID, but I usually use 128 bits ID (32 chars).
+
+CONFIGURATION
+=============
+
+   This package can either use an already open DBH handle or it can be
+told the DataSource, UserName and Password to open its own database
+connection.
+
+   In the first case use something like this (using the `SYNOPSIS|' in
+this node example):
+
+     my $dbh = DBI->connect( $DSN, $USER, $PASSWORD, { AutoCommit => 0,
+     						      RaiseError => 1,} );
+     tie %sesssion, 'MySession', undef, { dbh => $dbh };
+
+   In the second case use something like this :
+
+     tie %session, 'MySession', undef, { DataSource => $DSN,
+     					UserName   => $USERNAME,
+     					Password   => $PASSWORD,
+     				        };
+
+   In the case where you give this module a DBH handle to use, rather than
+to manage its own. The module will commit the transaction after each
+insert, update or delete. Be warned if you are not using AutoCommit mode.
+
+CREDITS
+=======
+
+   This module is largely based on
+`Apache::Session::DBIStore|Apache::Session::DBIStore' in this node by
+Jeffrey William Baker (jeffrey@kathyandjeffrey.net).
+
+AUTHOR
+======
+
+   Copyright (c) 1999 Francis J. Lacoste and iNsu Innovations Inc.  All
+rights reserved.
+
+   Parts Copyright (c) 1998,1999 Jeffrey William Baker
+(jeffrey@kathyandjeffrey.net)
+
+   This program is free software; you can redistribute it and/or modify it
+under the terms as perl itself.
+
+SEE ALSO
+========
+
+   Apache::Session(3) Apache::Session::DBIStore(3) DBI(3)
+
+
+File: pm.info,  Node: Apache/Session/DBIStore,  Next: Apache/Session/DB_File,  Prev: Apache/Session/DBIBase64Store,  Up: Module List
+
+Session persistence via DBI
+***************************
+
+NAME
+====
+
+   Apache::Session::DBIStore - Session persistence via DBI
+
+SYNOPSIS
+========
+
+DESCRIPTION
+===========
+
+   Apache::Session::DBIStore is a backing store module for Apache::Session.
+Session data is stored in a DBI-accessible database.
+
+SCHEMA
+======
+
+   To use this module, you will need these columns in a table called
+'sessions':
+
+     id char(16)
+     length int(11)
+     a_session text
+
+   Where the a_session column needs to be able to handle arbitrarily long
+binary data.
+
+CONFIGURATION
+=============
+
+   When using DBI, the module must know what datasource, username, and
+password to use when connecting to the database.  These values can be set
+for all sessions by using package globals, or for each individual session
+using the options hash (see Apache::Session documentation).  The options
+are:
+
+   Package globals:
+
+$Apache::Session::DBIStore::DataSource
+$Apache::Session::DBIStore::UserName
+$Apache::Session::DBIStore::Password
+   Corresponding options:
+
+DataSource
+UserName
+Password
+   Example with options:
+
+     tie %hash, 'Apache::Session::DBI', $id, {
+         DataSource => 'dbi:driver:database',
+         UserName   => 'database_user',
+         Password   => 'K00l'
+     };
+     
+     Example with package globals:
+
+     $Apache::Session::DBIStore::DataSource = 'dbi:driver:database';
+     $Apache::Session::DBIStore::UserName   = 'database_user';
+     $Apache::Session::DBIStore::Password   = 'K00l';
+     
+     tie %hash, 'Apache::Session::DBI', $id;
+
+
+File: pm.info,  Node: Apache/Session/DB_File,  Next: Apache/Session/Embperl,  Prev: Apache/Session/DBIStore,  Up: Module List
+
+An implementation of Apache::Session
+************************************
+
+NAME
+====
+
+   Apache::Session::DB_File - An implementation of Apache::Session
+
+SYNOPSIS
+========
+
+     use Apache::Session::DB_File;
+     
+     tie %hash, 'Apache::Session::DB_File', $id, {
+        FileName      => 'sessions.db',
+        LockDirectory => '/var/lock/sessions',
+     };
+
+DESCRIPTION
+===========
+
+   This module is an implementation of Apache::Session.  It uses the
+DB_File backing store and the File locking scheme.  You must specify the
+filename of the database file and the directory for locking in arguments
+to the constructor.  See the example, and the documentation for
+Apache::Session::Store::DB_File and Apache::Session::Lock::File.
+
+AUTHOR
+======
+
+   This module was written by Jeffrey William Baker <jwbaker@acm.org>.
+
+SEE ALSO
+========
+
+   *Note Apache/Session/File: Apache/Session/File,, *Note
+Apache/Session/Flex: Apache/Session/Flex,, *Note Apache/Session/MySQL:
+Apache/Session/MySQL,, *Note Apache/Session/Postgres:
+Apache/Session/Postgres,, *Note Apache/Session: Apache/Session,
+
+
+File: pm.info,  Node: Apache/Session/Embperl,  Next: Apache/Session/File,  Prev: Apache/Session/DB_File,  Up: Module List
+
+works with HTML::Embperl
+************************
+
+NAME
+====
+
+   Apache::Session::Embperl - works with HTML::Embperl
+
+DESCRIPTION
+===========
+
+   An adaptation of Apache::Session to work with HTML::Embperl
+
+SYNOPSIS
+========
+
+Addtional Attributes for TIE
+----------------------------
+
+lazy
+     By Specifing this attribute, you tell Apache::Session to not do any
+     access to the object store, until the first read or write access to
+     the tied hash. Otherwise the tie function will make sure the hash
+     exist or creates a new one.
+
+create_unknown
+     Setting this to one causes Apache::Session to create a new session
+     when the specified session id does not exists. Otherwise it will die.
+
+object_store
+     Specify the class for the object store. (The Apache::Session:: prefix
+     is optional)
+
+lock_manager
+     Specify the class for the lock manager. (The Apache::Session:: prefix
+     is optional)
+
+   Example using attrubtes to specfiy store and object classes instead of
+a derived class:
+
+     use Apache::Session ;
+
+     tie %session, 'Apache::Session', undef,
+        {
+        object_store => 'DBIStore',
+        lock_manager => 'SysVSemaphoreLocker',
+        DataSource => 'dbi:Oracle:db'
+        };
+
+   NOTE: Apache::Session will require the nessecary additional perl
+modules for you.
+
+Addtional Methods
+-----------------
+
+setid
+     Set the session id for futher accesses.
+
+getid
+     Get the session id. The difference to using $session{_session_id} is,
+     that in lazy mode, getid will not create a new session id, if it
+     doesn't exists.
+
+cleanup
+     Writes any pending data, releases all locks and deletes all data from
+     memory.
+
+AUTHORS
+=======
+
+   This class was written by Jeffrey Baker (jeffrey@kathyandjeffrey.net)
+but it is taken wholesale from a patch that Gerald Richter
+(richter@ecos.de) sent me against Apache::Session
+
+
+File: pm.info,  Node: Apache/Session/File,  Next: Apache/Session/Flex,  Prev: Apache/Session/Embperl,  Up: Module List
+
+An implementation of Apache::Session
+************************************
+
+NAME
+====
+
+   Apache::Session::File - An implementation of Apache::Session
+
+SYNOPSIS
+========
+
+     use Apache::Session::File;
+     
+     tie %hash, 'Apache::Session::File', $id, {
+        Directory => '/tmp/sessions',
+        LockDirectory   => '/var/lock/sessions',
+     };
+
+DESCRIPTION
+===========
+
+   This module is an implementation of Apache::Session.  It uses the File
+backing store and the File locking scheme.  You must specify the directory
+for the object store and the directory for locking in arguments to the
+constructor. See the example, and the documentation for
+Apache::Session::Store::File and Apache::Session::Lock::File.
+
+AUTHOR
+======
+
+   This module was written by Jeffrey William Baker <jwbaker@acm.org>.
+
+SEE ALSO
+========
+
+   *Note Apache/Session/DB_File: Apache/Session/DB_File,, *Note
+Apache/Session/Flex: Apache/Session/Flex,, *Note Apache/Session/MySQL:
+Apache/Session/MySQL,, *Note Apache/Session/Postgres:
+Apache/Session/Postgres,, *Note Apache/Session: Apache/Session,
+
+
+File: pm.info,  Node: Apache/Session/Flex,  Next: Apache/Session/Generate/MD5,  Prev: Apache/Session/File,  Up: Module List
+
+Specify everything at runtime
+*****************************
+
+NAME
+====
+
+   Apache::Session::Flex - Specify everything at runtime
+
+SYNOPSIS
+========
+
+     use Apache::Session::Flex;
+     
+     tie %hash, 'Apache::Session::Flex', $id, {
+        Store     => 'DB_File',
+        Lock      => 'Null',
+        Generate  => 'MD5',
+        Serialize => 'Storable'
+     };
+     
+     # or
+
+     tie %hash, 'Apache::Session::Flex', $id, {
+        Store     => 'Postgres',
+        Lock      => 'Null',
+        Generate  => 'MD5',
+        Serialize => 'Base64'
+     };
+     
+     # you decide!
+
+DESCRIPTION
+===========
+
+   This module is an implementation of Apache::Session.  Unlike other
+implementations, it allows you to specify the backing store, locking
+scheme, ID generator, and data serializer at runtime.  You do this by
+passing arguments in the usual Apache::Session style (see SYNOPSIS).  You
+may use any of the modules included in this distribution, or a module of
+your own making.  If you wish to use a module of your own making, you
+should make sure that it is available under the Apache::Session package
+namespace.
+
+USAGE
+=====
+
+   You pass the modules you want to use as arguments to the constructor.
+The Apache::Session::Whatever part is appended for you: you should not
+supply it.  For example, if you wanted to use MySQL as the backing store,
+you should give the argument `Store =' 'MySQL'>, and not `Store ='
+'Apache::Session::Store::MySQL'>.  There are four modules that you need to
+specify.  Store is the backing store to use.  Lock is the locking scheme.
+Generate is the ID generation module.  Serialize is the data serialization
+module.
+
+   There are many modules included in this distribution.  For each role,
+they are:
+
+     Store:
+        MySQL
+        Postgres
+        DB_File
+        File
+     
+     Lock:
+        Null
+        MySQL
+        Semaphore
+
+     Generate:
+        MD5
+     
+     Serialize:
+        Storable
+        Base64
+        UUEncode
+     
+     In addition to the arguments needed by this module, you must provide whatever
+     arguments are expected by the backing store and lock manager that you are
+     using.  Please see the documentation for those modules.
+
+AUTHOR
+======
+
+   This module was written by Jeffrey William Baker <jwbaker@acm.org>.
+
+SEE ALSO
+========
+
+   *Note Apache/Session/File: Apache/Session/File,, *Note
+Apache/Session/DB_File: Apache/Session/DB_File,, *Note
+Apache/Session/MySQL: Apache/Session/MySQL,, *Note
+Apache/Session/Postgres: Apache/Session/Postgres,, *Note Apache/Session:
+Apache/Session,
+
+
+File: pm.info,  Node: Apache/Session/Generate/MD5,  Next: Apache/Session/IPC,  Prev: Apache/Session/Flex,  Up: Module List
+
+Use MD5 to create random object IDs
+***********************************
+
+NAME
+====
+
+   Apache::Session::Generate::MD5 - Use MD5 to create random object IDs
+
+SYNOPSIS
+========
+
+     use Apache::Session::Generate::MD5;
+     
+     $id = Apache::Session::Generate::MD5::generate();
+
+DESCRIPTION
+===========
+
+   This module fulfills the ID generation interface of Apache::Session.
+The IDs are generated using a two-round MD5 of a random number, the time
+since the epoch, the process ID, and the address of an anonymous hash.
+The resultant ID number is highly entropic on Linux and other platforms
+that have good random number generators.  You are encouraged to
+investigate the quality of your system's random number generator if you
+are using the generated ID numbers in a secure environment.
+
+   This module can also examine session IDs to ensure that they are,
+indeed, session ID numbers and not evil attacks.  The reader is encouraged
+to consider the effect of bogus session ID numbers in a system which uses
+these ID numbers to access disks and databases.
+
+   This modules takes one argument in the usual Apache::Session style.  The
+argument is IDLength, and the value, between 0 and 32, tells this module
+where to truncate the session ID.  Without this argument, the session ID
+will be 32 hexadecimal characters long, equivalent to a 128-bit key.
+
+AUTHOR
+======
+
+   This module was written by Jeffrey William Baker <jwbaker@acm.org>.
+
+SEE ALSO
+========
+
+   *Note Apache/Session: Apache/Session,
+
+
+File: pm.info,  Node: Apache/Session/IPC,  Next: Apache/Session/Lock/File,  Prev: Apache/Session/Generate/MD5,  Up: Module List
+
+Store client sessions via IPC::Shareable
+****************************************
+
+NAME
+====
+
+   Apache::Session::IPC - Store client sessions via IPC::Shareable
+
+SYNOPSIS
+========
+
+   use Apache::Session::IPC
+
+DESCRIPTION
+===========
+
+   This is an IPC storage subclass for Apache::Session.  Client state is
+stored in a shared memory block.  Try `perldoc Session' for more info.
+
+INSTALLATION
+============
+
+Getting started
+---------------
+
+   Build, test, and install IPC::Shareable, from CPAN.  If you don't have
+IPC on your system, you can't use this module.
+
+   Build and install Apache::Session
+
+Environment
+-----------
+
+   Apache::Session::IPC does not define any environment variables beyond
+those of Apache::Session.  See that package for details.
+
+USAGE
+=====
+
+   This package complies with the API defined by Apache::Session.  For
+details, please see that package's documentation.
+
+   The default for autocommit in Apache::Session::IPC is 0, which means
+that you will need to either call $session->store() when you are done or
+set autocommit to 1 via the open() and new() functions.
+
+NOTES
+=====
+
+   Performance of IPC on my test system (Linux 2.0.34) is boy-howdy slow.
+DBI is approx. 80 times faster.  Also, IPC::Shareable will eventually fall
+over under heavy load.  Try to use one of the other subclasses unless your
+system's IPC is vastly better than what I have seen.
+
+AUTHORS
+=======
+
+   Jeffrey Baker <jeff@godzilla.tamu.edu>, author and maintainer.
+
+   Redistribute under the Perl Artistic License.
+
+
+File: pm.info,  Node: Apache/Session/Lock/File,  Next: Apache/Session/Lock/MySQL,  Prev: Apache/Session/IPC,  Up: Module List
+
+Provides mutual exclusion using flock
+*************************************
+
+NAME
+====
+
+   Apache::Session::Lock::File - Provides mutual exclusion using flock
+
+SYNOPSIS
+========
+
+     use Apache::Session::Lock::File;
+     
+     my $locker = new Apache::Session::Lock::File;
+     
+     $locker->acquire_read_lock($ref);
+     $locker->acquire_write_lock($ref);
+     $locker->release_read_lock($ref);
+     $locker->release_write_lock($ref);
+     $locker->release_all_locks($ref);
+
+     $locker->clean($dir, $age);
+
+DESCRIPTION
+===========
+
+   Apache::Session::Lock::File fulfills the locking interface of
+Apache::Session.  Mutual exclusion is achieved through the use of temporary
+files and the flock function.
+
+CONFIGURATION
+=============
+
+   The module must know where to create its temporary files.  You must
+pass an argument in the usual Apache::Session style.  The name of the
+argument is LockDirectory and its value is the path where you want the
+lockfiles created.  Example:
+
+     tie %s, 'Apache::Session::Blah', $id, {LockDirectory => '/var/lock/sessions'}
+
+   If you do not supply this argument, temporary files will be created in
+/tmp.
+
+NOTES
+=====
+
+   This module does not unlink temporary files, because it interferes with
+proper locking.  THis can cause problems on certain systems (Linux) whose
+file systems (ext2) do not perform well with lots of files in one
+directory.  To prevent this you should use a script to clean out old files
+from your lock directory.  The meaning of old is left as a policy decision
+for the implementor, but a method is provided for implementing that
+policy.  You can use the clean method of this module to remove files
+unmodified in the last $age seconds.  Example:
+
+     my $l = new Apache::Session::Lock::File;
+     $l->clean('/var/lock/sessions', 3600) #remove files older than 1 hour
+
+AUTHOR
+======
+
+   This module was written by Jeffrey William Baker <jwbaker@acm.org>.
+
+SEE ALSO
+========
+
+   *Note Apache/Session: Apache/Session,
+
+
+File: pm.info,  Node: Apache/Session/Lock/MySQL,  Next: Apache/Session/Lock/Null,  Prev: Apache/Session/Lock/File,  Up: Module List
+
+Provides mutual exclusion using MySQL
+*************************************
+
+NAME
+====
+
+   Apache::Session::Lock::MySQL - Provides mutual exclusion using MySQL
+
+SYNOPSIS
+========
+
+     use Apache::Session::Lock::MySQL;
+     
+     my $locker = new Apache::Session::Lock::MySQL;
+     
+     $locker->acquire_read_lock($ref);
+     $locker->acquire_write_lock($ref);
+     $locker->release_read_lock($ref);
+     $locker->release_write_lock($ref);
+     $locker->release_all_locks($ref);
+
+DESCRIPTION
+===========
+
+   Apache::Session::Lock::MySQL fulfills the locking interface of
+Apache::Session.  Mutual exclusion is achieved through the use of MySQL's
+GET_LOCK and RELEASE_LOCK functions.  MySQL does not support the notion of
+read and write locks, so this module only supports exclusive locks.  When
+you request a shared read lock, it is instead promoted to an exclusive
+write lock.
+
+CONFIGURATION
+=============
+
+   The module must know how to connect to your MySQL database to acquire
+locks.  You must provide a datasource name, a user name, and a password.
+These options are passed in the usual Apache::Session style, and are very
+similar to the options for Apache::Session::Store::MySQL.  Example:
+
+     tie %hash, 'Apache::Session::MySQL', $id, {
+         LockDataSource => 'dbi:mysql:database',
+         LockUserName   => 'database_user',
+         LockPassword   => 'K00l'
+     };
+
+   Instead, you may pass in an already opened DBI handle to your database.
+
+     tie %hash, 'Apache::Session::MySQL', $id, {
+         LockHandle => $dbh
+     };
+
+AUTHOR
+======
+
+   This module was written by Jeffrey William Baker <jwbaker@acm.org>.
+
+SEE ALSO
+========
+
+   *Note Apache/Session: Apache/Session,
+
+
+File: pm.info,  Node: Apache/Session/Lock/Null,  Next: Apache/Session/Lock/Semaphore,  Prev: Apache/Session/Lock/MySQL,  Up: Module List
+
+Does not actually provides mutual exclusion
+*******************************************
+
+NAME
+====
+
+   Apache::Session::Lock::Null - Does not actually provides mutual
+exclusion
+
+SYNOPSIS
+========
+
+     use Apache::Session::Lock::Null;
+     
+     my $locker = new Apache::Session::Lock::Null;
+     
+     $locker->acquire_read_lock($ref);
+     $locker->acquire_write_lock($ref);
+     $locker->release_read_lock($ref);
+     $locker->release_write_lock($ref);
+     $locker->release_all_locks($ref);
+
+DESCRIPTION
+===========
+
+   Apache::Session::Lock::Null fulfills the locking interface of
+Apache::Session, without actually doing any work.  This is the module to
+use if you want maximum performance and don't actually need locking.
+
+AUTHOR
+======
+
+   This module was written by Jeffrey William Baker <jwbaker@acm.org>.
+
+SEE ALSO
+========
+
+   *Note Apache/Session: Apache/Session,
+
+

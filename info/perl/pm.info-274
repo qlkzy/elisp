@@ -1,0 +1,1569 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: NetServer/Generic,  Next: NetServer/Portal,  Prev: NetPacket/UDP,  Up: Module List
+
+generic TCP/IP server class
+***************************
+
+NAME
+====
+
+   Server - generic TCP/IP server class
+
+SYNOPSIS
+========
+
+     my $server_cb = sub  {
+                            my ($s) = shift ;
+                            print STDOUT "Echo server: type bye to quit, exit ",
+                                         "to kill the server.\n\n" ;
+                            while (defined ($tmp = <STDIN>)) {
+                                return if ($tmp =~ /^bye/i);
+                                $s->quit() if ($tmp =~ /^exit/i);
+                                print STDOUT "You said:>$tmp\n";
+                          }
+     my ($foo) = new NetServer::Generic;
+     $foo->port(9000);
+     $foo->callback($server_cb);
+     $foo->mode("forking");
+     print "Starting server\n";
+     $foo->run();
+
+DESCRIPTION
+===========
+
+   `NetServer::Generic' provides a (very) simple server daemon for TCP/IP
+processes. It is intended to free the programmer from having to think too
+hard about networking issues so that they can concentrate on doing
+something useful.
+
+   The `NetServer::Generic' object accepts the following methods, which
+configure various aspects of the new server:
+
+port
+     The port to listen on.
+
+hostname
+     The local address to bind to. If no address is specified, listens for
+     any connection on the designated port.
+
+listen
+     Queue size for listen.
+
+proto
+     Protocol we're listening to (defaults to tcp)
+
+timeout
+     Timeout value (see *Note IO/Socket/INET: IO/Socket/INET,)
+
+allowed
+     list of IP addresses or hostnames that are explicitly allowed to
+     connect to the server. If empty, the default policy is to allow
+     connections from anyone not in the 'forbidden' list.
+
+     NOTE: IP addresses or hostnames may be specified as perl regular
+     expressions; for example 154\.153\.4\..* matches any IP address
+     beginning with '154.153.4.'; .*antipope\.org matches any hostname in
+     the antipope.org domain.
+
+forbidden
+     list of IP addresses or hostnames that are refused permission to
+     connect to the server. If empty, the default policy is to refuse
+     connections from anyone not in the 'allowed' list (unless the allowed
+     list is empty, in which case anyone may connect).
+
+callback
+     Coderef to a subroutine which handles incoming connections (called
+     with one parameter - a `NetServer::Generic' object which can be used
+     to shut down the session).
+
+mode
+     Can be one of *forking*, select, *select_fast*, client, *threaded*,
+     or *prefork*.
+
+     By default, *forking* mode is selected.
+
+     *forking* mode is selected, the server handles requests by forking a
+     child process to service them. If select mode is selected, the server
+     uses the IO::Select class to implement a simple non-forking server.
+
+     The select-based server may block on i/o on a heavily-loaded system.
+     If you need to do non-blocking i/o you should look at
+     NetServer::FastSelect.
+
+     The client mode is special; it indicates that rather than sitting
+     around waiting for an incoming connection, the server is itself a
+     TCP/IP client. In client mode, hostname is the remote host to connect
+     to and port is the remote port to open. The callback routine is used,
+     as elsewhere, but it should be written as for a client - i.e. it
+     should issue a request or command, then read.  An additional method
+     exists for client mode: `trigger'. `trigger' expects a coderef as a
+     parameter. This coderef is executed before the client-mode server
+     spawns a child; if it returns a non-zero value the child is forked
+     and opens a client connection to the target host, otherwise the
+     server exits. The trigger method may be used to sleep for a random
+     interval then return 1 (so that repeated clients are spawned at
+     random intervals), or fork several children (on a one- time-only
+     basis) then work as above (so that several clients poke at the target
+     server on a random basis). The default trigger method returns 1
+     immediately the first time it is called, then returns 0 - this means
+     that the client makes a single connection to the target host, invokes
+     the callback routine, then exits. (See the test examples which come
+     with this module for examples of how to use client mode.)
+
+     Note that client mode relies on the fork() system call.
+
+     The *threaded* mode indicates that multithreading will be used to
+     service requests. This feature requires Perl 5.005 or higher and a
+     native threads library to run, so it's not 100% portable). Moreover,
+     it's unreliable! Don't use this mode unless you're prepared to do some
+     debugging.
+
+     The *prefork* mode indicates that the server will bind to the
+     designated port, then fork repeatedly up to `$start_servers' times
+     (where `start_servers' is a scalar parameter to `NetServer::Generic').
+     Each child then enters a select-based loop. (i.e. run_select), but
+     exits after handling `$server_lifespan' transactions (where
+     `server_lifespan' is another parameter to `NetServer::Generic').
+     Every time a child handles a transaction it writes its PID and
+     generation number down a pipe to the parent process, with a message
+     when it exits.  The parent keeps track of how many servers are in use
+     and fires up extra children (up to `$max_servers') if the number in
+     use leaves less than `$min_spare_servers' free. See the example
+     *preforked-shttpd* for a minimal HTTP 0.9 server implemented using
+     the *prefork* mode.
+
+   Of these, the callback method is most important; it specifies a
+reference to a subroutine which effectively does whatever the server does.
+
+   A callback subroutine is a normal Perl subroutine. It is invoked with
+STDIN and STDOUT attached to an IO::Socket::INET object, so that reads
+from STDIN get information from the client, and writes to STDOUT send
+information to the client. Note that both STDIN and STDOUT are unbuffered.
+In addition, a `NetServer::Generic' object is passed as an argument (but
+the callback is free to ignore it).
+
+   Your server reads and writes data via the socket as if it is the
+standard input and standard output filehandles; for example:
+
+     while (defined ($tmp = <STDIN>)) {  # read a line from the socket
+
+     print STDOUT "You said: $tmp\n";    # print something to the socket
+
+   (See IO::Handle and IO::Socket for more information on this.)
+
+   If you're not familiar with sockets, don't get too fresh and try to
+close or seek on STDIN or STDOUT; just treat them like a file.
+
+   The server object is not strictly necessary in the callback, but comes
+in handy: you can shut down the server completely by calling the quit()
+method.
+
+   When writing a callback subroutine, remember to define some condition
+under which you return!
+
+   Here's a slightly more complex server example:
+
+     # minimal http server (HTTP/0.9):
+     # this is a REALLY minimal HTTP server. It only understands GET
+     # requests, does no header parsing whatsoever, and doesn't understand
+     # relative addresses! Nor does it understand CGI scripts. And it ain't
+     # suitable as a replacement for Apache (at least, not any time soon :).
+     # The base directory for the server and the default
+     # file name are defined in B<url_to_file()>, which maps URLs to
+     # absolute pathnames. The server code itself is defined in the
+     # closure B<$http>, which shows how simple it is to write a server
+     # using this module.
+
+     sub url_to_file($) {
+       # for a given URL, turn it into an absolute pathname
+       my ($u) = shift ;  # incoming URL fragment from GET request
+       my ($f) = "";      # file pathname to return
+       my ($htbase) = "/usr/local/etc/httpd/docs/";
+       my ($htdefault) = "index.html";
+       chop $u;
+       if ($u eq "/") {
+           $f = $htbase . $htdefault;
+           return $f;
+       } else {
+           if ($u =~ m|^/.+|) {
+               $f = $htbase;  chop $f;
+               $f .= $u;
+           } elsif ($u =~ m|[^/]+|) {
+               $f = $htbase . $u;
+           }
+           if ($u =~ m|.+/$|) {
+               $f .= $htdefault;
+           }
+           if ($f =~ /\.\./) {
+               my (@path) = split("/", $f);
+               my ($buff, $acc) = "";
+               shift @path;
+               while ($buff = shift @path) {
+                   my ($tmp) = shift @path;
+                   if ($tmp ne '..') {
+                       unshift @path, $tmp;
+                       $acc .= "/$buff";
+                   }
+               }
+               $f = $acc;
+           }
+       }
+       return $f;
+     }
+
+     my ($http) = sub {
+        my ($fh) = shift ;
+        while (defined ($tmp = <STDIN>)) {
+            chomp $tmp;
+            if ($tmp =~ /^GET\s+(.*)$/i) {
+                $getfile = $1;
+                $getfile = url_to_file($getfile);
+                print STDERR "Sending $getfile\n";
+                my ($in) = new IO::File();
+                if ($in->open("<$getfile") ) {
+                    $in->autoflush(1);
+                    print STDOUT "Content-type: text/html\n\n";
+                    while (defined ($line = <$in>)) {
+                        print STDOUT $line;
+                    }
+                } else {
+                    print STDOUT "404: File not found\n\n";
+                }
+            }
+            return 0;
+        }
+     };
+
+     # main program starts here
+
+     my (%config) =  ("port"     => 9000,
+                      "callback" => $http,
+                      "hostname" => "public.antipope.org");
+
+     my ($allowed) = ['.*antipope\.org',
+                      '.*localhost.*'];
+
+     my ($forbidden) = [ '194\.205\.10\.2'];
+
+     my ($foo) = new Server(%config); # create new http server bound to port
+                                      # 9000 of public.antipope.org
+     $foo->allowed($allowed);         # who is allowed to connect to us
+     $foo->forbidden($forbidden);     # who is refused access
+     print "Starting http server on port 9000\n";
+     $foo->run();
+     exit 0;
+
+Additional methods
+------------------
+
+   `NetServer::Generic' provides a couple of extra methods.
+
+peer()
+     The peer() method returns a reference to a two-element list containing
+     the hostname and IP address of the host at the other end of the
+     socket.  If called before a connection has been received, its value
+     will be undefined.  (Don't try to assign values via *peer* unless you
+     want to confuse the allowed/forbidden checking code!)
+
+quit()
+     The quit() method attempts to shut down a server. If running as a
+     forking service, it does so by sending a kill -15 to the parent
+     process. If running as a select-based service it returns from run().
+
+start_servers()
+     In *prefork* mode, specifies how many child servers to start up.
+
+max_servers()
+     In *prefork* mode, specifies the maximum number of children to spawn
+     under load.
+
+min_spare_servers()
+     In *prefork* mode, specifies a number of spare (inactive) child
+     servers; if we drop below this level (due to load), the parent will
+     spawn additional children (up to a maximum of max_servers) until we
+     go back over *min_spare_servers*.
+
+server_lifespan()
+     In *prefork* server mode, child servers run as select servers. After
+     *server_lifespan* connections they will commit suicide and be
+     replaced by the parent. If *server_lifespan* is set to 1, children
+     will effectively run once then exit (like a forking server). For
+     purposes of insanity, a lifespan of 0 is treated like a lifespan of 1.
+
+servername()
+     In the *prefork* server, unless you *explicitly* tell the server to
+     bind to a named host, it will accept all incoming connections. Within
+     a client, you may need to know what local IP address an incoming
+     connection was intended for. The servername() method can be invoked
+     within the child server's callback and returns a two-element arrayref
+     containing the port and IP address that the connection came in on.
+     For example, in the client:
+
+          my $callback = sub {
+            my $server = shift;
+            my ($server_port, $server_addr) = @{ $server->servername() };
+            print "Connection on $server_addr:$server_port\n";
+
+Types of server
+---------------
+
+   A full discussion of internet servers is well beyond the scope of this
+man page. Beginners may want to start with a source like `Beginning Linux
+Programming' in this node (which provides a simple, lucid discussion);
+more advanced readers may find Stevens' `Advanced Programming in the UNIX
+environment' in this node useful.
+
+   In general, on non-threaded systems, a forking server is slightly less
+efficient than a select-based server (and uses up lots of PIDs). On the
+other hand, a select-based server is not a good solution to high workloads
+or time-consuming processes such as providing an NNTP news feed to an
+online newsreader.
+
+   A major issue with the select-based server code in this release is that
+the IO::Select based server cannot know that a socket is ready until some
+data is received over it. (It calls *can_read()* to detect sockets waiting
+to be read from.) Thus, it is not suitable for writing servers like which
+emit status information without first reading a request.
+
+SEE ALSO
+========
+
+   *Note IO/Handle: IO/Handle,, *Note IO/Socket: IO/Socket,, *Note LWP:
+LWP,, *Note Perlfunc: (perl.info)perlfunc,, `"I', *Note Perlop:
+(perl.info)perlop,
+
+BUGS
+====
+
+   There are two bugs lurking in NetServer::Generic. Or maybe they're
+design flaws. I don't have time to fix them right now, but maybe you'd
+like to contribute an hour or two and get your name in the credits?
+
+   Bug the first:
+
+   NetServer::Generic attempts to make it easy to write a server by letting
+the programmer concentrate on reading from STDIN and writing to STDOUT.
+However, this form of i/o is line oriented.  NetServer::Generic relies on
+the buffering and i/o capabilities provided by Perl and IO::Socket
+respectively. It doesn't buffer its own input.
+
+   This means that in principle a malicious attacker (or just a badly-
+written client program) can write a stream of bytes to a
+NetServer::Generic application and, as long as those bytes don't include a
+"\n", Perl will keep gobbling it up until it runs out of virtual memory.
+
+   This can be fixed by replacing the globbed IO::Socket::INET that is
+attached to STDIN with something else - probably an object that presents
+itself as an IO::Stringy but that does its own buffering, so that it will
+return *either* a line, or some sort of error message in $! if it sees
+something undigestible in its input stream. (If anyone wants to contribute
+a patch that fixes this, please feel free; this is an open source project,
+after all ...)
+
+   Bug the second:
+
+   The select-based server was originally written because I wanted to
+share state information between some forking servers and I couldn't use
+System V shared memory (the application had to be portable to a flavour of
+UNIX that didn't support it).
+
+   It works okay, up to a point, but under heavy load on Linux it can run
+into major problems. Partly this may be attributable to deficiencies in
+the way Linux handles the select() system call (or so Stephen Tweedie
+keeps telling me), but the result is that the select-based server tends to
+drop some connections when it's under stress: if two connections come in
+while it's serving another, the first may never get processed before a
+timeout occurs.
+
+   A somewhat worse problem is that IO::Select doesn't do buffered (line-
+oriented) input; it just checks to see if one or more bytes are waiting to
+be read from one of the file handles it's got hold of. It is possible for
+a couple of bytes to come in (but not a whole line), so that the
+select-based server merrily tries to process a transaction and blocks
+until the rest of the input arrives - thus ensuring that the server is
+bottlenecked by the speed of the slowest client connection.
+
+   Suggestion: if you need to serve lots of connections using select(),
+look at the eventserver module instead. If you're a bit more ambitious,
+the defect in NetServer::Generic is fixable by writing a module with a
+similar API to IO::Select, but which provides buffering for the file
+handles under its control and which only returns something in response to
+can_read() when one of the buffers has a complete line of input waiting.
+
+AUTHOR
+======
+
+   Charlie Stross (charle@antipope.org). With thanks for bugfixes and
+patches to Marius Kjeldahl *marius@ace.funcom.com*, Art Sackett
+*asackett@artsackett.com*, Claudio Garcia *cgarcia@dbitech.com*, Claudio
+Calvelli *lunatic@assurdo.com*, Martin Waite
+*Martin.Waite@montgomery134.freeserve.co.uk*. Debian package contributed
+by Jon Middleton, *jjm@datacash.com*.
+
+HISTORY
+=======
+
+Version 0.1
+     Based on the simple forking server in Chapter 10 of "Advanced Perl
+     Programming" by Sriram Srinivasan, with a modular wrapper to make it
+     easy to use and configure, and a rudimentary access control system.
+
+Version 0.2
+     Added the peer() method to provide peer information.
+
+     Bugfix to *ok_to_serve* from Marius Kjeldahl *marius@ace.funcom.com*.
+
+     Added select-based server code, mode method to switch between forking
+     and selection server modes.
+
+     Updated test code (should do something now!)
+
+     Added example: fortune server and client code.
+
+     Supports NetServer::SMTP (and, internally, NetServer::vTID).
+
+Version 0.3
+     fixed test failure.
+
+Version 1.0
+     Added alpha-ish prefork server mode.
+
+     Added alpha-ish multithreaded mode (UNSTABLE)
+
+     Modified IP address filtering to cope with regexps (suggested by Art
+     Sackett *asackett@artsackett.com*)
+
+     Modified select() server to do non-blocking writes via a
+
+     Non-blocking-socket class tied to STDIN/STDOUT
+
+     Option to log new connection peer addresses via STDERR
+
+     Extra test scripts
+
+     Updated documentation
+
+
+     Fix so it works on installations with no threading support (duh).
+     Tested on Solaris, too.
+
+
+     Bugfixes to the preforked mode (thanks to Art Sackett for detecting
+     them). Bugfix to ok_to_serve() (thanks to Claudio Garcia,
+     cgarcia@dbitech.com). Some notes on the two known bugs (related to
+     buffering).
+
+
+     Signal handling code was fixed to avoid leaving zombie processes
+     (thanks to Luis Munoz, lem@cantv.net)
+
+
+File: pm.info,  Node: NetServer/Portal,  Next: NetServer/Portal/Top,  Prev: NetServer/Generic,  Up: Module List
+
+Interactively Manipulate Daemon Processes
+*****************************************
+
+NAME
+====
+
+   NetServer::Portal - Interactively Manipulate Daemon Processes
+
+SYNOPSIS
+========
+
+     require NetServer::Portal;
+
+     'NetServer::Portal'->default_start();  # creates server
+     warn "NetServer::Portal listening on port ".(7000+($$ % 1000))."\n";
+
+DESCRIPTION
+===========
+
+   This module implements a framework for adding interactive windows into
+daemon processes.  The portal server listens on port 7000+($$%1000) by
+default.
+
+   A top-like server is included that can help debug complicated event
+loops.
+
+SEE ALSO
+========
+
+   `NetServer::Portal::Pi' in this node, *Note NetServer/Portal/Top:
+NetServer/Portal/Top,
+
+
+File: pm.info,  Node: NetServer/Portal/Top,  Next: NetServer/SMTP,  Prev: NetServer/Portal,  Up: Module List
+
+Make event loop statistics easily available
+*******************************************
+
+NAME
+====
+
+   NetServer::Portal::Top - Make event loop statistics easily available
+
+SYNOPSIS
+========
+
+     require NetServer::Portal::Top;
+
+DESCRIPTION
+===========
+
+   All statistics collected by *Note Event: Event, are displayed in a
+format similar to the popular (and excellent) top program.
+
+PRECISE STAT DEFINITIONS
+========================
+
+   * idle
+
+     Idle tracks the amount of time that the process cooperatively
+     reliquished control to the operating system.  (Usually via `select'
+     in this node or `poll' in this node.)
+
+   * other processes
+
+     Attempts to estimate the process's non-idle time that the operating
+     system instead gave to other processes. (Actual clock time minus the
+     combined total time spent in idle and in running event handlers.)
+     This stat is an underestimate (lower bound) since the process can also
+     be preemptively interrupted *during* event processing.
+
+   * lag
+
+     Lag is the percent over the *planned amount of time* that the event
+     loop took to complete.  ((Actual time - planned time) / planned time)
+
+   It is unfortunately that more intuitive stats are not available.
+Benchmarking is a slippery business.  If you have ideas for improvements,
+don't be shy!
+
+SCREENSHOT
+==========
+
+     pl/3bork  [12836 @ eq1062]                                    12:15:18 [  15s]
+     21 events (6 zombies); load averages: 0.33, 0.32, 0.32
+     
+      EID PRI STATE  RAN  TIME  CPU  TYPE DESCRIPTION                            P1
+        0   8 sleep  247  0:09 66.7%  sys idle
+       24   4 sleep  105  0:04 28.1% idle QSGTable sweep
+        3   4 sleep   15  0:00  2.4% time server status
+       22   4 sleep   15  0:00  1.8% time QSGTable
+       12   4 cpu      4  0:00  0.8% time NetServer::Portal::Client localhost
+       23   4 sleep   15  0:00  0.1% time QSGTable Detail
+        2   4 sleep   15  0:00  0.0% time Qt
+        7   4 sleep    8  0:00  0.0% time ObjStore::Serve checkpoint
+       10   4 sleep    8  0:00  0.0% time SSL items
+        9   4 sleep    8  0:00  0.0% time SSL service
+        6  -1 sleep    5  0:00  0.0% time Event::Stats
+       21   4 zomb     0  0:00  0.0% idle QSGTable sweep
+       19   4 zomb     0  0:00  0.0% time QSGTable
+       11   4 sleep    0  0:00  0.0%   io NetServer::Portal::Client localhost
+        8   4 sleep    0  0:00  0.0%   io SSL
+       13   4 zomb     0  0:00  0.0% time QSGTable
+
+   The three load averages are for the most recent 15 seconds, 1 minute,
+and 15 minutes, respectively.
+
+   For efficiency, not all time intervals are available.  When you change
+the time interval, it will be rounded to the closest for which there is
+data.
+
+BUGS
+====
+
+   The potential impact of multiple CPUs and kernel-level thread support
+is ignored.
+
+
+File: pm.info,  Node: NetServer/SMTP,  Next: Netscape/Bookmarks,  Prev: NetServer/Portal/Top,  Up: Module List
+
+basic SMTP server class for Perl
+********************************
+
+NAME
+====
+
+   NetServer::SMTP - basic SMTP server class for Perl
+
+SYNOPSIS
+========
+
+     my ($self) = NetServer::SMTP->new();
+     while (<STDIN>) {
+         next if (! defined($_));
+         my (@vec) = split(/\s+/);
+         my ($fn) = shift @vec;
+         $fn = uc($fn);
+         if (grep(/$fn/i, @$NetServer::SMTP::States) != 0) {
+             $self->in($in);
+             $self->out($out);
+             $self->next_state_ok($fn) && do {
+                 $self->$fn(@vec);
+             };
+         } else {
+               print STDERR "What on earth does [$fn][",
+     	                   join(" ", @vec), "] mean?\n";
+         }
+         if ($self->{ERROR} > 0 ) {
+     	    $self->DESTROY();
+     	    exit;
+     	}
+     }
+
+DESCRIPTION
+===========
+
+   A class that provides a basic SMTP server object and some methods. (Note
+that it doesn't provide a run method with a main execution loop - hence
+the above example.)
+
+   (`Net::SMTP' provides a corresponding client class.)
+
+   It accepts requests in accordance with RFC 821, 4.5.1 ("Minimum
+Implementation"). No attempt to verify the authenticity of the sender is
+made; no attempt is made to filter out relay attacks or deliver the mail,
+and it doesn't even attempt to check messages for RFC 822 compliance.
+Instead, the mail is spooled in the form of a deep-frozen `NetServer::SMTP'
+object, dropped into the spool directory.
+
+   Spooled mail may be transmitted by (a) unfreezing it into a live
+`NetServer::SMTP' object and (b) invoking the send() method on it.  This
+is the low-level delivery mechanism; it does not include a queueing
+mechanism.
+
+   Only one delivery method is supported in the base `NetServer::SMTP'
+class; this is dumb SMTP forwarding to a remote smarthost. Child classes
+derived from `NetServer::SMTP' may provide alternative send() methods
+which override this default, for example to supply local delivery methods,
+routing, and associated transport mechanisms for transport via UUCP or
+other protocols.
+
+To-do list
+----------
+
+   RFC822 checking of incoming mail to ensure it's not totally corrupt
+(via Mail::Internet?).
+
+   Velocity checking implemented at the server level - a semaphore
+maintains a count of children spawned/reaped, and if the spawn rate goes
+over a designated hot limit the server will begin issuing 421 responses.
+
+   Queued mail should be tracked via a queue database - probably a tied
+DB_File.  The key to each record is the position in the queue; the value
+is a record containing items like the number of retries (so far), the
+filename of the message, whether to use local or remote delivery methods,
+and so on.  The queue is handled in a round-robin fashion by a queue
+delivery subroutine. Additional methods for queueing needed.
+
+   Currently, mail is stored using Freeze::Thaw to dump a frozen
+NetServer::SMTP object. A better solution would be to dump a
+Mail::Internet object and a NetServer::SMTP object containing delivery and
+queueing metainformation.  (Expect this in release 0.02.)
+
+States
+------
+
+   `NetServer::SMTP' implements a rather minimalist mechanism for checking
+that state transactions within the SMTP protocol are valid. When entering
+a given state (or receiving an SMTP command), it checks the hash of arrays
+`NetServer::SMTP::NFA'; this contains a list of acceptable antecedent
+states for the requested command. If the current state isn't in this list,
+it assumes an error has occured and complains. This is just about okay for
+a simple program which is intended to receive and spool messages, but it
+is not a good basis for extension (e.g. for the implementation of a full
+ESMTP server architecture). In any event, state consistency checking is
+carried out by calling `next_state_ok()' - more sophisticated servers will
+want to override this.
+
+   Attempts to start an ESMTP session will therefore be politely rejected.
+
+Methods
+-------
+
+   NetServer::SMTP knows about a few standard messages, and a basic set of
+SMTP commands (each of which is implemented as a method):
+
+new()
+     Create a new NetServer::SMTP object. The object is now available to
+     process incoming mail. It reads from STDIN, and writes responses to
+     STDOUT; it should be called via `NetServer::Generic'.
+
+     Some initialisation parameters may be specified as a hash, or as a
+     filehandle referring to a configuration file, or as a configuration
+     file name.
+
+     Initialisation parameters may not be changed once the object has been
+     created; you need to destroy it and start a new one. (Don't worry,
+     this isn't a major overhead.)
+
+HELO
+     Commence new session
+
+MAIL
+     Begin a new mail
+
+RCPT
+     Specify recipients
+
+DATA
+     Send data
+
+RSET
+     Reset session
+
+NOOP
+     Do nothing
+
+QUIT
+     End session (spooling mail)
+
+   These are the minimal SMTP commands required for a basic implementation
+of RFC 821. Each command is handled via the autoloader, which knows what
+to do.
+
+   In addition, NetServer::SMTP knows about the following extra commands,
+which may not behave quite as you expect them to do:
+
+HELP
+     Normally, provides help on a command.
+
+initialise()
+     Called by new() to initialise the new object.  Initialisation keys
+     may be specified as a hash, supplied as a parameter to the new
+     object, or as a filename or file handle containing a frozen
+     *NetServer::SMTP* object which is users to overlay the object.
+
+     Recognized keys are:
+
+    myhost
+          My host name (FQDN)
+
+    allowed
+          array of aliases for hosts users allowed to send mail
+
+    silent
+          If silent, dont say hello when creating a new server (we have
+          other reasons for creating NetServer::SMTP objects, once in a
+          while :)
+
+    relay
+          Relay hostname (FQDN)
+
+    ERROR
+          If this flag goes non-zero, Something Bad has happened and the
+          session should either terminate or refuse to proceed further
+
+    spooldir
+          Directory where spooled transactions are waiting
+
+
+File: pm.info,  Node: Netscape/Bookmarks,  Next: Netscape/Cache,  Prev: NetServer/SMTP,  Up: Module List
+
+Process and manipulate Netscape bookmarks files
+***********************************************
+
+NAME
+====
+
+   Netscape::Bookmarks - Process and manipulate Netscape bookmarks files
+
+SYNOPSIS
+========
+
+     use Netscape::Bookmarks;
+     @bookmarks = bookmarks_array($filename);
+     @bookmarks = bookmarks_lol($filename);
+
+DESCRIPTION
+===========
+
+   This module helps you process and manipulate Netscape bookmarks files.
+
+bookmarks_array()
+-----------------
+
+   Returns a flat array of bookmark URLs.
+
+bookmarks_lol()
+---------------
+
+   Returns a list of lists of bookmarks, with the following elements in
+each of the arrayrefs:
+
+     0	URL
+     1	Name (the text name of the bookmark)
+     2	Added date
+     3	Last modified date
+     4	Last visited date
+
+BUGS
+====
+
+   This module isn't very fast, but then I do have ~1300 bookmarks, which
+is probably excessive.  Nevertheless, it's still easier to use this module
+and the `bmgrep' script to find bookmarks than to use Netscape's bookmarks
+interface.
+
+   I don't have any other versions of Netscape available to play with, so
+I only know that this works with my own copy which is v4.51 on Linux.
+Please let me know if you have any problems with other versions.
+
+FUTURE DIRECTIONS
+=================
+
+   I intend to add a feature to get a decent tree-like representation of
+your folders.  I also intend to provide ways to add, delete and otherwise
+manipulate bookmarks.  This will probably be non-trivial, but that's life
+I guess.
+
+AUTHOR
+======
+
+   Kirrily 'Skud' Robert
+
+   Netizen Pty Ltd
+
+   skud@netizen.com.au
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: Netscape/Cache,  Next: Netscape/History,  Prev: Netscape/Bookmarks,  Up: Module List
+
+object class for accessing Netscape cache files
+***********************************************
+
+NAME
+====
+
+   Netscape::Cache - object class for accessing Netscape cache files
+
+SYNOPSIS
+========
+
+   The object oriented interface:
+
+     use Netscape::Cache;
+
+     $cache = new Netscape::Cache;
+     while (defined($url = $cache->next_url)) {
+     	print $url, "\n";
+     }
+
+     while (defined($o = $cache->next_object)) {
+     	print
+     	  $o->{'URL'}, "\n",
+     	  $o->{'CACHEFILE'}, "\n",
+     	  $o->{'LAST_MODIFIED'}, "\n",
+     	  $o->{'MIME_TYPE'}, "\n";
+     }
+
+   The TIEHASH interface:
+
+     use Netscape::Cache;
+
+     tie %cache, 'Netscape::Cache';
+     foreach (sort keys %cache) {
+     	print $cache{$_}->{URL}, "\n";
+     }
+
+DESCRIPTION
+===========
+
+   The *Netscape::Cache* module implements an object class for accessing
+the filenames and URLs of the cache files used by the Netscape web browser.
+
+   Note: You can also use the undocumented pseudo-URLs `about:cache',
+`about:memory-cache' and `about:global-history' to access your disk cache,
+memory cache and global history.
+
+   There is also an interface for using tied hashes.
+
+   Netscape uses the old Berkeley DB format (version 1.85) for its cache
+index `index.db'. Version 2.x.x is incompatible with the old format
+(`db_intro(3)' in this node), so you have either to downgrade or to
+convert the database using *db_dump185* and *db_load*. See
+`convert_185_2xx|' in this node for a (experimental) converter function.
+
+CONSTRUCTOR
+===========
+
+     $cache = new Netscape::Cache(-cachedir => "$ENV{HOME}/.netscape/cache");
+
+   This creates a new instance of the *Netscape::Cache* object class. The
+*-cachedir* argument is optional. By default, the cache directory setting
+is retrieved from `~/.netscape/preferences'. The index file is normally
+named `index.db' on Unix systems and `FAT.DB' on Microsoft systems. It may
+be changed with the *-index* argument.
+
+   If the Netscape cache index file does not exist, a warning message will
+be generated, and the constructor will return undef.
+
+METHODS
+=======
+
+   The *Netscape::Cache* class implements the following methods:
+
+   * rewind - reset cache index to first URL
+
+   * next_url - get next URL from cache index
+
+   * next_object - get next URL as a full Netscape::Cache::Object from
+     cache index
+
+   * get_object - get a Netscape::Cache::Object for a given URL
+
+   Each of the methods are described separately below.
+
+next_url
+--------
+
+     $url = $history->next_url;
+
+   This method returns the next URL from the cache index. Unlike
+Netscape::History, this method returns a string and not an URI::URL-like
+object.
+
+   This method is faster than next_object, since it does only evaluate the
+URL of the cached file.
+
+next_object
+-----------
+
+     $cache->next_object;
+
+   This method returns the next URL from the cache index as a
+Netscape::Cache::Object object. See below for accessing the components
+(cache filename, content length, mime type and more) of this object.
+
+get_object
+----------
+
+     $cache->get_object;
+
+   This method returns the Netscape::Cache::Object object for a given URL.
+If the URL does not live in the cache index, then the returned value will
+be undefined.
+
+delete_object
+-------------
+
+   Deletes URL from cache index and the related file from the cache.
+
+   WARNING: Do not use delete_object while in a next_object loop!  It is
+better to collect all objects for delete in a list and do the deletion
+after the loop, otherwise you can get strange behavior (e.g.  malloc
+panics).
+
+rewind
+------
+
+     $cache->rewind();
+
+   This method is used to move the internal pointer of the cache index to
+the first URL in the cache index. You do not need to bother with this if
+you have just created the object, but it does not harm anything if you do.
+
+get_object_by_cachefile
+-----------------------
+
+     $o = $cache->get_object_by_cachefile($cachefile);
+
+   Finds the corresponding entry for a cache file and returns the object,
+or undef if there is no such `$cachefile'. This is useful, if you find
+something in your cache directory by using grep and you want to know the
+URL and other attributes of this file.
+
+   WARNING: Do not use this method while iterating with get_url, get_object
+or each, because this method does iterating itself and would mess up the
+previous iteration.
+
+get_object_by_cachefile
+-----------------------
+
+     $url = $cache->get_url_by_cachefile($cachefile);
+
+   Finds the corresponding URL for a cache file. This method is implemented
+using get_object_by_cachefile.
+
+convert_185_2xx
+---------------
+
+     $newindex = Netscape::Cache::convert_185_2xx($origindex [, $tmploc])
+
+   This is a (experimental) utility for converting `index.db' to the new
+Berkeley DB 2.x.x format. Note that this function will not overwrite the
+original `index.db', but rather copy the converted index to `$tmploc' or
+`/tmp/index.$$.db', if `$tmploc' is not given.  convert_185_2xx returns
+the filename of the new created index file.  The converted index is only
+temporary, and all write access is useless.
+
+   Usage example:
+
+     my $newindex = Netscape::Cache::convert_185_2xx($indexfile);
+     my $o = new Netscape::Cache -index => $newindex;
+
+Netscape::Cache::Object
+=======================
+
+   next_object and get_object return an object of the class
+Netscape::Cache::Object. This object is simply a hash, which members have
+to be accessed directly (no methods).
+
+   An example:
+
+     $o = $cache->next_object;
+     print $o->{'URL'}, "\n";
+
+URL
+     The URL of the cached object
+
+COMPLETE_URL
+     The complete URL with the query string attached (only Netscape 4.x).
+
+CACHEFILE
+     The filename of the cached URL in the cache directory. To construct
+     the full path use ($cache is a *Netscape::Cache* object and $o a
+     Netscape::Cache::Object object)
+
+          $cache->{'CACHEDIR'} . "/" . $o->{'CACHEFILE'}
+
+CACHEFILE_SIZE
+     The size of the cache file.
+
+CONTENT_LENGTH
+     The length of the cache file as specified in the HTTP response header.
+     In general, SIZE and CONTENT_LENGTH are equal. If you interrupt a
+     transfer of a file, only the first part of the file is written to the
+     cache, resulting in a smaller CONTENT_LENGTH than SIZE.
+
+LAST_MODIFIED
+     The date of last modification of the URL as unix time (seconds since
+     epoch). Use
+
+          scalar localtime $o->{'LAST_MODIFIED'}
+
+     to get a human readable date.
+
+LAST_VISITED
+     The date of last visit.
+
+EXPIRE_DATE
+     If defined, the date of expiry for the URL.
+
+MIME_TYPE
+     The MIME type of the URL (eg. text/html or image/jpeg).
+
+ENCODING
+     The encoding of the URL (eg. x-gzip for gzipped data).
+
+CHARSET
+     The charset of the URL (eg. iso-8859-1).
+
+NS_VERSION
+     The version of Netscape which created this cache file (3 for Netscape
+     2.x and 3.x, 4 for Netscape 4.0x and 5 for Netscape 4.5).
+
+AN EXAMPLE PROGRAM
+==================
+
+   This program loops through all cache objects and prints a HTML-ified
+list.  The list is sorted by URL, but you can sort it by last visit date
+or size, too.
+
+     use Netscape::Cache;
+
+     $cache = new Netscape::Cache;
+
+     while ($o = $cache->next_object) {
+         push(@url, $o);
+     }
+     # sort by name
+     @url = sort {$a->{'URL'} cmp $b->{'URL'}} @url;
+     # sort by visit time
+     #@url = sort {$b->{'LAST_VISITED'} <=> $a->{'LAST_VISITED'}} @url;
+     # sort by mime type
+     #@url = sort {$a->{'MIME_TYPE'} cmp $b->{'MIME_TYPE'}} @url;
+     # sort by size
+     #@url = sort {$b->{'CACHEFILE_SIZE'} <=> $a->{'CACHEFILE_SIZE'}} @url;
+
+     print "<ul>\n";
+     foreach (@url) {
+         print
+           "<li><a href=\"file:",
+           $cache->{'CACHEDIR'}, "/", $_->{'CACHEFILE'}, "\">",
+           $_->{'URL'}, "</a> ",
+     	  scalar localtime $_->{'LAST_VISITED'}, "<br>",
+           "type: ", $_->{'MIME_TYPE'},
+     	  ",size: ", $_->{'CACHEFILE_SIZE'}, "\n";
+     }
+     print "</ul>\n";
+
+FORMAT OF index.db
+==================
+
+   Here is a short description of the format of index.db. All integers are
+in VAX byte order (little endian). Time is specified as seconds since
+epoch.
+
+     Key:
+
+     Offset  Type/Length  Description
+
+     0       long         Length of key entry
+     4       long         Length of URL with trailing \0
+     8       string       URL (null-terminated)
+     +0      string       filled with \0
+
+     Value:
+
+     Offset  Type/Length  Description
+
+     0       long         Length of value entry
+     4       long         A version number (see NS_VERSION)
+     8       long         Last modified
+     12      long         Last visited
+     16      long         Expire date
+     20      long         Size of cachefile
+     24      ...          Unknown
+     29      long         Length of cache filename with trailing \0
+     33      string       Cache filename (null-terminated)
+     +0      ...          Unknown
+     +33     long         Length of mime type with trailing \0
+     +37     string       Mime type (null-terminated)
+     +0      long         Length of content encoding with trailing \0
+     +4      string       Content encoding (null-terminated)
+     +0      long         Length of charset with trailing \0
+     +4      string       Charset (null-terminated)
+     +0      ...          Unknown
+     +1      long         Content length
+     +5      long         Length of the complete URL with trailing \0
+     +9      string       Complete URL (null-terminated)
+
+ENVIRONMENT
+===========
+
+   The *Netscape::Cache* module examines the following environment
+variables:
+
+HOME
+     Home directory of the user, used to find Netscape's preferences
+     (`$HOME/.netscape'). Otherwise, if not set, retrieve the home
+     directory from the passwd file.
+
+BUGS
+====
+
+   There are still some unknown fields (_XXX_FLAG_{2,3,4}).
+
+   You can't use delete_object while looping with next_object. See the
+question "What happens if I add or remove keys from a hash while iterating
+over it?" in *Note Perlfaq4: (perl.info)perlfaq4,.
+
+   *keys()* or *each()* on the tied hash are slower than the object
+oriented equivalents next_object or next_url.
+
+SEE ALSO
+========
+
+   *Note Netscape/History: Netscape/History,
+
+AUTHOR
+======
+
+   Slaven Rezic <eserte@cs.tu-berlin.de>
+
+   Thanks to: Fernando Santagata <lac0658@iperbole.bologna.it>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997 Slaven Rezic. All rights reserved.  This module is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+
+File: pm.info,  Node: Netscape/History,  Next: Netscape/HistoryURL,  Prev: Netscape/Cache,  Up: Module List
+
+object class for accessing Netscape history database
+****************************************************
+
+NAME
+====
+
+   Netscape::History - object class for accessing Netscape history database
+
+SYNOPSIS
+========
+
+     use Netscape::History;
+     
+     $history = new Netscape::History();
+     while (defined($url = $history->next_url() ))
+     {
+     }
+
+DESCRIPTION
+===========
+
+   The Netscape::History module implements an object class for accessing
+the history database maintained by the Netscape web browser.  The history
+database keeps a list of all URLs you have visited, and is used by
+Netscape to change the color of URLs which you have previously visited,
+for example.
+
+   With this module, you can get at the URLs stored in a Netscape history
+file, delete URLs, and add new ones. With the associated
+`Netscape::HistoryURL' module you can access the information which is
+associated with each URL.
+
+   *Please Note:* the database format for the browser history was changed
+with Netscape 4. Previously only the time of most recent visit was
+available; now you can also get at the time of your first visit, the
+number of visits, the title of the referenced page, and another value.
+
+CONSTRUCTOR
+-----------
+
+     $history = Netscape::History->new();
+
+   This creates a new instance of the Netscape::History object class.  You
+can optionally pass the path to the history database as an argument to the
+constructor, as in:
+
+     $history = Netscape::History->new('/home/bob/.netscape/history.db');
+
+   If you do not specify the file, then the constructor will use:
+
+     $HOME/.netscape/history.db
+
+   If the Netscape history database does not exist, a warning message will
+be generated, and the constructor will return undef.
+
+METHODS
+=======
+
+   The Netscape::History class implements the following methods:
+
+   * get_url - get a specific URL from your history
+
+   * rewind - reset history database to first URL
+
+   * next_url - get next URL from your history
+
+   * delete_url - remove a URL from your history
+
+   * add_url - add a URL to the history file
+
+   * close - close the history database
+
+   Each of the methods is described separately below.
+
+get_url - get a specific URL from your history
+----------------------------------------------
+
+     $url = $history->get_url( URL );
+
+   This method is used to extract information about a specific URL from
+your history database.
+
+   This method takes a URL (which could be just a text string, or an
+object of class URI::URL) and returns an instance of Netscape::HistoryURL.
+
+next_url - get the next URL from your history database
+------------------------------------------------------
+
+     $url = $history->next_url();
+
+   This method returns the next URL from your history database.  If you
+want to process all URLs in the database, you should call the rewind
+method before looping over all URLs.
+
+   The URL returned is an instance of the Netscape::HistoryURL class,
+which works just like an instance of URI::URL, but provides an extra
+methods, as described in the documentation for Netscape::HistoryURL.
+
+delete_url - remove a URL from the history database
+---------------------------------------------------
+
+     $history->delete_url($url);
+
+   This method is used to remove a URL from your history database.  The
+URL passed can be a simple text string with the URL, or an instance of
+Netscape::HistoryURL, URI::URL, or any other class which can be rendered
+into a string.
+
+add_url - add a URL to the history database
+-------------------------------------------
+
+     $history->add_url( URL );
+
+   This method is used to add a URL to a history database.  This might be
+useful if you are merging information from multiple history databases, for
+example.
+
+   If the URL passed is an instance of Netscape::HistoryURL, then the
+information available will be stored.
+
+   If the URL is specified as a text string, is derived from URI::URL,
+then a Netscape::HistoryURL will be created with the following:
+
+     LAST   = current time
+     FIRST  = current time
+     COUNT  = 1
+     EXPIRE = 1
+     TITLE  = ''
+
+   If the EXPIRE field is not set to 1, then it won't appear in Netscape's
+history window. Not really sure why :-)
+
+rewind - reset internal URL pointer to first URL in history
+-----------------------------------------------------------
+
+     $history->rewind();
+
+   This method is used to move the history database's internal pointer to
+the first URL in your history database.  You don't need to bother with
+this if you have just created the object, but it doesn't harm anything if
+you do.
+
+close - close the history database
+----------------------------------
+
+     $history->close();
+
+   This closes the history database. The destructor will do this
+automatically for you, so most of time you don't actually have to bother
+calling this method explicitly. Good programming style says you should
+though :-)
+
+EXAMPLES
+========
+
+DISPLAY CONTENTS OF HISTORY
+---------------------------
+
+   The following example illustrates use of this module, and the
+*visit_time()* method of the URLs returned.  The program will list all
+URLs visited, along with visit time.  The Date::Format module is used to
+format the visit time.
+
+     #!/usr/bin/perl -w
+     
+     use Netscape::History;
+     use Date::Format;
+     use strict;
+     
+     my $history;
+     my $url;
+     
+     $history = new Netscape::History;
+     while (defined($url = $history->next_url() ))
+     {
+         print "$url :\n";
+         print "    First  : ", ctime($url->first_visit_time());
+         print "    Last   : ", ctime($url->last_visit_time());
+         print "    Count  : ", $url->visit_count(), "\n";
+         print "    Expire : ", $url->expire(), "\n";
+         print "    Title  : ", $url->title(), "\n";
+     }
+     $history->close();
+
+MERGE TWO HISTORY FILES
+-----------------------
+
+   The following example illustrates use of the add_url method to merge
+two history databases. We read all URLs from `history2.db', and merge them
+into `history1.db', overwriting any duplicates.
+
+     $history1 = new Netscape::History("history1.db");
+     $history2 = new Netscape::History("history2.db");
+     while (defined($url = $history2->next_url() ))
+     {
+         $history1->add_url($url);
+     }
+     $history1->close();
+     $history2->close();
+
+SEE ALSO
+========
+
+*Note Netscape/HistoryURL: Netscape/HistoryURL,
+     When you call the `next_url' in this node method, you are returned
+     instances of this class.
+
+*Note DB_File: DB_File,
+     The Netscape history file is just a Berkeley DB File, which we access
+     using the DB_File module. You can use a different DB_File compatible
+     library (such as `DB_File::SV185') by running
+
+          use Netscape::History dblib => 'DB_File::SV185'
+
+     in which case you are only depending on the specified library and not
+     DB_File.
+
+*Note URI/URL: URI/URL,
+     The underlying class for *Note Netscape/HistoryURL:
+     Netscape/HistoryURL,, which provides the mechanisms for manipulating
+     URLs.
+
+*Note Date/Format: Date/Format,
+     Functions for formatting time and date in strings.
+
+AUTHOR
+======
+
+   Neil Bowers <neilb@cre.canon.co.uk>, and Richard Taylor
+<rit@cre.canon.co.uk>.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997-2000 Canon Research Centre Europe. All rights
+reserved.  This module is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Netscape/HistoryURL,  Next: Netscape/Registry,  Prev: Netscape/History,  Up: Module List
+
+URI::URL subclass with Netscape history information
+***************************************************
+
+NAME
+====
+
+   Netscape::HistoryURL - URI::URL subclass with Netscape history
+information
+
+SYNOPSIS
+========
+
+     use Netscape::HistoryURL;
+     
+     $url = new Netscape::HistoryURL('http://foobar.com/',
+                                     LAST, FIRST, COUNT, EXPIRE, TITLE);
+
+DESCRIPTION
+===========
+
+   The `Netscape::HistoryURL' module subclasses *Note URI/URL: URI/URL, to
+provide a URL class with methods for accessing the information which is
+stored in Netscape's *history database*.
+
+   The history database is used to keep track of all URLs you have visited.
+This is used to color previously visited URLs different, for example.  The
+information stored in the history database depends on the version of
+Netscape being used.
+
+CONSTRUCTOR
+===========
+
+     $object = new Netscape::HistoryURL( URL,
+                                         LAST, FIRST, COUNT, EXPIRE, TITLE );
+
+   This creates a new instance of the Netscape::HistoryURL object class.
+This supports all the methods supported by the URI::URL class.  Please see
+the documentation for that module.
+
+   The first argument passed is a string which contains a valid URL.  The
+remaining arguments are information (usually) extracted from Netscape's
+history database.
+
+   *LAST* is the time the URL was last visited, and FIRST is the time when
+the URL was first visited. *COUNT* is the number of times you have visited
+the URL. We're not really sure what *EXPIRE* is yet.  TITLE is the title
+of the referenced page.
+
+   You will normally not use the constructor yourself; it is usually
+invoked by the `next_url()' method of the Netscape::History class.
+
+METHODS
+=======
+
+   The *Netscape::HistoryURL* class supports all methods of the URI::URL
+class, and additional methods as described below.  Please see the
+documentation for URI::URL for details of the other methods supported.
+
+visit_time - return the time of last visit
+------------------------------------------
+
+     $time = $url->visit_time();
+
+   This routine is provided for backwards compatibility with the previous
+versions of this module. You should use `last_visit_time()' instead.
+
+first_visit_time - the time you first visited the URL
+-----------------------------------------------------
+
+     $time = $url->first_visit_time();
+
+   This method returns the time you first visited the URL, in seconds
+since the last epoch.  This can then be used with any of the standard
+routines for formatting as a string.  The following example uses ctime(),
+from the Date::Format module:
+
+     print "Time of last visit for $url : ", ctime($url->first_visit_time);
+
+last_visit_time - the time you last visited the URL
+---------------------------------------------------
+
+     $time = $url->last_visit_time();
+
+   This method returns the time you last (most recently) visited the URL,
+in seconds since the last epoch.
+
+title - the title of the associated page
+----------------------------------------
+
+     $title = $url->title();
+
+   This method returns the title of the referenced page, if one was
+available. The value will be undef otherwise.
+
+visit_count - the number of times you have visited the page
+-----------------------------------------------------------
+
+     $count = $url->visit_count();
+
+   This method returns the number of times you have visited the page.
+
+expire - the expire value for the URL
+-------------------------------------
+
+     $expire = $url->expire();
+
+   This method returns the expire values which is stored for the URL.  We
+don't know what this is for yet, or the right way to interpret it.
+
+SEE ALSO
+========
+
+Netscape::History
+     An object class for accessing the Netscape history database.
+
+URI::URL
+     Base-class, which provides heaps of functionality.
+
+AUTHOR
+======
+
+   Neil Bowers <neilb@cre.canon.co.uk> and Richard Taylor
+<rit@cre.canon.co.uk>.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997-2000 Canon Research Centre Europe. All rights
+reserved.  This module is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.
+
+

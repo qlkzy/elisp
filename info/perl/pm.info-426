@@ -1,0 +1,2677 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Win32API/Net,  Next: Win32API/Registry,  Prev: Win32API/File,  Up: Module List
+
+Perl interface to the Windows NT LanManager API account management functions.
+*****************************************************************************
+
+NAME
+====
+
+   Win32API::Net - Perl interface to the Windows NT LanManager API account
+management functions.
+
+SYNOPSIS
+========
+
+   use Win32API::Net;
+
+NOTE ON VERSIONS PRIOR TO 0.08
+==============================
+
+   As of version 0.08 of this module, the behaviour relating to empty
+strings in input hashes has changed. The old behaviour converted such
+strings to the NULL pointer. The underlying API uses this value as an
+indication to not change the value stored for a given field. This meant
+that you were not able to clear (say) the logonScript field for a user
+using UserSetInfo().
+
+   The new behaviour is to leave the string as an empty C string which will
+allow fields to be cleared.  To pass a NULL pointer to the underlying API
+call (and thus, to leave the field as it was), you need to set the
+corresponding field to undef.
+
+   WARNING: *THIS IS AN INCOMPATIBLE CHANGE*.  *EXISTING SCRIPTS THAT
+RELIED ON PRIOR BEHAVIOR MAY NEED TO BE MODIFIED*.
+
+DESCRIPTION
+===========
+
+   Win32API::Net provides a more complete wrapper for the account
+management parts of the NT LanManager API than do other similar packages.
+Most of what you can achieve with the native C++ API is possible with this
+package - albeit in a more Perl like manner by using references to pass
+information to and from functions.
+
+   For an understanding of the environment in which these functions
+operate see `DATA STRUCTURES' in this node.
+
+   The following groups of functions are available:
+
+`NET USER FUNCTIONS' in this node
+`NET GROUP FUNCTIONS' in this node
+`NET LOCAL GROUP FUNCTIONS' in this node
+`NET GET FUNCTIONS' in this node
+   All functions return 0 on failure and 1 on success. Use the
+Win32::GetLastError() function to find out more information on why a
+function failed. In addition, some functions that take a hash reference to
+pass information in (e.g. `UserAdd()') have a last argument that will
+allow more detailed information on which key/value pair was not properly
+specified.
+
+Using References
+----------------
+
+   References to hashes and arrays are used throughout this package to pass
+information into and out of functions.
+
+Using Hash References
+     Where a hash reference is required you can use anything that
+     evaluates to a hash reference. e.g.
+
+          $href = \%someHash;
+          UserAdd(server, 2, $hRef);
+
+     Or more directly:
+
+          UserAdd(server, 2, \%someHash);
+
+Using Array references
+     Array references are used in a similar manner to hash references. e.g.
+
+          $aref = \@someArray;
+          UserEnum(server, $aref);
+
+     Or more directly:
+
+          UserEnum(server, \@someArray);
+
+   Please note: Any `*Get*()' or `*Enum()' operation will first clear the
+contents of the input hash or array being referenced.
+
+   See `EXAMPLES' in this node and the test.pl script for examples of
+usage.
+
+DATA STRUCTURES
+===============
+
+   Most the the functions in the underlying API allow the programmer to
+pass specify at runtime the amount of information that is supplied to the
+function. For example, the `NetUserGetInfo()' call allows the programmer to
+specify levels of 0, 1, 2, 3 (and others). Having specified this level, the
+function returns a structure that will contain different fields. For a
+level 0, the function returns a structure that has only one field. For a
+supplied level of 1, the function returns a structure with 8 fields. The
+programmer needs to know in advance what fields should be provided or will
+be returned for a given level. This mechanism works very will since it
+effectively overloads functions without having to use different function
+prototypes. Perl provides better higher level data structures in the form
+of arrays and hashes. This package uses hashes as the means to pass these
+variable size structure into and out of functions.
+
+   For any function that takes a reference to a hash as input, the
+programmer is expected to provide appropriate keys and corresponding
+values as well as the level parameter. The called function will then takes
+the values out of the supplied hash and build the approprite structure to
+pass to the underlying API function.
+
+   For any function that takes a reference to a hash to recieve output, the
+function will first clear any keys an corresponding values in the supplied
+hash. It will call the underlying API call and will then return in the hash
+any keys and values that are applicable at the requested level.
+
+   Example:
+
+   The `UserGetInfo()' can takes a number of levels. If called with level 0
+the supplied hash will, on return from the function, contain a single key
+and value - namely name/*requested-users-name*. If called with a level of
+1 the supplied hash will, on return from the function, contain 8 keys and
+values. The returned keys are `name, password', `passwordAge', `priv',
+`homeDir', comment, flags, `scriptPath'. See `USER INFO FIELDS' in this
+node for more information on what these represent.
+
+Exports
+=======
+
+   By default, Win32API::Net exports no symbols into the callers namespace.
+The following tags can be used to selectively import symbols into the main
+namespace.
+
+`:User'
+     Exports all symbols needed for the `User*()' functions.  See `NET
+     USER FUNCTIONS' in this node.
+
+`:Get'
+     Exports all symbols needed for the `Get*()' functions.  See `NET GET
+     FUNCTIONS' in this node.
+
+`:Group'
+     Exports all symbols needed for the `Group*()' functions.  See `NET
+     GROUP FUNCTIONS' in this node.
+
+`:LocalGroup'
+     Exports all symbols needed for the `LocalGroup*()' functions.  See
+     `NET LOCAL GROUP FUNCTIONS' in this node.
+
+NET USER FUNCTIONS
+==================
+
+   The `User*()' functions operate on NT user accounts.
+
+   Administrator or Account Operator group membership is required to
+successfully execute most of these functions on a remote server or on a
+computer that has local security enabled. Administrator privileges are
+required to add an Administrator Privilege account.  There are some
+exceptions to this whereby a user can change some of their own settings
+where these don't conflict with 'administrative information' (e.g. full
+name).
+
+   The server field can be the empty string, in which case the function
+defaults to running on the local computer. If you leave this field blank
+then you should ensure that you are running the function on a PDC or BDC
+for your current domain. Use the support function `GetDCName()' to find out
+what the domain controller is, should you not be running this on the PDC.
+
+   All functions in this section are 'DOMAIN functions'. This means that,
+for example, the `UserGetLocalGroups()' function actually lists the
+domain's local groups of which the named user is a member.
+
+   The following functions are available.
+
+UserAdd(server, level, hash, error)
+-----------------------------------
+
+   Add a new user account. The user name is taken from the name-key's
+value in the supplied hash.
+
+server - Scalar String
+     The server on which to add the account.
+
+level - Scalar Int
+     Level of information provided in hash. This can be either 1, 2 or 3.
+     See `USER INFO LEVELS' in this node.
+
+hash - Hash Reference
+     The information to use to add this account. This should have all the
+     appropriate keys and values required for level.
+
+error - Scalar Int
+     Provides information on which field in the hash was not properly
+     specified.  See `USER FIELD ERRORS' in this node for more information
+     about what values this can take.
+
+UserChangePassword(server, user, old, new)
+------------------------------------------
+
+   Changes the password for user. If the policy of the machine/domain only
+allows password changes if the user is logged on then the user must be
+logged on to execute this function. With Administrator or Account Operator
+privilege you can use this function to change anyone's password, so long
+as you know the old password.
+
+server - Scalar String
+     The server on which to change the password.
+
+user - Scalar String
+     The name of the user whose password is being changed.
+
+old - Scalar String
+     The existing password for user.
+
+new - Scalar String
+     The new password for user.
+
+UserDel(server, user)
+---------------------
+
+   Deletes the specified user account. Administrator or Account Operator
+privilege is required to execute this function.
+
+server - Scalar String
+     The server on which to delete the user.
+
+user - Scalar String
+     The user account to delete.
+
+UserEnum(server, array[, filter])
+---------------------------------
+
+   Enumerates all the accounts on server that satisfy filter. Unlike the
+`NetUserEnum()' function in the API, this function does not allow you to
+specify a level (internally it is hardcoded to 0). In Perl it is trivial
+to implement the equivalent function (should you need it) - see `Example
+1' in this node.
+
+server - Scalar String
+     The server on which to enumerate the accounts satisfying filter.
+
+array - Array Reference
+     The array that will hold the names of all users on server whose
+     accounts match filter.
+
+filter - Scalar Int (optional)
+     The filter to apply (see `USER ENUM FILTER' in this node). This
+     argument is optional and if not present a default of
+     `FILTER_NORMAL_ACCOUNT' is used.
+
+UserGetGroups(server, user, array)
+----------------------------------
+
+   Get the global groups for which user is a member. It returns the group
+names in array. Unlike the `NetUserGetGroups()' function in the API, this
+function does not allow you to specify a level (internally is hardcoded to
+0). In Perl it is trivial to implement the equivalent function (in the
+unlikely event that you might need it).
+
+server - Scalar String
+     The server from which to get the groups of which user is a member.
+
+user - Scalar String
+     The user whose group membership you wish to examine.
+
+array - Scalar String
+     The array that will contain the group names to which user belongs.
+
+UserGetInfo(server, user, level, hash)
+--------------------------------------
+
+   Returns the information at the specified level for the named user in
+hash.
+
+server - Scalar String
+     The server from which to get the requested information about user.
+
+user - Scalar String
+     The user whose information you want.
+
+level - Scalar Int
+     One of: 0, 1, 2, 3, 10, 11 and 20. See `USER INFO LEVELS' in this
+     node.
+
+hash - Hash Reference
+     The hash that will contain the keys and values for the information
+     requested. See `USER INFO FIELDS' in this node for information about
+     which keys are present in a given level.
+
+UserGetLocalGroups(server, user, array[, flags])
+------------------------------------------------
+
+   Gets the names of the local groups of which user is a member. Unlike
+the `NetUserEnum()' function in the API, this function does not allow you
+to specify a level. Since the underlying API restricts you to level 0 there
+really isn't any need to include it...
+
+server - Scalar String
+     The server from which to get the local groups of which user is a
+     member.
+
+user - Scalar String
+     The user whose local group membership you wish to enumerate.
+
+array - Array Reference
+     The array that will hold the names of the local groups to which user
+     belongs.
+
+flags - Scalar Int <em>(optional)</em>
+     Either `Win32API::Net::LG_INCLUDE_INDIRECT()' or 0. if flags is
+     omitted, the function internally uses 0. Specifying
+     `LG_INCLUDE_INDIRECT()' will include in the list the names of the
+     groups of which the user is indirectly a member (e.g. by being in a
+     global group that is a member of a local group).
+
+     This field can take no other values.
+
+UserModalsGet()
+---------------
+
+   This function is not currently implemented.
+
+UserModalsSet()
+---------------
+
+   This function is not currently implemented.
+
+UserSetGroups(server, user, array)
+----------------------------------
+
+   Sets the (global) group membership for user to the specified groups.
+Unlike the API function `NetUserSetGroups()', this function does not take a
+level parameter (mainly because this option is largely redundant).
+
+server - Scalar String
+     The server on which you wish to set the group membership for user.
+
+user - Scalar String
+     The user whose group membership you wish to set.
+
+array - Array Reference
+     The array containing the (global) group names to set the users
+     membership of.
+
+   This function will fail if any of the group names specified do not
+exist.
+
+UserSetInfo(server, user, level, hash, error)
+---------------------------------------------
+
+   Sets the info for user according to the information contained in hash
+for level (see `USER INFO LEVELS' in this node).
+
+server - Scalar String
+     The server on which you wish to change the info for user.
+
+user - Scalar String
+     The user whose info you wish to change.
+
+level - Scalar Int
+     One of 0, 1, 2, 3, or 20 (according to Microsoft documentation). In
+     practice, you can use all the 10xx levels as well to change most of
+     the individual properties of the named user - although this may not be
+     supported in future...
+
+hash - Hash Reference
+     The hash that will contain the necessary key/value pairs required for
+     level (see `USER INFO LEVELS' in this node).
+
+error - Scalar Int
+     Provides information on which field in hash were not properly
+     specified. See `USER FIELD ERRORS' in this node for more information
+     about what values can be returned in this field.
+
+NET GROUP FUNCTIONS
+===================
+
+   The `Group*()' functions all operate only on global groups. To modify
+local groups, use the corresponding `LocalGroup*()' functions.
+
+   Administrator or Account Operator group membership is required to
+successfully execute most of these functions on a remote server or on a
+computer that has local security enabled.
+
+   The server field can be the empty string, in which case the function
+defaults to running on the local computer. If you leave this field blank
+then you should ensure that you are running the function on a PDC or BDC
+for your current domain. Use the support function `GetDCName()' to find out
+what the domain controller is, should you not be running this on the PDC.
+
+   The following functions are available.
+
+GroupAdd(server, level, hash, error)
+------------------------------------
+
+   Adds the specified group.
+
+server - Scalar String
+     The server on which to add the group.
+
+level - Scalar String
+     The level of information contained in hash. This can be one of 0, 1
+     or 2. See `GROUP INFO LEVELS' in this node.
+
+hash - Hash Reference
+     A hash containing the required key/value pairs for level.
+
+error - Scalar Int
+     Provides information on which field in hash was not properly
+     specified.  See `GROUP FIELD ERRORS' in this node for more
+     information about what values can be returned in this field.
+
+GroupAddUser(server, group, user)
+---------------------------------
+
+   Adds the specified user to the specified group.
+
+server - Scalar String
+     The server on which to add the user to group.
+
+group - Scalar String
+     The group to add the user to.
+
+user - Scalar String
+     The user to add to group.
+
+GroupDel(server, group)
+-----------------------
+
+   Deletes the specified global group.
+
+server - Scalar String
+     The server on which to delete the named group.
+
+group -Scalar String
+     The group to delete.
+
+GroupDelUser(server, group, user)
+---------------------------------
+
+   Deletes the specified user from the specified group.
+
+server - Scalar String
+     The server on which to delete user from group.
+
+group - Scalar String
+     The group from which to delete user.
+
+user - Scalar String
+     The user to delete from group.
+
+GroupEnum(server, array)
+------------------------
+
+   Enumerates all the global groups on the server. Unlike the API call
+`NetGroupEnum()', this function does not allow you to specify a level
+(internally it is hardcoded to 0). In Perl it is trivial to implement the
+equivalent function (should you need it).
+
+server - Scalar String
+     The server on which to enumerate the (global) groups.
+
+array - Array Reference
+     An array that, on return, will contain the group names.
+
+GroupGetInfo(server, group, level, hash)
+----------------------------------------
+
+   Retrieves level information for group returning information in hash.
+
+server - Scalar String
+     The server from which to get the group information.
+
+group - Scalar String
+     The group whose information you wish to obtain.
+
+level - Scalar Int
+     The level of information you wish to retrieve. This can be one of 1, 2
+     or 3. See `GROUP INFO LEVELS' in this node.
+
+hash - Hash Reference
+     The hash that will contain the information.
+
+GroupGetUsers(server, group, array)
+-----------------------------------
+
+   Returns (in array) the users belonging to group. Unlike the API call
+`NetGroupGetUsers()', this function does not allow you to specify a level
+(internally it is hardcoded to 0). In Perl it is trivial to implement the
+equivalent function (should you need it).
+
+server - Scalar String
+     The server from which to get the group information.
+
+group - Scalar String
+     The group whose users you wish to obtain.
+
+array - Array Reference
+     The array to hold the user names retrieved.
+
+GroupSetInfo(server, group, level, hash, error)
+-----------------------------------------------
+
+   Sets the information for group according to level.
+
+server - Scalar String
+     The server on which to set the group information.
+
+group - Scalar String
+     The group whose information you wish to set.
+
+level - Scalar Int
+     The level of information you are supplying in hash.  Level can be one
+     of 0, 1 or 2. See `GROUP INFO LEVELS' in this node.
+
+hash - Hash Reference
+     The hash containing the required key/value pairs for level.
+
+error - Scalar String
+     On failure, the error parameter will contain a value which specifies
+     which field caused the error. See `GROUP FIELD ERRORS' in this node.
+
+GroupSetUsers(server, group, array)
+-----------------------------------
+
+   Sets the membership of group to contain only those users specified in
+array. This function will fail if any user names contained in the array
+are not valid users on server.  On successful completion group will
+contain only the users specified in array.  Use the functions
+`GroupAddUser()/GroupDelUser()' to add and delete individual users from a
+group.
+
+server - Scalar String
+     The server on which to set the group membership.
+
+group - Scalar String
+     The group to set the membership of.
+
+array - Array Reference
+     The array containing the names of all users who will be members of
+     group.
+
+NET LOCAL GROUP FUNCTIONS
+=========================
+
+   The `LocalGroup*()' functions operate on local groups. If these
+functions are run on a PDC then these functions operate on the domains
+local groups.
+
+   Administrator or Account Operator group membership is required to
+successfully execute most of these functions on a remote server or on a
+computer that has local security enabled.
+
+   The server field can be the empty string, in which case the function
+defaults to running on the local computer. If you leave this field blank
+then you should ensure that you are running the function on a PDC or BDC
+for your current domain. Use the support function `GetDCName()' to find
+out what the domain controller is, should you not be running this on the
+PDC.
+
+   The following functions are available.
+
+LocalGroupAdd(server, level, hash, error)
+-----------------------------------------
+
+   Adds the specified group. The name of the group is contained in the name
+key of hash.
+
+server - Scalar String
+     The server on which to add the group.
+
+level - Scalar String
+     The level of information contained in hash. This can be one of 0 or 1.
+     See `LOCAL GROUP INFO LEVELS' in this node.
+
+hash - Hash Reference
+     A hash containing the required key/value pairs for level.
+
+error - Scalar Int
+     Provides information on which field in hash wasn't properly specified.
+     See `LOCAL GROUP FIELD ERRORS' in this node for more information
+     about what values this can take.
+
+LocalGroupAddMember()
+---------------------
+
+   This function is obselete in the underlying API and has therefore not
+been implemented.  Use `LocalGroupAddMembers' instead.
+
+LocalGroupAddMembers(server, group, array)
+------------------------------------------
+
+   Adds the specified users (members) to the local group. Unlike the API
+function `NetLocalGroupAddMembers()', this function does not allow you to
+specify a level (internally it is hardcoded to 3).  This was done to
+simplify the implementation. To add a 'local' user, you need only specify
+the name. You can also specify users using the `DOMAIN\user' syntax.
+
+server - Scalar String
+     The server on which to add the members to group.
+
+group - Scalar String
+     The group to add the members to.
+
+array - Array Reference
+     The array containing the members to add to group.
+
+LocalGroupDel(server, group)
+----------------------------
+
+   Delete the specified local group.
+
+server - Scalar String
+     The server on which to delete the named group.
+
+group -Scalar String
+     The group to delete.
+
+LocalGroupDelMember()
+---------------------
+
+   This function is obselete in the underlying API and has therefore not
+been implemented.  Use `LocalGroupDelMembers()' instead.
+
+LocalGroupDelMembers(server, group, array)
+------------------------------------------
+
+   Delete the specified users (members) of the local group. Unlike the API
+function `NetLocalGroupDelMembers()', this function does not allow you to
+specify a level (internally it is hardcoded to 3). This was done to
+simplify the implementation. To delete a 'local' user, you need only
+specify the name. You can also specify users using the `DOMAIN\user'
+syntax.
+
+server - Scalar String
+     The server on which to delete the members from group.
+
+group - Scalar String
+     The group to delete the members from.
+
+array - Array Reference
+     The array containing the members to delete from group.
+
+LocalGroupEnum(server, array)
+-----------------------------
+
+   Enumerates all the local groups on the server. Unlike the API call
+`NetLocalGroupEnum()', this function does not allow you to specify a level
+(internally it is hardcoded to 0). In Perl it is trivial to implement the
+equivalent function (should you need it).
+
+server - Scalar String
+     The server on which to enumerate the (local) groups.
+
+array - Array Reference
+     The array to hold the group names.
+
+LocalGroupGetInfo(server, group, level, hash)
+---------------------------------------------
+
+   Retrieves level information for group.
+
+server - Scalar String
+     The server from which to get the group information.
+
+group - Scalar String
+     The group whose information you wish to obtain.
+
+level - Scalar Int
+     The level of information you wish to retrieve. This can be 0 or 1.
+     See `LOCAL GROUP INFO LEVELS' in this node.
+
+hash - Hash Reference
+     The hash that will contain the information.
+
+LocalGroupGetMembers(server, group, hash)
+-----------------------------------------
+
+   Retrieves the users belonging to group. Unlike the API call
+`NetLocalGroupGetUsers()', this function does not allow you to specify a
+level (internally it is hardcoded to 0). In Perl it is trivial to
+implement the equivalent function (should you need it).
+
+server - Scalar String
+     The server from which to retrieve the group information.
+
+group - Scalar String
+     The group whose users you wish to obtain.
+
+array - Array Reference
+     The array to hold the user names retrieved.
+
+LocalGroupSetInfo(server, level, hash, error)
+---------------------------------------------
+
+   Sets the information for group according to level.
+
+server - Scalar String
+     The server on which to set the group information.
+
+group - Scalar String
+     The group whose information you wish to set.
+
+level - Scalar Int
+     The level of information you are supplying in hash.  Level can be one
+     of 0 or 1. See `LOCAL GROUP INFO LEVELS' in this node.
+
+hash - Hash Reference
+     The hash containing the required key/value pairs for level.
+
+error - Scalar String
+     On failure, the error parameter will contain a value which specifies
+     which field caused the error. See `LOCAL GROUP FIELD ERRORS' in this
+     node.
+
+LocalGroupSetMembers()
+----------------------
+
+   This function has not been implemented at present.
+
+NET GET FUNCTIONS
+=================
+
+GetDCName(server, domain, domain-controller)
+--------------------------------------------
+
+   Gets the `domain-controllder' name for server and domain.
+
+server - Scalar String
+     The server whose domain controller you wish to locate.
+
+domain - Scalar String
+     The domain that server is a member of whose domain-controller you
+     wish the locate.
+
+`domain-controller' - Scalar String (output)
+     The name of the `domain-controller' for the requested domain.
+
+   Note: This module does not implement the `NetGetAnyDCName()'API function
+as this is obsolete.
+
+USER INFO LEVELS
+================
+
+   Most of the `User*()' functions take a level parameter. This level
+specifies how much detail the corresponding hash should contain (or in the
+case of a `UserGet*()' function, will contain after the call). The
+following level descriptions provide information on what fields should be
+present for a given level. See `USER INFO FIELDS' in this node for a
+description of the fields.
+
+Level 0
+     name
+
+Level 1
+     name, password, passwordAge, priv, homeDir, comment, flags, scriptPath
+
+Level 2
+     name, password, passwordAge, priv, homeDir, comment, flags,
+     scriptPath, authFlags, fullName, usrComment, parms, workstations,
+     lastLogon, lastLogoff, acctExpires, maxStorage, unitsPerWeek,
+     logonHours, badPwCount, numLogons, logonServer, countryCode, codePage
+
+Level 3
+     name, password, passwordAge, priv, homeDir, comment, flags,
+     scriptPath, authFlags, fullName, usrComment, parms, workstations,
+     lastLogon, lastLogoff, acctExpires, maxStorage, unitsPerWeek,
+     logonHours, badPwCount, numLogons, logonServer, countryCode,
+     codePage, userId, primaryGroupId, profile, homeDirDrive,
+     passwordExpired
+
+Level 10
+     name, comment, usrComment, fullName
+
+Level 11
+     name, comment, usrComment, fullName, priv, authFlags, passwordAge,
+     homeDir, parms, lastLogon, lastLogoff, badPwCount, numLogons,
+     logonServer, countryCode, workstations, maxStorage, unitsPerWeek,
+     logonHours, codePage
+
+Level 20
+     name, fullName, comment, flags, userId
+
+Level 21
+     *Not available in this implementation*
+
+Level 22
+     *Not available in this implementation*
+
+Level 1003
+     password
+
+Level 1005
+     priv
+
+Level 1006
+     homeDir
+
+Level 1007
+     comment
+
+Level 1008
+     flags
+
+Level 1009
+     scriptPath
+
+Level 1010
+     authFlags
+
+Level 1011
+     fullName
+
+Level 1012
+     usrComment
+
+Level 1013
+     parms
+
+Level 1014
+     workstations
+
+Level 1017
+     acctExpires
+
+Level 1018
+     maxStorage
+
+Level 1020
+     unitsPerWeek, logonHours
+
+Level 1023
+     logonServer
+
+Level 1024
+     countryCode
+
+Level 1025
+     codePage
+
+Level 1051
+     primaryGroupId
+
+Level 1052
+     profile
+
+Level 1053
+     homeDirDrive
+
+USER INFO FIELDS
+================
+
+   The following is an alphabetical listing of each possible field,
+together with the data type that the field is expected to contain.
+
+`acctExpires' - Scalar Int (UTC)
+     The time (as the number of seconds since 00:00:00, 1st January 1970)
+     when the account expires. A -1 in this field specifies that the
+     account never expires.
+
+`authFlags' - Scalar Int (See USER_AUTH_FLAGS).
+     The level of authority that this use has. The value this can take
+     depends on the users group membership - this value is therefore read
+     only and cannot be set using `UserAdd()' or `UserSetInfo()'. Its
+     value can be one of:
+
+     User belongs to group		Flag value
+     ---------------------		----------
+     Print Operators			Win32API::Net::AF_OP_PRINT()
+     Server Operators		Win32API::Net::AF_OP_SERVER()
+     Account Operators		Win32API::Net::AF_OP_ACCOUNTS()
+
+`badPwCount' - Scalar Int
+     The number of times that the user has failed to logon by specifying an
+     incorrect password.
+
+`codePage' - Scalar Int
+     The code page that this user uses.
+
+comment - Scalar String
+     The comment associated with this user account. This can be any string
+     (apparently of any length).
+
+`countryCode' - Scalar Int
+     The country code that this user uses.
+
+flags - Scalar Int (Bitwise OR of USER_FLAGS)
+     The flags for this user. See `USER FLAGS' in this node.
+
+`fullName' - Scalar String
+     The users' full name.
+
+`homeDir' - Scalar String
+     The home directory of the user. This can be either a UNC path or an
+     absolute path (drive letter + path). Can be the empty string ("").
+
+`homeDirDrive' - Scalar String
+     The home directory drive that the users home directory is mapped to
+     (assuming that the specified home directory is a UNC path).
+
+`lastLogon' - Scalar Int (UTC)
+     The time (as the number of seconds since 00:00:00, 1st January 1970)
+     that the user last logged on.
+
+`lastLogoff' - Scalar Int (UTC)
+     The time (as the number of seconds since 00:00:00, 1st January 1970)
+     that the user last logged off .
+
+`logonHours' - Reference to Array of Integers (length 21 elements)
+     The times at which the user can logon. This should be an integer array
+     with 21 elements.  Each element represents an 8 hour period and each
+     bit represents represents an hour. Only the lower byte of each
+     integer is used. If this is left undefined then no restrictions are
+     placed on the account.
+
+`logonServer' - Scalar String
+     The logon server for this user. Under Windows NT, this value cannot be
+     set and will always have the value '\\*' when queried.
+
+`maxStorage' - Scalar Int
+     The current release of Windows NT does not implement disk quotas so
+     it is believed that the value of this key is ignored.
+
+name - Scalar String
+     The user name that this request applies to. Most of the functions take
+     the user name as a separate argument. In general, the user name
+     provided should be the same as that in the one provided in the hash.
+
+`numLogons' - Scalar Int
+     The number of times that the named user has successfully logged on to
+     this machine/domain.
+
+`parms' - Scalar String
+     The value of this key can be used by applications. There are none
+     known to to author that use it, although it could be used to hold
+     adminitrative information.
+
+password - Scalar String
+     The password to be set. The password is never returned in a
+     `UserGet()' operation.
+
+`passwordAge' - Scalar Int (UTC)
+     The current age of the password (stored as the number of seconds since
+     00:00:00, 1st January 1970).
+
+`passwordExpired' - Scalar Int
+     The value of this key is used in two different ways. When queried via
+     `UserGetInfo()' the return value is 0 is the password has not expired
+     and 1 if it has. When setting the value via `UserAdd()' or
+     `UserSetInfo()' a value of 0 indicates that the users' password has
+     not expired whereas a value of 1 will force the user to change their
+     password at the next logon.
+
+`primaryGroupId' - Scalar Int
+     The id of the primary group that this user belongs to. When creating
+     accounts with `UserAdd()' you should use a value of 0x201.
+
+`priv' - Scalar Int (Bitwise OR of USER_PRIVILEGE_FLAGS)
+     The privilege level that this user has. This is never returned from a
+     `UserGet()' call. See `USER PRIVILEGE FLAGS' in this node.
+
+profile - Scalar String
+     The profile that is associated with the named user. This can be UNC
+     path, a local path or undefined.
+
+`scriptPath' - Scalar String
+     The path to the logon script for this user. This should be specified
+     as a relative path and will cause the logon script to be run from
+     (relative location) in the logon servers export directory.
+
+`unitsPerWeek' - Scalar Int
+     The value of this key represents the granularity of the logonHours
+     array.  Its use is beyond the scope of this package.
+
+`usrComment' - Scalar String
+     The user comment field (contrasted with the comment field ;-).
+
+`workstations' - Scalar String
+     A comma-separated string containing upto 8 workstation that the named
+     user can login to.  Setting a value for this key will then allow the
+     named user to login to only those computers named.
+
+`userId' - Scalar Int
+     The user id associated with this user This value is generated by the
+     system and cannot be set or changed using the `UserAdd()' or
+     `UserSetInfo()' calls.
+
+USER FLAGS
+==========
+
+   The following is an alphabetical listing of the user flags.  The flags
+key (see `USER INFO FIELDS' in this node) should be the bitwise OR of one
+or more of these values.
+
+`UF_ACCOUNTDISABLE()'
+     This account has been disabled.
+
+`UF_DONT_EXPIRE_PASSWD()'
+     Never expire the password on this account.
+
+`UF_HOMEDIR_REQUIRED()'
+     A home directory must be specified (ignored for NT).
+
+`UF_INTERDOMAIN_TRUST_ACCOUNT()'
+     The account represents a interdomain trust account.
+
+`UF_LOCKOUT()'
+     Lock out this account (or this account has been locked out due to
+     security policy - i.e.  badLogonCount is greater than your policy
+     allows).  This value can be cleared but not set by a `UserSetInfo()'
+     call.
+
+`UF_NORMAL_ACCOUNT()'
+     The account is a normal user account.
+
+`UF_PASSWD_CANT_CHANGE()'
+     The password for this account cannot be changed (execpt by an
+     Administrator using one of the above calls).
+
+`UF_PASSWD_NOTREQD()'
+     A password is not required for this account.
+
+`UF_SCRIPT()'
+     This <strong>must be set when creating account on Windows NT.
+
+`UF_SERVER_TRUST_ACCOUNT()'
+     The account represents a Windows NT Backup Domain Controller account
+     in the domain.
+
+`UF_TEMP_DUPLICATE_ACCOUNT()'
+     To quote the Microsoft Documentation <em>&quot;This is an account for
+     users whose primary account is in another domain. This account
+     provides user access to this domain, but not to any domain that
+     trusts this domain.  The User Manager refers to this account type as
+     a local user account.
+
+`UF_WORKSTATION_TRUST_ACCOUNT()'
+     The account represents a computer account for a workstation or server
+     in the domain.
+
+   Please note that these are implemented as functions and are therefore
+called in the same way as other functions. You should typically use them
+like:
+
+     $ufScript = Win32API::Net::UF_SCRIPT();
+
+USER PRIVILEGE FLAGS
+====================
+
+   These following values are used in the `priv' key. This field is never
+initialised on a `UserGet*()' call and once set cannot be changed in a
+`UserSetInfo()' call.
+
+`USER_PRIV_ADMIN()'
+     Account is an an administrative account.
+
+`USER_PRIV_GUEST()'
+     Account is a guest account.
+
+`USER_PRIV_USER()'
+     Account is a user account.
+
+   Please note that these are implemented as functions and are therefore
+called in the same way as other functions. You should typically use them
+like:
+
+     $userPrivUser = Win32API::Net::USER_PRIV_USER();
+
+USER ENUM FILTER
+================
+
+   These flags are used in the `UserEnum()' function to specify which
+accounts to retrieve. It should be a bitwise OR of some (or all) of the
+following.
+
+`FILTER_TEMP_DUPLICATE_ACCOUNT()'
+     Show temporary duplicate account (one presumes).
+
+`FILTER_NORMAL_ACCOUNT()'
+     Show normal user account.
+
+`FILTER_INTERDOMAIN_TRUST_ACCOUNT()'
+     Show interdomain trust accounts.
+
+`FILTER_WORKSTATION_TRUST_ACCOUNT()'
+     Show workstation trust accounts.
+
+`FILTER_SERVER_TRUST_ACCOUNT()'
+     Show server trust accounts.
+
+   Please note that these are implemented as functions and are therefore
+called in the same way as other functions. You should typically use them
+like:
+
+     $filterNormalAccounts = Win32API::Net::FILTER_NORMAL_ACCOUNT();
+
+USER FIELD ERRORS
+=================
+
+   For the `User*()' functions that take an error parameter this variable
+will, on failure, contain one of the following constants. Note that the
+function may fail because more than one key/value was missing from the
+input hash. You will only find out about the first one that was incorrectly
+specified. This is only really useful in debugging.
+
+`USER_ACCT_EXPIRES_PARMNUM()'
+     `acctExpires' field was absent or not correctly specified.
+
+`USER_AUTH_FLAGS_PARMNUM()'
+     `authFlags' field was absent or not correctly specified.
+
+`USER_BAD_PW_COUNT_PARMNUM()'
+     `badPasswordCount' field was absent or not correctly specified.
+
+`USER_CODE_PAGE_PARMNUM()'
+     `codePage' field was absent or not correctly specified.
+
+`USER_COMMENT_PARMNUM()'
+     comment field was absent or not correctly specified.
+
+`USER_COUNTRY_CODE_PARMNUM()'
+     `countryCode' field was absent or not correctly specified.
+
+`USER_FLAGS_PARMNUM()'
+     flags field was absent or not correctly specified.
+
+`USER_FULL_NAME_PARMNUM()'
+     `fullName' field was absent or not correctly specified.
+
+`USER_HOME_DIR_DRIVE_PARMNUM()'
+     `homeDirDrive' field was absent or not correctly specified.
+
+`USER_HOME_DIR_PARMNUM()'
+     `homeDir' field was absent or not correctly specified.
+
+`USER_LAST_LOGOFF_PARMNUM()'
+     `lastLogoff' field was absent or not correctly specified.
+
+`USER_LAST_LOGON_PARMNUM()'
+     `lastLogon' field was absent or not correctly specified.
+
+`USER_LOGON_HOURS_PARMNUM()'
+     `logonHours' field was absent or not correctly specified.
+
+`USER_LOGON_SERVER_PARMNUM()'
+     `logonServer' field was absent or not correctly specified.
+
+`USER_MAX_STORAGE_PARMNUM()'
+     `maxStorage' field was absent or not correctly specified.
+
+`USER_NAME_PARMNUM()'
+     name field was absent or not correctly specified.
+
+`USER_NUM_LOGONS_PARMNUM()'
+     `numLogons' field was absent or not correctly specified.
+
+`USER_PARMS_PARMNUM()'
+     `parms' field was absent or not correctly specified.
+
+`USER_PASSWORD_AGE_PARMNUM()'
+     `passwordAge' field was absent or not correctly specified.
+
+`USER_PASSWORD_PARMNUM()'
+     password field was absent or not correctly specified.
+
+`USER_PRIMARY_GROUP_PARMNUM()'
+     `primaryGroup' field was absent or not correctly specified.
+
+`USER_PRIV_PARMNUM()'
+     `priv' field was absent or not correctly specified.
+
+`USER_PROFILE_PARMNUM()'
+     profile field was absent or not correctly specified.
+
+`USER_SCRIPT_PATH_PARMNUM()'
+     `scriptPath' field was absent or not correctly specified.
+
+`USER_UNITS_PER_WEEK_PARMNUM()'
+     `unitPerWeek' field was absent or not correctly specified.
+
+`USER_USR_COMMENT_PARMNUM()'
+     `usrComment' field was absent or not correctly specified.
+
+`USER_WORKSTATIONS_PARMNUM()'
+     `workstations' field was absent or not correctly specified.
+
+GROUP INFO LEVELS
+=================
+
+   Some of the `Group*()' functions take a level parameter. This level
+specifies how much detail the corresponding hash should contain (or in the
+case of a `GroupGetInfo()' function, will contain after the call).  The
+following level descriptions provide information on what fields should be
+present for a given level. See `GROUP INFO FIELDS' in this node for a
+description of the fields.
+
+`Level 0'
+     name.
+
+`Level 1'
+     name, comment.
+
+`Level 2'
+     name, comment, groupId, attributes.
+
+`Level 1002'
+     comment.
+
+`Level 1005'
+     attributes.
+
+GROUP INFO FIELDS
+=================
+
+attributes - Scalar Int
+     The attributes of the group. These are no longer settable in Windows
+     NT 4.0 and they are not currently supported in this package either.
+
+comment - Scalar String
+     The comment that applies to this group. This is the only value that
+     can be set via a GroupSetInfo call.
+
+`groupId' - Scalar Int
+     The groups Id.
+
+name - Scalar String
+     The groups name.
+
+GROUP FIELD ERRORS
+==================
+
+   For the `Group*()' functions that take an error parameter this variable
+will, on failure, contain one of the following constants.  Note that the
+function may fail because more than one key/value was missing from the
+input hash. You will only find out about the first one that was
+incorrectly specified. This is only really useful for debugging purposes.
+
+`GROUP_ATTRIBUTES_PARMNUM()'
+     attributes field was absent or not correctly specified.
+
+`GROUP_COMMENT_PARMNUM()'
+     comment field was absent or not correctly specified.
+
+`GROUP_NAME_PARMNUM()'
+     name field was absent or not correctly specified.
+
+GROUP USERS INFO LEVELS
+=======================
+
+   The `GroupGetUsers()' function can take a level of 0 or 1. These will
+return the following:
+
+`Level 0'
+     name.
+
+`Level 1'
+     name, attributes.
+
+GROUP USERS INFO FIELDS
+=======================
+
+name - Scalar String
+     The user's name.
+
+attributes - Scalar Int
+     The attributes of the group. These are no longer settable in Windows
+     NT 4.0 and they are not currently supported in this package either.
+
+LOCAL GROUP INFO LEVELS
+=======================
+
+`Level 0'
+     name
+
+`Level 1'
+     name, comment
+
+`Level 1002'
+     comment
+
+LOCAL GROUP INFO FIELDS
+=======================
+
+name - Scalar String
+     The groups name
+
+comment - Scalar String
+     The groups 'comment'
+
+LOCAL GROUP FIELD ERRORS
+========================
+
+   For the `LocalGroup*()' functions that take an error parameter this
+variable will, on failure, contain one of the following constants. Note
+that the function may fail because more than one key/value was missing or
+incorrectly specified in the input hash. You will only find out about the
+first one that was incorrectly specified. This is only really useful for
+debugging purposes.
+
+`LOCALGROUP_NAME_PARMNUM()'
+     The name field was absent or not correctly specified.
+
+`LOCALGROUP_COMMENT_PARMNUM()'
+     The comment field wasabsent or not correctly specified.
+
+EXAMPLES
+========
+
+   The following example shows how you can create a function in Perl that
+has the same functionality as the `NetUserEnum()' API call. The Perl
+version doesn't have the level parameter so you must first use the
+`UserEnum()' function to retrieve all the account names and then iterate
+through the returned array issuing `UserGetInfo()' calls.
+
+     sub userEnumAtLevel {
+        my($server, $level, $filter) = @_;
+        my(@array);
+        Win32API::Net::UserEnum($server, \@array, $filter);
+        for $user (@array) {
+     	  Win32API::Net::UserGetInfo($server, $user, $level, \%hash);
+     	  print "This could access all level $level settings for $user - eg fullName $hash{fullName}\n";
+        }
+     }
+     userEnumAtLevel("", 2, 0);
+
+AUTHOR
+======
+
+   Bret Giddings, <bret@essex.ac.uk>
+
+SEE ALSO
+========
+
+   `perl(1)'
+
+ACKNOWEDGEMENTS
+===============
+
+   This work was built upon work done by HiP Communications along with
+modifications to HiPs code by <michael@ecel.uwa.edu.au> and
+<rothd@roth.net>.  In addition, I would like to thank Jenny Emby at GEC
+Marconi, U.K. for proof reading this manual page and making many
+suggestions that have led to its current layout. Last but not least I
+would like to thank Larry Wall and all the other Perl contributors for
+making this truly wonderful language.
+
+
+File: pm.info,  Node: Win32API/Registry,  Next: Wizard,  Prev: Win32API/Net,  Up: Module List
+
+Low-level access to Win32 system API calls from WINREG.H
+********************************************************
+
+NAME
+====
+
+   Win32API::Registry - Low-level access to Win32 system API calls from
+WINREG.H
+
+SYNOPSIS
+========
+
+     use Win32API::Registry 0.21 qw( :ALL );
+
+     RegOpenKeyEx( HKEY_LOCAL_MACHINE, "SYSTEM\\Disk", 0, KEY_READ, $key );
+       or  die "Can't open HKEY_LOCAL_MACHINE\\SYSTEM\\Disk: ",
+     	    regLastError(),"\n";
+     RegQueryValueEx( $key, "Information", [], $type, $data, [] );
+       or  die "Can't read HKEY_L*MACHINE\\SYSTEM\\Disk\\Information: ",
+     	    regLastError(),"\n";
+     [...]
+     RegCloseKey( $key )
+       or  die "Can't close HKEY_LOCAL_MACHINE\\SYSTEM\\Disk: ",
+     	    regLastError(),"\n";
+
+DESCRIPTION
+===========
+
+   This provides fairly low-level access to the Win32 System API calls
+dealing with the Registry [mostly from WINREG.H].  This is mostly intended
+to be used by other modules such as `Win32::TieRegistry' [which provides
+an extremely Perl-friendly method for using the Registry].
+
+   For a description of the logical structure of the Registry, see the
+documentation for the `Win32::TieRegistry' module.
+
+   To pass in NULL as the pointer to an optional buffer, pass in an empty
+list reference, [].
+
+   Beyond raw access to the API calls and related constants, this module
+handles smart buffer allocation and translation of return codes.
+
+   All calls return a true value for success and a false value for
+failure.  After any failure, $^E should automatically be set to indicate
+the reason.  However, current versions of Perl often overwrite $^E too
+quickly, so you can use `regLastError()' instead, which is only set by
+Win32API::Registry routines.  `regLastError()' is also good if you have a
+really old version of Perl that does not connect $^E to `GetLastError()' on
+Win32.
+
+   Note that $! is not set by these routines except by
+`Win32API::Registry::constant()' when a constant is not defined.
+
+Exports
+-------
+
+   Nothing is exported by default.  The following tags can be used to have
+sets of symbols exported.
+
+   [Note that much of the following documentation refers to the behavior
+of the underlying API calls which may vary in current and future versions
+of the Win32 API without any changes to this module.  Therefore you should
+check the Win32 API documentation directly when needed.]
+
+:Func
+     The basic function names:
+
+    AllowPriv
+    `AllowPriv( $sPrivName, $bEnable )'
+          Not a Win32 API call.  Enables or disables a specific privilege
+          for the current process.  Returns a true value if successful and
+          a false value [and sets $^E/`regLastError()'] on failure.  This
+          routine does not provide a way to tell if a privilege is
+          currently enabled.
+
+          `$sPrivname' is a Win32 privilege name [see `' in this node].
+          For example, `"SeBackupPrivilege"' [a.k.a. `SE_BACKUP_NAME']
+          controls whether you can use `RegSaveKey()' and
+          `"SeRestorePrivilege"' [a.k.a.  `SE_RESTORE_NAME'] controls
+          whether you can use `RegLoadKey()'.
+
+          If `$bEnable' is true, then `AllowPriv()' tries to enable the
+          privilege.  Otherwise it tries to disable the privilege.
+
+    AbortSystemShutdown
+    `AbortSystemShutdown( $sComputerName )'
+          Tries to abort a remote shutdown request previously made via
+          `InitiateSystemShutdown()'.  Returns a true value if successful
+          and a false value [and sets $^E/`regLastError()'] on failure.
+
+    InitiateSystemShutdown
+    `InitiateSystemShutdown( $sComputer, $sMessage, $uTimeoutSecs, $bForce, $bReboot )'
+          Requests that a [remote] computer be shutdown or rebooted.
+          Returns a true value if successful and a false value [and sets
+          $^E/`regLastError()'] on failure.
+
+          `$sComputer' is the name [or address] of the computer to be
+          shutdown or rebooted.  You can use [] [for NULL] or "" to
+          indicate the local computer.
+
+          `$sMessage' is the message to be displayed in a pop-up window on
+          the desktop of the computer to be shutdown or rebooted until the
+          timeout expires or the shutdown is aborted via
+          `AbortSystemShutdown()'.  With `$iTimeoutSecs == 0', the message
+          will never be visible.
+
+          `$iTimeoutSecs' is the number of seconds to wait before starting
+          the shutdown.
+
+          If `$bForce' is false, then any applications running on the
+          remote computer get a chance to prompt the remote user whether
+          they want to save changes.  Also, for any applications that do
+          not exit quickly enough, the operating system will prompt the
+          user whether they wish to wait longer for the application to
+          exit or force it to exit now.  At any of these prompts the user
+          can press *CANCEL* to abort the shutdown but if no applications
+          have unsaved data, they will likely all exit quickly and the
+          shutdown will progress with the remote user having no option to
+          cancel the shutdown.
+
+          If `$bForce' is true, all applications are told to exit
+          immediately and so will not prompt the user even if there is
+          unsaved data.  Any applications that take too long to exit will
+          be forcibly killed after a short time.  The only way to abort
+          the shutdown is to call `AbortSystemShutdown()' before the
+          timeout expires and there is no way to abort the shutdown once
+          it has begun.
+
+          If `$bReboot' is true, the computer will automatically reboot
+          once the shutdown is complete.  If `$bReboot' is false, then
+          when the shutdown is complete the computer will halt at a screen
+          indicating that the shutdown is complete and offering a way for
+          the user to start to boot the computer.
+
+          You must have the `"SeRemoteShutdownPrivilege"' privilege on the
+          remote computer for this call to succeed.  If shutting down the
+          local computer, then the calling process must have the
+          `"SeShutdownPrivilege"' privilege and have it enabled.
+
+    RegCloseKey
+    `RegCloseKey( $hKey )'
+          Closes the handle to a Registry key returned by `RegOpenKeyEx()',
+          `RegConnectRegistry()', `RegCreateKeyEx()', or a few other
+          routines.  Returns a true value if successful and a false value
+          [and sets $^E/`regLastError()'] on failure.
+
+    RegConnectRegistry
+    `RegConnectRegistry( $sComputer, $hRootKey, $ohKey )'
+          Connects to one of the root Registry keys of a remote computer.
+          Returns a true value if successful and a false value [and sets
+          $^E/`regLastError()'] on failure.
+
+          `$sComputer' is the name [or address] of a remote computer whose
+          Registry you wish to access.
+
+          `$hKey' must be either `HKEY_LOCAL_MACHINE' or `HKEY_USERS' and
+          specifies which root Registry key on the remote computer you
+          wish to have access to.
+
+          `$phKey' will be set to the handle to be used to access the
+          remote Registry key if the call succeeds.
+
+    regConstant
+    `$value= regConstant( $sConstantName )'
+          Fetch the value of a constant.  Returns undef if `$sConstantName'
+          is not the name of a constant supported by this module.  Never
+          sets $! nor $^E.
+
+          This function is rarely used since you will usually get the
+          value of a constant by having that constant imported into your
+          package by listing the constant name in the `use
+          Win32API::Registry' statement and then simply using the constant
+          name in your code [perhaps followed by `()'].  This function is
+          useful for verifying constant names not in Perl code, for
+          example, after prompting a user to type in a constant name.
+
+    RegCreateKey
+    `RegCreateKey( $hKey, $sSubKey, $ohSubKey )'
+          This routine is meant only for compatibility with Windows version
+          3.1.  Use `RegCreateKeyEx()' instead.
+
+    RegCreateKeyEx
+    `RegCreateKeyEx( $hKey, $sSubKey, $uZero, $sClass, $uOpts, $uAccess, $pSecAttr, $ohNewKey, $ouDisp )'
+          Creates a new Registry subkey.  Returns a true value if
+          successful and a false value [and sets $^E/`regLastError()'] on
+          failure.
+
+          `$hKey' is the handle to a Registry key [either `HKEY_*' or from
+          a previous call].
+
+          `$sSubKey' is the name of the new subkey to be created.
+
+          `$iZero' is reserved for future use and should always be
+          specified as 0.
+
+          `$sClass' is a string to be used as the class for the new
+          subkey.  We are not aware of any current use for Registry key
+          class information so the empty string, "", should usually be
+          used here.
+
+          `$iOpts' is a numeric value containing bits that control options
+          used while creating the new subkey.  `REG_OPTION_NON_VOLATILE'
+          is the default.  `REG_OPTION_VOLATILE' [which is ignored on
+          Windows 95] means the data stored under this key is not kept in
+          a file and will not be preserved when the system reboots.
+          `REG_OPTION_BACKUP_RESTORE' [also ignored on Windows 95] means
+          ignore the `$iAccess' parameter and try to open the new key with
+          the access required to backup or restore the key.
+
+          `$iAccess' is a numeric mask of bits specifying what type of
+          access is desired when opening the new subkey.  See
+          `RegOpenKeyEx()'.
+
+          `$pSecAttr' is a `SECURITY_ATTRIBUTES' structure packed into a
+          Perl string which controls whether the returned handle can be
+          inherited by child processes.  Normally you would pass [] for
+          this parameter to have NULL passed to the underlying API
+          indicating that the handle cannot be inherited.  If not under
+          Windows95, then `$pSecAttr' also allows you to specify
+          `SECURITY_DESCRIPTOR' that controls which users will have what
+          type of access to the new key - otherwise the new key inherits
+          its security from its parent key.
+
+          `$phKey' will be set to the handle to be used to access the new
+          subkey if the call succeeds.
+
+          `$piDisp' will be set to either `REG_CREATED_NEW_KEY' or
+          `REG_OPENED_EXISTING_KEY' to indicate for which reason the call
+          succeeded.  Can be specified as [] if you don't care.
+
+          If `$phKey' and `$piDisp' start out as integers, then they will
+          probably remain unchanged if the call fails.
+
+    RegDeleteKey
+    `RegDeleteKey( $hKey, $sSubKey )'
+          Deletes a subkey of an open Registry key provided that the subkey
+          contains no subkeys of its own [but the subkey may contain
+          values].  Returns a true value if successful and a false value
+          [and sets $^E/`regLastError()'] on failure.
+
+          `$hKey' is the handle to a Registry key [either `HKEY_*' or from
+          a previous call].
+
+          `$sSubKey' is the name of the subkey to be deleted.
+
+    RegDeleteValue
+    `RegDeleteValue( $hKey, $sValueName )'
+          Deletes a value from an open Registry key.  Returns a true value
+          if successful and a false value [and sets $^E/`regLastError()']
+          on failure.
+
+          `$hKey' is the handle to a Registry key [either `HKEY_*' or from
+          a previous call].
+
+          `$sValueKey' is the name of the value to be deleted.
+
+    RegEnumKey
+    `RegEnumKey( $hKey, $uIndex, $osName, $ilNameSize )'
+          This routine is meant only for compatibility with Windows version
+          3.1.  Use `RegEnumKeyEx()' instead.
+
+    RegEnumKeyEx
+    `RegEnumKeyEx( $hKey, $uIndex, $osName, $iolName, $pNull, $osClass, $iolClass, $opftLastWrite )'
+          Lets you enumerate the names of all of the subkeys directly under
+          an open Registry key.  Returns a true value if successful and a
+          false value [and sets $^E/`regLastError()'] on failure.
+
+          `$hKey' is the handle to a Registry key [either `HKEY_*' or from
+          a previous call].
+
+          `$iIndex' is the sequence number of the immediate subkey that
+          you want information on.  Start with this value as 0 then repeat
+          the call incrementing this value each time until the call fails
+          with $^E/`regLastError()' numerically equal to
+          `ERROR_NO_MORE_ITEMS'.
+
+          `$sName' will be set to the name of the subkey.  Can be [] if
+          you don't care about the name.
+
+          `$plName' initially specifies the [minimum] buffer size to be
+          allocated for `$sName'.  Will be set to the length of the subkey
+          name if the requested subkey exists even if `$sName' isn't
+          successfully set to the subkey name.  See `Buffer sizes' in this
+          node for more information.
+
+          `$pNull' is reserved for future used and should be passed as [].
+
+          `$sClass' will be set to the class name for the subkey.  Can be
+          [] if you don't care about the class.
+
+          `$plClass' initially specifies the [minimum] buffer size to be
+          allocated for `$sClass' and will be set to the length of the
+          subkey class name if the requested subkey exists.  See `Buffer
+          sizes' in this node for more information.
+
+          `$pftLastWrite' will be set to a `FILETIME' structure packed
+          into a Perl string and indicating when the subkey was last
+          changed.  Can be [].
+
+          You may omit both `$plName' and `$plClass' to get the same effect
+          as passing in [] for each of them.
+
+    RegEnumValue
+    `RegEnumValue( $hKey, $uIndex, $osValName, $iolValName, $pNull, $ouType, $opValData, $iolValData )'
+          Lets you enumerate the names of all of the values contained in an
+          open Registry key.  Returns a true value if successful and a
+          false value [and sets $^E/`regLastError()'] on failure.
+
+          `$hKey' is the handle to a Registry key [either `HKEY_*' or from
+          a previous call].
+
+          `$iIndex' is the sequence number of the value that you want
+          information on.  Start with this value as 0 then repeat the call
+          incrementing this value each time until the call fails with
+          `ERROR_NO_MORE_ITEMS'.
+
+          `$sValName' will be set to the name of the value.  Can be [] if
+          you don't care about the name.
+
+          `$plValName' initially specifies the [minimum] buffer size to be
+          allocated for `$sValName'.  Will be set to the length of the
+          value name if the requested value exists even if `$sValName'
+          isn't successfully set to the value name.  See `Buffer sizes' in
+          this node for more information.
+
+          `$pNull' is reserved for future used and should be passed as [].
+
+          `$piType' will be set to the type of data stored in the value
+          data.  If the call succeeds, it will be set to a `REG_*' value
+          unless passed in as [].
+
+          `$pValData' will be set to the data [packed into a Perl string]
+          that is stored in the requested value.  Can be [] if you don't
+          care about the value data.
+
+          `$plValData' initially specifies the [minimum] buffer size to be
+          allocated for `$sValData' and will be set to the length of the
+          value data if the requested value exists.  See `Buffer sizes' in
+          this node for more information.
+
+          You may omit both `$plValName' and `$plValData' to get the same
+          effect as passing in [] for each of them.
+
+    RegFlushKey
+    `RegFlushKey( $hKey )'
+          Forces the data stored under an open Registry key to be flushed
+          to the disk file where the data is preserved between reboots.
+          Forced flushing is not guaranteed to be efficient so this routine
+          should almost never be called.  Returns a true value if
+          successful and a false value [and sets $^E/`regLastError()'] on
+          failure.
+
+          `$hKey' is the handle to a Registry key [either `HKEY_*' or from
+          a previous call].
+
+    RegGetKeySecurity
+    `RegGetKeySecurity( $hKey, $uSecInfo, $opSecDesc, $iolSecDesc )'
+          Retrieves one of the `SECURITY_DESCRIPTOR' structures describing
+          part of the security for an open Registry key.  Returns a true
+          value if successful and a false value [and sets
+          $^E/`regLastError()'] on failure.
+
+          `$hKey' is the handle to a Registry key [either `HKEY_*' or from
+          a previous call].
+
+          `$iSecInfo' is a numeric `SECURITY_INFORMATION' value that
+          specifies which parts of the `SECURITY_DESCRIPTOR' structure to
+          retrieve.  Should be `OWNER_SECURITY_INFORMATION',
+          `GROUP_SECURITY_INFORMATION', `DACL_SECURITY_INFORMATION', or or
+          `SACL_SECURITY_INFORMATION' or two or more of these bits
+          combined using |.
+
+          `$pSecDesc' will be set to the requested `SECURITY_DESCRIPTOR'
+          structure [packed into a Perl string].
+
+          `$plSecDesc' initially specifies the [minimum] buffer size to be
+          allocated for `$sSecDesc' and will be set to the length of the
+          security descriptor.  See `Buffer sizes' in this node for more
+          information.  You may omit this parameter to get the same effect
+          as passing in [] for it.
+
+    regLastError
+    `$svError= regLastError();'
+    `regLastError( $uError );'
+          Returns the last error encountered by a routine from this module.
+          It is just like $^E except it isn't changed by anything except
+          routines from this module.  Ideally you could just use $^E, but
+          current versions of Perl often overwrite $^E before you get a
+          chance to check it and really old versions of Perl don't really
+          support $^E under Win32.
+
+          Just like $^E, in a numeric context `regLastError()' returns the
+          numeric error value while in a string context it returns a text
+          description of the error [actually it returns a Perl scalar that
+          contains both values so `$x= regLastError()' causes $x to give
+          different values in string vs. numeric contexts].  On old
+          versions of Perl where $^E isn't tied to `GetLastError()',
+          regLastError simply returns the number of the error and you'll
+          need to use <Win32::FormatMessage> to get the error string.
+
+          The last form sets the error returned by future calls to
+          `regLastError()' and should not be used often.  `$uError' must
+          be a numeric error code.  Also returns the dual-valued version
+          of `$uError'.
+
+    RegLoadKey
+    `RegLoadKey( $hKey, $sSubKey, $sFileName )'
+          Loads a hive file.  That is, it creates a new subkey in the
+          Registry and associates that subkey with a disk file that
+          contains a Registry hive so that the new subkey can be used to
+          access the keys and values stored in that hive.  Hives are
+          usually created via `RegSaveKey()'.  Returns a true value if
+          successful and a false value [and sets $^E/`regLastError()'] on
+          failure.
+
+          `$hKey' is the handle to a Registry key that can have hives
+          loaded to it.  This must be `HKEY_LOCAL_MACHINE', `HKEY_USERS',
+          or a remote version of one of these from a call to
+          `RegConnectRegistry()'.
+
+          `$sSubKey' is the name of the new subkey to created and
+          associated with the hive file.
+
+          $sFileName is the name of the hive file to be loaded.  This file
+          name is interpretted relative to the
+          `%SystemRoot%/System32/config' directory on the computer where
+          the `$hKey' key resides.  If $sFileName is on a FAT file system,
+          then its name must not have an extension.
+
+          You must have the `SE_RESTORE_NAME' privilege to use this
+          routine.
+
+          WARNING:  Loading of hive files via a network share may silently
+          corrupt the hive and so should not be attempted [this is a
+          problem in at least some versions of the underlying API which
+          this module does not try to fix or avoid].  To access a hive
+          file located on a remote computer, connect to the remote
+          computer's Registry and load the hive via that.
+
+    RegNotifyChangeKeyValue
+    `RegNotifyChangeKeyValue( $hKey, $bWatchSubtree, $uNotifyFilter, $hEvent, $bAsync )'
+          Arranges for your process to be notified when part of the
+          Registry is changed.  Returns a true value if successful and a
+          false value [and sets $^E/`regLastError()'] on failure.
+
+          `$hKey' is the handle to a Registry key [either `HKEY_*' or from
+          a previous call] for which you wish to be notified when any
+          changes are made to it.
+
+          If `$bWatchSubtree' is true, then changes to any subkey or
+          descendant of `$hKey' are also reported.
+
+          `$iNotifyFilter' controllers what types of changes are reported.
+          It is a numeric value containing one or more of the following
+          bit masks:
+
+         `REG_NOTIFY_CHANGE_NAME'
+               Notify if a subkey is added or deleted to a monitored key.
+
+         `REG_NOTIFY_CHANGE_LAST_SET'
+               Notify if a value in a monitored key is added, deleted, or
+               modified.
+
+         `REG_NOTIFY_CHANGE_SECURITY'
+               Notify if a security descriptor of a monitored key is
+               changed.
+
+         `REG_NOTIFY_CHANGE_ATTRIBUTES'
+               Notify if any attributes of a monitored key are changed
+               [class name or security descriptors].
+
+          `$hEvent' is ignored unless `$bAsync' is true.  Otherwise,
+          `$hEvent' is a handle to a Win32 event that will be signaled
+          when changes are to be reported.
+
+          If `$bAsync' is true, then `RegNotifyChangeKeyValue()' returns
+          immediately and uses `$hEvent' to notify your process of changes.
+          If `$bAsync' is false, then `RegNotifyChangeKeyValue()' does not
+          return until there is a change to be notified of.
+
+          This routine does not work with Registry keys on remote
+          computers.
+
+    RegOpenKey
+    `RegOpenKey( $hKey, $sSubKey, $ohSubKey )'
+          This routine is meant only for compatibility with Windows version
+          3.1.  Use `RegOpenKeyEx()' instead.
+
+    RegOpenKeyEx
+    `RegOpenKeyEx( $hKey, $sSubKey, $uOptions, $uAccess, $ohSubKey )'
+          Opens an existing Registry key.  Returns a true value if
+          successful and a false value [and sets $^E/`regLastError()'] on
+          failure.
+
+          `$hKey' is the handle to a Registry key [either `HKEY_*' or from
+          a previous call].
+
+          `$sSubKey' is the name of an existing subkey to be opened.  Can
+          be "" or [] to open an additional handle to the key specified by
+          `$hKey'.
+
+          `$iOptions' is a numeric value containing bits that control
+          options used while opening the subkey.  There are currently no
+          supported options so this parameter should be specified as 0.
+
+          `$iAccess' is a numeric mask of bits specifying what type of
+          access is desired when opening the new subkey.  Should be a
+          combination of one or more of the following bit masks:
+
+         `KEY_ALL_ACCESS'
+                    KEY_READ | KEY_WRITE | KEY_CREATE_LINK
+
+         `KEY_READ'
+                    KEY_QUERY_VALUE | KEY_ENUMERATE_SUBKEYS | KEY_NOTIFY | STANDARD_RIGHTS_READ
+
+         `KEY_WRITE'
+                    KEY_SET_VALUE | KEY_CREATE_SUB_KEY | STANDARD_RIGHTS_WRITE
+
+         `KEY_QUERY_VALUE'
+         `KEY_SET_VALUE'
+         `KEY_ENUMERATE_SUB_KEYS'
+         `KEY_CREATE_SUB_KEY'
+         `KEY_NOTIFY'
+               Allows you to use `RegNotifyChangeKeyValue()' on the opened
+               key.
+
+         `KEY_EXECUTE'
+               Same as `KEY_READ'.
+
+         `KEY_CREATE_LINK'
+               Gives you permission to create a symbolic link like
+               `HKEY_CLASSES_ROOT' and `HKEY_CURRENT_USER', though the
+               method for doing so is not documented [and probably
+               requires use of the mostly undocumented "native" routines,
+               `Nt*()' a.k.a. `Zw*()'].
+
+          `$phKey' will be set to the handle to be used to access the new
+          subkey if the call succeeds.
+
+    RegQueryInfoKey
+    `RegQueryInfoKey( $hKey, $osClass, $iolClass, $pNull, $ocSubKeys, $olSubKey, $olSubClass, $ocValues, $olValName, $olValData, $olSecDesc, $opftTime )'
+          Gets miscellaneous information about an open Registry key.
+          Returns a true value if successful and a false value [and sets
+          $^E/`regLastError()'] on failure.
+
+          `$hKey' is the handle to a Registry key [either `HKEY_*' or from
+          a previous call].
+
+          `$sClass' will be set to the class name for the key.  Can be []
+          if you don't care about the class.
+
+          `$plClass' initially specifies the [minimum] buffer size to be
+          allocated for `$sClass' and will be set to the length of the
+          key's class name.  See `Buffer sizes' in this node for more
+          information.  You may omit this parameter to get the same effect
+          as passing in [] for it.
+
+          `$pNull' is reserved for future use and should be passed as [].
+
+          `$pcSubKeys' will be set to the count of the number of subkeys
+          directly under this key.  Can be [].
+
+          `$plSubKey' will be set to the length of the longest subkey name.
+          Can be [].
+
+          `$plSubClass' will be set to the length of the longest class name
+          used with an immediate subkey of this key.  Can be [].
+
+          `$pcValues' will be set to the count of the number of values in
+          this key.  Can be [].
+
+          `$plValName' will be set to the length of the longest value name
+          in this key.  Can be [].
+
+          `$plValData' will be set to the length of the longest value data
+          in this key.  Can be [].
+
+          `$plSecDesc' will be set to the length of this key's full
+          security descriptor.
+
+          `$pftTime' will be set to a `FILETIME' structure packed into a
+          Perl string and indicating when this key was last changed.  Can
+          be [].
+
+    RegQueryMultipleValues
+    `RegQueryMultipleValues( $hKey, $ioarValueEnts, $icValueEnts, $opBuffer, $iolBuffer )'
+          Allows you to use a single call to query several values from a
+          single open Registry key to maximize efficiency.  Returns a true
+          value if successful and a false value [and sets
+          $^E/`regLastError()'] on failure.
+
+          `$hKey' is the handle to a Registry key [either `HKEY_*' or from
+          a previous call].
+
+          `$pValueEnts' should contain a list of `VALENT' structures packed
+          into a single Perl string.  Each `VALENT' structure should have
+          the `ve_valuename' entry [the first 4 bytes] pointing to a string
+          containing the name of a value stored in this key.  The remaining
+          fields are set if the function succeeds.
+
+          `$cValueEnts' should contain the count of the number of `VALENT'
+          structures contained in `$pValueEnts'.
+
+          `$pBuffer' will be set to the data from all of the requested
+          values concatenated into a single Perl string.
+
+          `$plBuffer' initially specifies the [minimum] buffer size to be
+          allocated for `$sBuffer' and will be set to the total length of
+          the data to be written to `$sBuffer'.  See `Buffer sizes' in
+          this node for more information.  You may omit this parameter to
+          get the same effect as passing in [] for it.
+
+          Here is sample code to populate `$pValueEnts':
+
+               # @ValueNames= ...list of value name strings...;
+               $cValueEnts= @ValueNames;
+               $pValueEnts= pack( " p x4 x4 x4 " x $cValueEnts, @ValueNames );
+
+          Here is sample code to retrieve the data type and data length
+          returned in `$pValueEnts':
+
+               @Lengths= unpack( " x4 L x4 x4 " x $cValueEnts, $pValueEnts );
+               @Types=   unpack( " x4 x4 x4 L " x $cValueEnts, $pValueEnts );
+
+          Given the above, and assuming you haven't modified `$sBuffer'
+          since the call, you can also extract the value data strings from
+          `$sBuffer' by using the pointers returned in `$pValueEnts':
+
+               @Data=    unpack(  join( "", map {" x4 x4 P$_ x4 "} @Lengths ),
+               		$pValueEnts  );
+
+          Much better is to use the lengths and extract directly from
+          `$sBuffer' using `unpack()' [or `substr()']:
+
+               @Data= unpack( join("",map("P$_",@Lengths)), $sBuffer );
+
+    RegQueryValue
+    `RegQueryValue( $hKey, $sSubKey, $osValueData, $iolValueData )'
+          This routine is meant only for compatibility with Windows version
+          3.1.  Use `RegQueryValueEx()' instead.  This routine can only
+          query unamed values [a.k.a. "default values"], that is, values
+          with a name of "".
+
+    RegQueryValueEx
+    `RegQueryValueEx( $hKey, $sValueName, $pNull, $ouType, $opValueData, $iolValueData )'
+          Lets you look up value data stored in an open Registry key by
+          specifying the value name.  Returns a true value if successful
+          and a false value [and sets $^E/`regLastError()'] on failure.
+
+          `$hKey' is the handle to a Registry key [either `HKEY_*' or from
+          a previous call].
+
+          `$sValueName' is the name of the value whose data you wish to
+          retrieve.
+
+          `$pNull' this parameter is reserved for future use and should be
+          specified as [].
+
+          `$piType' will be set to indicate what type of data is stored in
+          the named value.  Will be set to a `REG_*' value if the function
+          succeeds.
+
+          `$pValueData' will be set to the value data [packed into a Perl
+          string] that is stored in the named value.  Can be [] if you
+          don't care about the value data.
+
+          `$plValueData' initially specifies the [minimum] buffer size to
+          be allocated for `$sValueData' and will be set to the size
+          [always in bytes] of the data to be written to `$sValueData',
+          even if `$sValueData' is not successfully written to.  See
+          `Buffer sizes' in this node for more information.
+
+    RegReplaceKey
+    `RegReplaceKey( $hKey, $sSubKey, $sNewFile, $sOldFile )'
+          Lets you replace an entire hive when the system is next booted.
+          Returns a true value if successful and a false value [and sets
+          $^E/`regLastError()'] on failure.
+
+          `$hKey' is the handle to a Registry key that has hive(s) loaded
+          in it.  This must be `HKEY_LOCAL_MACHINE', `HKEY_USERS', or a
+          remote version of one of these from a call to
+          `RegConnectRegistry()'.
+
+          `$sSubKey' is the name of the subkey of `$hKey' whose hive you
+          wish to have replaced on the next reboot.
+
+          `$sNewFile' is the name of a file that will replace the existing
+          hive file when the system reboots.
+
+          `$sOldFile' is the file name to save the current hive file to
+          when the system reboots.
+
+          `$sNewFile' and `$sOldFile' are interpretted relative to the
+          `%SystemRoot%/System32/config' directory on the computer where
+          the `$hKey' key resides [I think].  If either file is [would be]
+          on a FAT file system, then its name must not have an extension.
+
+          You must have the `SE_RESTORE_NAME' privilege to use this
+          routine.
+
+    RegRestoreKey
+    `RegRestoreKey( $hKey, $sFileName, $uFlags )'
+          Reads in a hive file and copies its contents over an existing
+          Registry tree.  Returns a true value if successful and a false
+          value [and sets $^E/`regLastError()'] on failure.
+
+          `$hKey' is the handle to a Registry key [either `HKEY_*' or from
+          a previous call].
+
+          $sFileName is the name of the hive file to be read.  For each
+          value and subkey in this file, a value or subkey will be added
+          or replaced in `$hKey'.
+
+          `$uFlags' is usally 0.  It can also be `REG_WHOLE_HIVE_VOLATILE'
+          which, rather than copying the hive over the existing key,
+          replaces the existing key with a temporary, memory-only Registry
+          key and then copies the hive contents into it.  This option only
+          works if `$hKey' is `HKEY_LOCAL_MACHINE', `HKEY_USERS', or a
+          remote version of one of these from a call to
+          `RegConnectRegistry()'.
+
+          RegRestoreKey does not delete values nor keys from the existing
+          Registry tree when there is no corresponding value/key in the
+          hive file.
+
+    RegSaveKey
+    `RegSaveKey( $hKey, $sFileName, $pSecAttr )'
+          Dumps any open Registry key and all of its subkeys and values
+          into a new hive file.  Returns a true value if successful and a
+          false value [and sets $^E/`regLastError()'] on failure.
+
+          `$hKey' is the handle to a Registry key [either `HKEY_*' or from
+          a previous call].
+
+          $sFileName is the name of the file that the Registry tree should
+          be saved to.  It is interpretted relative to the
+          `%SystemRoot%/System32/config' directory on the computer where
+          the `$hKey' key resides.  If $sFileName is on a FAT file system,
+          then it must not have an extension.
+
+          `$pSecAttr' contains a `SECURITY_ATTRIBUTES' structure that
+          specifies the permissions to be set on the new file that is
+          created.  This can be [].
+
+          You must have the `SE_RESTORE_NAME' privilege to use this
+          routine.
+
+    RegSetKeySecurity
+    `RegSetKeySecurity( $hKey, $uSecInfo, $pSecDesc )'
+          Sets [part of] the `SECURITY_DESCRIPTOR' structure describing
+          part of the security for an open Registry key.  Returns a true
+          value if successful and a false value [and sets
+          $^E/`regLastError()'] on failure.
+
+          `$hKey' is the handle to a Registry key [either `HKEY_*' or from
+          a previous call].
+
+          `$uSecInfo' is a numeric `SECURITY_INFORMATION' value that
+          specifies which `SECURITY_DESCRIPTOR' structure to set.  Should
+          be `OWNER_SECURITY_INFORMATION', `GROUP_SECURITY_INFORMATION',
+          `DACL_SECURITY_INFORMATION', or `SACL_SECURITY_INFORMATION' or
+          two or more of these bits combined using |.
+
+          `$pSecDesc' contains the new `SECURITY_DESCRIPTOR' structure
+          packed into a Perl string.
+
+    RegSetValue
+    `RegSetValue( $hKey, $sSubKey, $uType, $sValueData, $lValueData )'
+          This routine is meant only for compatibility with Windows version
+          3.1.  Use `RegSetValueEx()' instead.  This routine can only set
+          unamed values [a.k.a. "default values"].
+
+    RegSetValueEx
+    `RegSetValueEx( $hKey, $sName, $uZero, $uType, $pData, $lData )'
+          Adds or replaces a value in an open Registry key.  Returns a
+          true value if successful and a false value [and sets
+          $^E/`regLastError()'] on failure.
+
+          `$hKey' is the handle to a Registry key [either `HKEY_*' or from
+          a previous call].
+
+          `$sName' is the name of the value to be set.
+
+          `$uZero' is reserved for future use and should be specified as 0.
+
+          `$uType' is the type of data stored in `$pData'.  It should be a
+          `REG_*' value.
+
+          `$pData' is the value data packed into a Perl string.
+
+          `$lData' is the length of the value data that is stored in
+          `$pData'.  You will usually omit this parameter or pass in 0 to
+          have `length($pData)' used.  In both of these cases, if `$iType'
+          is REG_SZ or REG_EXPAND_SZ, `RegSetValueEx()' will append a
+          trailing `'\0'' to the end of `$pData' [unless there is already
+          one].
+
+    RegUnLoadKey
+    `RegUnLoadKey( $hKey, $sSubKey )'
+          Unloads a previously loaded hive file.  That is, closes the hive
+          file then deletes the subkey that was providing access to it.
+          Returns a true value if successful and a false value [and sets
+          $^E/`regLastError()'] on failure.
+
+          `$hKey' is the handle to a Registry key that has hives loaded in
+          it.  This must be `HKEY_LOCAL_MACHINE', `HKEY_USERS', or a
+          remote version of one of these from a call to
+          `RegConnectRegistry()'.
+
+          `$sSubKey' is the name of the subkey whose hive you wish to have
+          unloaded.
+
+    :FuncA
+          The ASCII-specific function names.
+
+          Each of these is identical to the version listed above without
+          the trailing "A":
+
+               AbortSystemShutdownA	InitiateSystemShutdownA
+               RegConnectRegistryA	RegCreateKeyA		RegCreateKeyExA
+               RegDeleteKeyA		RegDeleteValueA		RegEnumKeyA
+               RegEnumKeyExA		RegEnumValueA		RegLoadKeyA
+               RegOpenKeyA		RegOpenKeyExA		RegQueryInfoKeyA
+               RegQueryMultipleValuesA	RegQueryValueA		RegQueryValueExA
+               RegReplaceKeyA		RegRestoreKeyA		RegSaveKeyA
+               RegSetValueA		RegSetValueExA		RegUnLoadKeyA
+
+    :FuncW
+          The UNICODE-specific function names.  These are the same as the
+          versions listed above without the trailing "W" except that string
+          parameters are UNICODE strings rather than ASCII strings, as
+          indicated.
+
+    AbortSystemShutdownW
+    `AbortSystemShutdownW( $swComputerName )'
+          `$swComputerName' is UNICODE.
+
+    InitiateSystemShutdownW
+    `InitiateSystemShutdownW( $swComputer, $swMessage, $uTimeoutSecs, $bForce, $bReboot )'
+          `$swComputer' and `$swMessage' are UNICODE.
+
+    RegConnectRegistryW
+    `RegConnectRegistryW( $swComputer, $hRootKey, $ohKey )'
+          `$swComputer' is UNICODE.
+
+    RegCreateKeyW
+    `RegCreateKeyW( $hKey, $swSubKey, $ohSubKey )'
+          `$swSubKey' is UNICODE.
+
+    RegCreateKeyExW
+    `RegCreateKeyExW( $hKey, $swSubKey, $uZero, $swClass, $uOpts, $uAccess, $pSecAttr, $ohNewKey, $ouDisp )'
+          `$swSubKey' and `$swClass' are UNICODE.
+
+    RegDeleteKeyW
+    `RegDeleteKeyW( $hKey, $swSubKey )'
+          `$swSubKey' is UNICODE.
+
+    RegDeleteValueW
+    `RegDeleteValueW( $hKey, $swValueName )'
+          `$swValueName' is UNICODE.
+
+    RegEnumKeyW
+    `RegEnumKeyW( $hKey, $uIndex, $oswName, $ilwNameSize )'
+          `$oswName' is UNICODE and `$ilwNameSize' is measured as number of
+          `WCHAR's.
+
+    RegEnumKeyExW
+    `RegEnumKeyExW( $hKey, $uIndex, $oswName, $iolwName, $pNull, $oswClass, $iolwClass, $opftLastWrite )'
+          `$swName' and `$swClass' are UNICODE and `$iolwName' and
+          `$iolwClass' are measured as number of `WCHAR's.
+
+    RegEnumValueW
+    `RegEnumValueW( $hKey, $uIndex, $oswName, $iolwName, $pNull, $ouType, $opData, $iolData )'
+          `$oswName' is UNICODE and `$iolwName' is measured as number of
+          `WCHAR's.
+
+          `$opData' is UNICODE if `$piType' is REG_SZ, REG_EXPAND_SZ, or
+          REG_MULTI_SZ.  Note that `$iolData' is measured as number of
+          bytes even in these cases.
+
+    RegLoadKeyW
+    `RegLoadKeyW( $hKey, $swSubKey, $swFileName )'
+          `$swSubKey' and `$swFileName' are UNICODE.
+
+    RegOpenKeyW
+    `RegOpenKeyW( $hKey, $swSubKey, $ohSubKey )'
+          `$swSubKey' is UNICODE.
+
+    RegOpenKeyExW
+    `RegOpenKeyExW( $hKey, $swSubKey, $uOptions, $uAccess, $ohSubKey )'
+          `$swSubKey' is UNICODE.
+
+    RegQueryInfoKeyW
+    `RegQueryInfoKeyW( $hKey, $oswClass, $iolwClass, $pNull, $ocSubKeys, $olwSubKey, $olwSubClass, $ocValues, $olwValName, $olValData, $olSecDesc, $opftTime )'
+          `$swClass' is UNICODE.  `$iolwClass', `$olwSubKey',
+          `$olwSubClass', and `$olwValName' are measured as number of
+          `WCHAR's.  Note that `$olValData' is measured as number of bytes.
+
+    RegQueryMultipleValuesW
+    `RegQueryMultipleValuesW( $hKey, $ioarValueEnts, $icValueEnts, $opBuffer, $iolBuffer )'
+          The `ve_valuename' fields of the `VALENT' [actually `VALENTW']
+          structures in `$ioarValueEnts' are UNICODE.  Values of type
+          REG_SZ, REG_EXPAND_SZ, and REG_MULTI_SZ are written to
+          `$opBuffer' in UNICODE.  Note that `$iolBuffer' and the
+          `ve_valuelen' fields of the `VALENT' [`VALENTW'] structures are
+          measured as number of bytes.
+
+    RegQueryValueW
+    `RegQueryValueW( $hKey, $swSubKey, $oswValueData, $iolValueData )'
+          `$swSubKey' and `$oswValueData' are UNICODE.  Note that
+          `$iolValueData' is measured as number of bytes.
+
+    RegQueryValueExW
+    `RegQueryValueExW( $hKey, $swName, $pNull, $ouType, $opData, $iolData )'
+          `$swName' is UNICODE.
+
+          `$opData' is UNICODE if `$ouType' is REG_SZ, REG_EXPAND_SZ, or
+          REG_MULTI_SZ.  Note that `$iolData' is measured as number of
+          bytes even in these cases.
+
+    RegReplaceKeyW
+    `RegReplaceKeyW( $hKey, $swSubKey, $swNewFile, $swOldFile )'
+          `$swSubKey', `$swNewFile', and `$swOldFile' are UNICODE.
+
+    RegRestoreKeyW
+    `RegRestoreKeyW( $hKey, $swFileName, $uFlags )'
+          `$swFileName' is UNICODE.
+
+    RegSaveKeyW
+    `RegSaveKeyW( $hKey, $swFileName, $pSecAttr )'
+          `$swFileName' is UNICODE.
+
+    RegSetValueW
+    `RegSetValueW( $hKey, $swSubKey, $uType, $swValueData, $lValueData )'
+          `$swSubKey' and `$swValueData' are UNICODE.  Note that
+          `$lValueData' is measured as number of bytes even though
+          `$swValueData' is always UNICODE.
+
+    RegSetValueExW
+    `RegSetValueExW( $hKey, $swName, $uZero, $uType, $pData, $lData )'
+          `$swName' is UNICODE.
+
+          `$pData' is UNICODE if `$uType' is REG_SZ, REG_EXPAND_SZ, or
+          REG_MULTI_SZ.  Note that `$lData' is measured as number of bytes
+          even in these cases.
+
+    RegUnLoadKeyW
+    `RegUnLoadKeyW( $hKey, $swSubKey )'
+          `$swSubKey' is UNICODE.
+
+    :HKEY_
+          All `HKEY_*' constants:
+
+               HKEY_CLASSES_ROOT	HKEY_CURRENT_CONFIG	HKEY_CURRENT_USER
+               HKEY_DYN_DATA		HKEY_LOCAL_MACHINE	HKEY_PERFORMANCE_DATA
+               HKEY_USERS
+
+    :KEY_
+          All `KEY_*' constants:
+
+               KEY_QUERY_VALUE		KEY_SET_VALUE		KEY_CREATE_SUB_KEY
+               KEY_ENUMERATE_SUB_KEYS	KEY_NOTIFY		KEY_CREATE_LINK
+               KEY_READ		KEY_WRITE		KEY_EXECUTE
+               KEY_ALL_ACCESS
+
+    :REG_
+          All `REG_*' constants:
+
+               REG_CREATED_NEW_KEY		REG_OPENED_EXISTING_KEY
+
+               REG_LEGAL_CHANGE_FILTER		REG_NOTIFY_CHANGE_ATTRIBUTES
+               REG_NOTIFY_CHANGE_NAME		REG_NOTIFY_CHANGE_LAST_SET
+               REG_NOTIFY_CHANGE_SECURITY	REG_LEGAL_OPTION
+
+               REG_OPTION_BACKUP_RESTORE	REG_OPTION_CREATE_LINK
+               REG_OPTION_NON_VOLATILE		REG_OPTION_OPEN_LINK
+               REG_OPTION_RESERVED		REG_OPTION_VOLATILE
+
+               REG_WHOLE_HIVE_VOLATILE		REG_REFRESH_HIVE
+               REG_NO_LAZY_FLUSH
+
+               REG_NONE			REG_SZ
+               REG_EXPAND_SZ			REG_BINARY
+               REG_DWORD			REG_DWORD_LITTLE_ENDIAN
+               REG_DWORD_BIG_ENDIAN		REG_LINK
+               REG_MULTI_SZ			REG_RESOURCE_LIST
+               REG_FULL_RESOURCE_DESCRIPTOR	REG_RESOURCE_REQUIREMENTS_LIST
+
+    :ALL
+          All of the above.
+
+    :SE_
+          The strings for the following privilege names:
+
+               SE_ASSIGNPRIMARYTOKEN_NAME	SE_AUDIT_NAME
+               SE_BACKUP_NAME			SE_CHANGE_NOTIFY_NAME
+               SE_CREATE_PAGEFILE_NAME		SE_CREATE_PERMANENT_NAME
+               SE_CREATE_TOKEN_NAME		SE_DEBUG_NAME
+               SE_INCREASE_QUOTA_NAME		SE_INC_BASE_PRIORITY_NAME
+               SE_LOAD_DRIVER_NAME		SE_LOCK_MEMORY_NAME
+               SE_MACHINE_ACCOUNT_NAME		SE_PROF_SINGLE_PROCESS_NAME
+               SE_REMOTE_SHUTDOWN_NAME		SE_RESTORE_NAME
+               SE_SECURITY_NAME		SE_SHUTDOWN_NAME
+               SE_SYSTEMTIME_NAME		SE_SYSTEM_ENVIRONMENT_NAME
+               SE_SYSTEM_PROFILE_NAME		SE_TAKE_OWNERSHIP_NAME
+               SE_TCB_NAME			SE_UNSOLICITED_INPUT_NAME
+
+          It can be difficult to successfully build this module in a way
+          that makes these constants available.  So some builds of this
+          module may not make them available.  For such builds, trying to
+          export any of these constants will cause a fatal error.  For
+          this reason, none of these symbols are currently included in the
+          `":ALL"' grouping.
+
+The Win32API:: heirarchy
+------------------------
+
+   This and the other Win32API:: modules are meant to expose the nearly
+raw API calls so they can be used from Perl code in any way they might be
+used from C code.  This provides the following advantages:
+
+Many modules can be written by people that don't have a C compiler.
+Encourages more module code to be written in Perl [not C].
+     Perl code is often much easier to inspect, debug, customize, and
+     enhance than XS code.
+
+Allows those already familiar with the Win32 API to get off to a quick start.
+Provides an interactive tool for exploring even obscure details of the Win32 API.
+     It can be very useful to interactively explore ad-hoc calls into
+     parts of the Win32 API using:
+
+          perl -de 0
+
+Ensures that native Win32 data structures can be used.
+     This allows maximum efficiency.  It also allows data from one module
+     [for example, time or security information from the
+     `Win32API::Registry' or `Win32API::File' modules] to be used with
+     other modules [for example, `Win32API::Time' and `Win32API::SecDesc'].
+
+Provides a single version of the XS interface to each API call where improvements can be collected.
+Buffer sizes
+------------
+
+   For each parameter that specifies a buffer size, a value of 0 can be
+passed.  For parameter that are pointers to buffer sizes, you can also
+pass in NULL by specifying an empty list reference, [].  Both of these
+cases will ensure that the variable has E<some> buffer space allocated to
+it and pass in that buffer's allocated size.  Many of the calls indicate,
+via `ERROR_MORE_DATA', that the buffer size was not sufficient and the
+`Registry.xs' code will automatically enlarge the buffer to the required
+size and repeat the call.
+
+   Numeric buffer sizes are used as minimum initial sizes for the buffers.
+The larger of this size and the size of space already allocated to the
+scalar will be passed to the underlying routine.  If that size was
+insufficient, and the underlying call provides an easy method for
+determining the needed buffer size, then the buffer will be enlarged and
+the call repeated as above.
+
+   The underlying calls define buffer size parameter as unsigned, so
+negative buffer sizes are treated as very large positive buffer sizes
+which usually cause `malloc()' to fail.
+
+   To force the `Registry.xs' code to pass in a specific value for a
+buffer size, preceed the size with an equals sign via `"=".'.  Buffer
+sizes that are passed in as strings starting with an equals sign will have
+the equal sign stripped and the remainder of the string interpretted as a
+number [via C's `strtoul()' using only base 10] which will be passed to
+the underlying routine [even if the allocated buffer is actually larger].
+The `Registry.xs' code will enlarge the buffer to the specified size, if
+needed, but will not enlarge the buffer based on the underlying routine
+requesting more space.
+
+   Some Reg*() calls may not currently set the buffer size when they
+return `ERROR_MORE_DATA'.  But some that are not documented as doing so,
+currently do so anyway.  So the code assumes that any routine E<might> do
+this and resizes any buffers and repeats the call.   We hope that
+eventually all routines will provide this feature.
+
+   When you use [] for a buffer size, you can still find the length of the
+data returned by using `length($buffer)'.  Note that this length will be
+in bytes while a few of the buffer sizes would have been in units of wide
+characters.
+
+   Note that the RegQueryValueEx*() and RegEnumValue*() calls will trim
+the trailing `'\0'' [if present] from the returned data values of type
+REG_SZ or REG_EXPAND_SZ but only if the value data length parameter is
+omitted [or specified as []].
+
+   The RegSetValueEx*() calls will add a trailing `'\0'' [if missing] to
+the supplied data values of type REG_SZ and REG_EXPAND_SZ but only if the
+value data length parameter is omitted [or specified as 0].
+
+Hungarian Notation
+------------------
+
+   The following abbreviations are used at the start of each parameter
+name to hint at aspects of how the parameter is used.  The prefix is
+always in lower case and followed by a capital letter that starts the
+descriptive part of the parameter name.  Several of the following
+abbreviations can be combined into a single prefix.
+
+   Probably not all of these prefix notations are used by this module.
+This document section may be included in any `Win32API' module and so
+covers some notations not used by this specific module.
+
+s
+     A string.  In C, a `'\0''-terminated `char *'.  In Perl, just a
+     string except that it will be truncated at the first `"\0"', if it
+     contains one.
+
+sw
+     A wide [UNICODE] string.  In C, a `L'\0''-terminated `WCHAR *'.  In
+     Perl, a string that contains UNICODE data.  You can convert a string
+     to UNICODE in Perl via:
+
+          $string= "This is an example string";
+          $unicode= pack( "S*", unpack("C*",$string), 0 );
+
+     Note how `, 0' above causes an explicit `L'\0'' to be added since
+     Perl's implicit `'\0'' that it puts after each of its strings is not
+     wide enough to terminate a UNICODE string.  So UNICODE strings are
+     different than regular strings in that the Perl version of a regular
+     string will not include the trialing `'\0'' while the Perl version of
+     a UNICODE string must include the trailing `L'\0''.
+
+     If a UNICODE string contains no non-ASCII characters, then you can
+     convert it back into a normal string via:
+
+          $string= pack( "C*", unpack("S*",$unicode) );
+          $string =~ s/\0$//;
+
+p
+     A pointer to some buffer [usually containing some `struct'].  In C, a
+     `void *' or some other pointer type.  In Perl, a string that is
+     usually manipulated using pack and unpack.  The "p" is usually
+     followed by more prefix character(s) to indicate what type of data is
+     stored in the bufffer.
+
+a
+     A packed array.  In C, an array [usually of `struct's].  In Perl, a
+     string containing the packed data.  The "a" is usually followed by
+     more prefix character(s) to indicate the data type of the elements.
+
+     These packed arrays are also called "vectors" in places to avoid
+     confusion with Perl arrays.
+
+n
+     A generic number.   In C, any of the integer or floating point data
+     types.  In Perl, a number; either an integer, unsigned, or double
+     [IV, UV, or NV, respectively].  Usually an integer.
+
+iv
+     A signed integral value.  In C, any of the signed integer data types.
+     In Perl, an integer [IV].
+
+u
+     An unsigned integral value.  In C, any of the unsigned integer data
+     types.  In Perl, an unsigned integer [UV].
+
+d
+     A floating-point number.  In C, a float or double or, perhaps, a
+     `long double'.  In Perl, a double-precision floating-point number
+     [NV].
+
+b
+     A Boolean value.  In C, any integer data type, though usually via a
+     type alias of `bool' or `BOOL', containing either a 0 [false] or
+     non-zero [true] value.  In Perl, a scalar containing a Boolean value
+     [0, "", or undef for "false" and anything else for "true"].
+
+c
+     A count of items.  In C, any integer data type.  In Perl, an unsigned
+     integer [UV].  Usually used in conjunction with a "vector" parameter
+     [see `' in this node above] to indicate the number of elements.
+
+l
+     A length [in bytes].  In C, any integer data type.  In Perl, an
+     unsigned integer [UV].  Usually used in conjunction with a "string"
+     or "pointer" parameter [see `' in this node and `' in this node
+     above] to indicate the buffer size or the size of the value stored in
+     the buffer.
+
+     For strings, there is no general rule as to whether the trailing
+     `'\0'' is included in such sizes.  For this reason, the `Win32API'
+     modules follow the Perl rule of always allocating one extra byte and
+     reporting buffer sizes as being one smaller than allocated in case
+     the `'\0'' is not included in the size.
+
+lw
+     A length measured as number of UNICODE characters.  In C, a count of
+     `WCHAR's.  In Perl, an unsigned integer [UV] counting "shorts" [see
+     "s" and "S" in pack and unpack].
+
+     For UNICODE strings, the trailing `L'\0'' may or may not be included
+     in a length so, again, we always allocate extra room for one and
+     don't report that extra space.
+
+h
+     A handle.  In C, a `HANDLE' or more-specific handle data type.  In
+     Perl, an unsigned integer [UV].  In C, these handles are often
+     actually some type of pointer, but Perl just treats them as opaque
+     numbers, as it should.  This prefix is also used for other pointers
+     that are treated as integers in Perl code.
+
+r
+     A record.  In C, almost always a `struct' or perhaps union.  Note
+     that C `struct's are rarely passed by value so the "r" is almost
+     always preceeded by a "p" or "a" [see `' in this node and `' in this
+     node above].  For the very rare unadorned "r", Perl stores the record
+     in the same way as a "pr", that is, in a string.  For the very rare
+     case where Perl explicitly stores a pointer to the `struct' rather
+     than storing the `struct' directly in a Perl string, the prefix "pp"
+     or "ppr" or even "par" is used.
+
+sv
+rv
+hv
+av
+cv
+     A Perl data type.  Respectively, a scalar value [SV], a reference
+     [RV] [usually to a scalar], a hash [HV], a Perl array [AV], or a Perl
+     code reference [PVCV].  For the "hv", "av", and "cv" prefixes, a
+     leading "rv" is usually assumed.  For a parameter to an XS subroutine,
+     a prefix of "sv" means the parameter is a scalar and so may be a
+     string or a number [or undef] or even both at the same time.  So "sv"
+     doesn't imply a leading "rv".
+
+Input or Output
+     Whether a parameter is for input data, output data, or both is usually
+     not reflected by the data type prefix.  In cases where this is not
+     obvious nor reflected in the parameter name proper, we may use the
+     following in front of the data type prefix.
+
+    i
+          An input parameter given to the API [usually omitted].
+
+    o
+          An output-only parameter taken from the API.  You should not get
+          a warning if such a parameter is undef when you pass it into the
+          function.  You should get an error if such a parameter is
+          read-only.  You can [usually] pass in [] for such a parameter to
+          have the parameter silently ignored.
+
+          The output may be written directly into the Perl variable passed
+          to the subroutine, the same way the buffer parameter to Perl's
+          `sysread()'.  This method is often avoided in Perl because the
+          call then lacks any visual cue that some parameters are being
+          overwritten.   But this method closely matches the C API which is
+          what we are trying to do.
+
+    io
+          Input given to the API then overwritten with output taken from
+          the API.  You should get a warning [if -w is in effect] if such a
+          parameter is undef when you pass it into the function [unless it
+          is a buffer or buffer length parameter].  If the value is
+          read-only, then [for most parameters] the output is silently not
+          written.  This is because it is often convenient to pass in
+          read-only constants for many such parameters.  You can also
+          usually pass in [] for such parameters.
+
+pp
+ppr
+par
+pap
+     These are just unusual combinations of prefix characters described
+     above.
+
+     For each, a pointer is stored in a [4-byte] Perl string.  You can
+     usually use `unpack "P"' to access the real data from Perl.
+
+     For "ppr" [and often for "pp"], the pointer points directly at a C
+     `struct'.  For "par", the pointer points to the first element of a C
+     [packed] array of `struct's.  For "pap", the pointer points to a C
+     [packed] array of pointers to other things.
+
+ap
+     Here we have a list of pointers packed into a single Perl string.
+
+BUGS
+====
+
+   The old ActiveState ports of Perl for Win32 [but not, ActivePerl, the
+ActiveState distributions of standard Perl 5.004 and beyond] do not support
+the tools for building extensions and so do not support this extension.
+
+   No routines are provided for using the data returned in the `FILETIME'
+buffers.  Those are in the `Win32API::Time' module.
+
+   No routines are provided for dealing with UNICODE data effectively.
+See `' in this node above for some simple-minded UNICODE methods.
+
+   Parts of the module test will fail if used on a version of Perl that
+does not yet set $^E based on `GetLastError()'.
+
+   On NT 4.0 [at least], the RegEnum*() calls do not set the required
+buffer sizes when returning `ERROR_MORE_DATA' so this module will not grow
+the buffers in such cases.  `Win32::TieRegistry' overcomes this by using
+values from `RegQueryInfoKey()' for buffer sizes in RegEnum* calls.
+
+   On NT 4.0 [at least], `RegQueryInfoKey()' on `HKEY_PERFORMANCE_DATA'
+never succeeds.  Also, `RegQueryValueEx()' on `HKEY_PERFORMANCE_DATA'
+never returns the required buffer size.  To access `HKEY_PERFORMANCE_DATA'
+you will need to keep growing the data buffer until the call succeeds.
+
+   Because `goto &subroutine' seems to be buggy under Win32 Perl, it is
+not used in the stubs in `Registry.pm'.
+
+AUTHOR
+======
+
+   Tye McQueen, tye@metronet.com, http://www.metronet.com/~tye/.
+
+SEE ALSO
+========
+
+*Note Win32/TieRegistry: Win32/TieRegistry,
+
+`Win32::Registry' in this node
+

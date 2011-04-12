@@ -1,0 +1,1712 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: HTTPD/RealmManager,  Next: HTTPD/UserAdmin,  Prev: HTTPD/Realm,  Up: Module List
+
+SYNOPSIS
+========
+
+     use HTTPD::RealmManager;
+
+     # open up the database (could also use HTTPD::Realm::connect())
+     $database = HTTPD::RealmManager->open(-config_file=>'/home/httpd/conf/realms.conf',
+                                           -realm=>'members',
+                                           -writable=>1);
+
+     # List functions
+     @users = $database->users();
+     @groups = $database->groups();
+
+     # Information about users and groups:
+     print "Lincoln's groups are @group\n"
+         if @group = $database->group(-user=>'lincoln');
+
+     print "Lincoln is a subscriber\n"
+         if $database->match_group(-user=>'lincoln',-group=>'subscribers');
+
+     print "Lincoln's password is $pass\n"
+         if $pass = $database->passwd(-user=>'lincoln');
+
+     print "Intruder alert.\n"
+         unless $database->match_passwd(-user=>'lincoln',
+                                        -password=>'xyzzy');
+
+     $lincoln_info = $database->get_fields(-user=>'lincoln');
+     print "Lincoln's full name is $lincoln_info->{Name}\n";
+
+     print "The subscribers are @members.\n"
+         if @members = $database->members(-group=>'subscribers');
+
+     # Database updates
+     print "Added Fred.\n"
+         if $database->set_passwd(-user=>'fred',
+                                  -password=>'sssh!',
+                                  -fields=>{Name=>'Fred Smith',
+                                            Nationality=>'French'});
+
+     print "Assigned Fred to 'subscribers' and 'VIPs'\n"
+     	if $database->set_group(-user=>'fred',
+                                 -group=>['subscribers','VIPs']);
+
+     print "Changed Fred's nationality.\n"
+          if $database->set_fields(-user=>'fred',
+                                   -fields=>{Nationality=>'German'});
+
+     print "Fred is now gone.\n"
+         if $database->delete_user(-user=>'fred');
+
+     print "VIP group is now gone.\n"
+         if $database->delete_group(-group=>'VIPs');
+
+     print "Uh oh.  An error occurred: ",$database->errstr,"\n"
+         if $database->errstr;
+
+DESCRIPTION
+===========
+
+   HTTPD::RealmManager provides a high-level, unified view onto the many
+access control databases used by Apache, Netscape, NCSA httpd, CERN and
+other Web servers.  It works hand-in-hand with HTTPD::Realm, which
+provides access to a standard configuration file for describing security
+database setups.  Internally, HTTPD::Realm uses Doug MacEachern's
+HTTPD-Tools modules for database access and locking.
+
+   *Important note:* Do not use these modules to adjust the Unix password
+or group files.  They do not have the same format as the Web access
+databases.
+
+METHODS
+=======
+
+   HTTPD::RealmManager provides the following class and instance methods.
+
+new()
+          $db = HTTPD::RealmManager->new(-realm    => $realm_def,
+                                         -writable => 1,
+                                         -mode     => 0644,
+                                         -server   => 'ncsa');
+
+     The new() class method creates a new connection to the database
+     indicated by the indicated HTTPD::RealmDef object.  Ordinarily it will
+     be more convenient to use the open() method (below) or
+     HTTPD::RealmDef::connect().  Only the -realm argument is mandatory.
+     The others are optional and will default to reasonable values.
+
+     If successful, the function result is an HTTPD::RealmManager object,
+     which you can treat as a handle to the database.
+
+     Arguments:
+
+          -realm      Realm definition.  See HTTPD::Realm(3).
+          -writable   If true, open database for writing.
+          -mode       Override file creation mode.
+          -server     Override server type.
+
+open()
+          $db = HTTPD::RealmManager->open(-realm       => 'subscribers',
+                                          -config_file => '/home/httpd/conf/realms.conf',
+                                          -writable => 1,
+                                          -mode     => 0644,
+                                          -server   => 'ncsa');
+
+     The open() class method creates a new connection to the database
+     given the indicated configuration file and realm name.  Internally it
+     first creates an HTTPD::Realm object, then queries it for the named
+     realm, passing this result to new().  This is probably the easiest way
+     to create a new connection.
+
+     Only the -realm and -config_file arguments are mandatory.  The others
+     are optional and will default to reasonable values.
+
+     If successful, the function result is an HTTPD::RealmManager object,
+     which you can treat as a handle to the database.
+
+     Arguments:
+
+          -config_file Path to realm configuration file. See HTTPD::Realm(3).
+          -realm       Realm name.
+          -writable    If true, open database for writing.
+          -config      An alias for -config_file.
+          -mode        Override file creation mode.
+          -server      Override server type.
+
+close()
+          $db->close()
+
+     When you are done with the database you should close() it.  This will
+     commit changes and tidy up.
+
+users()
+          @users = $db->users();
+
+     Return all users known to this database as a (potentially very long)
+     list.
+
+groups()
+          @groups = $db->groups()
+
+     Return all groups known to this database as a (potentially very long)
+     list.
+
+group()
+          @groups = $db->group(-user=>'username');
+          $boolean = $db->group(-user=>'username',-group=>'groupname');
+
+     This method returns information about the groups that a user belongs
+     to.  Called with the name of the user only, it returns a list of all
+     the groups the user is a member of.  Called with both a user and a
+     group name, it returns a boolean value indicating whether the user
+     belongs to the group.
+
+     Arguments:
+
+          -user     Name of the user
+          -group    Name of the group
+          -name     An alias for -user
+          -grp      An alias for -group
+
+     You can also call this method with the positional parameters
+     (user,group), as in:
+
+          @groups = $db->group('username');
+
+match_group()
+          $boolean = $db->match_group(-user=>'username',-group=>'groupname');
+
+     This method is identical to the group() function, except that it
+     requires a group name to be provided.
+
+passwd()
+          $password = $db->passwd(-user=>'username');
+          $boolean = $db->passwd(-user=>'username',-password=>'password');
+
+     Called with a user name this method returns his *encrypted* password.
+     Called with a user name and an *unencrypted* password, this routine
+     returns a boolean indicating whether this password matches the stored
+     password.
+
+     Arguments:
+
+          -user      Name of the user
+          -password  Password to check against (optional)
+          -name      Alias for -user
+          -passwd    Alias for -password
+
+     You can also call this routine using positional arguments, where the
+     first argument is the user name and the second is the password to try:
+
+          print "You're OK" if $db->password('Fred','Open sesame');
+
+password()
+          $password = $db->password(-user=>'username');
+          $boolean = $db->password(-user=>'username',-password=>'password');
+
+     An alias for passwd(), just to make things interesting.
+
+match_passwd()
+          $boolean = $db->match_passwd(-user=>'username',-password=>'password');
+
+     This method is identical to the two-argument form of passwd(), except
+     that it requires a trial password to be provided.
+
+match()
+          $boolean = $db->match(-user=>'username',-password=>'password');
+
+     This method is an alias for match_passwd(), just to make things
+     interesting.
+
+get_fields()
+          $fields = $db->get_fields(-user=>'username',
+                                    -fields=>\@list_of_fields);
+
+     The user database can contain additional information about the user in
+     the form of name/value pairs.  This method provides access to these
+     "additional fields."
+
+     get_fields() accepts a user name and optionally a list of the fields
+     to retrieve.  If no field list is provided, it will retrieve all
+     fields defined in the security realm configuration file (see
+     HTTPD::Realm (3)).  In practice, it is rarely necessary to limit the
+     fields that are retrieved unless you are accessing a SQL database
+     table containing an unusually large number of fields.
+
+     Arguments:
+
+          -user    Name of user
+          -fields  List reference to fields to retrieve (optional)
+          -name    Alias for -user
+          -field   Alias for -fields
+
+     The return value is a hash reference.  You can retrieve the actual
+     values like this:
+
+          $fields = $db->get_fields(-user=>'fred');
+          print $fields->{'Full_Name'};
+
+set_passwd()
+          $resultcode = $db->set_passwd(-user=>'username',
+                                        -password=>'password',
+                                        -fields=>\%extra_fields);
+
+     set_passwd() sets the user's password and/or additional field
+     information.  If the user does not already exist in the database, he
+     is created.  The method requires the username and one or more of the
+     new password and a hash reference to additional user fields.  If
+     either the password or the additional fields are absent, they will be
+     unchanged.
+
+     When setting field values, the old and new values are merged.  To
+     delete a previous field value, you must explicitly set it to undef in
+     the hash reference.  Otherwise the previous value will be retained.
+
+     A result code of true indicates a successful update.  The method will
+     fail unless the database is opened for writing.
+
+     Arguments:
+
+          -user      Name of the user to update
+          -password  New password
+          -fields    Hash ref to the fields to update
+          -name      Alias for -user
+          -passwd    Alias for -password
+          -gcos      Alias for -fields
+
+set_password()
+          $resultcode = $db->set_password(-user=>'username',
+                                          -password=>'password',
+                                          -fields=>\%extra_fields);
+
+     This is an alias for set_passwd(), just to make life interesting.
+
+set_fields()
+          $resultcode = $db->set_fields(-user=>'username',
+                                        -fields=>\%extra_fields);
+
+     set_fields() allows you to adjust the extra field information about
+     the designated user.  Its functionality is identical to set_passwd(),
+     but the name is a little more appropriate.  This method requires a
+     user name and a hash reference containing new field values.
+
+     When setting field values, the old and new values are merged.  To
+     delete a previous field value, you must explicitly set it to undef in
+     the hash reference.  Otherwise the previous value will be retained.
+
+     Arguments:
+
+          -user      Name of the user to update
+          -fields    Hash ref to the fields to update
+          -name      Alias for -user
+          -gcos      Alias for -fields
+
+     A true result code indicates that the database was successfully
+     updated.  The database must be writable for this method to succeed.
+
+set_group()
+          $resultcode = $db->set_group(-user=>'username',
+                                       -group=>\@list_of_groups);
+
+     This method allows you to set the list of groups that a user belongs
+     to without changing any other information about him or her.  It
+     expects a user name and a list reference pointing to the groups to
+     assign the user to.  The user will be removed from any groups he
+     previously participated in.
+
+     Arguments:
+
+          -user      Name of the user to update
+          -group     List of groups to assign user to
+          -name      Alias for -user
+          -grp       Alias for -group
+
+     A true result code indicates that the database was successfully
+     updated.  The database must be writable for this method to succeed.
+
+delete_user()
+          $resultcode = $db->delete_user(-user=>'username');
+
+     Delete the user and all his associated information from the database.
+     If there are any empty groups after this deletion, they are removed as
+     well.  This operation is irreversible.
+
+     Arguments:
+
+          -user      Name of the user to remove
+          -name      Alias for -user
+
+     A true result code indicates that the database was successfully
+     updated.  The database must be writable for this method to succeed.
+
+     You may also call this method with a single positional argument:
+
+          $resultcode = $db->delete_user('username');
+
+delete_group()
+          $resultcode = $db->delete_group(-group=>'groupname');
+
+     Delete the group from the database.  Users who participate in the
+     deleted group are not deleted.  However, they may find themselves
+     orphaned (not participating in any groups).
+
+     Arguments:
+
+          -group      Name of the user to remove
+          -grp        Alias for -group
+
+     A true result code indicates that the database was successfully
+     updated.  The database must be writable for this method to succeed.
+
+     You may also call this method with a single positional argument:
+
+          $resultcode = $db->delete_group('groupname');
+
+errstr()
+          $error = $db->errstr();
+
+     This method returns a string describing the last error encountered by
+     RealmManager.pm.  It is not reset by successful function calls, so its
+     contents are only valid after a method returns a false result code.
+
+SEE ALSO
+========
+
+   HTTPD::Realm(3) HTTPD::UserAdmin(3) HTTPD::GroupAdmin(3),
+HTTPD::Authen(3)
+
+AUTHOR
+======
+
+   Lincoln Stein <lstein@cshl.org>
+
+   Copyright (c) 1997, Lincoln D. Stein
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: HTTPD/UserAdmin,  Next: Hardware/Verilog/Parser,  Prev: HTTPD/RealmManager,  Up: Module List
+
+Management of HTTP server user databases
+****************************************
+
+NAME
+====
+
+   HTTPD::UserAdmin - Management of HTTP server user databases
+
+SYNOPSIS
+========
+
+     use HTTPD::UserAdmin ();
+
+DESCRIPTION
+===========
+
+   This software is meant to provide a generic interface that hides the
+inconsistencies across HTTP server implementations of user and group
+databases.
+
+METHODS
+=======
+
+new ()
+     Here's where we find out what's different about your server.
+
+     Some examples:
+
+          @DBM = (DBType => 'DBM',
+          	    DB     => '.htpasswd',
+          	    Server => 'apache');
+
+          $user = new HTTPD::UserAdmin @DBM;
+
+     This creates an object who's database is a DBM file named
+     '.htpasswd', in a format that the Apache server understands.
+
+          @Text = (DBType => 'Text',
+          	     DB     => '.htpasswd',
+          	     Server => 'ncsa');
+
+          $user = new HTTPD::UserAdmin @Text;
+
+     This creates an object whose database is a plain text file named
+     '.htpasswd', in a format that the NCSA server understands.
+
+          @SQL =  (DBType =>    "SQL",
+          	     Host =>      "",             #server hostname
+          	     Port =>      "",             #server port
+          	     DB =>        "www",          #database name
+          	     User =>      "", 	  	  #database login name
+          	     Auth =>      "",             #database login password
+                   Encrypt =>   "crypt",        #encryption method
+          	     Driver =>    "mSQL",         #driver for DBI
+          	     Server =>    "apache",       #HTTP server type, not required
+          	     UserTable => "www-users",    #table with field names below
+          	     NameField => "user",         #field for the name
+          	     PasswordField => "password", #field for the password
+          	     );
+
+          $user = new HTTPD::UserAdmin @SQL;
+
+     This creates an object who's mSQL database is named 'www', with a
+     schema that the Apache server (extention) understands.
+
+     Full list of constructor attributes:
+
+     Note: Attribute names are case-insensitive
+
+     *DBType*  - The type of database, one of 'DBM', 'Text', or 'SQL'
+     (Default is 'DBM')
+
+     DB      - The database name (Default is '.htpasswd' for DBM & Text
+     databases)
+
+     Server  - HTTP server name (Default is the generic class, that works
+     with NCSA, Apache and possibly others)
+
+     Note: run 'perl t/support.t matrix' to see what support is currently
+     availible
+
+     Encrypt - One of 'crypt', 'MD5', or 'none' (no encryption.  Defaults
+     to 'crypt'
+
+     Locking - Boolean, Lock Text and DBM files (Default is true)
+
+     Path    - Relative DB files are resolved to this value  (Default is
+     '.')
+
+     Debug   - Boolean, Turn on debug mode
+
+     Flags   - The read, write and create flags.  There are four modes:
+     *rwc* - the default, open for reading, writing and creating.  rw -
+     open for reading and writing.  r - open for reading only.  w - open
+     for writing only.
+
+     Specific to DBM files:
+
+     *DBMF*    - The DBM file implementation to use (Default is 'NDBM')
+
+     Mode    - The file creation mode, defaults to '0644'
+
+     Specific to DBI: We talk to an SQL server via Tim Bunce's DBI
+     interface. For more info see:
+     http://www.hermetica.com/technologia/DBI/
+
+     Host      - Server hostname
+
+     Port      - Server port
+
+     User      - Database login name
+
+     Auth      - Database login password
+
+     Driver    - Driver for DBI  (Default is 'mSQL')
+
+     *UserTable* - Table with field names below
+
+     *NameField* - Field for the name  (Default is 'user')
+
+     *PasswordField* - Field for the password  (Default is 'password')
+
+     From here on out, things should look the same for everyone.
+
+add($username,$password,[@fields])
+add($username,$password,\%fields)
+     Add a user.
+
+     Fails if $username exists in the database
+
+          if($user->add('dougm', 'secret')) {
+          	print "You have the power!\n";
+          }
+
+     You may need to pass additional fields, such as the user's real name.
+     This depends on your server of course.
+
+          $user->add('JoeUser', 'try2guess', '', 'Joseph A. User');
+
+     You can also pass a set of field name/value pairs in the form of a
+     hash ref.  Example
+
+          $user->add('JoeUser','try2guess','',
+                               {'Name'=>'Joseph A. User','Credit_limit'=>2000});
+
+delete($username)
+     Delete a user
+
+          if($user->delete('dougm')) {
+          	print "He's gone\n";
+          }
+
+suspend($username)
+     Suspend a user
+
+          if($user->suspend('dougm')) {
+          	print "Account suspended\n";
+          }
+
+unsuspend($username)
+     Unsuspend a suspended user
+
+          if($user->unsuspend('dougm')) {
+          	print "Account restored to normal\n";
+          }
+
+exists($username)
+     True if $username is found in the database
+
+          if($user->exists('dougm')) {
+          	die "oh no!";
+          }
+
+password()
+     Returns the encrypted password for a user
+
+          $passwd = $user->password("dougm");
+
+     Useful for copying users to another database.
+
+fetch($username,@fields)
+          Fetch a list of field values from the indicated user.  Field names may
+          be provided as a list or as an array reference.  The return value is a
+          reference to a hash containing the field/value pairs.
+
+list()
+     Returns a list of usernames in the current database
+
+          @users = $user->list
+
+update($username,$password)
+update($username,$password,\%fields) *SQL only*
+     Update $username with a new $password
+
+          if($user->update('dougm', 'idunno')) {
+          	print "Updated\n";
+          }
+
+     With SQL servers, you can update other fields in the table by passing
+     a hash reference:
+
+          $user->update('dougm','idunno',{'credit_limit'=>1000});
+
+     An undefined value in the password field will leave the field
+     unchanged.
+
+group()
+     Short cut for creating an HTTPD::GroupAdmin object.  All applicable
+     attributes are inherited, but can be overridden.
+
+          $group = $user->group(NAME => 'www-group');
+
+     (See HTTPD::GroupAdmin)
+
+convert(@Attributes)
+     Convert a database.
+
+          $dbmuser = $user->convert(@Apache);
+
+lock([$timeout])
+unlock()
+     These methods give you control of the locking mechanism.
+
+          $user = new HTTPD::UserAdmin (Locking => 0); #turn off auto-locking
+          $user->lock; #lock the object's database
+          $user->add($username,$passwd); #write while file is locked
+          $user->unlock; release the lock
+
+db($dbname);
+     Select a different database.
+
+          $olddb = $user->db($newdb);
+          print "Now we're reading and writing '$newdb', done with '$olddb'n\";
+
+flags([$flags])
+     Get or set read, write, create flags.
+
+commit
+     Commit changes to disk (for Text files).
+
+Message Digest User Databases
+=============================
+
+   Currently, you can store user info in a format for servers who support
+Message Digest Authentication.  Here's an example:
+
+     $user = new HTTPD::UserAdmin (DB => '.htdigest', Encrypt => 'MD5');
+     
+     ($username,$realm,$password) = ('JoeUser', 'SomePlace', '14me');
+
+     #The checksum contains more info that just a password
+     $user->add($username, "$username:$realm:$password");
+     $user->update($username, "$username:$realm:newone");
+
+     $info = $user->password($username);
+     ($realm, $checksum) = split(":", $info);
+
+     $user->delete($username);
+
+   See <URL:http://hoohoo.ncsa.uiuc.edu/docs/howto/md5_auth.html> for
+NCSA's implementation.
+
+   So, it's a little more work, but don't worry, a nicer interface is on
+the way.
+
+SEE ALSO
+========
+
+   HTTPD::GroupAdmin(3), HTTPD::Authen(3)
+
+AUTHOR
+======
+
+   Doug MacEachern <dougm@osf.org>
+
+   Copyright (c) 1996, Doug MacEachern
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Hardware/Verilog/Parser,  Next: Hardware/Vhdl/Parser,  Prev: HTTPD/UserAdmin,  Up: Module List
+
+A complete grammar for parsing Verilog code using perl
+******************************************************
+
+NAME
+====
+
+   Hardware::Verilog::Parser - A complete grammar for parsing Verilog code
+using perl
+
+SYNOPSIS
+========
+
+     use Hardware::Verilog::Parser;
+     $parser = new Hardware::Verilog::Parser;
+
+     $parser->Filename(@ARGV);
+
+DESCRIPTION
+===========
+
+   This module defines the complete grammar needed to parse any Verilog
+code.  By overloading this grammar, it is possible to easily create perl
+scripts which run through Verilog code and perform specific functions.
+
+   For example, a Hierarchy.pm uses Hardware::Verilog::Parser to overload
+the grammar rule for module instantiations. This single modification will
+print out all instance names that occur in the file being parsed.  This
+might be useful for creating an automatic build script, or a graphical
+hierarchical browser of a Verilog design.
+
+   This module is currently in alpha release. All code is subject to
+change.  Bug reports are welcome.
+
+   DSLI information:
+
+   D - Development Stage
+
+     a - alpha testing
+
+   S - Support Level
+
+     d - developer
+
+   L - Language used
+
+     p - perl only, no compiler needed, should be platform independent
+
+   I - Interface Style
+
+     O - Object oriented using blessed references and / or inheritance
+
+AUTHOR
+======
+
+   Copyright (C) 2000 Greg London   All Rights Reserved.
+
+   This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   email contact: greg42@bellatlantic.net
+
+SEE ALSO
+========
+
+   Parse::RecDescent, version 1.77
+
+   perl(1).
+
+
+File: pm.info,  Node: Hardware/Vhdl/Parser,  Next: Hash/Filler,  Prev: Hardware/Verilog/Parser,  Up: Module List
+
+A complete grammar for parsing VHDL code using perl
+***************************************************
+
+NAME
+====
+
+   Hardware::Vhdl::Parser - A complete grammar for parsing VHDL code using
+perl
+
+SYNOPSIS
+========
+
+     use Hardware::Vhdl::Parser;
+     $parser = new Hardware::Vhdl::Parser;
+
+     $parser->Filename(@ARGV);
+
+DESCRIPTION
+===========
+
+   This module defines the complete grammar needed to parse any VHDL code.
+By overloading this grammar, it is possible to easily create perl scripts
+which run through VHDL code and perform specific functions.
+
+   For example, a Hierarchy.pm uses Hardware::Vhdl::Parser to overload the
+grammar rule for component instantiations. This single modification will
+print out all instance names that occur in the file being parsed.  This
+might be useful for creating an automatic build script, or a graphical
+hierarchical browser of a VHDL design.
+
+   This module is currently in Beta release. All code is subject to change.
+Bug reports are welcome.
+
+   DSLI information:
+
+   D - Development Stage
+
+     a - alpha testing
+
+   S - Support Level
+
+     d - developer
+
+   L - Language used
+
+     p - perl only, no compiler needed, should be platform independent
+
+   I - Interface Style
+
+     O - Object oriented using blessed references and / or inheritance
+
+AUTHOR
+======
+
+   Copyright (C) 2000 Greg London   All Rights Reserved.
+
+   This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   email contact: greg42@bellatlantic.net
+
+SEE ALSO
+========
+
+   Parse::RecDescent version 1.77
+
+   perl(1).
+
+
+File: pm.info,  Node: Hash/Filler,  Next: Hash/NoVivify,  Prev: Hardware/Vhdl/Parser,  Up: Module List
+
+Programatically fill elements of a hash based in prerequisites
+**************************************************************
+
+NAME
+====
+
+   HashFiller - Programatically fill elements of a hash based in
+prerequisites
+
+SYNOPSIS
+========
+
+     use Hash::Filler;
+
+     my $hf = new Hash::Filler;
+
+     # Show how a ->fill() method executes
+     # the rules
+       $Hash::Filler::DEBUG = 1;
+
+     # Add a set of rules
+
+     $hf->add('key1', sub { my $hr = shift; ... }, ['key2', 'key3'], $pref);
+     $hf->add('key1', sub { my $hr = shift; ... }, [], $pref);
+     $hf->add('key2', sub { my $hr = shift; ... }, ['key1', 'key3'], $pref);
+     $hf->add('key3', sub { my $hr = shift; ... }, ['key1', 'key2'], $pref);
+     $hf->add(undef, sub { ... }, [], $pref);
+
+     # Remove rules
+
+     $hf->remove($rule_id);
+
+     $hf->loop(0);			# Don't try to avoid infinite loops
+
+     # Test if a key exists using defined()
+       $hf->method($Hash::Filler::DEFINED);
+
+     my %hash;
+
+     $hf->fill(\%hash, 'key1');	# Calculate the value of $hash{key1}
+     $hash{'key2'} = 'foo';	# Manually fill a hash position
+     $hf->fill(\%hash, 'key2');	# Calculate the value of $hash{key2}
+     $hr->dump_r_tree();		# Print the key tree
+
+     my @stats = $hf->stats();	# Obtain statistics about rule invocation
+     my @prof = $hf->profile();	# Obtain profiling information about the rules
+
+DESCRIPTION
+===========
+
+   `Hash::Filler' provides an interface so that hash elements can be
+calculated depending in the existence of other hash elements, using
+user-supplied code references.
+
+   One of the first uses of this module was inside a server. In this
+server, the responses to commands came from external sources. For each
+request, the server needed to contact a number of external sources to
+calculate the proper answer. These calculations sometimes attempted
+redundant external accesses, thus increased the response time and load.
+
+   To help in this situation, the calculations were rewritten to access a
+hash instead of the external sources directly and this module was used to
+fill the hash depending on the requirements of the calculations. The
+external accesses were also improved so that more than one choice or rule
+existed for each datum, depending on wether prerequisites existed already
+in the hash or not.
+
+   Hopefully this explanation will make it easier to understand what this
+module is about :)
+
+   There are a few relevant methods, described below:
+
+`->add($key, $code, $r_prereq, $pref)'
+     Adds a new rule to the `Hash::Filler' object. The rule will be used
+     to fill the hash bucket identified with key $key. To fill this bucket,
+     the code referenced by $code will be invoked, passing it a reference
+     to the hash being worked on and the key that is being filled. This
+     will only be called if all of the hash buckets whose keys are in the
+     list referenced by $r_prereq `exist'.
+
+     If the user-supplied code returns a false value, failure is assumed.
+
+     An optional preference can be supplied. This is used to help the
+     internal rule selection choose the better rule.
+
+     Multiple rules for the same $key and the same $r_prereq can be added.
+     The module will attempt to use them both but the execution order will
+     be undefined unless you use $pref. The default $pref is 100.
+
+     A special case occurs when $key is undefined. In this case, this rule
+     is said to be a 'wildcard'. This means that the rule applies to any
+     key that needs to be filled. Wildcard rules are applied after any
+     matching rules (ie, after rules that apply specifically to a given
+     $key). Multiple wildcard rules are selected based in the preference
+     and availability of prerequisites.
+
+     This function returns a 'rule identifier'. This identifier is the
+     index that designates a given rule. Generally, it is only used in
+     conjunction with profiling.
+
+`->remove($id)'
+     Removes the rule whose identifier matches $id. The implementation
+     actually does not remove the rule. Instead it marks the rule as
+     non-usable.
+
+`->dump_r_tree'
+     This method prints out a representation of the rule tree kept by the
+     object. The tree lists the rules in the order they would be preferred
+     for a given key.
+
+     Output is sent to STDOUT.
+
+`->profile'
+     Returns an array containing time profiles for the execution of each
+     rule. The index in the array is the identifier assigned for each
+     rule. Each slot in the array contain the accumulated time for all the
+     invocations of that particular rule.
+
+     Slot 0 in the array contains the accumulated time for ALL the invoked
+     rules. This make it easier to find the most important contributors to
+     the accumulated time.
+
+     Note that time is only computed if the user-supplied method must be
+     called. Whenever the hash bucket to be filled by a rule already has a
+     value, this method will not be called and no time will be added to
+     this rule.
+
+`->stats'
+     This method returns an array which counts the number of times a given
+     rule has been invoked and its user-supplied method has been called.
+     The index into the array is the rule identifier, just as in the case
+     of `->profile'. The 0th element of the array contains the total
+     number of times that `->fill' has been called. This is useful to
+     deduce how many times the rules needed to be invoked.
+
+`->method($val)'
+     Which method to use to decide if a given key is present in the hash.
+     The accepted values are:
+
+    `$Hash::Filler::EXISTS' (default)
+               The existence of a hash element or key is calculated using a
+               construct like C<exists($hash{$key})>.
+
+    `$Hash::Filler::DEFINED'
+               The existence of a hash element or key is calculated using a
+               construct like C<defined($hash{$key})>.
+
+    `$Hash::Filler::TRUE'
+               The existence of a hash element or key is calculated using a
+               construct like C<$hash{$key}>.
+
+    Reference to a sub
+               This allows the user to specify a function to determine wether a
+               hash bucket must be calculated or not. The function is invoked by
+               passing it a reference to the hash and the key that must be
+               checked. The function must return a TRUE value is the bucket is
+               already populated or false if the corresponding rules must be
+               applied.
+
+     This allow this module to be customized to the particular application
+     in which it is being used. Be advised that changing this might cause a
+     change in which and when the rules are invoked for a particular hash
+     so probably it should only be used before the first call to `->fill'.
+
+     By defult, the module uses exists() to do this check.
+
+`->loop($val)'
+     Controls if the module should try to avoid infinite loops. A true $val
+     means that it must try (the default). A false value means otherwise.
+
+`->fill($r_hash, $key)'
+     Attempts to fill the bucket $key of the hash referenced by $r_hash
+     using the supplied rules.
+
+     This method will return a true value if there are rules that allow the
+     requested $key to be calculated (or the $key is in the hash) and the
+     user supplied code returned true.
+
+     To avoid infinite loops, the code will not invoke a rule twice unless
+     `->loop' is called with a true value. The rules will be used starting
+     with the ones with less prerequisites, as these are assumed to be
+     lighter. To use a different ordering, specify $pref. Higher values of
+     $pref are used first.
+
+CAVEATS
+=======
+
+   This code uses recursion to resolve rules. This allows it to figure out
+the value for a given key with only an incomplete rule specification. Be
+warned that this might be costly if used with large sets of rules.
+
+AUTHOR
+======
+
+   Luis E. Munoz < lem@cantv.net>
+
+SEE ALSO
+========
+
+   perl(1).
+
+WARRANTY
+========
+
+   Absolutely none.
+
+
+File: pm.info,  Node: Hash/NoVivify,  Next: Heap,  Prev: Hash/Filler,  Up: Module List
+
+Perl extension for non-vivifying exists and defined functions
+*************************************************************
+
+NAME
+====
+
+   Hash::NoVivify - Perl extension for non-vivifying exists and defined
+functions
+
+SYNOPSIS
+========
+
+     use Hash::NoVivify qw(Defined Exists);
+
+     ...
+
+     if (Exists(\%hash, qw(key1 key2 ... keyn ))) {
+         ...
+     }
+
+     if (Defined(\%hash, qw(key1 key2 ... keyn))) {
+         ...
+     }
+
+DESCRIPTION
+===========
+
+   When used on a hash, the exists() and defined() functions will create
+entries in a hash in order to evaluate the function.
+
+   For instance, the code:
+
+     %a = (a => 1, b=> 2);
+     print "Doesn't exist\n" unless exists($a{c});
+     print "Also Doesn't exist\n" unless exists($a{c}->{d});
+     print "Oh, my, not good\n" if exists($a{c});
+
+   will print out:
+
+     Doesn't exist
+     Also Doesn't exist
+     Oh, my, not good
+
+   The Hash::NoVivify module provides two functions, Defined() and
+Exists(), which avoid this, at the cost of a slightly convoluted syntax.
+Both functions take a reference to a hash, followed by a list of
+descending keys defining the hash entry to be investigated.
+
+AUTHOR
+======
+
+   Brent B. Powers (B2Pi), Powers@B2Pi.com
+
+   Copyright(c) 1999 Brent B. Powers. All rights reserved. This program is
+free software, you may redistribute it and/or modify it under the same
+terms as Perl itself.
+
+SEE ALSO
+========
+
+   perl(1), perlfunc(1).
+
+
+File: pm.info,  Node: Heap,  Next: Heap/Binary,  Prev: Hash/NoVivify,  Up: Module List
+
+Perl extensions for keeping data partially sorted
+*************************************************
+
+NAME
+====
+
+   Heap - Perl extensions for keeping data partially sorted
+
+SYNOPSIS
+========
+
+     use Heap;
+
+     my $heap = Heap->new;
+     my $elem;
+
+     use Heap::Elem::Num(NumElem);
+
+     foreach $i ( 1..100 ) {
+         $elem = NumElem( $i );
+         $heap->add( $elem );
+     }
+
+     while( defined( $elem = $heap->extract_maximum ) ) {
+         print "Smallest is ", $elem->val, "\n";
+     }
+
+DESCRIPTION
+===========
+
+   The Heap collection of modules provide routines that manage a heap of
+elements.  A heap is a partially sorted structure that is always able to
+easily extract the smallest of the elements in the structure (or the
+largest if a reversed compare routine is provided).
+
+   If the collection of elements is changing dynamically, the heap has
+less overhead than keeping the collection fully sorted.
+
+   The elements must be objects as described in `"Heap::Elem"' in this node
+and all elements inserted into one heap must be mutually compatible -
+either the same class exactly or else classes that differ only in ways
+unrelated to the *Heap::Elem* interface.
+
+METHODS
+=======
+
+$heap = HeapClass::new(); $heap2 = $heap1->new();
+     Returns a new heap object of the specified (sub-)class.  This is
+     often used as a subroutine instead of a method, of course.
+
+$heap->DESTROY
+     Ensures that no internal circular data references remain.  Some
+     variants of Heap ignore this (they have no such references).  Heap
+     users normally need not worry about it, DESTROY is automatically
+     invoked when the heap reference goes out of scope.
+
+$heap->add($elem)
+     Add an element to the heap.
+
+$elem = $heap->minimum
+     Return the top element on the heap.  It is not removed from the heap
+     but will remain at the top.  It will be the smallest element on the
+     heap (unless a reversed cmp function is being used, in which case it
+     will be the largest).  Returns undef if the heap is empty.
+
+$elem = $heap->extract_minimum
+     Delete the top element from the heap and return it.  Returns undef if
+     the heap was empty.
+
+$heap1->absorb($heap2)
+     Merge all of the elements from *$heap2* into *$heap1*.  This will
+     leave *$heap2* empty.
+
+$heap1->decrease_key($elem)
+     The element will be moved closed to the top of the heap if it is now
+     smaller than any higher parent elements.  The user must have changed
+     the value of $elem before *decrease_key* is called.  Only a decrease
+     is permitted.  (This is a decrease according to the cmp function - if
+     it is a reversed order comparison, then you are only permitted to
+     increase the value of the element.  To be pedantic, you may only use
+     *decrease_key* if *$elem-*cmp($elem_original) <= 0> if
+     *$elem_original* were an elem with the value that $elem had before it
+     was *decreased*.)
+
+$elem = $heap->delete($elem)
+     The element is removed from the heap (whether it is at the top or
+     not).
+
+AUTHOR
+======
+
+   John Macdonald, jmm@elegant.com
+
+COPYRIGHT
+=========
+
+   Copyright 1998, O'Reilly & Associates.
+
+   This code is distributed under the same copyright terms as perl itself.
+
+SEE ALSO
+========
+
+   Heap::Elem(3), Heap::Binary(3), Heap::Binomial(3), Heap::Fibonacci(3).
+
+
+File: pm.info,  Node: Heap/Binary,  Next: Heap/Binomial,  Prev: Heap,  Up: Module List
+
+a Perl extension for keeping data partially sorted
+**************************************************
+
+NAME
+====
+
+   Heap::Binary - a Perl extension for keeping data partially sorted
+
+SYNOPSIS
+========
+
+     use Heap::Binary;
+
+     $heap = Heap::Binary->new;
+     # see Heap(3) for usage
+
+DESCRIPTION
+===========
+
+   Keeps an array of elements in heap order.  The heap method of an
+element is used to store the index into the array that refers to the
+element.
+
+   See *Note Heap: Heap, for details on using this module.
+
+AUTHOR
+======
+
+   John Macdonald, jmm@elegant.com
+
+COPYRIGHT
+=========
+
+   Copyright 1998, O'Reilly & Associates.
+
+   This code is distributed under the sme copyright as perl itself.
+
+SEE ALSO
+========
+
+   Heap(3), Heap::Elem(3).
+
+
+File: pm.info,  Node: Heap/Binomial,  Next: Heap/Elem,  Prev: Heap/Binary,  Up: Module List
+
+a Perl extension for keeping data partially sorted
+**************************************************
+
+NAME
+====
+
+   Heap::Binomial - a Perl extension for keeping data partially sorted
+
+SYNOPSIS
+========
+
+     use Heap::Binomial;
+
+     $heap = Heap::Binomial->new;
+     # see Heap(3) for usage
+
+DESCRIPTION
+===========
+
+   Keeps elements in heap order using a linked list of binomial trees.
+The heap method of an element is used to store a reference to the node in
+the list that refers to the element.
+
+   See *Note Heap: Heap, for details on using this module.
+
+AUTHOR
+======
+
+   John Macdonald, jmm@elegant.com
+
+COPYRIGHT
+=========
+
+   Copyright 1998, O'Reilly & Associates.
+
+   This code is distributed under the sme copyright as perl itself.
+
+SEE ALSO
+========
+
+   Heap(3), Heap::Elem(3).
+
+
+File: pm.info,  Node: Heap/Elem,  Next: Heap/Elem/Num,  Prev: Heap/Binomial,  Up: Module List
+
+Perl extension for elements to be put in Heaps
+**********************************************
+
+NAME
+====
+
+   Heap::Elem - Perl extension for elements to be put in Heaps
+
+SYNOPSIS
+========
+
+     use Heap::Elem::SomeInheritor;
+
+     use Heap::SomeHeapClass;
+
+     $elem = Heap::Elem::SomeInheritor->new( $value );
+     $heap = Heap::SomeHeapClass->new;
+
+     $heap->add($elem);
+
+DESCRIPTION
+===========
+
+   This is an inheritable class for Heap Elements.  It provides the
+interface documentation and some inheritable methods.  Only a child
+classes can be used - this class is not complete.
+
+METHODS
+=======
+
+$elem = Heap::Elem::SomeInheritor->new( [args] );
+     Creates a new Elem.
+
+$elem->heap( $val ); $elem->heap;
+     Provides a method for use by the Heap processing routines.  If a
+     value argument is provided, it will be saved.  The new saved value is
+     always returned.  If no value argument is provided, the old saved
+     value is returned.
+
+     The Heap processing routines use this method to map an element into
+     its internal structure.  This is needed to support the Heap methods
+     that affect elements that are not are the top of the heap -
+     *decrease_key* and delete.
+
+$elem1->cmp($elem2)
+     A routine to compare two elements.  It must return a negative value
+     if this element is less than *$elem2*, 0 if they are equal, or a
+     positive value if this element is greater than *$elem2*.  Just as
+     with sort, you can negate the meaning to reverse the order - causing
+     the heap to always return the largest element instead of the
+     smallest.  (That does make the Heap method names minimum,
+     *extract_minimum*, and *decrease_key* counter-intuitive, though.)
+
+INHERITING
+==========
+
+   This class can be inherited to provide an oject with the ability to be
+heaped.  If the object is implemented as a hash, and if it can deal with a
+kay of heap, leaving it unchanged for use by the heap routines, then the
+following implemetation will work.
+
+     package myObject;
+
+     require Exporter;
+
+     @ISA = qw(Heap::Elem);
+
+     sub new {
+         my $self = shift;
+         my $class = ref($self) || $self;
+
+     my $self = SUPER::new($class);
+
+     # set $self->{key} = $value;
+       }
+
+     sub cmp {
+         my $self = shift;
+         my $other = shift;
+
+     $self->{key} cmp $other->{key};
+       }
+
+     # other methods for the rest of myObject's functionality
+
+AUTHOR
+======
+
+   John Macdonald, jmm@elegant.com
+
+SEE ALSO
+========
+
+   Heap(3), Heap::Elem::Num(3), Heap::Elem::NumRev(3), Heap::Elem::Str(3),
+Heap::Elem::StrRev(3).
+
+
+File: pm.info,  Node: Heap/Elem/Num,  Next: Heap/Elem/NumRev,  Prev: Heap/Elem,  Up: Module List
+
+Perl extension for Numeric Heap Elements
+****************************************
+
+NAME
+====
+
+   Heap::Elem::Num - Perl extension for Numeric Heap Elements
+
+SYNOPSIS
+========
+
+     use Heap::Elem::Num( NumElem );
+     use Heap::Fibonacci;
+
+     my $heap = Heap::Fibonacci->new;
+     my $elem;
+
+     foreach $i ( 1..100 ) {
+         $elem = NumElem( $i );
+         $heap->add( $elem );
+     }
+
+     while( defined( $elem = $heap->extract_minimum ) ) {
+         print "Smallest is ", $elem->val, "\n";
+     }
+
+DESCRIPTION
+===========
+
+   Heap::Elem::Num is used to wrap numeric values into an element that can
+be managed on a heap.  The top of the heap will have the smallest element
+still remaining.  (See *Note Heap/Elem/NumRev: Heap/Elem/NumRev, if you
+want the heap to always return the largest element.)
+
+   The details of the Elem interface are described in *Note Heap/Elem:
+Heap/Elem,.
+
+   The details of using a Heap interface are described in *Note Heap:
+Heap,.
+
+AUTHOR
+======
+
+   John Macdonald, jmm@elegant.com
+
+SEE ALSO
+========
+
+   Heap(3), Heap::Elem(3), Heap::Elem::NumRev(3).
+
+
+File: pm.info,  Node: Heap/Elem/NumRev,  Next: Heap/Elem/Ref,  Prev: Heap/Elem/Num,  Up: Module List
+
+Perl extension for Reversed Numeric Heap Elements
+*************************************************
+
+NAME
+====
+
+   Heap::Elem::NumRev - Perl extension for Reversed Numeric Heap Elements
+
+SYNOPSIS
+========
+
+     use Heap::Elem::NumRev( NumRElem );
+     use Heap::Fibonacci;
+
+     my $heap = Heap::Fibonacci->new;
+     my $elem;
+
+     foreach $i ( 1..100 ) {
+         $elem = NumRElem( $i );
+         $heap->add( $elem );
+     }
+
+     while( defined( $elem = $heap->extract_minimum ) ) {
+         print "Largest is ", $elem->val, "\n";
+     }
+
+DESCRIPTION
+===========
+
+   Heap::Elem::NumRev is used to wrap numeric values into an element that
+can be managed on a heap.  The top of the heap will have the largest
+element still remaining.  (See *Note Heap/Elem/Num: Heap/Elem/Num, if you
+want the heap to always return the smallest element.)
+
+   The details of the Elem interface are described in *Note Heap/Elem:
+Heap/Elem,.
+
+   The details of using a Heap interface are described in *Note Heap:
+Heap,.
+
+AUTHOR
+======
+
+   John Macdonald, jmm@elegant.com
+
+SEE ALSO
+========
+
+   Heap(3), Heap::Elem(3), Heap::Elem::Num(3).
+
+
+File: pm.info,  Node: Heap/Elem/Ref,  Next: Heap/Elem/RefRev,  Prev: Heap/Elem/NumRev,  Up: Module List
+
+Perl extension for Object Reference Heap Elements
+*************************************************
+
+NAME
+====
+
+   Heap::Elem::Ref - Perl extension for Object Reference Heap Elements
+
+SYNOPSIS
+========
+
+     use Heap::Elem::Ref( RefElem );
+     use Heap::Fibonacci;
+
+     my $heap = Heap::Fibonacci->new;
+     my $elem;
+
+     foreach $i ( 1..100 ) {
+         $obj = myObject->new( $i );
+         $elem = RefElem( $obj );
+         $heap->add( $elem );
+     }
+
+     while( defined( $elem = $heap->extract_minimum ) ) {
+         # assume that myObject object have a method I<printable>
+         print "Smallest is ", $elem->val->printable, "\n";
+     }
+
+DESCRIPTION
+===========
+
+   Heap::Elem::Ref is used to wrap object reference values into an element
+that can be managed on a heap.  Each referenced object must have a method
+cmp which can compare itself with any of the other objects that have
+references on the same heap.  These comparisons must be consistant with
+normal arithmetic.  The top of the heap will have the smallest (according
+to cmp) element still remaining.  (See *Note Heap/Elem/RefRev:
+Heap/Elem/RefRev, if you want the heap to always return the largest
+element.)
+
+   The details of the Elem interface are described in *Note Heap/Elem:
+Heap/Elem,.
+
+   The details of using a Heap interface are described in *Note Heap:
+Heap,.
+
+AUTHOR
+======
+
+   John Macdonald, jmm@elegant.com
+
+SEE ALSO
+========
+
+   Heap(3), Heap::Elem(3), Heap::Elem::RefRev(3).
+
+
+File: pm.info,  Node: Heap/Elem/RefRev,  Next: Heap/Elem/Str,  Prev: Heap/Elem/Ref,  Up: Module List
+
+Perl extension for reversed Object Reverence Heap Elements
+**********************************************************
+
+NAME
+====
+
+   Heap::Elem::RefRev - Perl extension for reversed Object Reverence Heap
+Elements
+
+SYNOPSIS
+========
+
+     use Heap::Elem::RefRev( RefRElem );
+     use Heap::Fibonacci;
+
+     my $heap = Heap::Fibonacci->new;
+     my $elem;
+
+     foreach $i ( 1..100 ) {
+         $obj = myObject->new( $i );
+         $elem = RefRElem( $obj );
+         $heap->add( $elem );
+     }
+
+     while( defined( $elem = $heap->extract_minimum ) ) {
+         # assume that myObject object have a method I<printable>
+         print "Largest is ", $elem->val->printable, "\n";
+     }
+
+DESCRIPTION
+===========
+
+   Heap::Elem::RefRev is used to wrap object reference values into an
+element that can be managed on a heap.  Each referenced object must have a
+method cmp which can compare itself with any of the other objects that
+have references on the same heap.  These comparisons must be consistant
+with normal arithmetic.  The top of the heap will have the largest
+(according to cmp) element still remaining.  (See *Note Heap/Elem/Ref:
+Heap/Elem/Ref, if you want the heap to always return the smallest element.)
+
+   The details of the Elem interface are described in *Note Heap/Elem:
+Heap/Elem,.
+
+   The details of using a Heap interface are described in *Note Heap:
+Heap,.
+
+AUTHOR
+======
+
+   John Macdonald, jmm@elegant.com
+
+SEE ALSO
+========
+
+   Heap(3), Heap::Elem(3), Heap::Elem::Ref(3).
+
+
+File: pm.info,  Node: Heap/Elem/Str,  Next: Heap/Elem/StrRev,  Prev: Heap/Elem/RefRev,  Up: Module List
+
+Perl extension for String Heap Elements
+***************************************
+
+NAME
+====
+
+   Heap::Elem::Str - Perl extension for String Heap Elements
+
+SYNOPSIS
+========
+
+     use Heap::Elem::Str( StrElem );
+     use Heap::Fibonacci;
+
+     my $heap = Heap::Fibonacci->new;
+     my $elem;
+
+     foreach $i ( 'aa'..'bz' ) {
+         $elem = StrElem( $i );
+         $heap->add( $elem );
+     }
+
+     while( defined( $elem = $heap->extract_minimum ) ) {
+         print "Smallest is ", $elem->val, "\n";
+     }
+
+DESCRIPTION
+===========
+
+   Heap::Elem::Str is used to wrap string values into an element that can
+be managed on a heap.  The top of the heap will have the smallest element
+still remaining.  (See *Note Heap/Elem/StrRev: Heap/Elem/StrRev, if you
+want the heap to always return the largest element.)
+
+   The details of the Elem interface are described in *Note Heap/Elem:
+Heap/Elem,.
+
+   The details of using a Heap interface are described in *Note Heap:
+Heap,.
+
+AUTHOR
+======
+
+   John Macdonald, jmm@elegant.com
+
+SEE ALSO
+========
+
+   Heap(3), Heap::Elem(3), Heap::Elem::StrRev(3).
+
+
+File: pm.info,  Node: Heap/Elem/StrRev,  Next: Heap/Fibonacci,  Prev: Heap/Elem/Str,  Up: Module List
+
+Perl extension for Reversed String Heap Elements
+************************************************
+
+NAME
+====
+
+   Heap::Elem::StrRev - Perl extension for Reversed String Heap Elements
+
+SYNOPSIS
+========
+
+     use Heap::Elem::StrRev( StrRElem );
+     use Heap::Fibonacci;
+
+     my $heap = Heap::Fibonacci->new;
+     my $elem;
+
+     foreach $i ( 'aa'..'bz' ) {
+         $elem = StrRElem( $i );
+         $heap->add( $elem );
+     }
+
+     while( defined( $elem = $heap->extract_minimum ) ) {
+         print "Largest is ", $elem->val, "\n";
+     }
+
+DESCRIPTION
+===========
+
+   Heap::Elem::StrRev is used to wrap string values into an element that
+can be managed on a heap.  The top of the heap will have the largest
+element still remaining.  (See *Note Heap/Elem/Str: Heap/Elem/Str, if you
+want the heap to always return the smallest element.)
+
+   The details of the Elem interface are described in *Note Heap/Elem:
+Heap/Elem,.
+
+   The details of using a Heap interface are described in *Note Heap:
+Heap,.
+
+AUTHOR
+======
+
+   John Macdonald, jmm@elegant.com
+
+SEE ALSO
+========
+
+   Heap(3), Heap::Elem(3), Heap::Elem::Str(3).
+
+

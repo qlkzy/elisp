@@ -1,0 +1,1647 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Data/MagicTie,  Next: Data/MagicTie/BerkeleyDB,  Prev: Data/Locations,  Up: Module List
+
+This module implements a proxy like Perl TIE interface over local and remote Berkeley DB files containing BLOBs
+***************************************************************************************************************
+
+NAME
+====
+
+   Data::MagicTie - This module implements a proxy like Perl TIE interface
+over local and remote Berkeley DB files containing BLOBs
+
+SYNOPSIS
+========
+
+     use Data::MagicTie;
+     	use Fcntl;
+
+     my $hash = tie %a,'Data::MagicTie','test';
+     my $hash = tie %a,'Data::MagicTie','test',( Q => 7, mode => O_RDONLY); #query 7 dbs in one
+     my $hash = tie %a,'Data::MagicTie','test',( Q => 1, noft => 1); #normal hash
+     my $hash = tie %a,'Data::MagicTie','test',( style => "BerkeleyDB"); #sleepycat-ish :-)
+     my $hash = tie %a,'Data::MagicTie','test',( lr => 1, dbms_host => 'me.jrc.it'); #cool way
+
+     $a{mykey} = 'myvalue'; #store
+     my $b = $a{mykey}; #fetch
+     #iterator
+     while (($k,$v) = each %a) {
+     	my $c = $v;
+     };
+     #clear
+     %a=();
+
+     #basic delegation model - first match %a then %b
+     my $hash1 = tie %b,'Data::MagicTie','test1';
+     $hash1->set_parent($hash);
+     print $b{mykey}; # looks up in %a :)
+     untie %b;
+
+     untie %a;
+
+DESCRIPTION
+===========
+
+   This module acts as a proxy for the actual implementations of local and
+remote counterparts Data::MagicTie::DBMS(3) Data::MagicTie::DB_File(3)
+Data::MagicTie::BerkeleyDB(3) modules.  It allows to an application script
+to transparently TIE hashes and arrays to either local or remote Berkeley
+DB files, containing key/value pairs. The values can be either strings or
+in-memory data structures (BLOBs) - see Storable(3); each tie database can
+then be splitted up on several files for eccifency and reduce the size of
+the actual database files. More, for query purposes only, tie operations
+can be "chained" to transparently access different databases; such a chain
+feature does not need any additional field in the database, but it is just
+using in-memory Perl OO methods to delegate read operations (FETCH,
+EXISTS, FIRSTKEY, NETXKEY). I.e. a look up for a key or value in a
+database ends up in a read operation in the current database or in one of
+its "delegates".
+
+   Each atomic operation using the Perl operators actually trigger either
+local or remote database lookups and freeze/thaw operations on values.
+Perl constructs such as each, keys and values can be used to iterate over
+the content of a tied database; when the file is splitted over several
+single files the module iterates over the whole set of files. Even when a
+parent (delegate) is set for a database these operators allow to scan the
+whole set of storages (note: this feature might be not efficent over large
+databases).
+
+   By using such a Perl TIE model is becoming easy to write simple "cache"
+systems for example using the Apache Web server and mod_perl. This could
+really important for RDF storages and cumbersome and cpu-consuming
+queries. (see RDFStore::Model and RDFStore::FindIndex)
+
+CONSTRUCTORS
+============
+
+   The following methods construct/tie Data::MagicTie databases and
+objects:
+
+$db_hash = tie %b, 'Data::MagicTie', $filename, %whateveryoulikeit;
+     Tie the hash %b to a MagicTie database called $filename. The
+     %whateveryoulikeit hash contains a set of configuration options about
+     how and where store actual data.  Possible options are the following:
+
+    lr
+          This is an integer flag 1/0 if a database is going to be stored
+          in the local filesystem or on a remote DBMS(3) server - see
+          Data::MagicTie::DBMS(3). Default is 0, local storage
+
+    Q
+          An integer about how many files to split around the database.
+          Default to 1 (normal perltie behaviour).  Please note that set a
+          number too high here might exceed you operating system MAX
+          filedescriptors threshold (see man dbmsd(8) and DBMS(3) if
+          installed on your system)
+
+    mode
+          Some valid predefied constant specifing if the database must be
+          created, opened read/write/readonly.  For
+          Data::MagicTie::DB_File(3) and Data::MagicTie::DBMS(3) possible
+          values are O_CREAT, O_RDWR or O_RDONLY. For
+          Data::MagicTie::BerkeleyDB(3) it culd either be DB_CREATE or
+          DB_RDONLY - see DB_File(3) and BerkeleyDB(3)
+
+    style
+          A string identifing if the database is going to be
+          Data::MagicTie::DB_File(3), Data::MagicTie::BerkeleyDB(3) or
+          Data::MagicTie::DBMS(3). Possible values are 'DB_File',
+          'BerkeleyDB' or 'DBMS'.  Default is 'DB_File'.
+
+    noft
+          This is in integer flag 1/0 to tell to the Data::MagicTie module
+          whether or not use Storable(3) freeze/thaw operations on values.
+          This could be renamed blobs option. See BUGS section below.
+
+    dbms_host
+          This option is only valid for Data::MagicTie::DBMS(3) style and
+          tells to the system which is the IP address or machine name of
+          the DBMS(3) server. Default is 'localhost'. See man dbmsd(8)
+
+    dbms_port
+          This option is only valid for Data::MagicTie::DBMS(3) style and
+          tells to the system which is the TCP/IP port to connect to for
+          the DBMS protocol. Default is '1234'. See man dbmsd(8)
+
+    $db_array = tie @b, 'Data::MagicTie', $filename, %whateveryoulikeit;
+          Tie the array @b to a MagicTie database called $filename. The
+          %whateveryoulikeit hash is the same as above.
+
+METHODS
+=======
+
+   Most of the method are common to the standard perltie(3) interface
+(sync, TIEHASH, TIEARRAY, FETCH, STORE, EXISTS, FIRSTKEY, NEXTKEY, CLEAR,
+DELETE, DESTROY)
+
+   In addition Data::MagicTie provides additional method that allow to
+magane a simple delegation or pass-through model for database for read
+methods such as FETCH, EXISTS, FIRSTKEY, NEXTKEY. These are the following:
+
+get_Options()
+     Return an hash reference containing all the major options plus the
+     directory and filename of the database. See CONSTRUCTORS
+
+set_parent($ref)
+     Set the parent delegate to which forward read requests. $ref must be
+     a valid Data::MagicTie blessed Perl object, othewise the delegate is
+     not set. After this method call any FETCH, EXISTS, FIRSTKEY or
+     NEXTKEY invocation (normally automagically called by Perl for you :-)
+     starts up a chain of requests to parents till the result has been
+     found or undef.
+
+get_parent()
+     Return a valid Data::MagicTie blessed Perl object pointing to the
+     parent of a tied database
+
+reset_parent()
+     Remove the parent of the database and the operations are back to
+     normal.
+
+EXAMPLES
+========
+
+delegates
+     use Data::MagicTie;
+
+     my $hash = tie %a,'Data::MagicTie','test'; my $hash1 = tie
+     %b,'Data::MagicTie','test1'; my $hash2 = tie
+     %c,'Data::MagicTie','test2';
+
+     for (1..10) {         $a{"A".$_} = "valueA".$_;         $b{"B".$_} =
+     "valueB".$_;         $c{"C".$_} = "valueC".$_; };
+
+     #basic delegation model - first match %a then %a1 then %2
+     $hash->set_parent($hash1); $hash1->set_parent($hash2); print $a{B3};
+     # looks up in %b print $a{C9}; # looks up in %c
+
+     #I think this one is much cooler :-> my $hash3 = tie
+     %d,'Data::MagicTie','test3',( lr => 1 ); my $hash4 = tie
+     %e,'Data::MagicTie','test4',( style => "BerkeleyDB" );
+
+     for (1..10) {         $d{"D".$_} = "valueD".$_;         $e{"E".$_} =
+     "valueE".$_; };
+
+     #...and then use local or remote databases transparently
+     $hash2->set_parent($hash3); $hash3->set_parent($hash4); print $a{D1};
+     # really the Perl way of doing ;-) print $a{E1},"\n";
+
+     #iterator while (($k,$v) = each %a) {         print $k,"=",$v,"\n"; };
+
+     undef $hash; untie %a; undef $hash1; untie %b; undef $hash2; untie %c;
+     undef $hash3; untie %d; undef $hash4; untie %e;
+
+BUGS
+====
+
+     - The current implementation of TIE supports only the TIEHASH and TIEARRAY interfaces.
+     - Data::MagicTie::DBMS does not support TIEARRAY yet.
+     - Data::MagicTie ARRAY support is not complete and probably broken
+     - a well-known problem using BLOBs is the following:
+     
+     	tie %a,"Data::MagicTie","test"; #by default is using BLOBs
+     	$a{key1} = sub { print "test"; }; # works
+     	$a{key2} = { a => [ 1,2,3], b => { tt => [6,7],zz => "test1234" } }; # it works too
+     	$a{key3}->{this}->{is}->{not} = sub { "working"; }; #does not always work
+
+     The problem seems to be realated to the fact Perl is "automagically" extending/defining
+     hashes (or other in-memory structures). As soon as you start to reference a value it
+     gets created "spontaneously" :-(
+     E.g.
+     	$a = {};
+     	$a->{a1} = { a2 => [] };
+
+     $b->{a1}->{a2} = []; # this is the same of the two lines above
+
+     In the Data::MagicTie realm this problem affects the Storable freeze/thaw method results.
+     Any idea how to fix this?
+
+SEE ALSO
+========
+
+   perltie(3) Storable(3) DBMS(3) Data::MagicTie::DBMS(3)
+Data::MagicTie::DB_File(3) Data::MagicTie::BerkeleyDB(3)
+
+AUTHOR
+======
+
+   Alberto Reggiori <alberto.reggiori@jrc.it> You can send your postcards
+and bugfixes to
+
+Contact Details
+===============
+
+     TP270 - Reliable Information Technologies
+     Institute for Systems, Informatics and Safety
+     Joint Research Center of the European Community
+     Ispra VA
+     21020 Italy
+
+     Fax +39 332 78 9185
+
+
+File: pm.info,  Node: Data/MagicTie/BerkeleyDB,  Next: Data/MagicTie/DBMS,  Prev: Data/MagicTie,  Up: Module List
+
+This module is used by Data::MagicTie(3) to get a tied over SleepyCat BerkeleyDB files.
+***************************************************************************************
+
+NAME
+====
+
+   Data::MagicTie::BerkeleyDB - This module is used by Data::MagicTie(3)
+to get a tied over SleepyCat BerkeleyDB files.
+
+SYNOPSIS
+========
+
+   see BerkeleyDB(3)
+
+DESCRIPTION
+===========
+
+SEE ALSO
+========
+
+   http://www.sleepycat.com
+
+AUTHOR
+======
+
+   Alberto Reggiori <alberto.reggiori@jrc.it>
+
+
+File: pm.info,  Node: Data/MagicTie/DBMS,  Next: Data/MagicTie/DB_File,  Prev: Data/MagicTie/BerkeleyDB,  Up: Module List
+
+This module is used by Data::MagicTie(3) to get a tied remote interface over TCP/IP using DBMS(3) and DB_File(3)
+****************************************************************************************************************
+
+NAME
+====
+
+   Data::MagicTie::DBMS - This module is used by Data::MagicTie(3) to get
+a tied remote interface over TCP/IP using DBMS(3) and DB_File(3)
+
+SYNOPSIS
+========
+
+   see DBMS(3) and DB_File(3)
+
+DESCRIPTION
+===========
+
+SEE ALSO
+========
+
+   http://www.sleepycat.com
+
+AUTHOR
+======
+
+   Alberto Reggiori <alberto.reggiori@jrc.it>
+
+
+File: pm.info,  Node: Data/MagicTie/DB_File,  Next: Data/PropertyList,  Prev: Data/MagicTie/DBMS,  Up: Module List
+
+This module is used by Data::MagicTie(3) to get a tied tied DB_File with locking support.
+*****************************************************************************************
+
+NAME
+====
+
+   Data::MagicTie::DB_File - This module is used by Data::MagicTie(3) to
+get a tied tied DB_File with locking support.
+
+SYNOPSIS
+========
+
+   see DB_File(3)
+
+DESCRIPTION
+===========
+
+SEE ALSO
+========
+
+   http://www.sleepycat.com
+
+AUTHOR
+======
+
+   Alberto Reggiori <alberto.reggiori@jrc.it>
+
+
+File: pm.info,  Node: Data/PropertyList,  Next: Data/Random,  Prev: Data/MagicTie/DB_File,  Up: Module List
+
+Convert arbitrary objects to/from strings
+*****************************************
+
+NAME
+====
+
+   Data::PropertyList - Convert arbitrary objects to/from strings
+
+SYNOPSIS
+========
+
+     use Data::PropertyList qw(astext fromtext);
+     
+     $hash_ref = { 'items' => [ 7 .. 11 ], 'key' => 'value' };
+     $string = astext($hash_ref);
+     # ...
+     $hash_ref = fromtext($string);
+     print $hash_ref->{'items'}[0];
+     
+     $array_ref = [ 1, { 'key' => 'value' }, 'Omega' ];
+     $string = astext($array_ref);
+     # ...
+     $array_ref = fromtext($string, '-array'=>1 );
+     print $array_ref->[1]{'key'};
+
+DESCRIPTION
+===========
+
+   Data::Propertylist provides functions that turn data structures with
+nested references into NeXT's Property List text format and back again.
+
+   You may find this useful for saving and loading application information
+in text files, or perhaps for generating error messages while debugging.
+
+astext( $reference ) : $propertylist_string;
+     Writes out a nested Perl data structure in NeXT property list format.
+
+fromtext( $propertylist_string ) : $hash_ref
+fromtext( $propertylist_string, '-array'=>1 ) : $array_ref
+     Reconstructs a Perl data structure of nested references and scalars
+     from a NeXT property list. Use the -array flag if the string encodes
+     an array rather than a hash.
+
+The Property List Format
+------------------------
+
+   *The below is excerpted from a draft of the NeXT PropertyList(5) man
+page:*
+
+   A property list organizes data into named values and lists of values.
+Property lists are used by the NEXTSTEP user defaults system (among other
+things).
+
+   In simple terms, a property list contains strings, binary data, arrays
+of items, and dictionaries.  These four kinds of items can be combined in
+various ways, as described below.
+
+   A string is enclosed in double quotation marks; for example, "This is a
+string." (The period is included in this string.)  The quotation marks can
+be omitted if the string is composed strictly of alphanumeric characters
+and contains no white space (numbers are handled as strings in property
+lists).  Though the property list format uses ASCII for strings, note that
+NEXTSTEP uses Unicode.  You may see strings containing unreadable
+sequences of ASCII characters; these are used to represent Unicode
+characters.
+
+   Binary data is enclosed in angle brackets and encoded in hexadecimal
+ASCII; for example, <0fbd777 1c2735ae>.  Spaces are ignored.
+
+   An array is enclosed in parentheses, with the elements separated by
+commas; for example, ("San Francisco", "New York", "London").  The items
+don't all have to be of the same type (for example, all strings) - but
+they normally should be.  Arrays can contain strings, binary data, other
+arrays, or dictionaries.
+
+   A dictionary is enclosed in curly braces, and contains a list of keys
+with their values.  Each key-value pair ends with a semicolon.  Here's a
+sample dictionary: { user = maryg; "error string" = "core dump"; code =
+<fead0007>; }.  (Note the omission of quotation marks for single-word
+alphanumeric strings.) Values don't all have to be the same type, since
+their types are usually defined by whatever pro- gram uses them (in this
+example, the program using the dic- tionary knows that user is a string
+and code is binary data).  Dictionaries can contain strings, binary data,
+arrays, and other dictionaries.
+
+   Below is a sample of a more complex property list, taken from a user's
+defaults system (see defaults(1)).  The pro- perty list itself is a
+dictionary with keys "Clock," "NSGlobalDomain," and so on; each value is
+also a diction- ary, which contains the individual defaults.
+
+     {
+     	Clock = {ClockStyle = 3; };
+     	NSGlobalDomain = {24HourClock = Yes; Language = English; };
+     	NeXT1 = {Keymap = /NextLibrary/Keyboards/NeXTUSA; };
+     	Viewer = {NSBrowserColumnWidth = 145; "NSWindow Frame
+     Preferences" = "5 197 395 309 "; };
+     	Workspace = {SelectedTabIndex = 0; WindowOrigin = "-75.000000"; };
+     	pbs = {};
+     }
+
+   *Please note that the above documentation is incomplete, and that the
+current implementation does not support all of the features discussed
+above.*
+
+EXAMPLE
+=======
+
+   Here's an example of a PropertyList-encoded data structure:
+
+     my $produce_info = {
+       'red' =>     { 'fruit' => [ { 'name' => 'apples',
+     				  'source' => 'Washington' } ],
+     		  'tubers' => [ { 'name' => 'potatoes',
+     				  'source' => 'Idaho' } ] },
+       'orange' =>  { 'fruit' => [ { 'name' => 'oranges',
+     				  'source' => 'Florida' } ] }
+     };
+     print astext( $produce_info);
+
+   Examine STDOUT, et voila!
+
+     orange = {
+       fruit = (
+         {
+     	name = oranges;
+     	source = Florida;
+         },
+       );
+     };
+     red = {
+       fruit = (
+         {
+     	name = apples;
+     	source = Washington;
+         },
+       );
+       tubers = (
+         {
+     	name = potatoes;
+     	source = Washington;
+         },
+       );
+     };
+
+PREREQUISITES AND INSTALLATION
+==============================
+
+   This package requires the String::Escape module. It should run on any
+standard Perl 5 installation.
+
+   To install this package, download and unpack the distribution archive
+from http://www.evoscript.com/dist/ and execute the standard "perl
+Makefile.PL", "make test", "make install" sequence.
+
+STATUS AND SUPPORT
+==================
+
+   This release of Data::PropertyList is intended for public review and
+feedback.  It has been tested in several environments and used in
+commercial production, but it should be considered "alpha" pending that
+feedback and fixes for some of the below bugs.
+
+     Name            DSLI  Description
+     --------------  ----  ---------------------------------------------
+     Data::
+     ::PropertyList  adpf  Convert arbitrary objects to/from strings
+
+   Further information and support for this module is available at
+<www.evoscript.com>.
+
+   Please report bugs or other problems to <bugs@evoscript.com>.
+
+   The following changes are in progress or under consideration:
+
+Better Whitespace Parsing
+     Code is currently picky about parsing whitespace, and stilted about
+     printing it. In particular, a newline is required after each item in
+     an array or hash.
+
+Restore Classes During Parsing
+     The class of blessed objects is indicated in `/* ... */' comments
+     embedded in the output, but are not yet restored when reading.
+
+Restore Circular References During Parsing
+     Circular references are indicated in `/* ... */' comments embedded in
+     the output, but are not yet restored when reading.
+
+NeXT Binary Format
+     Doesn't currently parse or write NeXT's <FFFF> binary format.
+
+SEE ALSO
+========
+
+   Similar to PropertyList.pm by Markus Felten
+<markus@arlac.rhein-main.de>.
+
+   The packages Data::Dumper and FreezeThaw (available from CPAN) also
+stream and destream data structures.
+
+AUTHORS AND COPYRIGHT
+=====================
+
+   Copyright 1996, 1997, 1998 Evolution Online Systems, Inc.
+
+   You may use this software for free under the terms of the Artistic
+License
+
+   Contributors: M. Simon Cavalletto `<simonm@evolution.com>', Eleanor J.
+Evans `<piglet@evolution.com>', Jeremy G. Bishop `<jeremy@evolution.com>',
+Eric Schneider `<roark@evolution.com>'
+
+
+File: pm.info,  Node: Data/Random,  Next: Data/Random/WordList,  Prev: Data/PropertyList,  Up: Module List
+
+Perl module to generate random data
+***********************************
+
+NAME
+====
+
+   Data::Random - Perl module to generate random data
+
+SYNOPSIS
+========
+
+     use Data::Random qw(:all);
+     
+     my @random_words = rand_words( wordlist => '/usr/dict/words', size => 10 );
+     
+     my @random_chars = rand_chars( set => 'all', min => 5, max => 8 );
+     
+     my @random_set = rand_set( set => \@set, size => 5 );
+     
+     my $random_enum = rand_enum( set => \@set );
+     
+     my $random_date = rand_date();
+     
+     my $random_time = rand_time();
+     
+     my $random_datetime = rand_datetime();
+
+DESCRIPTION
+===========
+
+   A module used to generate random data.  Useful mostly for test programs.
+
+METHODS
+=======
+
+rand_words()
+------------
+
+   This returns a list of random words given a wordlist.  See below for
+possible parameters.
+
+   * wordlist - the path to the wordlist file.  A lot of systems have one
+     at /usr/dict/words.  You can also optionally supply a
+     Data::Random::WordList object to keep a persistent wordlist.
+
+   * min - the minimum number of words to return.  The default is 1.
+
+   * max - the maximum number of words to return.  The default is 1.
+
+   * size - the number of words to return.  The default is 1.  If you
+     supply a value for 'size', then 'min' and 'max' aren't paid attention
+     to.
+
+   * shuffle - whether or not the words should be randomly shuffled.  Set
+     this to 0 if you don't want the words shuffled.  The default is 1.
+     Random::Data::WordList returns words in the order that they're viewed
+     in the word list file, so shuffling will make sure that the results
+     are a little more random.
+
+rand_chars()
+------------
+
+   This returns a list of random characters given a set of characters.
+See below for possible parameters.
+
+   * set - the set of characters to be used.  This value can be either a
+     reference to an array of strings, or one of the following:
+
+          alpha        - alphabetic characters: a-z, A-Z
+          upperalpha   - upper case alphabetic characters: A-Z
+          loweralpha   - lower case alphabetic characters: a-z
+          numeric      - numeric characters: 0-9
+          alphanumeric - alphanumeric characters: a-z, A-Z, 0-9
+          char         - non-alphanumeric characters: # ~ ! @ $ % ^ & * ( ) _ + = - { } | : " < > ? / . ' ; ] [ \ `
+          all          - all of the above
+          
+          =item *
+          
+          min - the minimum number of characters to return.  The default is 0.
+
+   * max - the maximum number of characters to return.  The default is the
+     size of the set.
+
+   * size - the number of characters to return.  The default is 1.  If you
+     supply a value for 'size', then 'min' and 'max' aren't paid attention
+     to.
+
+   * shuffle - whether or not the characters should be randomly shuffled.
+     Set this to 0 if you want the characters to stay in the order
+     received.  The default is 1.
+
+rand_set()
+----------
+
+   This returns a random set of elements given an initial set.  See below
+for possible parameters.
+
+   * set - the set of strings to be used.  This should be a reference to
+     an array of strings.
+
+   * min - the minimum number of strings to return.  The default is 0.
+
+   * max - the maximum number of strings to return.  The default is the
+     size of the set.
+
+   * size - the number of strings to return.  The default is 1.  If you
+     supply a value for 'size', then 'min' and 'max' aren't paid attention
+     to.
+
+   * shuffle - whether or not the strings should be randomly shuffled.
+     Set this to 0 if you want the strings to stay in the order received.
+     The default is 1.
+
+rand_enum()
+-----------
+
+   This returns a random element given an initial set.  See below for
+possible parameters.
+
+   * set - the set of strings to be used.  This should be a reference to
+     an array of strings.
+
+rand_date()
+-----------
+
+   This returns a random date in the form "YYYY-MM-DD".  2-digit years are
+not currently supported.  Efforts are made to make sure you're returned a
+truly valid date-ie, you'll never be returned the date February 31st.  See
+the options below to find out how to control the date range.  Here are a
+few examples:
+
+     # returns a date somewhere in between the current date, and one year from the current date
+     $date = rand_date();
+     
+     # returns a date somewhere in between September 21, 1978 and September 21, 1979
+     $date = rand_date( min => '1978-9-21' );
+     
+     # returns a date somewhere in between September 21, 1978 and the current date
+     $date = rand_date( min => '1978-9-21', max => 'now' );
+     
+     # returns a date somewhere in between the current date and September 21, 2008
+     $date = rand_date( min => 'now', max => '2008-9-21' );
+     
+     See below for possible parameters.
+
+   * min - the minimum date to be returned. It should be in the form
+     "YYYY-MM-DD" or you can alternatively use the string "now" to
+     represent the current date.  The default is the current date;
+
+   * max - the maximum date to be returned. It should be in the form
+     "YYYY-MM-DD" or you can alternatively use the string "now" to
+     represent the current date.  The default is one year from the minimum
+     date;
+
+rand_time()
+-----------
+
+   This returns a random time in the form "HH:MM:SS".  24 hour times are
+supported.  See the options below to find out how to control the time
+range.  Here are a few examples:
+
+     # returns a random 24-hr time (between 00:00:00 and 23:59:59)
+     $time = rand_time();
+     
+     # returns a time somewhere in between 04:00:00 and the end of the day
+     $time = rand_time( min => '4:0:0' );
+     
+     # returns a time somewhere in between 8:00:00 and the current time (if it's after 8:00)
+     $time = rand_time( min => '12:00:00', max => 'now' );
+     
+     # returns a date somewhere in between the current time and the end of the day
+     $time = rand_time( min => 'now' );
+     
+     See below for possible parameters.
+
+   * min - the minimum time to be returned. It should be in the form
+     "HH:MM:SS" or you can alternatively use the string "now" to represent
+     the current time.  The default is 00:00:00;
+
+   * max - the maximum time to be returned. It should be in the form
+     "HH:MM:SS" or you can alternatively use the string "now" to represent
+     the current time.  The default is 23:59:59;
+
+rand_datetime()
+---------------
+
+   This returns a random date and time in the form "YYYY-MM-DD HH:MM:SS".
+See the options below to find out how to control the date/time range.
+Here are a few examples:
+
+     # returns a date somewhere in between the current date/time, and one year from the current date/time
+     $datetime = rand_datetime();
+     
+     # returns a date somewhere in between 4:00 September 21, 1978 and 4:00 September 21, 1979
+     $datetime = rand_datetime( min => '1978-9-21 4:0:0' );
+     
+     # returns a date somewhere in between 4:00 September 21, 1978 and the current date
+     $datetime = rand_datetime( min => '1978-9-21 4:0:0', max => 'now' );
+     
+     # returns a date somewhere in between the current date/time and the end of the day September 21, 2008
+     $datetime = rand_datetime( min => 'now', max => '2008-9-21 23:59:59' );
+     
+     See below for possible parameters.
+
+   * min - the minimum date/time to be returned. It should be in the form
+     "YYYY-MM-DD HH:MM:SS" or you can alternatively use the string "now"
+     to represent the current date/time.  The default is the current
+     date/time;
+
+   * max - the maximum date/time to be returned. It should be in the form
+     "YYYY-MM-DD HH:MM:SS" or you can alternatively use the string "now"
+     to represent the current date/time.  The default is one year from the
+     minimum date/time;
+
+VERSION
+=======
+
+   0.01
+
+AUTHOR
+======
+
+   Adekunle Olonoh, ade@bottledsoftware.com
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000 Adekunle Olonoh. All rights reserved. This program
+is free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+SEE ALSO
+========
+
+   Data::Random::WordList
+
+
+File: pm.info,  Node: Data/Random/WordList,  Next: Data/Reporter,  Prev: Data/Random,  Up: Module List
+
+Perl module to get random words from a word list
+************************************************
+
+NAME
+====
+
+   Data::Random::WordList - Perl module to get random words from a word
+list
+
+SYNOPSIS
+========
+
+     use Data::Random::WordList;
+     
+     my $wl = new Data::Random::WordList( wordlist => '/usr/dict/words' );
+
+     my @rand_words = $wl->get_words(10);
+
+     $wl->close();
+
+DESCRIPTION
+===========
+
+   Data::Random::WordList is a module that manages a file containing a
+list of words.
+
+   The module expects each line of the word list file to contain only one
+word.  It could thus be easily used to select random lines from a file,
+but for coherency's sake, I'll keep referring to each line as a word.
+
+   The module uses a persistent filehandle so that there isn't a lot of
+overhead every time you want to fetch a list of random words.  However,
+it's much more efficient to grab multiple words at a time than it is to
+fetch one word at a time multiple times.
+
+   The module also refrains from reading the whole file into memory, so it
+can be safer to use with larger files.
+
+METHODS
+=======
+
+new()
+-----
+
+   Returns a reference to a new Data::Random::WordList object.  Use the
+"wordlist" param to initialize the object:
+
+   * wordlist - the path to the wordlist file.
+
+get_words([NUM])
+----------------
+
+   NUM contains the number of words you want from the wordlist.  NUM
+defaults to 1 if it's not specified.  get_words() dies if NUM is greater
+than the number of words in the wordlist.  This function returns an array
+or an array reference depending on the context in which it's called.
+
+close()
+-------
+
+   Closes the filehandle associated with the word list.  It's good
+practice to do this every time you're done with the word list.
+
+VERSION
+=======
+
+   0.01
+
+AUTHOR
+======
+
+   Adekunle Olonoh, ade@bottledsoftware.com
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000 Adekunle Olonoh. All rights reserved. This program
+is free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+SEE ALSO
+========
+
+   Data::Random
+
+
+File: pm.info,  Node: Data/Reporter,  Next: Data/Reporter/Datasource,  Prev: Data/Random/WordList,  Up: Module List
+
+Report generator.
+*****************
+
+NAME
+====
+
+   Reporter - Report generator.
+
+SYNOPSIS
+========
+
+     use strict;
+     use Data::Reporter::RepFormat;
+     use Data::Reporter;
+     use Data::Reporter::Filesource;
+
+     sub HEADER($$$$) {
+        my ($reporter, $sheet, $rep_actline, $rep_lastline) = @_;
+        $sheet->MVPrint(10,0, 'This is the header');
+        $sheet->MVPrint(10,1, 'This is the page :');
+        $sheet->Print($reporter->page());
+     }
+
+     sub TITLE($$$$) {
+        my ($reporter, $sheet, $rep_actline, $rep_lastline) = @_;
+        $sheet->MVPrint(10,0, 'This is the title');
+     }
+
+     sub DETAIL($$$$) {
+        my ($reporter, $sheet, $rep_actline, $rep_lastline) = @_;
+        $sheet->MVPrint(10,0, 'This is the detail');
+        $sheet->MVPrint(10,1, 'This is the begin of the report') if ($reporter->{BOR});
+     }
+
+     #main
+     {
+        $source = new Data::Reporter::Filesource(File => "inputfile");
+        my $report = new Data::Reporter();
+        $report->configure(
+            Width => 105,
+            Height => 66,
+            SubHeaher => \&HEADER,
+            SubTitle => \&TITLE,
+            SubDetail => \&DETAIL,
+            Source => $source,
+            File_name => "OUPUT"
+        );
+        $report->generate();
+     }
+
+DESCRIPTION
+===========
+
+Data::Reporter::new();
+     Creates a new Report handler
+
+$report->configure(option => value)
+     valid options are:
+
+
+          Width		number of columns
+
+
+          Height		number of rows
+
+
+          Orientation 	Report orientation (portrait, landscape)
+
+
+          Footer_size 	rows in footer
+
+
+          File_name		output file name
+
+
+          Source		Data source (Datasource class descendant)
+
+
+          Breaks		Hash reference, which contains the breaks information
+
+
+          SubHeader		function reference, which will be called to print the
+          report header
+
+
+          SubTitle		function reference, which will be called to print the
+          report title
+
+
+          SubDetail		function reference, which will be called to print every
+          report detail
+
+
+          SubFooter		function reference, which will be called to print the
+          report footer
+
+
+          SubFinal		function reference, which is called when all data has
+          been processed
+
+
+          SubPrint		function reference, which is called when the report is
+          created
+
+
+     $report->generate()		Generates the report. Returns 0 if OK, 2
+     if there was no data
+
+SPECIAL FUNCTIONS
+=================
+
+
+     $report->page()		returns the page number
+
+
+     $report->date(n)	returns the date in a specific format. n is the
+     format code. Currently, there are only 2 formats
+
+          1		dd/mm/aaaa
+          2		mm/dd/aaaa
+
+
+     $report->time(n)	returns the time in a specific format. n is the
+     format code. Currently, there is only 1 format
+
+          1    hh:mm
+
+
+     $report->eOR()		indicates the end of report
+
+
+     $report->bOR()		indicates the begining of the report
+
+
+     $report->bOP()		indicates the firts detail in the the page
+
+
+     $report->width()	Report's width
+
+
+     $report->height()	Report's height
+
+
+     $report->islastbreak()	Returns true if it's the last
+     processing break (using the cascade breaks approach)
+
+
+     $report->iPB()	Returns true if the reporter is processing breaks
+     (useful when you want or not to do something while processing breaks)
+
+
+     $report->newpage([TIMES])	indicates that a new page is
+     required. TIMES is the number of form feeds to do. By default is 1
+
+
+     $report->newreport(FILE)		indicates that the data processed up
+     to this point should be stored in file FILE.
+
+EVENT FUNCTIONS
+===============
+
+   Each event function (Header, Title, Detail, Break, Foooter, Final), is
+called automatically when neccesary, passing them the following parameters:
+
+
+     report		which can be used to access the special variables
+
+
+     sheet		blank sheet where the output will be defined (see
+     RepFormat pod documentation)
+
+
+     actual_reg	actual processing register
+
+
+     last_reg		last processing register
+
+HEADER FUNCTION
+---------------
+
+   This functions is called each time when a new page is required
+
+TITLE FUNCTION
+--------------
+
+   This function is called after the header, and breaks functions.
+
+DETAIL FUNCTION
+---------------
+
+   This function is called for every data record
+
+FOOTER FUNCTION
+---------------
+
+   This functions is called at the end of each page
+
+FINAL FUNCTION
+--------------
+
+   This function is called after the last record has been processed for
+the detail function
+
+BREAK FUNTIONS
+--------------
+
+   These functions are called when the break field of the function has
+changed (see BREAKS section). These functions are called before the detail
+function for the actual register.
+
+BREAKS
+======
+
+GENERALS
+     Each break is defined with a break field and a break function. For
+     example:
+
+     assume we have the following data:
+
+          1 2
+          1 3
+          2 4
+
+     If we want a break for the first field, that prints the sum of the
+     second field, we have to define the following hash
+
+     $breaks{0} = \&sub_break;
+
+     where sub_break is the function where the output is defined. We have
+     to define the sum for each record in the 'detail' function
+
+          sub detail ( .....
+          ...
+          $sum += $field[1];
+          ....
+
+     so we can do
+
+          sub sub_break ( ....
+          ...
+          $sheet->Print("the sum is $sum");
+          $sum = 0; #reset $sum
+          ...
+
+     As many breaks as necessary can be defined, but only one break per
+     field is allowed.
+
+CASCADE BREAKS
+     When defining more that one Break, they are handled in cascade. A
+     change in a break field will cause all the break functions defined
+     for fields with a lower value to be called. For example
+
+     assume the following data
+
+          1 2 3 1 1
+          1 2 3 1 2
+          1 2 4 2 3
+          1 3 4 2 4
+
+     and the following break hash
+
+          $breaks{0} = \&break1;
+          $breaks{1} = \&break2;
+          $breaks{3} = \&break3;
+
+     in the third register, the field #3 changes. This will cause the
+     functions break1, break2 and break3 to be called. The order in which
+     these functions are called are from the left most to the right most
+     one.
+
+     In the fourth register the field #2 changes, so functions break1 and
+     break2 will be called, in this order.
+
+DATASOURCES
+===========
+
+   This indicates the source for the report data. It can be a Database or
+a plain ascii file.
+
+   Internally, Data::Reporter uses this object to retreive data. This
+object should have a function 'getdata' defined, which receives a function
+reference that will be called on each record.
+
+   This approach allows to have diferent data sources. At this point the
+only sources available are a Sybase database and a plain ascii file, but
+sources for others databases can easily be implemented.
+
+
+File: pm.info,  Node: Data/Reporter/Datasource,  Next: Data/Reporter/Filesource,  Prev: Data/Reporter,  Up: Module List
+
+Abstract base class for all the Reporter source data types
+**********************************************************
+
+NAME
+====
+
+   Datasource - Abstract base class for all the Reporter source data types
+
+SYNOPSIS
+========
+
+   use Data::Reporter::Datasource;
+
+DESCRIPTION
+===========
+
+   This class helps to maintain control of the source data types in
+Data::Reporter.  The method 'getdata', should be defined in each source
+data type.
+
+
+File: pm.info,  Node: Data/Reporter/Filesource,  Next: Data/Reporter/Orasource,  Prev: Data/Reporter/Datasource,  Up: Module List
+
+Reporter handler for plain text information
+*******************************************
+
+NAME
+====
+
+   Filesource - Reporter handler for plain text information
+
+SYNOPSIS
+========
+
+   use Data::Reporter::Filesource;
+
+     $source = new Data::Reporter::Filesource(File => $file);
+     #			$file 			- source filename
+
+     $subru = sub {print "record -> $_\n"};
+     $source->getdata($subru);
+     $source->configure(File => $file);
+
+DESCRIPTION
+===========
+
+new()
+     Creates a new handler to manipulate the file information.
+
+$source->configure(option => value)
+     File		File with the information to process. It is the only
+     valid option at this moment
+
+$source->getdata($subru)
+     For each record in the file, call the function $subru, passing the
+     record as a parameter
+
+NOTES
+=====
+
+   "|" is the field separator.
+
+
+File: pm.info,  Node: Data/Reporter/Orasource,  Next: Data/Reporter/RepFormat,  Prev: Data/Reporter/Filesource,  Up: Module List
+
+Reporter Handler for oracle connection
+**************************************
+
+NAME
+====
+
+   Orasource - Reporter Handler for oracle connection
+
+SYNOPSIS
+========
+
+     use Data::Reporter::Orasource;
+
+     $source = new Data::Reporter::Orasource(File => $file,
+     			Arguments => $info,
+     			Query => $query);
+
+     $file 		- information file about connection login
+     $info		- array reference (usr, pwd, db, srv) about connection login
+     $query		- query to execute for getting data
+
+     $subru = sub {print "record -> $_\n"};
+     $source->getdata($subru);
+
+DESCRIPTION
+===========
+
+new()
+     Creates a new handler to manipulate the oracle information.
+
+$source->configure(option => value)
+     valid options are:
+
+
+          File			Information file about connection login. The file
+          must have the following information: user, password, database,
+          server. These items must come in this order, each on a separate
+          line.
+
+
+          Arguments		array reference with the following information: usr,
+          pwd, db, srv. This can be used instead of the File option
+
+
+          query		string with the query to execute to retrive the data
+
+$source->getdata($subru)
+     For each record of the query result, calls the function $subru,
+     sending the record as parameter
+
+AUTHOR 	 	Vecchio Fabrizio <jacote@tiscalinet.it> FABRVEC =cut
+==============================================================
+
+   package Data::Reporter::Orasource; use DBI; use Carp; use
+Data::Reporter::Datasource;  @ISA =  qw(Data::Reporter::Datasource); use
+strict;
+
+   sub new (%) { 	my $class = shift; 	my $self={}; 	my %param = @_; 	bless
+$self, $class; 	foreach my $key (keys %param) { 		if ($key eq "File")
+{ 			$self->{CONNECTIONINFO} = $self->_getfileparams($param{$key}); 		} elsif
+($key eq "Arguments") { 			my @data = @{$param{$key}}; 			croak
+"Invalid arguments for conexion  (usr, pwd, db)!!!"  				if (@data < 3);
+$self->{CONNECTIONINFO} = \@data; 		} elsif ($key eq "Query") {
+$self->{QUERY} = $param{$key}; 		} 	} 	$self->_connect();
+bless $self, $class; }
+
+   sub getdata($$) { 	my $self = shift; 	my $routine = shift; 	my
+@row=(); 	$self->{STH}=$self->{DBH}->prepare($self->{QUERY});
+$self->{STH}->execute(); 	while(@row=$self->{STH}->fetchrow_array)
+{ 	&$routine(split(/\|/,join("|",@row))); 	}; 	$self->{STH}->finish();
+}
+
+   sub _getfileparams($$) { 	my $self = shift; 	my $file = shift;
+
+     open FILECON, $file or croak "Can't open file $file!!!";
+     my @data = <FILECON>;
+     close FILECON;
+     
+     croak "file error: $file!!!" if (@data < 3);
+     my $usr = $data[0];
+     my $pas = $data[1];
+     my $db  = $data[2];
+     chomp($usr);
+     chomp($pas);
+     chomp($db);
+     return [$usr, $pas, $db];
+     }
+
+   sub _connect($) { 	my $self = shift; 	my ($usr, $pass, $db) =
+@{$self->{CONNECTIONINFO}};
+$self->{DBH}=DBI->connect("dbi:Oracle:".$db,$usr,$pass); }
+
+   sub close($) { 	my $self=shift; 	$self->{DBH}->disconnect(); };
+
+   1;
+
+
+File: pm.info,  Node: Data/Reporter/RepFormat,  Next: Data/Reporter/Sybsource,  Prev: Data/Reporter/Orasource,  Up: Module List
+
+Allows text formatting with simple instructions, mapping to a user-defined grid (the sheet).
+********************************************************************************************
+
+NAME
+====
+
+   RepFormat	- Allows text formatting with simple instructions,
+mapping to a user-defined grid (the sheet).
+
+SYNOPSIS
+========
+
+     use Data::Reporter::RepFormat;
+
+     $sheet = new Data::Reporter::RepFormat($cols, $rows);
+     $sheet->Move(0,3);
+     $sheet->Print('123');
+     $sheet->Out();
+     $sheet->Clear();
+     $sheet->Printf('%010d', 12);
+     $sheet->MVPrint(0, 3, '123');
+     $sheet->MVPrintf(0, 1, '%3.2f', 79.123);
+     $sheet->Nlines();
+     $sheet->Getline(20);
+     $sheet->Copy($source_sheet);
+     $sheet->Center('hello', 10);
+     my $pic = $sheet->ToPicture('$$$,999, 999', 1234.56);
+     $value = $sheet->Commify('1234567.89');
+
+DESCRIPTION
+===========
+
+new($cols, $rows)
+     Creates a new RepFormat object. This function receives two
+     parameters: columms and rows of the sheet.
+
+$sheet->Move($col, $row)
+     Moves cursor to the indicated position
+
+$sheet->Print($string)
+     Puts $string at the current cursor position.
+
+$sheet->Out([$handle])
+     Moves the sheet information to target output. If $handle is not
+     specified, then STDOUT is used.
+
+$sheet->Clear()
+     Clears the sheet
+
+$sheet->Printf(format, argument)
+     Prints using printf style format
+
+$sheet->MVPrint($col, $row, $string)
+     Moves, then Prints
+
+$sheet->MVPrintf($col, $row, format, argument)
+     Moves, then Prints (using printf style format)
+
+$sheet->Nlines()
+     Returns the number of lines in the sheet, discarding the last blank
+     lines
+
+$sheet->Getline($index)
+     Returns the $index row
+
+$sheet->Copy($source_sheet)
+     Appends $source_sheet in $sheet
+
+$sheet->Center($string, $size)
+     Returns a string with size = $size having $string centered in it.
+     This function uses spaces to pad on both sides.
+
+$sheet->Commify($number);
+     Returns $number as a string with commas (123456789.90 ->
+     123,456,789.90)
+
+     *NOTE This function will be no longer supported in next releases. Use
+     PrintP instead.
+
+$sheet->printP($string, $picture);
+     Puts a string at the current position with $string in the specified
+     $picture.
+
+     There are two clases of pictures: strings and numerical
+
+    strings
+          The following table list the text edit format characters:
+
+          Character			Description X             		Use character in field
+          B             		Insert blank ~(tilde)      		Skip
+          character in field
+
+          examples
+
+          Mask				value			Display
+          (xxx)bxxx-xxxx		2169910551		(216) 991-0551
+          xxx-xx-xxxx   		123456789 		123-45-6789 ~~xx~xx
+          		ABCDEFGHIJ		CDFG
+
+    numerical
+          The following table list the numerical edit format characters:
+
+          Character			Description 8				Digit, zero fill to the rigth of 				the
+          decimal point trim leading 				blanks (left justify the number)
+          9				Digit, zero fill to the right of 				the decimal point,
+          space fill to 				the left 0				Digit, zero fill to the
+          left $				Dollar sign, optionally floats to 				the right
+          B				Treated as a "9", but if a value 				is zero, the field is
+          converted 				to blanks V				Implied decimal point
+          MI				Entered at the end of the mask 				causes a minus to be
+          displayed at 				the right of the number PR				Entered at teh end of the
+          mask 				causes angle brackets (<>) to be 				displayed
+          around the number if 				the number is negative PS				Entered at
+          the end of the mask 				causes parentheses to display 				around
+          the number if the number 				is negative PF				Entered at the end of the
+          mask 				causes floating parentheses to 				display around teh
+          number if 				the number is negative .				Decimal point ,				Comma
+
+          examples
+
+          Mask				value			Display 999.99        		34.568
+               34.57 9,999,999v99  		123,456.78		 123,456.78
+          8,888,888.88  		123,456,78		123,456.78 9,999
+           	1234       		      1,234 09999           	1234
+            		      01234 9999            	12345
+          **** 9999mi          	-123       		       123- 9999pr
+             	-123       		     < 123> 9999ps          	-123
+              		     ( 123) 9999pf           	-123
+          ( 123)
+
+$sheet->MVPrintP($col, $row, $string, $pic)
+     Moves, then PrintP
+
+
+File: pm.info,  Node: Data/Reporter/Sybsource,  Next: Data/Reporter/VisSection,  Prev: Data/Reporter/RepFormat,  Up: Module List
+
+Reporter Handler for sybase connection
+**************************************
+
+NAME
+====
+
+   Sybsource - Reporter Handler for sybase connection
+
+SYNOPSIS
+========
+
+     use Data::Reporter::Sybsource;
+
+     $source = new Data::Reporter::Sybsource(File => $file,
+     			Arguments => $info,
+     			Query => $query);
+
+     $file 		- information file about connection login
+     $info		- array reference (usr, pwd, db, srv) about connection login
+     $query		- query to execute for getting data
+
+     $source->configure(option => value, ...);
+     $subru = sub {print "record -> $_\n"};
+     $source->getdata($subru);
+
+DESCRIPTION
+===========
+
+new()
+     Creates a new handler to manipulate the sybase information.
+
+$source->configure(option => value)
+     valid options are:
+
+
+          File			Information file about connection login. The file
+          must have the following information: user, password, database,
+          server. database and server can be defined as "default", so the
+          conexion uses the server defaults. These items must come in this
+          order, each on a separate line.
+
+
+          Arguments		array reference with the following information: usr,
+          pwd , db, srv. db and srv can be "undef" so the conexion uses
+          the server defaults. This can be used instead of the File option
+
+
+          query		string with the query to execute to retrive the data
+
+
+          Handler		Sybase conexion handler. The class uses this handler to
+          perform the query
+
+$source->getdata($subru)
+     For each record of the query result, calls the function $subru,
+     sending the record as parameter
+
+$source->close()
+     Close sybase connection
+
+
+File: pm.info,  Node: Data/Reporter/VisSection,  Next: Data/ShowTable,  Prev: Data/Reporter/Sybsource,  Up: Module List
+
+handler to manipulate sections in VisRep.pl.
+********************************************
+
+NAME
+====
+
+   VisSection - handler to manipulate sections in VisRep.pl.
+
+SYNOPSIS
+========
+
+     use Data::Reporter::VisSection;
+
+     $section = new Data::Reporter::VisSection();
+     $section->configure(Name => 'mydetail',
+     		Lines => ('line 1', 'line 2', 'line 3'),
+     		Code => "print 'this is the detail section\n';",
+     		Size => 3,
+     		Break_field => 0,
+     		Width => 20,
+     		Only_code => 0);
+     my $name = $section->name();
+     my $size = $section->size();
+     my $break_field = $section->break_field();
+     my @lines = $section->lines();
+     my $code = $section->code();
+     my $only_code = $section->only_code();
+     $section->append("print 'this is the last line of code\n');
+     $section->insert("print 'this is the first line of code\n'");
+
+     open OUT, "out.txt";
+     $section->generate(\*OUT);
+
+DESCRIPTION
+===========
+
+new();
+     Creates a new section handler
+
+$section->configure(option => value)
+     valid options are:
+
+
+          Name			Section name
+
+
+          Lines		array of Lines to be printed in this section
+
+
+          Code			Code to execute before printing the data section
+
+
+          Size			Number of lines in the section
+
+
+          Break_field	Field number in which the break applies
+
+
+          Width		Numbers of columns in section
+
+
+          Only_code		Indicator for a no-lines section
+
+$section->name()
+     Returns the section's name
+
+$section->size()
+     Returns the section's size
+
+$section->break_field()
+     Returns the section's break_field
+
+$section->lines()
+     Returns an array with the section`s lines
+
+$section->code()
+     Returns the section's Code
+
+$section->only_code()
+     Returns the only_code indicator
+
+
+     Print perl code in OUT handler. This code is the section's information
+
+NOTES
+=====
+
+   A section is a part of a report. For example the header section, the
+title section, etc. Each section has two parts:
+
+Code part
+     This contains perl code, which is executed before printing the data
+     lines of the section. This is useful because you can prepare the data
+     to print in the report or acumulate totals. The special variable
+     @field, is used to print data in lines.
+
+Lines part
+     Here are the lines to print. The lines are printed using the
+     RepFormat module, there are special fields in printing the lines:
+
+@Fn
+     This field generates code to print $field[n]
+
+@Pn
+     This field generates code to print $report->page(n). page is a
+     special feature from Reporter module
+
+@Tn
+     This field generates code to print $report->time(n). time is a
+     special feature from Reporter module
+
+@Dn
+     This field generates code to print $report->date(n). date is a
+     special feature from Reporter module
+
+

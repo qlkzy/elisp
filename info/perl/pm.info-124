@@ -1,0 +1,1470 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Data/ShowTable,  Next: Data/Table,  Prev: Data/Reporter/VisSection,  Up: Module List
+
+routines to display tabular data in several formats.
+****************************************************
+
+NAME
+====
+
+   ShowTable - routines to display tabular data in several formats.
+
+USAGE
+=====
+
+   `use Data::ShowTable;'
+
+   ShowTable { parameter => value, ... };
+
+   ShowTable *\@titles*, *\@types*, *\@widths*, *\&row_sub* [, *\&fmt_sub*
+];
+
+   ShowDatabases *\@dbnames*;
+
+   ShowDatabases { parameter => value, ... };
+
+   ShowTables *\@tblnames*;
+
+   ShowTables { parameter => value, ... };
+
+   ShowColumns *\@columns*, *\@col_types*, *\@col_lengths*, *\@col_attrs*;
+
+   ShowColumns { parameter => value, ... };
+
+   ShowBoxTable *\@titles*, *\@types*, *\@widths*, *\&row_sub* [,
+*\&fmt_sub* ];
+
+   ShowBoxTable { parameter => value, ... };
+
+   ShowSimpleTable *\@titles*, *\@types*, *\@widths*, *\&row_sub* [,
+*\&fmt_sub*];
+
+   ShowSimpleTable { parameter => value, ... };
+
+   ShowHTMLTable *\@titles*, *\@types*, *\@widths*, *\&row_sub* [,
+*\&fmt_sub*];
+
+   ShowHTMLTable { parameter => value, ... };
+
+   ShowListTable *\@titles*, *\@types*, *\@widths*, *\&row_sub* [,
+*\&fmt_sub*];
+
+   ShowListTable { parameter => value, ... };
+
+   `package Data::ShowTable';
+
+   $Show_Mode = 'mode';
+
+   $Max_Table_Width = number;
+
+   $Max_List_Width = number;
+
+   $No_Escape = flag;
+
+   %URL_Keys = { "*$colname*" => "*$col_URL*", ... };
+
+   *@Title_Formats* = ( *fmt1_html*, <fmt2_html>, ... );
+
+   *@Data_Formats* = ( *fmt1_html*, <fmt2_html>, ... );
+
+   ShowRow *$rewindflag*, *\$index*, *$col_array_1* [, *$col_array_2*,
+...;]
+
+   *$fmt* = ShowTableValue $value, $type, $max_width, $width, $precision,
+$showmode;
+
+   [*$plaintext* = ] PlainText [*$htmltext*];
+
+DESCRIPTION
+===========
+
+   The ShowTable module provides subroutines to display tabular data,
+typially from a database, in nicely formatted columns, in several formats.
+Its arguments can either be given in a fixed order, or, as a single,
+anonymous hash-array.
+
+   The output format for any one invocation can be one of four possible
+styles:
+
+Box
+     A tabular format, with the column titles and the entire table
+     surrounded by a "box" of "+", "-", and "|" characters.  See
+     `"ShowBoxTable"' in this node for details.
+
+Table
+     A simple tabular format, with columns automatically aligned, with
+     column titles.  See `"ShowSimpleTable"' in this node.
+
+List
+     A list style, where columns of data are listed as a name:value pair,
+     one pair per line, with rows being one or more column values,
+     separated by an empty line.  See `"ShowListTable"' in this node.
+
+HTML
+     The data is output as an HTML TABLE, suitable for display through a
+     Web-client.  See `"ShowHTMLTable"' in this node.  Input can either be
+     plain ASCII text, or text with embedded HTML elements, depending upon
+     an argument or global parameter.
+
+   The subroutines which perform these displays are listed below.
+
+EXPORTED NAMES
+==============
+
+   This module exports the following subroutines:
+
+     ShowDatabases    - show list of databases
+     ShowTables       - show list of tables
+     ShowColumns      - show table of column info
+     ShowTable        - show a table of data
+     ShowRow          - show a row from one or more columns
+     ShowTableValue   - show a single column's value
+     ShowBoxTable     - show a table of data in a box
+     ShowListTable    - show a table of data in a list
+     ShowSimpleTable  - show a table of data in a simple table
+     ShowHTMLTable    - show a table of data using HTML
+     PlainText	  - convert HTML text into plain text
+
+   All of these subroutines, and others, are described in detail in the
+following sections.
+
+MODULES
+=======
+
+ShowTable
+=========
+
+   Format and display the contents of one or more rows of data.
+
+     ShowTable { parameter => value, ... };
+
+     ShowTable *\@titles*, *\@types*, *\@widths*, *\&row_sub* [,
+*\&fmt_sub* [, $max_width ] [, *$show_mode* ] ];
+
+   The ShowTable subroutine displays tabular data aligned in columns, with
+headers.  ShowTable supports four *modes* of display: Box, Table, List,
+and HTML.  Each mode is described separately below.
+
+   The arguments to ShowTable may be given in one of two ways: as a
+hashed-array, or by a combination of fixed order arguments, and some
+package-global variable settings.  The hash-array parameters correspond to
+the fixed arguments and the global-parameter settings.
+
+   In the list below, both the hash-array parameter name and the
+fixed-order argument name is given as the value.  In the case where there
+is no fixed-order argument for a given parameter-value pair, then the
+corresponding global variable name is given.
+
+titles => *\@titles*
+     A reference to an array of column names, or titles.  If a particular
+     column name is null, then the string `Field_*num*' is used by
+     default.  To have a column have no title, use the empty string.
+
+types => *\@types*
+     A reference to an array of types, one for each column.  These types
+     are passed to the *fmt_sub* for appropriate formatting.  Also, if a
+     column type matches the regexp "`/text|char|string/i'", then the
+     column alignment will be left-justified, otherwise it will be
+     right-justified.
+
+`widths' => *\@widths*
+     A reference to an array of column widths, which may be given as an
+     integer, or as a string of the form: "width.*precision*".
+
+`row_sub' => *\&row_sub*
+     A reference to a subroutine which successively returns rows of values
+     in an array.  It is called for two purposes, each described
+     separately:
+
+     * To fetch successive rows of data:
+
+          @row = &$row_sub(0);
+
+     When given a null, zero, or empty argument, the next row is returned.
+
+     * To initialize or rewind the data traversal.
+
+          $rewindable = &$row_sub(1);
+
+     When invoked with a non-null argument, the subroutine should rewind
+     its row pointer to start at the first row of data.  If the data which
+     *row_sub* is traversing is not rewindable, it must return zero or
+     null.  If the data is rewindable, a non-null, non-zero value should
+     be returned.
+
+     The *row_sub* must expect to be invoked once with a non-null argument,
+     in order to discover whether or not the data is rewindable.  If the
+     data cannot be rewound, *row_sub* will thereafter only be called with
+     a zero argument.
+
+     Specifically, *row_sub* subroutine is used in this manner:
+
+          $rewindable = &$row_sub(1);
+          if ($rewindable) {
+              while ((@row = &$row_sub(0)), $#row >= 0) {
+                  # examine lengths for optimal formatting
+              }
+              &$row_sub(1);   # rewind
+          }
+          while ((@row = &$row_sub(0)), $#row >= 0) {
+              # format the data
+          }
+
+     The consequence of data that is not rewindable, a reasonably nice
+     table will still be formatted, but it may contain fairly large
+     amounts of whitespace for wide columns.
+
+`fmtsub' => *\&fmt_sub*
+     A reference to a subroutine which formats a value, according to its
+     type, width, precision, and the current column width.  It is invoked
+     either with a fixed list of arguments, or with a hash-array of
+     parameter and value pairs.
+
+          $string = &fmt_sub { I<parameter> => I<value>, ... };
+
+          $string = &fmt_sub($value, $type, $max_width, $width, $precision)
+
+     If *\&fmt_sub* is omitted, then a default subroutine, ShowTableValue,
+     will be used, which will use Perl's standard string formatting rules.
+
+     The arguments to *\&fmt_sub*, either as values passed in a fixed
+     order, or as part of the parameter value pair, are described in the
+     section on `"ShowTableValue' in this node below.
+
+`max_width' => number,
+     The maximum table width, including the table formatting characters.
+     If not given, defaults to the global variable $Max_Table_Width;
+
+`show_mode' => 'mode',
+     The display mode of the output.  One of five strings: `'Box'',
+     `'Table'', `'Simple'', `'List'', and `'HTML''.
+
+ShowDatabases
+=============
+
+   Show a list of database names.
+
+     ShowDatabases *\@dbnames*;
+
+     ShowDatabases { 'data' => *\@dbnames*, parameter => value, ...};
+
+   ShowDatabases is intended to be used to display a list of database
+names, under the column heading of "Databases".  It is a special case
+usage of ShowTable (and can thus be passed any parameter suitable for
+ShowTable.
+
+   The argument, *\@dbnames*, is a reference to an array of strings, used
+as the values of the single column display.
+
+ShowTables
+==========
+
+   Show an array of table names.
+
+     ShowTables *\@tblnames*;
+
+     ShowTables { 'data' => *\@tblnames*, parameter => value, ...};
+
+   ShowTables is used to display a list of table names, under the column
+heading of "Tables".  It is a special case usage of ShowTable, and can be
+passed any `"ShowTable"' in this node argument parameter.
+
+ShowColumns
+===========
+
+   Display a table of column names, types, and attributes.
+
+     ShowColumns { parameter => values, ... };
+
+     ShowColumns *\@columns*, *\@col_types*, *\@col_lengths*,
+*\@col_attrs*;
+
+   The ShowColumns subroutine displays a table of column names, types,
+lengths, and other attributes in a nicely formatted table.  It is a
+special case usage of ShowTable, and can be passed any argument suitable
+for `"ShowTable"' in this node;
+
+   The arguments are:
+
+columns = *\@columns*
+     An array of column names.  This provides the value for the first
+     column of the output.
+
+`col_types' = *\@col_types*
+     An array of column types names.  This provides the value for the
+     second column.
+
+`col_lengths' = *\@col_lengths*
+     An array of maximum lengths for corresponding columns.  This provides
+     the value for the third column of the output.
+
+`col_attrs' = *\@col_attrs*
+     An array of column attributes array references (ie: an array of
+     arrays).  The attributes array for the first column are at
+     "*$col_attrs*-\>[0]".  The first attribute of the second column is
+     "*$col_attrs*-\>[1][0]".
+
+   The columns, types, lengths, and attributes are displayed in a table
+with the column headings: "Column", "Type", "Length", and "Attributes".
+This is a special case usage of ShowTable, and can be passed additional
+arguments suitable for `"ShowTable"' in this node.
+
+ShowBoxTable
+============
+
+   Show tabular data in a box.
+
+     ShowBoxTable { parameter = value, ... };
+
+     ShowBoxTable *\@titles*, *\@types*, *\@widths*, *\&row_sub*       [,
+[ *\&fmt_sub* ] [, $max_width ] ];
+
+   The ShowBoxTable displays tabular data in titled columns using a "box"
+of ASCII graphics, looking something like this:
+
+     +------------+----------+-----+----------+
+     | Column1    | Column2  | ... | ColumnN  |
+     +------------+----------+-----+----------+
+     | Value11    | Value12  | ... | Value 1M |
+     | Value21    | Value22  | ... | Value 2M |
+     | Value31    | Value32  | ... | Value 3M |
+     |  ...       |  ...     | ... |  ...     |
+     | ValueN1    | ValueN2  | ... | Value NM |
+     +------------+----------+-----+----------+
+
+   The arguments are the same as with `"ShowTable"' in this node.  If the
+*@titles* array is empty, the header row is omitted.
+
+ShowSimpleTable
+===============
+
+   Display a table of data using a simple table format.
+
+     ShowSimpleTable *\@titles*, *\@types*, *\@widths*, *\&row_sub* [,
+*\&fmt_sub*];
+
+     ShowSimpleTable { parameter => values, ... };
+
+   The ShowSimpleTable subroutine formats data into a simple table of
+aligned columns, in the following example:
+
+     Column1  Column2  Column3
+     -------  -------  -------
+     Value1   Value2   Value3
+     Value12  Value22  Value32
+
+   Columns are auto-sized by the data's widths, plus two spaces between
+columns.  Values which are too long for the maximum colulmn width are
+wrapped within the column.
+
+ShowHTMLTable
+=============
+
+   Display a table of data nicely using HTML tables.
+
+     ShowHTMLTable { parameter => value, ... };
+
+     ShowHTMLTable *\@titles*, *\@types*, *\@widths*, *\&row_sub* [,
+*\&fmt_sub* [, $max_width [, *\%URL_Keys* [, *$no_escape* [,
+*\@title_formats [, I<\@data_formats [, I<$table_attrs* ] ] ] ] ] ] ];
+
+   The ShowHTMLTable displays one or more rows of columns of data using
+the HTML `\<TABLE\'> feature.  In addition to the usual parameter arguments
+of `"ShowTable"' in this node, the following parameter arguments are
+defined:
+
+`url_keys' => *\%URL_Keys*,
+     This is a hash array of column names (titles) and corresponding base
+     URLs.  The values of any column names or indexes occuring as keys in
+     the hash array will be generated as hypertext anchors using the
+     associated printf-like string as the base URL. Either the column name
+     or the column index (beginning with 1) may be used as the hash key.
+
+     In the string value, these macros can be substituted:
+
+     "`%K'" is replaced with the column name.
+
+     "`%V'" is replaced with the column value;
+
+     "`%I'" is replaced with the column index.
+
+     For example, if we define the array:
+
+          $base_url = "http://www.$domain/cgi/lookup?col=%K?val=%V";
+          %url_cols = ('Author' => $base_url,
+          		 'Name'   => $base_url);
+
+     Then, the values in the Author column will be generated with the
+     following HTML text:
+
+          <A HREF="http://www.$domain/cgi/lookup?col=Author?val=somevalue>somevalue</A>
+
+     and the values in the Name column will be generated with the URL:
+
+          <A HREF="http://www.$domain/cgi/lookup?col=Name?val=othervalue>othervalue</A>
+
+     If this variable is not given, it will default to the global variable
+     `\%URL_Keys'.
+
+`no_escape' => boolean,
+     Unless *$no_escape* is set, HTML-escaping is performed on the data
+     values in order to properly display the special HTML formatting
+     characters : '\<', '\>', and '&'.  If you wish to display data with
+     embedded HTML text, you must set *$no_escape*.
+
+     Enabling embedded HTML, turns on certain heuristics which enable the
+     user to more completely define appearance of the table.  For instance,
+     any `\<TR\'> tokens found embedded *anywhere* within a row of data
+     will be placed at the front of the row, within the generated `\<TR\'>.
+
+     Similarly, a row of data containing the `\<THEAD\'> or `\<TFOOT\'>
+     tokens, and their closing counterparts, will begin and end,
+     respectively a table header or footer data.
+
+`title_formats' => *\@title_formats*,
+`tformats' => *\@title_formats*,
+     An array of HTML formatting elements for the column titles, one for
+     each column.  Each array element is a list of one or more HTML
+     elements, given as `\<ELEMENT\'> or plainly, `ELEMENT', and separated
+     by a comma `','', semi-colon `';'', or vertical bar '|'.  Each given
+     HTML element is prepended to the corresponding column title, in the
+     order given.  The corresponding HTML closing elements are appended in
+     the opposite order.
+
+     For example, if *\@title_formats* contains the two elements:
+
+          [ 'FONT SIZE=+2,BOLD', 'FONT COLOR=red,EM' ]
+
+     then the text output for the title of the first column would be:
+
+          <FONT SIZE=+2><BOLD>I<column_1_title></BOLD></FONT>
+
+     If `title_formats' is omitted, the global variable *@Title_Formats*
+     is used by default.
+
+`data_formats' => *\@data_formats*,
+`dformats' => *\@data_formats*,
+     Similar to `title_formats', this array provides HTML formatting for
+     the columns of each row of data.  If `data_formats' is omitted or
+     null, then the global variable *\@Data_Formats* is used by default.
+
+`table_attrs' => *$table_attrs*,
+     This variable defines a string of attributes to be inserted within the
+     `\<TABLE\'> token.  For example, if the user wishes to have no table
+     border:
+
+          ShowHTMLTable {
+          	...
+          	table_attrs => 'BORDER=0',
+              ...
+          };
+
+ShowListTable
+=============
+
+   Display a table of data using a list format.
+
+     ShowListTable { parameter => value, ... };
+
+     ShowListTable *\@titles*, *\@types*, *\@widths*, *\&row_sub* [,
+*\&fmt_sub* [, $max_width [, *$wrap_margin* ] ] ];
+
+   The arguments for ShowListTable are the same as for `"ShowTable"' in
+this node, except for those described next.
+
+`max_width' = number,
+`wrap_margin' = number,
+     Lines are truncated, and wrapped when their length exceeds
+     $max_width.  Wrapping is done on a word-basis, unless the resulting
+     right margin exceeds *$wrap_margin*, in which case the line is simply
+     truncated at the $max_width limit.
+
+     The $max_width variable defaults to $Max_List_Width.  The
+     *$wrap_margin* defaults to $List_Wrap_Margin.
+
+   In List mode, columns (called "fields" in List mode) are displayed wth
+a field name and value pair per line, with records being one or more
+fields .  In other words, the output of a table would look something like
+this:
+
+     Field1_1: Value1_1
+     Field1_2: Value1_2
+     Field1_3: Value1_3
+     ...
+     Field1-N: Value1_M
+     <empty line>
+     Field2_1: Value2_1
+     Field2_2: Value2_2
+     Field2_3: Value2_3
+     ...
+     Field2_N: Value2_N
+     ...
+     FieldM_1: ValueM_1
+     FieldM_2: ValueM_2
+     ...
+     FieldM_N: ValueM_N
+     <empty line>
+     <empty line>
+
+   Characteristics of List mode:
+
+   * two empty lines indicate the end of data.
+
+   * An empty field (column) may be omitted, or may have a label, but no
+     data.
+
+   * A long line can be continue by a null field (column):
+
+          Field2: blah blah blah
+                : blah blah blah
+
+   * On a continuation, the null field is an arbitrary number of leading
+     white space, a colon ':', a single blank or tab, followed by the
+     continued text.
+
+   * Embedded newlines are indicated by the escape mechanism "\n".
+     Similarly, embedded tabs are indicated with "\t", returns with "\r".
+
+   * If the *@titles* array is empty, the field names "`Field_'*NN*" are
+     used instead.
+
+ShowRow
+=======
+
+   Fetch rows successively from one or more columns of data.
+
+     ShowRow *$rewindflag*, *\$index*, *$col_array_1* [, *$col_array_2*,
+...;]
+
+   The ShowRow subroutine returns a row of data from one or more columns
+of data.  It is designed to be used as a callback routine, within the
+ShowTable routine.   It can be used to select elements from one or more
+array reference arguments.
+
+   If passed two or more array references as arguments, elements of the
+arrays selected by $index are returned as the "row" of data.
+
+   If a single array argument is passed, and each element of the array is
+itself an array, the subarray is returned as the "row" of data.
+
+   If the *$rewindflag* flag is set, then the $index pointer is reset to
+zero, and "true" is returned (a scalar 1).  This indicates that the data
+is rewindable to the ShowTable routines.
+
+   When the *$rewindflag* is not set, then the current row of data, as
+determined by $index is returned, and $index will have been incremented.
+
+   An actual invocation (from ShowColumns) is:
+
+     ShowTable \@titles, \@types, \@lengths,
+         sub { &ShowRow( $_[0], \$current_row, $col_names, $col_types,
+                         $col_lengths, \@col_attrs); };
+
+   In the example above, after each invocation, the *$current_row* argument
+will have been incremented.
+
+ShowTableValue
+==============
+
+   Prepare and return a formatted representation of a value.  A value
+argument, using its corresponding type, effective width, and precision is
+formatted into a field of a given maximum width.
+
+     *$fmt* = ShowTableValue $value, $type, $max_width, $width,
+$precision, $showmode;
+
+width => $width
+$width
+     The width of the current value.  If omittied, $max_width is assumed.
+
+`precision' => $precision
+$precision
+     The number of decimal digits; zero is assumed if omittied.
+
+value => $value
+$value
+     The value to be formatted.
+
+$type
+     The type name of the value; eg: `char', `varchar', int, etc.
+
+`maxwidth' => $max_width
+$max_width
+     The maximum width of any value in the current value's column.  If
+     $width is zero or null, $max_width is used by default.  $max_width is
+     also used as a minimum width, in case $width is a smaller value.
+
+$width
+     The default width of the value, obtained from the width specification
+     of the column in which this value occurs.
+
+$precision
+     The precision specification, if any, from the column width
+     specification.
+
+$showmode
+     The mode of the output: one of "table", "list", "box", or "html".
+     Currently, only the "html" mode is significant: it is used to avoid
+     using HTML tokens as part of the formatted text and length
+     calculations.
+
+PlainText
+=========
+
+     *$plaintext* = *&PlainText*(*$htmltext*);
+
+     *&PlainText*
+
+   This function removes any HTML formatting sequences from the input
+argument, or from $_ if no argument is given.  The resulting plain text is
+returned as the result.
+
+VARIABLES
+=========
+
+   The following variables may be set by the user to affect the display
+(with the defaults enclosed in square brackets [..]):
+
+$Show_Mode [Box]
+     This is the default display mode when using ShowTable.  The
+     environment variable, `$ENV{'SHOW_MODE'}', is used when this variable
+     is null or the empty string.  The possible values for this variable
+     are: `"Box"', `"List"', `"Table"', and `"HTML"'.  Case is
+     insignificant.
+
+$List_Wrap_Margin [2]
+     This variable's value determines how large a margin to keep before
+     wrarpping a long value's display in a column.  This value is only
+     used in "List" mode.
+
+$Max_List_Width [80]
+     This variable, used in "List" mode, is used to determine how long an
+     output line may be before wrapping it.  The environment variable,
+     `$ENV{'COLUMNS'}', is used to define this value when it is null.
+
+$Max_Table_Width ["]
+     This variable, when set, causes all tables to have their columns
+     scaled such that their total combined width does not exceed this
+     value.  When this variable is not set, which is the default case,
+     there is no maximum table width, and no scaling will be done.
+
+$No_Escape ["]
+     If set, allows embedded HTML text to be included in the data displayed
+     in an HTML-formatted table.  By default, the HTML formatting
+     characters ("<", ">", and "&") occuring in values are escaped.
+
+%URL_Keys
+     In HTML mode, this variable is used to recognize which columns are to
+     be displayed with a corresponding hypertext anchor.  See
+     `"ShowHTMLTable"' in this node for more details.
+
+*@HTML_Elements*
+     An array of HTML elements (as of HTML 3.0) used to recognize and
+     strip for width calculations.
+
+$HTML_Elements
+     A regular expression string formed from the elements of
+     *@HTML_Elements*.
+
+INTERNAL SUBROUTINES
+====================
+
+get_params
+==========
+
+     my $args = *&get_params* *\@argv*, *\%params*, *\@arglist*;
+
+   Given the *@argv* originally passed to the calling sub, and the hash of
+named parameters as *%params*, and the array of parameter names in the
+order expected for a pass-by-value invocation, set the values of each of
+the variables named in *@vars*.
+
+   If the only element of the *@argv* is a hash array, then set the
+variables to the values of their corresponding parameters used as keys to
+the hash array.  If the parameter is not a key of the *%params* hash, and
+is not a key in the global hash *%ShowTableParams*, then an error is noted.
+
+   When *@argv* has multiple elements, or is not a hash array, set each
+variable, in the order given within *@arglist*, to the values from the
+*@argv*, setting the variables named by each value in *%params*.
+
+   Variables may given either by name or by reference.
+
+   The result is a HASH array reference, either corresponding directly to
+the HASH array passed as the single argument, or one created by
+associating the resulting variable values to the parameter names
+associated with the variable names.
+
+html_formats
+============
+
+     (*$prefixes*,*$suffixes*) = html_formats *\@html_formats*;
+
+   The *html_format* function takes an array reference of HTML formatting
+elements *\@html_formats*, and builds two arrays of strings: the first:
+*$prefixes*, is an array of prefixes containing the corresponding HTML
+formatting elements from *\@html_formats*, and the second, *$suffixes*,
+containing the appropriate HTML closing elements, in the opposite order.
+
+   The result is designed to be used as prefixes and suffixes for the
+corresponding titles and column values.
+
+   The array *\@html_formats* contains lists of HTML formatting elements,
+one for each column (either title or data).  Each array element is a list
+of one or more HTML elements, either given in HTML syntax, or as a "plain"
+name (ie: given as `\<ELEMENT\'> or plainly, `ELEMENT').  Multiple
+elements are separated by a comma `',''.
+
+   The resulting array of *$prefixes* contains the corresponding opening
+elements, in the order given, with the proper HTML element syntax.  The
+resulting array of *$suffixes* contains the closing elements, in the
+opposite order given, with the proper HTML element syntax.
+
+   For example, if *\@html_formats* contains the two elements:
+
+     [ 'FONT SIZE=+2,BOLD', 'FONT COLOR=red,EM' ]
+
+   then the resulting two arrays will be returned as:
+
+     [ [ '<FONT SIZE=+2><BOLD>', '<FONT COLOR=red><EM>' ],
+       [ '</FONT></BOLD>',	'</FONT></EM>' ] ]
+
+calc_widths
+===========
+
+     ($num_cols, $widths, $precision, $max_widths) =   *&calc_widths*(
+$widthspec, $titles, $rewindable,       $row_sub, $fmt_sub, $types,
+$showmode,       $max_width);
+
+DESCRIPTION
+-----------
+
+   calc_widths is a generalized subroutine used by all the ShowTable
+variant subroutines to setup internal variables prior to formatting for
+display.  *Calc_widths* handles the column width and precision analysis,
+including scanning the data (if rewindable) for appropriate default values.
+
+   The number of columns in the data is returned, as well as three arrays:
+the declared column widths, the column precision values, and the maximum
+column widths.
+
+RETURN VALUES
+-------------
+
+$num_cols
+     is the number of columns in the data.  If the data is not rewindable,
+     this is computed as the maximum of the number of elements in the
+     $widthspec array and the number of elements in the $titles array.
+     When the data is rewindable, this is the maximum of the number of
+     columns of each row of data.
+
+$widths
+     is the column widths array ref, without the precision specs (if any).
+     Each column's width value is determined by the original $widthspec
+     value and/or the maximum length of the formatted data for the column.
+
+$precision
+     is the precision component (if any) of the original $widthspec array
+     ref.  If there was no original precision component from the
+     $widthspec, and the data is rewindable, then the data is examined to
+     determine the maximum default precision.
+
+$max_widths
+     is the ref to the array of maximum widths for the given columns.
+
+ARGUMENTS
+---------
+
+$widthspec
+     A reference to an array of column width (or length) values, each given
+     as an integer, real number, or a string value of "width.*precision*".
+     If a value is zero or null, the length of the corresponding
+     formatted data (if rewindable) and column title length are used to
+     determine a reasonable default.
+
+     If a column's width portion is a positive, non-zero number, then the
+     column will be this wide, regardless of the values lengths of the data
+     in the column.
+
+     If the column's width portion is given as a negative number, then the
+     positive value is used as a minimum column width, with no limit on the
+     maximum column width.  In other words, the column will be at least
+     width characters wide.
+
+     If the data is not rewindable, and a column's width value is null or
+     zero, then the length of the column title is used.  This may cause
+     severe wrapping of data in the column, if the column data lengths are
+     much greater than the column title widths.
+
+$titles
+     The array ref to the column titles; used to determine the minimum
+     acceptable width, as well as the default number of columns.  If the
+     $titles array is empty, then the $widthspec array is used to
+     determine the default number of columns.
+
+$rewindable
+     A flag indicating whether or not the data being formatted is
+     rewindable.  If this is true, a pass over the data will be done in
+     order to calculate the maximum lengths of the actual formatted data,
+     using $fmt_sub (below), rather than just rely on the declared column
+     lengths.  This allows for optimal column width adjustments (ie: the
+     actual column widths may be less than the declared column widths).
+
+     If it is not desired to have the column widths dynamically adjusted,
+     then set the $rewindable argument to 0, even if the data is
+     rewindable.
+
+$row_sub
+     The code reference to the subroutine which returns the data; invoked
+     only if $rewindable is non-null.
+
+$fmt_sub
+     The subroutine used to determine the length of the data when
+     formatted; if this is omitted or null, the length of the data is used
+     by default.  The $fmt_sub is used only when the data is rewindable.
+
+$types
+     An array reference to the types of each of the value columns; used
+     only when $fmt_sub is invoked.
+
+$showmode
+     A string indicating the mode of the eventual display; one of four
+     strings: "box", "table", "list", and "html".  Used to adjust widths
+     for formatting requirements.
+
+$max_width
+     The maximum width of the table being formatted.  If set, and the total
+     sum of the individual columns exceeds this value, the column widths
+     are scaled down uniformly.  If not set (null), no column width
+     scaling is done.
+
+putcell
+=======
+
+     *$wrapped* = *&putcell*( *\@cells*, $c, *$cell_width*, *\@prefix*,
+*\@suffix*, *$wrap_flag* );
+
+   Output the contents of an array cell at *$cell*[$c], causing text
+longer than *$cell_width* to be saved for output on subsequent calls.
+Prefixing the output of each cell's value is a string from the two-element
+array *@prefix*.  Suffixing each cell's value is a string from the
+two-element array *@suffix*.  The first element of either array is
+selected when *$wrap_flag* is zero or null, or when there is no more text
+in the current to be output.  The second element is selected when
+*$wrap_flag* is non-zero, and when there is more text in the current cell
+to be output.
+
+   In the case of text longer than *$cell_width*, a non-zero value is
+returned.
+
+   Cells with undefined data are not output, nor are the prefix or suffix
+strings.
+
+center
+======
+
+   Center a string within a given width.
+
+     $field = center $string, $width;
+
+max
+===
+
+   Compute the maximum value from a list of values.
+
+     *$max* = *&max*( *@values* );
+
+min
+===
+
+   Compute the minum value from a list of values.
+
+     *$min* = *&min*( *@values* );
+
+max_length
+==========
+
+   Compute the maximum length of a set of strings in an array reference.
+
+     *$maxlength* = *&max_length*( *\@array_ref* );
+
+htmltext
+========
+
+   Translate regular text for output into an HTML document.  This means
+certain characters, such as "&", ">", and "<" must be escaped.
+
+     *$output* = *&htmltext*( *$input* [, *$allflag* ] );
+
+   If *$allflag* is non-zero, then all characters are escaped.  Normally,
+only the four HTML syntactic break characters are escaped.
+
+out
+===
+
+   Print text followed by a newline.
+
+     out *$fmt* [, *@text* ];
+
+put
+===
+
+   Print text (without a trailing newline).
+
+     out *$fmt* [, *@text* ];
+
+AUTHOR
+======
+
+   Alan K. Stebbens <aks@sgi.com>
+
+BUGS
+====
+
+   * Embedded HTML is how the user can insert formatting overrides.
+     However, the HTML formatting techniques have not been given much
+     consideration - feel free to provide constructive feedback.
+
+
+File: pm.info,  Node: Data/Table,  Next: Data/Walker,  Prev: Data/ShowTable,  Up: Module List
+
+Data type related to database tables, spreadsheets, CSV/TSV files, HTML table displays, etc.
+********************************************************************************************
+
+NAME
+====
+
+   Data::Table - Data type related to database tables, spreadsheets,
+CSV/TSV files, HTML table displays, etc.
+
+SYNOPSIS
+========
+
+     # some cool ways to use Table.pm
+     use Data::Table;
+     
+     $header = ["name", "age"];
+     $data = [
+       ["John", 20],
+       ["Kate", 18],
+       ["Mike", 23]
+     ]
+     $t = new Data::Table($data, $header, 0);	# Construct a table object with
+     					# $data, $header, $type=0 (consider
+     					# $data as the rows of the table).
+     print $t->csv;                        # Print out the table as a csv file.
+
+     $t = Data::Table::fromCSV("aaa.csv");       # Read a csv file into a table oject
+       print $t->html;                       # Diplay a 'portrait' HTML TABLE on web.
+
+     use DBI;
+     $dbh= DBI->connect("DBI:mysql:test", "test", "") or die $DBI::errstr;
+     my $minAge = 10;
+     $t = Data::Table::fromSQL($dbh, "select * from mytable where age >= ?", [$minAge]);
+     					# Construct a table form an SQL
+     					# database query.
+
+     $t->sort("age", 0, 0);                # Sort by col 'age',numerical,descending
+     print $t->html2;                      # Print out a 'landscape' HTML Table.
+
+     $row = $t->delRow(2);			# Delete the third row (index=2).
+     $t->addRow($row, 4);			# Add the deleted row back as fifth row.
+     @rows = $t->delRows([0..2]);		# Delete three rows (row 0 to 2).
+     $col = $t->delCol("age");		# Delete column 'age'.
+     $t->addCol($col, "age",2);		# Add column 'age' as the third column
+     @cols = $t->delCols(["name","phone","ssn"]);
+     					# Delete 3 columns at the same time.
+
+     $name =  $t->elm(2,"name");	        # Element access
+     $t2=$t->subTable([1, 3..4],['age', 'name']);
+     					# Extract a sub-table
+
+     $t->rename("Entry", "New Entry");	# Rename column 'Entry' by 'New Entry'
+     $t->replace("Entry", [1..$t->nofRow()], "New Entry");
+     					# Replace column 'Entry' by an array of
+     					# numbers and rename it as 'New Entry'
+     $t->swap("age","ssn");		# Swap the positions of column 'age'
+     					# with column 'ssn' in the table.
+
+     $t->colMap('name', sub {return uc});  # Map a function to a column
+     $t->sort('age',0,0,'name',1,0);	# Sort table first by the numerical
+     					# column 'age' and then by the
+     					# string column 'name' in descending
+     					# order
+     $t2=$t->match_pattern('$_->[0] =~ /^L/ && $_->[3]<0.2');
+     					# Select the rows that matched the
+     					# pattern specified
+     $t2=$t->match_string('John');		# Select the rows that matches 'John'
+     					# in any column
+
+     $t2=$t->clone();			# Make a copy of the table.
+     $t->rowMerge($t2);			# Merge two tables
+     $t->colMerge($t2);
+
+ABSTRACT
+========
+
+   This perl package uses perl5 objects to make it easy for manipulating
+spreadsheet data among disk files, database, and Web publishing.
+
+   A table object contains a header and a two-dimensional array of scalars.
+Three class methods Data::Table::fromCSV, Data::Table::fromTSV, and
+Data::Table::fromSQL allow users to create a table object from a CSV/TSV
+file or a database SQL selection in a snap.
+
+   Table methods provide basic access, add, delete row(s) or column(s)
+operations, as well as more advanced sub-table extraction, table sorting,
+record matching via keywords or patterns, table merging, and web
+publishing.  Data::Table class also provides a straightforward interface
+to other popular Perl modules such as DBI and GD::Graph.
+
+   The current version of Table.pm is available at
+http://www.geocities.com/easydatabase
+
+   We use Data::Table instead of Table, because Table.pm has already been
+used inside PerlQt module in CPAN.
+
+INTRODUCTION
+============
+
+   A table object has three data members:
+
+  1. $data: a reference to an array of array-references.  It's basically a
+     reference to a two-dimensional array.
+
+  2. $header: a reference to a string array. The array contains all the
+     column names.
+
+  3. $type = 1 or 0.  1 means that @$data is an array of table columns
+     (fields) (column-based); 0 means that @$data is an array of table
+     rows (records) (row-based);
+
+        Row-based/Column-based are two internal implementations for a
+table object.  E.g., if a spreadsheet consists of two columns lastname and
+age.  In a row-based table, $data = [ ['Smith', 29], ['Dole', 32] ].  In a
+column-based table, $data = [ ['Smith', 'Dole'], [29, 32] ].
+
+   Two implementions have their pros and cons for different operations.
+Row-based implementation is better for sorting and pattern matching, while
+column-based one is better for adding/deleting/swapping columns.
+
+   Users only need to specify the implementation type of the table upon its
+creation via Data::Table::new, and can forget about it afterwards.
+Implementation type of a table should be considered volital, because
+methods switch table objects from one type into another internally.  Be
+advised that row/column/element references gained via table::rowRef,
+table::rowRefs, table::colRef, table::colRefs, or table::elmRef may become
+stale after other method calls afterwards.
+
+   For those who want to inherit from the Data::Table class, internal
+method table::rotate is used to switch from one implementation type into
+another.  There is an additional internal assistant data structure called
+colHash in our current implementation. This hash table stores all column
+names and their corresponding column index number as key-value pairs for
+fast conversion. This gives users an option to use column name wherever a
+column ID is expected, so that user don't have to use table::colIndex all
+the time. E.g., you may say $t->rename('oldColName', 'newColName') instead
+of $t->rename($t->colIndex('oldColName'), 'newColIdx').
+
+DESCRIPTION
+===========
+
+Field Summary
+-------------
+
+data refto_arrayof_refto_array
+     contains a two-dimensional spreadsheet data.
+
+header refto_array
+     contains all column names.
+
+type 0/1
+     0 is row-based, 1 is column-based, describe the orientation of @$data.
+
+Package Variables
+-----------------
+
+$Data::Table::VERSION
+@Data::Table::OK
+     see table::match_string and table::match_pattern
+
+     # =item $Data::Table::ID # #see Data::Table::fromSQL
+
+Class Methods
+-------------
+
+   Syntax: return_type method_name ( [ parameter [ = default_value ]] [,
+parameter [ = default_value ]] )
+
+   If method_name starts with table::, this is an instance method, it can
+be used as $t->method( parameters ), where $t is a table reference.
+
+   If method_name starts with Data::Table::, this is a class method, it
+should be called as   Data::Table::method, e.g., $t =
+Data::Table::fromCSV("filename.csv").
+
+   Convensions for local variables:
+
+     colID: either a numerical column index or a column name;
+     rowIdx: numerical row index;
+     rowIDsRef: reference to an array of column IDs;
+     rowIdcsRef: reference to an array of row indices;
+     rowRef, colRef: reference to an array of scalars;
+     data: ref_to_array_of_ref_to_array of data values;
+     header: ref to array of column headers;
+     table: a table object, a blessed reference.
+
+Table Creation
+--------------
+
+table Data::Table::new ( $data = [], $header = [], $type = 0, $enforceCheck = 1)
+     create a new table.  It returns a table object upon success, undef
+     otherwise.  $data: points to the spreadsheet data.  $header: points
+     to an array of column names. A column name must have at least one
+     non-digit character.  $type: 0 or 1 for row-based/column-based
+     spreadsheet.  $enforceCheck: 1/0 to turn on/off initial checking on
+     the size of each row/column to make sure the data arguement indeed
+     points to a valid structure.
+
+table table::subTable ($rowIdcsRef, $colIDsRef)
+     create a new table, which is a subset of the original.  It returns a
+     table object.  $rowIdcsRef: points to an array of row indices.
+     $colIDsRef: points to an array of column IDs.  The function make a
+     copy of selected elements from the original table.  Undefined
+     $rowIdcsRef or $colIDsRef is interrpreted as all rows or all columns.
+
+table table::clone
+     make a clone of the original.  It return a table object, equivalent
+     to table::subTable(undef,undef).
+
+table Data::Table::fromCSV ($name, $header = 1)
+     create a table from a CSV file.  return a table object.  $name: the
+     CSV file name.  $header: 0 or 1 to ignore/interrpret the first line
+     in the file as column names, If it is set to 0, the default column
+     names are "col1", "col2", ...
+
+table table::fromCSVi ($name, $header = 1)
+     Same as Data::Table::fromCSV. However, this is an instant method
+     (that's what 'i' stands for), which can be inheritated.
+
+table Data::Table::fromTSV ($name, $header = 1)
+     create a table from a TSV file.  return a table object.  $name: the
+     TSV file name.  $header: 0 or 1 to ignore/interrpret the first line
+     in the file as column names, If it is set to 0, the default column
+     names are "col1", "col2", ...
+
+     Note: read "TSV FORMAT" section for details.
+
+table table::fromTSVi ($name, $header = 1)
+     Same as Data::Table::fromTSV. However, this is an instant method
+     (that's what 'i' stands for), whic h can be inheritated.
+
+table Data::Table::fromSQL ($dbh, $sql, $vars)
+     create a table from the result of an SQL selection query.  It returns
+     a table object upon success or undef otherwise.  $dbh: a valid
+     database handler.  Typically $dbh is obtained from DBI->connect, see
+     "Interface to Database" or DBI.pm.  $sql: an SQL query string.
+     $vars: optional reference to an array of variable values, required if
+     $sql contains '?'s which need to be replaced by the corresponding
+     variable values upon execution, see DBI.pm for details.  Hint: in
+     MySQL, Data::Table::fromSQL($dbh, 'show tables from test') will also
+     create a valid table object.
+
+table Data::Table::fromSQLi ($dbh, $sql, $vars)
+     Same as Data::Table::fromSQL. However, this is an instant method
+     (that's what 'i' stands for), whic h can be inheritated.
+
+Table Access and Properties
+---------------------------
+
+int table::colIndex ($colID)
+     translate a column name into its numerical position, the first column
+     has index 0 as in as any perl array.  return -1 for invalid column
+     names.
+
+int table::nofCol
+     return number of columns.
+
+int table::nofRow
+     return number of rows.
+
+scalar table::elm ($rowIdx, $colID)
+     return the value of a table element at [$rowIdx, $colID], undef if
+     $rowIdx or $colID is invalid.
+
+refto_scalar table::elmRef ($rowIdx, $colID)
+     return the reference to a table element at [$rowIdx, $colID], to
+     allow possible modification.  It returns undef for invalid $rowIdx or
+     $colID.
+
+refto_array table::header
+     return an array of column names.
+
+int table::type
+     return the implementation type of the table (row-based/column-based)
+     at the time, be aware that the type of a table should be considered
+     as volital during method calls.
+
+Table Formatting
+----------------
+
+string table::csv
+     return a string corresponding to the CSV representation of the table.
+
+string table::tsv
+     return a string corresponding to the TSV representation of the table.
+
+     Note: read "TSV FORMAT" section for details.
+
+string table::html ($colors = ["#D4D4BF","#ECECE4","#CCCC99"],  			  $specs = {'name' => ", 'border => '1', ...})
+     return a string corresponding to a 'Portrait'-style html-tagged table.
+     $colors: a reference to an array of three color strings, used for
+     backgrounds for table header, odd-row records, and even-row records,
+     respectively.  A defaut color array ("#D4D4BF","#ECECE4","#CCCC99")
+     will be used if $colors isn't defined.  $specs: a reference to a hash
+     that specifies other attributes such as name, border, id, class, etc.
+     for the TABLE tag.  The table is shown in the "Portrait" style, like
+     in Excel.
+
+string table::html2 ($colors = ["#D4D4BF","#ECECE4","#CCCC99"], 		 	   $specs = {'name' => ", 'border' => '1', ...})
+     return a string corresponding to a "Landscape" html-tagged table.
+     This is useful to present a table with many columns, but very few
+     entries.  Check the above table::html for parameter descriptions.
+
+Table Operations
+----------------
+
+int table::setElm ($rowIdx, $colID, $val)
+     modify the value of a table element at [$rowIdx, $colID] to a new
+     value $val.  It returns 1 upon success, undef otherwise.
+
+int table::addRow ( $rowRef, $rowIdx = table::nofRow)
+     add a new row ($rowRef points to the actual list of scalars), the new
+     row will be referred as $rowIdx as the result. E.g., addRow($aRow, 0)
+     will put the new row as the very first row.  By default, it appends a
+     row to the end.  It returns 1 upon success, undef otherwise.
+
+refto_array table::delRow ( $rowIdx )
+     delete a row at $rowIdx. It will the reference to the deleted row.
+
+refto_array table::delRows ( $rowIdcsRef )
+     delete rows in @$rowIdcsRef. It will return an array of deleted rows
+     upon success.
+
+int table::addCol ($colRef, $colName, $colIdx = numCol)
+     add a new column ($colRef points to the actual data), the new column
+     will be referred as $colName or $colIdx as the result. E.g.,
+     addCol($aCol, 'newCol', 0) will put the new column as the very first
+     column.  By default, append a row to the end.  It will return 1 upon
+     success or undef otherwise.
+
+refto_array table::delCol ($colID)
+     delete a column at $colID return the reference to the deleted column.
+
+arrayof_refto_array table::delCols ($colIDsRef)
+     delete a list of columns, pointed by $colIDsRef. It will return an
+     array of deleted columns upon success.
+
+refto_array table::rowRef ($rowIdx)
+     return a reference to the row at $rowIdx upon success or undef
+     otherwise.
+
+refto_arrayof_refto_array table::rowRefs ($rowIdcsRef)
+     return a reference to array of row references upon success, undef
+     otherwise.
+
+array table::row ($rowIdx)
+     return a copy of the row at $rowIdx upon success or undef otherwise.
+
+refto_hash table::rowHashRef ($rowIdx)
+     return a reference to a hash, which contains a copy of the row at
+     $rowIdx, upon success or undef otherwise. The keys in the hash are
+     column names, and the values are corresponding elements in that row.
+     The hash is a copy, therefore modifying the hash values doesn't
+     change the original table.
+
+refto_array table::colRef ($colID)
+     return a reference to the column at $colID upon success.
+
+refto_arrayof_refto_array table::colRefs ($colIDsRef)
+     return a reference to array of column references upon success.
+
+array table::col ($colID)
+     return a copy to the column at $colID upon success or undef otherwise.
+
+int table::rename ($colID, $newName)
+     rename the column at $colID to a $newName (the newName must be valid,
+     and should not be idential to any other existing column names).  It
+     returns 1 upon success or undef otherwise.
+
+refto_array table::replace ($oldColID, $newColRef, $newName)
+     replace the column at $oldColID by the array pointed by $newColRef,
+     and renamed it to $newName. $newName is optional if you don't want to
+     rename the column.  It returns 1 upon success or undef otherwise.
+
+int table::swap ($colID1, $colID2)
+     swap two columns referred by $colID1 and $colID2.  It returns 1 upon
+     success or undef otherwise.
+
+int table::colMap ($colID, $fun)
+     foreach element in column $colID, map a function $fun to it.  It
+     returns 1 upon success or undef otherwise.  This is a handy way to
+     format a column. E.g. if a column named URL contains URL strings,
+     colMap("URL", sub {"<a href='$_'>$_</a>"}) before html() will change
+     each URL into a clickable hyper link while displayed in a web browser.
+
+int table::sort($colID1, $type1, $order1, $colID2, $type2, $order2, ... )
+     sort a table in place.  First sort by column $colID1 in $order1 as
+     $type1, then sort by $colID2 in $order2 as $type2, ...  $type is 0
+     for numerical and 1 for others; $order is 0 for ascending and 1 for
+     descending; Sorting is done in the priority of colID1, colID2, ...
+     It returns 1 upon success or undef otherwise.  Notice the table is
+     rearranged as a result! This is different from perl's list sort,
+     which returns a sorted copy while leave the original list untouched,
+     the authors feel inplace sorting is more natural.
+
+table table::match_pattern ($pattern)
+     return a new table consisting those rows evaluated to be true by
+     $pattern upon success or undef otherwise.  Side effect:
+     @Data::Table::OK stores a true/false array for the original table
+     rows. Using it, users can find out what are the rows being
+     selected/unselected.  In the $pattern string, a column element should
+     be referred as $_->[$colIndex]. E.g., match_pattern('$_->[0]>3 &&
+     $_->[1]=~/^L') retrieve all the rows where its first column is
+     greater than 3 and second column starts with letter 'L'. Notice it
+     only takes colIndex, column names are not acceptable here!
+
+table table::match_string ($s, $caseIgnore)
+     return a new table consisting those rows contains string $s in any of
+     its fields upon success, undef otherwise. if $caseIgnore evaluated to
+     true, case will is be ignored (s/$s/i).
+
+     Side effect: @Data::Table::OK stores a true/false array for the
+     original table rows.  Using it, users can find out what are the rows
+     being selected/unselected.  The $s string is actually treated as a
+     regular expression and applied to each row element, therefore one can
+     actually specify several keywords by saying, for instance,
+     match_string('One|Other').
+
+Table-Table Manipulations
+-------------------------
+
+int table::rowMerge ($tbl)
+     Append all the rows in the table object $tbl to the original rows.
+     The merging table $tbl must have the same number of columns as the
+     original.  It returns 1 upon success, undef otherwise.  The table
+     object $tbl should not be used afterwards, since it becomes part of
+     the new table.
+
+int table::colMerge ($tbl)
+     Append all the columns in table object $tbl to the original columns.
+     Table $tbl must have the same number of rows as the original.  It
+     returns 1 upon success, undef otherwise.  Table $tbl should not be
+     used afterwards, since it becomes part of the new table.
+
+Internal Methods
+----------------
+
+   All internal methods are mainly implemented for used by other methods
+in the Table class. Users should avoid using them.  Nevertheless, they are
+listed here for developers who would like to understand the code and may
+derive a new class from Data::Table.
+
+int table::rotate
+     convert the internal structure of a table between row-based and
+     column-based.  return 1 upon success, undef otherwise.
+
+string csvEscape($rowRef)
+     Encode an array of scalars into a CSV-formatted string.
+
+refto_array parseCSV($string)
+     Break a CSV encoded string to an array of scalars (check it out, we
+     did it the cool way).
+
+string tsvEscape($rowRef)
+     Encode an array of scalars into a TSV-formatted string.
+
+refto_array parseTSV($string)
+     Break a TSV encoded string to an array of scalars (check it out, we
+     did it the cool way).
+
+TSV FORMAT
+==========
+
+   There is no standard for TSV format as far as we know. CSV format can't
+handle binary data very well, therefore, we choose the TSV format to
+overcome this limitation.
+
+   We define TSV based on MySQL convention.
+
+     "\0", "\n", "\t", "\r", "\b", "'", "\"", and "\\" are all escaped by '\' in the TSV file.
+     (Warning: MySQL treats '\f' as 'f', and it's not escaped here)
+     Undefined values are represented as '\N'.
+
+INTERFACE TO OTHER SOFTWARES
+============================
+
+   Spreadsheet is a very generic type, therefore Data::Table class
+provides an easy interface between databases, web pages, CSV/TSV files,
+graphics packages, etc.
+
+   Here is a summary (partially repeat) of some classic usages of
+Data::Table.
+
+Interface to Database and Web
+-----------------------------
+
+     use DBI;
+
+     $dbh= DBI->connect("DBI:mysql:test", "test", "") or die $DBI::errstr;
+     my $minAge = 10;
+     $t = Data::Table::fromSQL($dbh, "select * from mytable where age >= ?", [$minAge]);
+     print $t->html;
+
+Interface to CSV/TSV
+--------------------
+
+     $t = fromCSV("mydata.csv");
+     $t->sort(1,1,0);
+     print $t->csv;
+
+     Same for TSV
+
+Interface to Graphics Package
+-----------------------------
+
+     use GD::Graph::points;
+
+     $graph = GD::Graph::points->new(400, 300);
+     $t2 = $t->match('$_->[1] > 20 && $_->[3] < 35.7');
+     my $gd = $graph->plot($t->colRefs([0,2]));
+     open(IMG, '>mygraph.png') or die $!;
+     binmode IMG;
+     print IMG $gd->png;
+     close IMG;
+
+AUTHOR
+======
+
+   Copyright 1998-2000, Yingyao Zhou & Guangzhou Zou. All rights reserved.
+
+   It was first written by Zhou in 1998, significantly improved and
+maintained by Zou since 1999. The authors thank Tong Peng and Yongchuang
+Tao for valuable suggestions.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   Please send bug reports and comments to: easydatabase@yahoo.com. When
+sending bug reports, please provide the version of Table.pm, the version of
+Perl.
+
+SEE ALSO
+========
+
+     DBI, GD::Graph.
+
+

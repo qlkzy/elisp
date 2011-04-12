@@ -1,0 +1,1666 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Template/Iterator,  Next: Template/Parser,  Prev: Template/Filters,  Up: Module List
+
+Base iterator class used by the FOREACH directive.
+**************************************************
+
+NAME
+====
+
+   Template::Iterator - Base iterator class used by the FOREACH directive.
+
+SYNOPSIS
+========
+
+     my $iter = Template::Iterator->new(\@data, \%options);
+
+DESCRIPTION
+===========
+
+   The Template::Iterator module defines a generic data iterator for use
+by the FOREACH directive.
+
+   It may be used as the base class for custom iterators.
+
+PUBLIC METHODS
+==============
+
+new(\@data)
+-----------
+
+   Constructor method.  A reference to a list of values is passed as the
+first parameter and subsequent get_first() and get_next() calls will return
+each element.
+
+get_first()
+-----------
+
+   Returns a ($value, $error) pair for the first item in the iterator set.
+The $error returned may be zero or undefined to indicate a valid datum was
+successfully returned.  Returns an error of STATUS_DONE if the list is
+empty.
+
+get_next()
+----------
+
+   Returns a ($value, $error) pair for the next item in the iterator set.
+Returns an error of STATUS_DONE if all items in the list have been visited.
+
+get_all()
+---------
+
+   Returns a (\@values, $error) pair for all remaining items in the
+iterator set.  Returns an error of STATUS_DONE if all items in the list
+have been visited.
+
+size(), max(), index(), number(), first(), last()
+-------------------------------------------------
+
+   Return the size of the iteration set, the maximum index number (size -
+1), the current index number (0..max), the iteration number offset from 1
+(index + 1, i.e. 1..size), and boolean values indicating if the current
+iteration is the first or last in the set, respectively.
+
+AUTHOR
+======
+
+   Andy Wardley <abw@kfs.org>
+
+     http://www.template-toolkit.org/
+     http://www.kfs.org/~abw/
+
+REVISION
+========
+
+   $Revision: 1.1 $
+
+COPYRIGHT
+=========
+
+     Copyright (C) 1996-2000 Andy Wardley.  All Rights Reserved.
+     Copyright (C) 1998-2000 Canon Research Centre Europe Ltd.
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   L<Template|Template
+
+
+File: pm.info,  Node: Template/Parser,  Next: Template/Plugin,  Prev: Template/Iterator,  Up: Module List
+
+LALR(1) parser for compiling template documents
+***********************************************
+
+NAME
+====
+
+   Template::Parser - LALR(1) parser for compiling template documents
+
+SYNOPSIS
+========
+
+     use Template::Parser;
+
+     $parser   = Template::Parser->new(\%config);
+     $template = $parser->parse($text)
+         || die $parser->error(), "\n";
+
+DESCRIPTION
+===========
+
+   The Template::Parser module implements a LALR(1) parser and associated
+methods for parsing template documents into Perl code.
+
+PUBLIC METHODS
+==============
+
+new(\%params)
+-------------
+
+   The new() constructor creates and returns a reference to a new
+Template::Parser object.  A reference to a hash may be supplied as a
+parameter to provide configuration values.  These may include:
+
+START_TAG, END_TAG
+     The START_TAG and END_TAG options are used to specify character
+     sequences or regular expressions that mark the start and end of a
+     template directive.  The default values for START_TAG and END_TAG are
+     '[%' and '%]' respectively, giving us the familiar directive style:
+
+          [% example %]
+
+     Any Perl regex characters can be used and therefore should be escaped
+     (or use the Perl quotemeta function) if they are intended to
+     represent literal characters.
+
+          my $parser = Template::Parser->new({
+            	START_TAG => quotemeta('<+'),
+            	END_TAG   => quotemeta('+>'),
+          });
+
+     example:
+
+          <+ INCLUDE foobar +>
+
+     The TAGS directive can also be used to set the START_TAG and END_TAG
+     values on a per-template file basis.
+
+          [% TAGS <+ +> %]
+
+TAG_STYLE
+     The TAG_STYLE option can be used to set both START_TAG and END_TAG
+     according to pre-defined tag styles.
+
+          my $parser = Template::Parser->new({
+            	TAG_STYLE => 'php',
+          });
+
+     Available styles are:
+
+          template    [% ... %]               (default)
+          template1   [% ... %] or %% ... %%  (Template version 1)
+          metatext    %% ... %%               (Text::MetaText)
+          php         <? ... ?>               (PHP)
+          asp         <% ... %>               (ASP)
+          mason       <% ...  >               (HTML::Mason)
+          html        <!-- ... -->            (HTML comments)
+
+     Any values specified for START_TAG and/or END_TAG will over-ride
+     those defined by a TAG_STYLE.
+
+     The TAGS directive may also be used to set a TAG_STYLE
+
+          [% TAGS html %]
+          <!-- INCLUDE header -->
+
+PRE_CHOMP, POST_CHOMP
+     Anything outside a directive tag is considered plain text and is
+     generally passed through unaltered (but see the INTERPOLATE option).
+     This includes all whitespace and newlines characters surrounding
+     directive tags.  Any directives that don't generate any output will
+     leave gaps in the output document.
+
+     Example:
+
+          Foo
+          [% a = 10 %]
+          Bar
+
+     Output:
+
+          Foo
+
+          Bar
+
+     The PRE_CHOMP and POST_CHOMP options can help to clean up some of this
+     extraneous whitespace.  Both are disabled by default.
+
+          my $parser = Template::Parser->new({
+          	PRE_CHOMP  => 1,
+          	POST_CHOMP => 1,
+          });
+
+     With PRE_CHOMP set true, the newline and whitespace preceeding a
+     directive at the start of a line will be deleted.  This has the
+     effect of concatenating a line that starts with a directive onto the
+     end of the previous line.
+
+          Foo <----------.
+          	       |
+              ,---(PRE_CHOMP)----'
+              |
+              `-- [% a = 10 %] --.
+          	       |
+              ,---(POST_CHOMP)---'
+              |
+              `-> Bar
+
+     With POST_CHOMP set true, any whitespace after a directive up to and
+     including the newline will be deleted.  This has the effect of joining
+     a line that ends with a directive onto the start of the next line.
+
+     PRE_CHOMP and POST_CHOMP can be activated for individual directives by
+     placing a '-' immediately at the start and/or end of the directive.
+
+          [% FOREACH user = userlist %]
+             [%- user -%]
+          [% END %]
+
+     The '-' characters activate both PRE_CHOMP and POST_CHOMP for the one
+     directive '[%- name -%]'.  Thus, the template will be processed as if
+     written:
+
+          [% FOREACH user = userlist %][% user %][% END %]
+
+     Similarly, '+' characters can be used to disable PRE_CHOMP or
+     POST_CHOMP (i.e.  leave the whitespace/newline intact) options on a
+     per-directive basis.
+
+          [% FOREACH user = userlist %]
+          User: [% user +%]
+          [% END %]
+
+     With POST_CHOMP set on, the above example would be parsed as if
+     written:
+
+          [% FOREACH user = userlist %]User: [% user %]
+          [% END %]
+
+INTERPOLATE
+     The INTERPOLATE flag, when set to any true value will cause variable
+     references in plain text (i.e. not surrounded by START_TAG and
+     END_TAG) to be recognised and interpolated accordingly.
+
+          my $parser = Template::Parser->new({
+            	INTERPOLATE => 1,
+          });
+
+     Variables should be prefixed by a '$' to identify them.  Curly braces
+     can be used in the familiar Perl/shell style to explicitly scope the
+     variable name where required.
+
+          # INTERPOLATE = 0
+          <a href="http://[% server %]/[% help %]">
+          <img src="[% images %]/help.gif"></a>
+          [% myorg.name %]
+          
+          # INTERPOLATE = 1
+          <a href="http://$server/$help">
+          <img src="$images/help.gif"></a>
+          $myorg.name
+          
+          # explicit scoping with {  }
+          <img src="$images/${icon.next}.gif">
+
+ANYCASE
+     By default, directive keywords should be expressed in UPPER CASE.  The
+     ANYCASE option can be set to allow directive keywords to be specified
+     in any case.
+
+          # ANYCASE => 0 (default)
+          [% INCLUDE foobar %]	# OK
+          [% include foobar %]        # ERROR
+          [% include = 10   %]        # OK, 'include' is a variable
+
+          # ANYCASE => 1
+          [% INCLUDE foobar %]	# OK
+          [% include foobar %]	# OK
+          [% include = 10   %]        # ERROR, 'include' is reserved word
+
+     One side-effect of enabling ANYCASE is that you cannot use a variable
+     of the same name as a reserved word, regardless of case.  The reserved
+     words are currently:
+
+          GET CALL SET DEFAULT INSERT INCLUDE PROCESS WRAPPER
+          IF UNLESS ELSE ELSIF FOR FORNEXT WHILE SWITCH CASE
+          USE PLUGIN FILTER MACRO PERL RAWPERL BLOCK META
+          TRY THROW CATCH FINAL BREAK RETURN STOP CLEAR
+          TO STEP AND OR NOT MOD DIV END
+
+     The only lower case reserved words that cannot be used for variables,
+     regardless of the ANYCASE option, are the operators:
+
+          and or not mod div
+
+V1DOLLAR
+     In version 1 of the Template Toolkit, an optional leading '$' could
+     be placed on any template variable and would be silently ignored.
+
+          # VERSION 1
+          [% $foo %]       ===  [% foo %]
+          [% $hash.$key %] ===  [% hash.key %]
+
+     To interpolate a variable value the '${' ... '}' construct was used.
+     Typically, one would do this to index into a hash array when the key
+     value was stored in a variable.
+
+     example:
+
+          my $vars = {
+          	users => {
+          	    aba => { name => 'Alan Aardvark', ... },
+          	    abw => { name => 'Andy Wardley', ... },
+                  ...
+          	},
+          	uid => 'aba',
+              ...
+          };
+
+          $template->process('user/home.html', $vars)
+          	|| die $template->error(), "\n";
+
+     'user/home.html':
+
+          [% user = users.${uid} %]     # users.aba
+          Name: [% user.name %]         # Alan Aardvark
+
+     This was inconsistent with double quoted strings and also the
+     INTERPOLATE mode, where a leading '$' in text was enough to indicate a
+     variable for interpolation, and the additional curly braces were used
+     to delimit variable names where necessary.  Note that this use is
+     consistent with UNIX and Perl conventions, among others.
+
+          # double quoted string interpolation
+          [% name = "$title ${user.name}" %]
+
+          # INTERPOLATE = 1
+          <img src="$images/help.gif"></a>
+          <img src="$images/${icon.next}.gif">
+
+     For version 2, these inconsistencies have been removed and the syntax
+     clarified.  A leading '$' on a variable is now used exclusively to
+     indicate that the variable name should be interpolated (e.g.
+     subsituted for its value) before being used.  The earlier example
+     from version 1:
+
+          # VERSION 1
+          [% user = users.${uid} %]
+          Name: [% user.name %]
+
+     can now be simplified in version 2 as:
+
+          # VERSION 2
+          [% user = users.$uid %]
+          Name: [% user.name %]
+
+     The leading dollar is no longer ignored and has the same effect of
+     interpolation as '${' ... '}' in version 1.  The curly braces may
+     still be used to explicitly scope the interpolated variable name
+     where necessary.
+
+     e.g.
+
+          [% user = users.${me.id} %]
+          Name: [% user.name %]
+
+     The rule applies for all variables, both within directives and in
+     plain text if processed with the INTERPOLATE option.  This means that
+     you should no longer (if you ever did) add a leading '$' to a variable
+     inside a directive, unless you explicitly want it to be interpolated.
+
+     One obvious side-effect is that any version 1 templates with variables
+     using a leading '$' will no longer be processed as expected.  Given
+     the following variable definitions,
+
+          [% foo = 'bar'
+             bar = 'baz'
+          %]
+
+     version 1 would interpret the following as:
+
+          # VERSION 1
+          [% $foo %] => [% GET foo %] => bar
+
+     whereas version 2 interprets it as:
+
+          # VERSION 2
+          [% $foo %] => [% GET $foo %] => [% GET bar %] => baz
+
+     In version 1, the '$' is ignored and the value for the variable 'foo'
+     is retrieved and printed.  In version 2, the variable '$foo' is first
+     interpolated to give the variable name 'bar' whose value is then
+     retrieved and printed.
+
+     The use of the optional '$' has never been strongly recommended, but
+     to assist in backwards compatibility with any version 1 templates that
+     may rely on this "feature", the V1DOLLAR option can be set to 1
+     (default: 0) to revert the behaviour and have leading '$' characters
+     ignored.
+
+          my $parser = Template::Parser->new({
+          	V1DOLLAR => 1,
+          });
+
+GRAMMAR
+     The GRAMMAR configuration item can be used to specify an alternate
+     grammar for the parser.  This allows a modified or entirely new
+     template langauge to be constructed and used by the Template Toolkit.
+
+     Source templates are compiled to Perl code by the Template::Parser
+     using the Template::Grammar (by default) to define the language
+     structure and semantics.  Compiled templates are thus inherently
+     "compatible" with each other and there is nothing to prevent any
+     number of different template languages being compiled and used within
+     the same Template Toolkit processing environment (other than the usual
+     time and memory constraints).
+
+     The Template::Grammar file is constructed from a YACC like grammar
+     (using Parse::YAPP) and a skeleton module template.  These files are
+     provided, along with a small script to rebuild the grammar, in the
+     'parser' sub-directory of the distribution.  You don't have to know or
+     worry about these unless you want to hack on the template language or
+     define your own variant.  There is a README file in the same directory
+     which provides some small guidance but it is assumed that you know
+     what you're doing if you venture herein.  If you grok LALR parsers,
+     then you should find it comfortably familiar.
+
+     By default, an instance of the default Template::Grammar will be
+     created and used automatically if a GRAMMAR item isn't specified.
+
+          use MyOrg::Template::Grammar;
+
+          my $parser = Template::Parser->new({
+             	GRAMMAR = MyOrg::Template::Grammar->new();
+          });
+
+parse($text)
+------------
+
+   The parse() method parses the text passed in the first parameter and
+returns a reference to a Template::Document object which contains the
+compiled representation of the template text.  On error, undef is returned.
+
+   Example:
+
+     $doc = $parser->parse($text)
+     	|| die $parser->error();
+
+AUTHOR
+======
+
+   Andy Wardley <abw@kfs.org>
+
+     http://www.template-toolkit.org/
+     http://www.kfs.org/~abw/
+
+REVISION
+========
+
+   $Revision: 1.1 $
+
+COPYRIGHT
+=========
+
+     Copyright (C) 1996-2000 Andy Wardley.  All Rights Reserved.
+     Copyright (C) 1998-2000 Canon Research Centre Europe Ltd.
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   The original Template::Parser module was derived from a standalone
+parser generated by version 0.16 of the Parse::Yapp module.  The following
+copyright notice appears in the Parse::Yapp documentation.
+
+     The Parse::Yapp module and its related modules and shell
+     scripts are copyright (c) 1998 Francois Desarmenien,
+     France. All rights reserved.
+
+     You may use and distribute them under the terms of either
+     the GNU General Public License or the Artistic License, as
+     specified in the Perl README file.
+
+SEE ALSO
+========
+
+   The Template Toolkit web site contains the latest information, news and
+other resources.
+
+     http://www.template-toolkit.org/
+
+   A mailing list exists for up-to-date information on the Template Toolkit
+and for following and contributing to the development process.  To
+subscribe, send an email to
+
+     templates-request@template-toolkit.org
+
+   with the message 'subscribe' in the body.  You can also use the web
+interface to subscribe or browse the archives:
+
+     http://www.template-toolkit.org/mailman/listinfo/templates
+
+   The `tpage' and `ttree' scripts are distributed and installed along
+with the Template Toolkit.  The `tpage' script simply processes named
+files or STDIN if unspecified, using a default Template object.  The
+`ttree' script can be used to process entire directory trees of templates,
+allowing large content systems such as web sites to be rebuilt from a
+single command or configuration file.
+
+     perldoc tpage
+     perldoc ttree
+
+   The `Template::Tutorial' document provides an introduction to the
+Template Toolkit and shows some typical examples of usage.
+
+     perldoc Template::Tutorial
+
+   You may also like to consult the paper 'Building and Managing Web
+Systems with the Template Toolkit' and accompanying slides from the
+presentation at the 4th Perl Conference.  These are available from the
+Template Toolkit web site:
+
+     http://www.template-toolkit.org/docs.html
+
+   The following modules comprise the Template Toolkit.  Consult the
+individual documentation for further details.
+
+`Template::Service|Template::Service' in this node
+     The Template::Service module handles the template processing
+     lifecycle, adding PRE_PROCESS and POST_PROCESS templates, handling
+     redirection through any defined PROCESS template, and dispatching any
+     ERROR templates to handle uncaught exceptions.  The actual processing
+     of these templates is handled by an underlying
+     `Template::Context|Template::Context' in this node object.
+
+`Template::Context|Template::Context' in this node
+     The Template::Context module defines a class of objects which each
+     represent a unique run-time environment in which templates are
+     processed.  The context maintains references to the stash of variables
+     currently defined (`Template::Stash|Template::Stash' in this node)
+     and to provider objects for templates
+     (`Template::Provider|Template::Provider' in this node), filters
+     (`Template::Filters|Template::Filters' in this node) and plugins
+     (`Template::Plugins|Template::Plugins' in this node).
+
+`Template::Stash|Template::Stash' in this node
+     The Template::Stash module defines an object class which is used for
+     storing, retrieving and evaluating variables and their values.
+
+`Template::Provider|Template::Provider' in this node
+     The Template::Provider module defines an object class which is used to
+     find, load, parse, compile and then cache template documents.  The
+     cache implements a simple fetch($template) method which will accept a
+     wide range of inputs (filename, text ref, GLOB, IO::Handle, etc) and
+     attempt to read the template and call on a
+     `Template::Parser|Template::Parser' in this node to parse and compile
+     it to a `Template::Document|Template::Document' in this node which is
+     then cached.
+
+`Template::Document|Template::Document' in this node
+     Template::Document objects are thin wrappers around the Perl
+     subroutines which have been compiled from source templates by the
+     `Template::Parser|Template::Parser' in this node.  These objects also
+     maintain any metadata values for the template and have references to
+     any BLOCKs defined within the the template.
+
+`Template::Parser|Template::Parser' in this node
+     The Template::Parser module defines an object class which implements
+     the template parser and compiler.  The template text is first scanned
+     by a Perl regex which extracts the embedded directives and lexes the
+     tokens contained within.  A DFA (Deterministic Finite-state Automaton)
+     then iterates through the tokens using the rules and states defined in
+     `Template::Grammar|Template::Grammar' in this node and generates a
+     compiled template document as a Perl subroutine.
+
+`Template::Grammar|Template::Grammar' in this node
+     The Template::Grammar module defines the rules and state tables for
+     the `Template::Parser|Template::Parser' in this node DFA.  These are
+     generated by the Parse::Yapp module.  The Template-Toolkit
+     distribution contains a parser directory which contains further files
+     and information concerning the grammar and compilation thereof.
+
+`Template::Directive|Template::Directive' in this node
+     This module implements a number of factory methods which are used by
+     the `Template::Parser|Template::Parser' in this node to generate Perl
+     code from source templates.
+
+`Template::Filters|Template::Filters' in this node
+     This module implements the various FILTER subroutines and provides a
+     simple interface through which filter subs can be retrieved.
+
+`Template::Plugins|Template::Plugins' in this node
+     This module provides access to the standard Template Toolkit or user
+     defined plugin modules.
+
+`Template::Plugin|Template::Plugin' in this node
+     Base class for Template::Plugin::* modules.
+
+`Template::Exception|Template::Exception' in this node
+     The Template::Exception module defines an exception type for
+     representing error conditions within the Template Toolkit.
+
+`Template::Iterator|Template::Iterator' in this node
+     The Template::Iterator module defines a data iterator which is used
+     by the FOREACH directive.  This may be sub-classed to create more
+     specialised iterators for traversing data sets.
+
+`Template::Constants|Template::Constants' in this node
+     Defines various constants used in the Template Toolkit.
+
+`Template::Config|Template::Config' in this node
+     Implements a number of factory methods through which other Template::*
+     modules can be automatically loaded and instantiated.
+
+`Template::Base|Template::Base' in this node
+     A common base class for many Template::* modules.
+
+`Template::Test|Template::Test' in this node
+     Module for testing the Template Toolkit, primarily used by the test
+     scripts in the 't' distribution sub-directory
+
+
+File: pm.info,  Node: Template/Plugin,  Next: Template/Plugin/Autoformat,  Prev: Template/Parser,  Up: Module List
+
+base class for Template Toolkit plugins
+***************************************
+
+NAME
+====
+
+   Template::Plugin - base class for Template Toolkit plugins
+
+SYNOPSIS
+========
+
+     package MyOrg::Template::Plugin::MyPlugin;
+     use base qw( Template::Plugin );
+     use Template::Plugin;
+     use MyModule;
+
+     sub new {
+         my $class   = shift;
+         my $context = shift;
+     	bless {
+     	    ...
+     	}, $class;
+     }
+
+DESCRIPTION
+===========
+
+   A "plugin" for the Template Toolkit is simply a Perl module which
+exists in a known package location (e.g. Template::Plugin::*) and conforms
+to a regular standard, allowing it to be loaded and used automatically.
+
+   The Template::Plugin module defines a base class from which other
+plugin modules can be derived.  A plugin does not have to be derived from
+Template::Plugin but should at least conform to its object-oriented
+interface.
+
+   It is recommended that you create plugins in your own package namespace
+to avoid conflict with toolkit plugins.  e.g.
+
+     package MyOrg::Template::Plugin::FooBar;
+
+   Use the PLUGIN_BASE option to specify the namespace that you use.  e.g.
+
+     use Template;
+     my $template = Template->new({
+     	PLUGIN_BASE => 'MyOrg::Template::Plugin',
+     });
+
+PLUGIN API
+==========
+
+   The following methods form the basic interface between the Template
+Toolkit and plugin modules.
+
+load($context)
+     This method is called by the Template Toolkit when the plugin module
+     is first loaded.  It is called as a package method and thus implicitly
+     receives the package name as the first parameter.  A reference to the
+     Template::Context object loading the plugin is also passed.  The
+     default behaviour for the load() method is to simply return the class
+     name.  The calling context then uses this class name to call the new()
+     package method.
+
+          package MyPlugin;
+
+          sub load {               # called as MyPlugin->load($context)
+          	my ($class, $context) = @_;
+          	return $class;       # returns 'MyPlugin'
+          }
+
+new($context, @params)
+     This method is called to instantiate a new plugin object for the USE
+     directive.  It is called as a package method against the class name
+     returned by load().  A reference to the Template::Context object
+     creating the plugin is passed, along with any additional parameters
+     specified in the USE directive.
+
+          sub new {                # called as MyPlugin->new($context)
+          	my ($class, $context, @params) = @_;
+          	bless {
+          	    _CONTEXT => $context,
+          	}, $class;	     # returns blessed MyPlugin object
+          }
+
+fail($error)
+     This method is used for reporting errors.  It returns undef.  e.g.
+
+          sub new {
+          	my ($class, $context, $dsn) = @_;
+
+          return $class->fail('No data source specified')
+              unless $dsn;
+
+          bless {
+              _DSN => $dsn,
+          }, $class;
+              }
+
+error()
+     This method returns the error as set by the above fail() method.  It
+     is called by the loading/creating Template::Context object.
+
+DEEPER MAGIC
+============
+
+   The Template::Context object that handles the loading and use of
+plugins calls the new(), fail() and error() methods against the package
+name returned by the load() method.  In pseudo-code terms, it might look
+something like this:
+
+     $class  = MyPlugin->load($context);       # returns 'MyPlugin'
+
+     $object = $class->new($context, @params)  # MyPlugin->new(...)
+     	|| die $class->error();               # MyPlugin->error()
+
+   The load() method may alterately return a blessed reference to an
+object instance.  In this case, new(), fail() and error() are then called
+as object methods against that prototype instance.
+
+     package YourPlugin;
+
+     sub load {
+         my ($class, $context) = @_;
+     	bless {
+     	    _CONTEXT => $context,
+     	}, $class;
+     }
+
+     sub new {
+     	my ($self, $context, @params) = @_;
+     	return $self;
+     }
+
+   In this example, we have implemented a 'Singleton' plugin.  One object
+gets created when load() is called and this simply returns itself for each
+call to new().
+
+   Another implementation might require individual objects to be created
+for every call to new(), but with each object sharing a reference to some
+other object to maintain cached data, database handles, etc.  This
+pseudo-code example demonstrates the principle.
+
+     package MyServer;
+
+     sub load {
+         my ($class, $context) = @_;
+     	bless {
+     	    _CONTEXT => $context,
+     	    _CACHE   => { },
+     	}, $class;
+     }
+
+     sub new {
+     	my ($self, $context, @params) = @_;
+     	MyClient->new($self, @params);
+     }
+
+     sub add_to_cache   { ... }
+
+     sub get_from_cache { ... }
+
+     package MyClient;
+
+     sub new {
+     	my ($class, $server, $blah) = @_;
+     	bless {
+     	    _SERVER => $server,
+     	    _BLAH   => $blah,
+     	}, $class;
+     }
+
+     sub get {
+     	my $self = shift;
+     	$self->{ _SERVER }->get_from_cache(@_);
+     }
+
+     sub put {
+     	my $self = shift;
+     	$self->{ _SERVER }->add_to_cache(@_);
+     }
+
+   When the plugin is loaded, a MyServer instance is created.  The new()
+method is called against this object which instantiates and returns a
+MyClient object, primed to communicate with the creating MyServer.
+
+Template::Plugin BASE CLASS
+===========================
+
+   The Template::Plugin module implements a base class from which other
+Template Toolkit plugins can be derived.  In addition, it also acts as a
+general-purpose wrapper object, providing a delegation service via an
+AUTOLOAD method to an underlying object.
+
+   A reference to another object should be passed as a parameter (following
+the context reference) to the base class new() constructor.  All methods
+then called on the Template::Plugin object will be delegated to the
+underlying object via an AUTOLOAD method.
+
+     package Template::Plugin::MyPlugin;
+     use base qw( Template::Plugin );
+     use MyModule;
+
+     sub new {
+         my $class   = shift;
+         my $context = shift;
+     	$class->SUPER::new($context, MyModule->new(@_));
+     }
+
+   The name of a Perl module/class may be specified instead of a
+reference.  The constructor will attempt to load the module and
+instantiate an object via its new() method.  Any additional parameters
+passed will be forwarded onto new().
+
+     package Template::Plugin::CGI;
+     use base qw( Template::Plugin );
+
+     sub new {
+         my $class   = shift;
+         my $context = shift;
+     	$class->SUPER::new($context, 'CGI', @_);
+     }
+
+AUTHOR
+======
+
+   Andy Wardley <abw@kfs.org>
+
+     http://www.template-toolkit.org/
+     http://www.kfs.org/~abw/
+
+REVISION
+========
+
+   $Revision: 1.1 $
+
+COPYRIGHT
+=========
+
+     Copyright (C) 1996-2000 Andy Wardley.  All Rights Reserved.
+     Copyright (C) 1998-2000 Canon Research Centre Europe Ltd.
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   `Template|Template' in this node, `Template::Plugins|Template::Plugins'
+in this node, L<Template::Context|Template::Context
+
+
+File: pm.info,  Node: Template/Plugin/Autoformat,  Next: Template/Plugin/CGI,  Prev: Template/Plugin,  Up: Module List
+
+interface to Text::Autoformat module
+************************************
+
+NAME
+====
+
+   Template::Plugin::Autoformat - interface to Text::Autoformat module
+
+SYNOPSIS
+========
+
+     [% USE autoformat(options) %]
+
+     [% autoformat(text, more_text, ..., options) %]
+
+     [% FILTER autoformat(options) %]
+        a block of text
+     [% END %]
+
+EXAMPLES
+========
+
+     # define some text for the examples
+     [% text = BLOCK %]
+        Be not afeard.  The isle is full of noises, sounds and sweet
+        airs that give delight but hurt not.
+     [% END %]
+
+     # pass options to constructor...
+     [% USE autoformat(case => 'upper') %]
+     [% autoformat(text) %]
+
+     # and/or pass options to the autoformat subroutine itself
+     [% USE autoformat %]
+     [% autoformat(text, case => 'upper') %]
+     
+     # using the autoformat filter
+     [% USE autoformat(left => 10, right => 30) %]
+     [% FILTER autoformat %]
+        Be not afeard.  The isle is full of noises, sounds and sweet
+        airs that give delight but hurt not.
+     [% END %]
+
+     # another filter example with configuration options
+     [% USE autoformat %]
+     [% FILTER autoformat(left => 20) %]
+        Be not afeard.  The isle is full of noises, sounds and sweet
+        airs that give delight but hurt not.
+     [% END %]
+     
+     # another FILTER example, defining a 'poetry' filter alias
+     [% USE autoformat %]
+     [% text FILTER poetry = autoformat(left => 20, right => 40) %]
+
+     # reuse the 'poetry' filter alias
+     [% text FILTER poetry %]
+
+     # shorthand form ('|' is an alias for 'FILTER')
+     [% text | autoformat %]
+
+     # using forms
+     [% USE autoformat(form => '>>>>.<<<', numeric => 'AllPlaces') %]
+     [% autoformat(10, 20.32, 11.35) %]
+
+DESCRIPTION
+===========
+
+   The autoformat plugin is an interface to Damian Conway's
+Text::Autoformat Perl module which provides advanced text wrapping and
+formatting.
+
+   Configuration options may be passed to the plugin constructor via the
+USE directive.
+
+     [% USE autoformat(right => 30) %]
+
+   The autoformat subroutine can then be called, passing in text items
+which will be wrapped and formatted according to the current configuration.
+
+     [% autoformat('The cat sat on the mat') %]
+
+   Additional configuration items can be passed to the autoformat
+subroutine and will be merged with any existing configuration specified
+via the constructor.
+
+     [% autoformat(text, left => 20) %]
+
+   Configuration options are passed directly to the Text::Autoformat
+plugin.  At the time of writing, the basic configuration items are:
+
+     left	left margin (default: 1)
+     right	right margin (default 72)
+     justify 	justification as one of 'left', 'right', 'full'
+                 or 'centre' (default: left)
+     case        case conversion as one of 'lower', 'upper',
+                 'sentence', 'title', or 'highlight' (default: none)
+     squeeze 	squeeze whitespace (default: enabled)
+
+   The plugin also accepts a 'form' item which can be used to define a
+format string.  When a form is defined, the plugin will call the
+underlying form() subroutine in preference to autoformat().
+
+     [% USE autoformat(form => '>>>>.<<') %]
+     [% autoformat(123.45, 666, 3.14) %]
+
+   Additional configuration items relevant to forms can also be specified.
+
+     [% USE autoformat(form => '>>>>.<<', numeric => 'AllPlaces') %]
+     [% autoformat(123.45, 666, 3.14) %]
+
+   These can also be passed directly to the autoformat subroutine.
+
+     [% USE autoformat %]
+     [% autoformat( 123.45, 666, 3.14,
+     		   form    => '>>>>.<<',
+     		   numeric => 'AllPlaces' )
+     %]
+
+   See *Note Text/Autoformat: Text/Autoformat, for further details.
+
+AUTHORS
+=======
+
+   Robert McArthur <mcarthur@dstc.edu.au> wrote the original plugin code,
+with some modifications and additions from Andy Wardley <abw@kfs.org>.
+
+   Damian Conway <damian@conway.org> wrote the Text::Autoformat module (in
+his copious spare time :-) which does all the clever stuff.
+
+REVISION
+========
+
+   $Revision: 2.2 $
+
+COPYRIGHT
+=========
+
+   Copyright (C) 2000 Robert McArthur & Andy Wardley.  All Rights Reserved.
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   `Template::Plugin|Template::Plugin' in this node,
+`Text::Autoformat|Text::Autoformat' in this node
+
+
+File: pm.info,  Node: Template/Plugin/CGI,  Next: Template/Plugin/DBI,  Prev: Template/Plugin/Autoformat,  Up: Module List
+
+simple Template Plugin interface to CGI.pm module
+*************************************************
+
+NAME
+====
+
+   Template::Plugin::CGI - simple Template Plugin interface to CGI.pm
+module
+
+SYNOPSIS
+========
+
+     [% USE CGI %]
+     [% CGI.param('parameter') %]
+
+     [% USE things = CGI %]
+     [% things.param('name') %]
+     
+     # see CGI docs for other methods provided by the CGI object
+
+DESCRIPTION
+===========
+
+   This is a very simple Template Toolkit Plugin interface to the CGI
+module.  A CGI object will be instantiated via the following directive:
+
+     [% USE CGI %]
+
+   CGI methods may then be called as follows:
+
+     [% CGI.header %]
+     [% CGI.param('parameter') %]
+
+   An alias can be used to provide an alternate name by which the object
+should be identified.
+
+     [% USE mycgi = CGI %]
+     [% mycgi.start_form %]
+     [% mycgi.popup_menu({ Name   => 'Color'
+     			  Values => [ 'Green' 'Black' 'Brown' ] }) %]
+
+   Parenthesised parameters to the USE directive will be passed to the
+plugin constructor:
+
+   [% USE cgiprm = CGI('uid=abw&name=Andy+Wardley') %]     [%
+cgiprm.param('uid') %]
+
+AUTHOR
+======
+
+   Andy Wardley <kfs.org>
+
+REVISION
+========
+
+   $Revision: 2.0 $
+
+COPYRIGHT
+=========
+
+   Copyright (C) 1996-1999 Andy Wardley.  All Rights Reserved.  Copyright
+(C) 1998-1999 Canon Research Centre Europe Ltd.
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   `CGI|CGI' in this node, `Template::Plugin|Template::Plugin' in this
+node,
+
+
+File: pm.info,  Node: Template/Plugin/DBI,  Next: Template/Plugin/Datafile,  Prev: Template/Plugin/CGI,  Up: Module List
+
+Template Plugin interface to the DBI.pm module
+**********************************************
+
+NAME
+====
+
+   Template::Plugin::DBI - Template Plugin interface to the DBI.pm module
+
+SYNOPSIS
+========
+
+     # use positional arguments...
+     [% USE DBI('dbi:driver:database', 'username', 'password') %]
+
+     # ...or named parameters...
+     [% USE DBI(data_source = 'dbi:driver:database',
+                username    = 'username',
+                password    = 'password') %]
+
+     # ...or call connect() explicitly
+     [% USE DBI %]
+     [% DBI.connect(dsn, user, pass) %]
+
+     [% FOREACH item = DBI.query( 'SELECT rows FROM table' ) %]
+        Here's some row data: [% item.field %]
+     [% END %]
+
+     [% query = DBI.prepare('SELECT * FROM user WHERE manager = ?') %]
+     [% FOREACH user = query.execute('sam') %]
+        ...
+     [% FOREACH user = query.execute('abw') %]
+        ...
+
+     [% IF DBI.do("DELETE FROM users WHERE uid = 'sam'") %]
+        Oh No!  The user was deleted!
+     [% END %]
+
+DESCRIPTION
+===========
+
+   This Template Toolkit plugin module provides an interface to the Perl
+DBI/DBD modules, allowing you to integrate SQL queries into your template
+documents.
+
+   A DBI plugin object can be created as follows:
+
+     [% USE DBI %]
+
+   This creates an uninitialised DBI object.  You can then open a
+connection to a database using the connect() method.
+
+     [% DBI.connect('dbi:driver:database', 'username', 'password') %]
+
+   The DBI connection can be opened when the plugin is created by passing
+arguments to the constructor, called from the USE directive.
+
+     [% USE DBI('dbi:driver:database', 'username', 'password') %]
+
+   You can also use named parameters to provide the data source connection
+string, user name and password.
+
+     [% USE DBI(data_source => 'dbi:driver:database',
+                username    => 'username',
+                password    => 'password')  %]
+
+   Lazy Template hackers may prefer to use 'dsn' or 'connect' as a
+shorthand form of the 'data_source' parameter, and 'user' and 'pass' as
+shorthand forms of 'username' and 'password', respectively.
+
+     [% USE DBI(connect => 'dbi:driver:database',
+                user    => 'username',
+                pass    => 'password')  %]
+
+   Any additional DBI attributes can be specified as named parameters.
+The 'PrintError' attribute defaults to 0 unless explicitly set true.
+
+     [% USE DBI(dsn, user, pass, ChopBlanks=1) %]
+
+   Methods can then be called on the plugin object using the familiar
+dotted notation:
+
+     [% FOREACH item = DBI.query( 'SELECT rows FROM table' ) %]
+        Here's some row data: [% item.field %]
+     [% END %]
+
+   See `OBJECT METHODS' in this node below for further details of the
+methods available.
+
+   An alternate variable name can be provided for the plugin as per regular
+Template Toolkit syntax:
+
+     [% USE mydb = DBI('dbi:driver:database','username','password') %]
+
+     [% FOREACH item = mydb.query( 'SELECT rows FROM table' ) %]
+        ...
+
+   You can also specify the DBI plugin name in lower case if you prefer:
+
+     [% USE dbi(dsn, user, pass) %]
+     [% FOREACH item = dbi.query( 'SELECT rows FROM table' ) %]
+        ...
+
+   The disconnect() method can be called to explicitly disconnect the
+current database, but this generally shouldn't be necessary as it is
+called automatically when the plugin goes out of scope.  You can call
+connect() at any time to open a connection to another database.  The
+previous connection will be closed automatically.
+
+OBJECT METHODS
+==============
+
+connect($data_source, $username, $password)
+-------------------------------------------
+
+   Establishes a database connection.  This method accepts both positional
+and named parameter syntax.  e.g.
+
+     [% DBI.connect(data_source, username, password) %]
+     [% DBI.connect(data_source = 'dbi:driver:database'
+                    username    = 'foo'
+                    password    = 'bar' ) %]
+
+   The connect method allows you to connect to a data source explicitly.
+It can also be used to reconnect an exisiting object to a different data
+source.
+
+query($sql)
+-----------
+
+   This method submits an SQL query to the database and creates an iterator
+object to return the results.  This may be used directly in a FOREACH
+directive as shown below.  Data is automatically fetched a row at a time
+from the query result set as required for memory efficiency.
+
+     [% FOREACH row = DBI.query('select * from users') %]
+        Each [% row.whatever %] can be processed here
+     [% END %]
+
+prepare($sql)
+-------------
+
+   Prepare a query for later execution.  This returns a compiled query
+object (of the Template::Plugin::DBI::Query class) on which the execute()
+method can subsequently be called.
+
+     [% query = DBI.prepare('SELECT * FROM users WHERE id = ?') %]
+
+execute(@args)
+--------------
+
+   Execute a previously prepared query.  This method should be called on
+the query object returned by the prepare() method.  Returns an iterator
+object which can be used directly in a FOREACH directive.
+
+     [% query = DBI.prepare('SELECT * FROM users WHERE manager = ?') %]
+
+     [% FOREACH user = query.execute('sam') %]
+        [% user.name %]
+     [% END %]
+
+     [% FOREACH user = query.execute('sam') %]
+        [% user.name %]
+     [% END %]
+
+do($sql)
+--------
+
+   The do() method executes a sql statement from which no records are
+returned.  It will return true if the statement was successful
+
+     [% IF DBI.do("DELETE FROM users WHERE uid = 'sam'") %]
+        The user was successfully deleted.
+     [% END %]
+
+quote($value, $type)
+--------------------
+
+   Calls the quote() method on the underlying DBI handle to quote the value
+specified in the appropriate manner for its type.
+
+disconnect()
+------------
+
+   Disconnects the current database.
+
+PRE-REQUISITES
+==============
+
+   Perl 5.005, Template-Toolkit 2.00, DBI 1.02
+
+SEE ALSO
+========
+
+   For general information on the Template Toolkit and DBI modules, see
+*Note Template: Template, and `DBI' in this node.
+
+AUTHORS
+=======
+
+   The DBI plugin was written by Simon A Matthews,
+<sam@knowledgepool.com>, with contributions from Andy Wardley
+<abw@kfs.org>.
+
+HISTORY
+=======
+
+  1. 2000/11/03  abw Modified connect method to pass all named arguments
+     to DBI.  e.g.
+
+          [% USE DBI(dsn, user, pass, ChopBlanks=1) %]
+
+  2. 2000/11/14  abw Added prev() and next() methods to
+     Template::Plugin::DBI:Iterator to return the previous and next items
+     in the iteration set or undef if not available.
+
+  3. 2000/11/31  sam Added _connect method to Plugin::DBI for backwards
+     compatability with code from version 1 of Template that subclassed
+     the plugin
+
+     Changed the new method on the DBI plugin so that it checks to see if
+     it is being called by a subclassed object.
+
+     Fixed the return value in the DBI plugin when connect is called more
+     than once in the lifetime of the plugin.
+
+
+COPYRIGHT
+=========
+
+   Copyright (C) 1999-2000 Simon Matthews.  All Rights Reserved
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Template/Plugin/Datafile,  Next: Template/Plugin/Date,  Prev: Template/Plugin/DBI,  Up: Module List
+
+plugin to construct records from a simple data file
+***************************************************
+
+NAME
+====
+
+   Template::Plugin::Datafile - plugin to construct records from a simple
+data file
+
+SYNOPSIS
+========
+
+     [% USE mydata = datafile('/path/to/datafile') %]
+     [% USE mydata = datafile('/path/to/datafile', delim = '|') %]
+     
+     [% FOREACH record = mydata %]
+        [% record.this %]  [% record.that %]
+     [% END %]
+
+DESCRIPTION
+===========
+
+   This plugin provides a simple facility to construct a list of hash
+references, each of which represents a data record of known structure,
+from a data file.
+
+     [% USE datafile(filename) %]
+
+   A absolute filename must be specified (for this initial implementation
+at least - in a future version it might also use the INCLUDE_PATH).  An
+optional 'delim' parameter may also be provided to specify an alternate
+delimiter character.
+
+     [% USE userlist = datafile('/path/to/file/users')     %]
+     [% USE things   = datafile('items', delim = '|') %]
+
+   The format of the file is intentionally simple.  The first line defines
+the field names, delimited by colons with optional surrounding whitespace.
+Subsequent lines then defines records containing data items, also
+delimited by colons.  e.g.
+
+     id : name : email : tel
+     abw : Andy Wardley : abw@cre.canon.co.uk : 555-1234
+     neilb : Neil Bowers : neilb@cre.canon.co.uk : 555-9876
+
+   Each line is read, split into composite fields, and then used to
+initialise a hash array containing the field names as relevant keys.  The
+plugin returns a blessed list reference containing the hash references in
+the order as defined in the file.
+
+     [% FOREACH user = userlist %]
+        [% user.id %]: [% user.name %]
+     [% END %]
+
+   The first line of the file must contain the field definitions.  After
+the first line, blank lines will be ignored, along with comment line which
+start with a '#'.
+
+BUGS
+====
+
+   Should handle file names relative to INCLUDE_PATH.  Doesn't permit use
+of ':' in a field.  Some escaping mechanism is required.
+
+AUTHOR
+======
+
+   Andy Wardley <kfs.org>
+
+REVISION
+========
+
+   $Revision: 2.0 $
+
+COPYRIGHT
+=========
+
+   Copyright (C) 1996-1999 Andy Wardley.  All Rights Reserved.  Copyright
+(C) 1998-1999 Canon Research Centre Europe Ltd.
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   `Template::Plugin|Template::Plugin' in this node,
+
+
+File: pm.info,  Node: Template/Plugin/Date,  Next: Template/Plugin/Dumper,  Prev: Template/Plugin/Datafile,  Up: Module List
+
+generate formatted date strings
+*******************************
+
+NAME
+====
+
+   Template::Plugin::Date - generate formatted date strings
+
+SYNOPSIS
+========
+
+     [% USE date %]
+
+     # use current time and default format
+     [% date.format %]
+
+     # specify time as seconds since epoch or 'h:m:s d-m-y' string
+     [% date.format(960973980) %]
+     [% date.format('4:20:36 21/12/2000') %]
+
+     # specify format
+     [% date.format(mytime, '%H:%M:%S') %]
+
+     # specify locale
+     [% date.format(date.now, '%a %d %b %y', 'en_GB') %]
+
+     # named parameters
+     [% date.format(mytime, format = '%H:%M:%S') %]
+     [% date.format(locale = 'en_GB') %]
+     [% date.format(time   = date.now,
+     		   format = '%H:%M:%S',
+                    locale = 'en_GB) %]
+     
+     # specify default format to plugin
+     [% USE date(format = '%H:%M:%S', locale = 'de_DE') %]
+
+     [% date.format %]
+     ...
+
+DESCRIPTION
+===========
+
+   The Date plugin provides an easy way to generate formatted time and date
+strings by delegating to the POSIX strftime() routine.
+
+   The plugin can be loaded via the familiar USE directive.
+
+     [% USE date %]
+
+   This creates a plugin object with the default name of 'date'.  An
+alternate name can be specified as such:
+
+     [% USE myname = date %]
+
+   The plugin provides the format() method which accepts a time value, a
+format string and a locale name.  All of these parameters are optional
+with the current system time, default format ('%H:%M:%S %d-%b-%Y') and
+current locale being used respectively, if undefined.  Default values for
+the time, format and/or locale may be specified as named parameters in the
+USE directive.
+
+     [% USE date(format = '%a %d-%b-%Y', locale = 'fr_FR') %]
+
+   When called without any parameters, the format() method returns a string
+representing the current system time, formatted by strftime() according to
+the default format and for the default locale (which may not be the
+current one, if locale is set in the USE directive).
+
+     [% date.format %]
+
+   The plugin allows a time/date to be specified as seconds since the
+epoch, as is returned by time().
+
+     File last modified: [% date.format(filemod_time) %]
+
+   The time/date can also be specified as a string of the form 'h:m:s
+d/m/y'.  Any of the characters : / - or space may be used to delimit
+fields.
+
+     [% USE day = date(format => '%A', locale => 'en_GB') %]
+     [% day.format('4:20:00 9-13-2000') %]
+
+   Output:
+
+     Tuesday
+
+   A format string can also be passed to the format() method, and a locale
+specification may follow that.
+
+     [% date.format(filemod, '%d-%b-%Y') %]
+     [% date.format(filemod, '%d-%b-%Y', 'en_GB') %]
+
+   Any or all of these parameters may be named.  Positional parameters
+should always be in the order ($time, $format, $locale).
+
+     [% date.format(format => '%H:%M:%S') %]
+     [% date.format(time => filemod, format => '%H:%M:%S') %]
+     [% date.format(mytime, format => '%H:%M:%S') %]
+     [% date.format(mytime, format => '%H:%M:%S', locale => 'fr_FR') %]
+     ...etc...
+
+   The now() method returns the current system time in seconds since the
+epoch.
+
+     [% date.format(date.now, '%A') %]
+
+AUTHORS
+=======
+
+   Thierry-Michel Barral <kktos@electron-libre.com> wrote the original
+plugin and Andy Wardley <abw@cre.canon.co.uk> provided some minor
+fixups/enhancements, a test script and documentation).
+
+REVISION
+========
+
+   $Revision: 2.0 $
+
+COPYRIGHT
+=========
+
+   Copyright (C) 2000 Thierry-Michel Barral, Andy Wardley.
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   `Template::Plugin|Template::Plugin' in this node, `POSIX|POSIX' in this
+node
+
+
+File: pm.info,  Node: Template/Plugin/Dumper,  Next: Template/Plugin/Format,  Prev: Template/Plugin/Date,  Up: Module List
+
+simple Template Plugin interface to Data::Dumper
+************************************************
+
+NAME
+====
+
+   Template::Plugin::Dumper - simple Template Plugin interface to
+Data::Dumper
+
+SYNOPSIS
+========
+
+     [% USE Dumper %]
+
+     [% Dumper.dump(variable) %]
+     [% Dumper.dump_html(variable) %]
+
+DESCRIPTION
+===========
+
+   This is a very simple Template Toolkit Plugin Interface to the
+Data::Dumper module.  A Dumper object will be instantiated via the
+following directive:
+
+     [% USE Dumper %]
+
+   As a standard plugin, you can also specify its name in lower case:
+
+     [% USE dumper %]
+
+   The Data::Dumper 'Pad', 'Indent' and 'Varname' options are supported as
+constructor arguments to affect the output generated.  See *Note
+Data/Dumper: Data/Dumper, for further details.
+
+     [% USE dumper(Indent=0, Pad="<br>") %]
+
+   These options can also be specified in lower case.
+
+     [% USE dumper(indent=0, pad="<br>") %]
+
+METHODS
+=======
+
+   There are two methods supported by the Dumper object.  Each will output
+into the template the contents of the variables passed to the object
+method.
+
+dump()
+------
+
+   Generates a raw text dump of the data structure(s) passed
+
+     [% USE Dumper %]
+     [% Dumper.dump(myvar) %]
+     [% Dumper.dump(myvar, yourvar) %]
+
+dump_html()
+-----------
+
+   Generates a dump of the data structures, as per dump(), but with the
+characters <, > and E<amp> converted to their equivalent HTML entities and
+newlines converted to <br>.
+
+     [% USE Dumper %]
+     [% Dumper.dump_html(myvar) %]
+
+AUTHOR
+======
+
+   Simon Matthews <sam@knowledgepool.com>
+
+COPYRIGHT
+=========
+
+   Copyright (C) 2000 Simon Matthews All Rights Reserved.
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   `Data::Dumper|Data::Dumper' in this node,
+`Template::Plugin|Template::Plugin' in this node,
+
+

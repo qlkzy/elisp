@@ -1,0 +1,1597 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: XML/Filter/Reindent,  Next: XML/Filter/SAXT,  Prev: XML/Filter/Hekeln,  Up: Module List
+
+Reformats whitespace for pretty printing XML
+********************************************
+
+NAME
+====
+
+   XML::Filter::Reindent - Reformats whitespace for pretty printing XML
+
+SYNOPSIS
+========
+
+     use XML::Handler::Composer;
+     use XML::Filter::Reindent;
+
+     my $composer = new XML::Handler::Composer (%OPTIONS);
+     my $indent = new XML::Filter::Reindent (Handler => $composer, %OPTIONS);
+
+DESCRIPTION
+===========
+
+   XML::Filter::Reindent is a sub class of *Note XML/Filter/DetectWS:
+XML/Filter/DetectWS,.
+
+   XML::Filter::Reindent can be used as a PerlSAX filter to reformat an
+XML document before sending it to a PerlSAX handler that prints it (like
+*Note XML/Handler/Composer: XML/Handler/Composer,.)
+
+   Like *Note XML/Filter/DetectWS: XML/Filter/DetectWS,, it detects
+ignorable whitespace and blocks of whitespace characters in certain
+places. It uses this information and information supplied by the user to
+determine where whitespace may be modified, deleted or inserted.  Based on
+the indent settings, it then modifies, inserts and deletes characters and
+ignorable_whitespace events accordingly.
+
+   This is just a first stab at the implementation.  It may be buggy and
+may change completely!
+
+Constructor Options
+===================
+
+   * Handler
+
+     The PerlSAX handler (or filter) that will receive the PerlSAX events
+     from this filter.
+
+   * Tab (Default: one space)
+
+     The number of spaces per indent level for elements etc. in document
+     content.
+
+   * Newline (Default: "\x0A")
+
+     The newline to use when re-indenting.  The default is the internal
+     newline used by *Note XML/Parser: XML/Parser,, *Note XML/DOM:
+     XML/DOM, etc., and should be fine when used in combination with *Note
+     XML/Handler/Composer: XML/Handler/Composer,.
+
+$self->indent_children ($start_element_event)
+=============================================
+
+   This method determines whether children of a certain element may be
+reformatted.  The default implementation checks the PreserveWS parameter
+of the specified start_element event and returns 0 if it is set or MAYBE
+otherwise.  The value MAYBE (2) indicates that further investigation is
+needed, e.g.  by examining the element contents. A value of 1 means yes,
+indent the child nodes, no further investigation is needed.
+
+   NOTE: the PreserveWS parameter is set by the parent class, *Note
+XML/Filter/DetectWS: XML/Filter/DetectWS,, when the element or one of its
+ancestors has the attribute xml:space="preserve".
+
+   Override this method to tweak the behavior of this class.
+
+$self->indent_element ($start_element_event, $parent_says_indent)
+=================================================================
+
+   This method determines whether a certain element may be re-indented.
+The default implementation returns the value of the $parent_says_indent
+parameter, which was set to the value returned by indent_children for the
+parent element. In other words, the element will be re-indented if the
+parent element allows it.
+
+   Override this method to tweak the behavior of this class.  I'm not sure
+how useful this hook is. Please provide feedback!
+
+Current Implementation
+======================
+
+   The current implementation puts all incoming Perl SAX events in a queue
+for further processing. When determining which nodes should be re-indented,
+it sometimes needs information from previous events, hence the use of the
+queue.
+
+   The parameter (Compress => 1) is added to matching start_element and
+end_element events with no events in between This indicates to an XML
+printer that a compressed notation can be used, e.g <foo/>.
+
+   If an element allows reformatting of its contents (xml:space="preserve"
+was not active and indent_children returned MAYBE), the element contents
+will be reformatted unless it only has one child node and that child is a
+regular text node (characters event.)  In that case, the element will be
+printed as <foo>text contents</foo>.
+
+   If you want element nodes with just one text child to be reindented as
+well, simply override indent_children to return 1 instead of MAYBE (2.)
+
+   This behavior may be changed or extended in the future.
+
+CAVEATS
+=======
+
+   This code is highly experimental!  It has not been tested well and the
+API may change.
+
+   The code that detects blocks of whitespace at potential indent positions
+may need some work.
+
+AUTHOR
+======
+
+   Send bug reports, hints, tips, suggestions to Enno Derksen at
+<`enno@att.com'>.
+
+
+File: pm.info,  Node: XML/Filter/SAXT,  Next: XML/Generator,  Prev: XML/Filter/Reindent,  Up: Module List
+
+Replicates SAX events to several SAX event handlers
+***************************************************
+
+NAME
+====
+
+   XML::Filter::SAXT - Replicates SAX events to several SAX event handlers
+
+SYNOPSIS
+========
+
+     $saxt = new XML::Filter::SAXT ( { Handler => $out1 },
+     				 { DocumentHandler => $out2 },
+     				 { DTDHandler => $out3,
+     				   Handler => $out4
+     				 }
+     			       );
+
+     $perlsax = new XML::Parser::PerlSAX ( Handler => $saxt );
+     $perlsax->parse ( [OPTIONS] );
+
+DESCRIPTION
+===========
+
+   SAXT is like the Unix 'tee' command in that it multiplexes the input
+stream to several output streams. In this case, the input stream is a
+PerlSAX event producer (like XML::Parser::PerlSAX) and the output streams
+are PerlSAX handlers or filters.
+
+   The SAXT constructor takes a list of hash references. Each hash
+specifies an output handler. The hash keys can be: DocumentHandler,
+DTDHandler, EntityResolver or Handler, where Handler is a combination of
+the previous three and acts as the default handler.  E.g. if
+DocumentHandler is not specified, it will try to use Handler.
+
+EXAMPLE
+-------
+
+   In this example we use *Note XML/Parser/PerlSAX: XML/Parser/PerlSAX, to
+parse an XML file and to invoke the PerlSAX callbacks of our SAXT object.
+The SAXT object then forwards the callbacks to *Note XML/Checker:
+XML/Checker,, which will 'die' if it encounters an error, and to
+`XML::Hqandler::BuildDOM' in this node, which will store the XML in an
+*Note XML/DOM/Document: XML/DOM/Document,.
+
+     use XML::Parser::PerlSAX;
+     use XML::Filter::SAXT;
+     use XML::Handler::BuildDOM;
+     use XML::Checker;
+
+     my $checker = new XML::Checker;
+     my $builder = new XML::Handler::BuildDOM (KeepCDATA => 1);
+     my $tee = new XML::Filter::SAXT ( { Handler => $checker },
+     				   { Handler => $builder } );
+
+     my $parser = new XML::Parser::PerlSAX (Handler => $tee);
+     eval
+     {
+        # This is how you set the error handler for XML::Checker
+        local $XML::Checker::FAIL = \&my_fail;
+
+     my $dom_document = $parser->parsefile ("file.xml");
+     ... your code here ...
+      };
+      if ($@)
+      {
+     # Either XML::Parser::PerlSAX threw an exception (bad XML)
+     # or XML::Checker found an error and my_fail died.
+     ... your error handling code here ...
+      }
+
+     # XML::Checker error handler
+     sub my_fail
+     {
+       my $code = shift;
+       die XML::Checker::error_string ($code, @_)
+     	if $code < 200;	  # warnings and info messages are >= 200
+     }
+
+CAVEATS
+=======
+
+   This is still alpha software.  Package names and interfaces are subject
+to change.
+
+AUTHOR
+======
+
+   Send bug reports, hints, tips, suggestions to Enno Derksen at
+<`enno@att.com'>.
+
+
+File: pm.info,  Node: XML/Generator,  Next: XML/Generator/DOM,  Prev: XML/Filter/SAXT,  Up: Module List
+
+Perl extension for generating XML
+*********************************
+
+NAME
+====
+
+   XML::Generator - Perl extension for generating XML
+
+SYNOPSIS
+========
+
+     use XML::Generator;
+     
+     my $xml = XML::Generator->new(escape => 'always',
+                                   pretty => 2,
+                                   conformance => 'strict');
+
+     print $xml->foo($xml->bar({ baz => 3 }, $xml->bam),
+     		   $xml->bar([ 'qux' ], "Hey there, world"));
+     
+     # The above would yield:
+     <foo>
+       <bar baz="3">
+         <bam />
+       </bar>
+       <qux:bar>Hey there, world</qux:bar>
+     </foo>
+
+DESCRIPTION
+===========
+
+   In general, once you have an XML::Generator object, you then simply call
+methods on that object named for each XML tag you wish to generate.  Say
+you want to generate this XML:
+
+     <person>
+       <name>Bob</name>
+       <age>34</age>
+       <job>Accountant</job>
+     </person>
+
+   Here's a snippet of code that does the job, complete with pretty
+printing:
+
+     use XML::Generator;
+     my $gen = XML::Generator->new(escape => 'always', pretty => 2);
+     print $gen->person(
+              $gen->name("Bob"),
+              $gen->age(34),
+              $gen->job("Accountant")
+           );
+
+   The only problem with this is if you want to use a tag name that Perl's
+lexer won't understand as a method name, such as "shoe-size".  Fortunately,
+since you can always call methods as variable names, there's a simple
+work-around:
+
+     my $shoe_size = "shoe-size";
+     $xml = $gen->$shoe_size("12 1/2");
+
+   Which correctly generates:
+
+     <shoe-size>12 1/2</shoe-size>
+
+   You can use a hash ref as the first parameter if the tag should include
+atributes.  An array ref can be supplied as the first argument to indicate
+a namespace for the element and the attributes (the elements of the array
+are concatenated with ':').  Under strict conformance, however, you are
+only allowed one namespace component.
+
+   If you want to specify a namespace as well as attributes, you can make
+the second argument a hash ref.  If you do it the other way around, the
+array ref will simply get stringified and included as part of the content
+of the tag.  If an XML::Generator object has a namespace set, and a
+namespace is also supplied to the tag, the supplied namespace overrides
+the default.
+
+   Here's an example to show how the attribute and namespace parameters
+work:
+
+     $xml = $gen->account({ type => 'checking', id => '34758'},
+     	    $gen->open(['transaction'], 2000),
+     	    $gen->deposit(['transaction'], { date => '1999.04.03'}, 1500)
+            );
+
+   This generates:
+
+     <account type="checking" id="34578">
+       <transaction:open>2000</transaction:open>
+       <transaction:deposit transaction:date="1999.04.03">1500</transaction:deposit>
+     </account>
+
+CONSTRUCTOR
+===========
+
+   XML::Generator->new(option => 'value', option => 'value');
+
+   The following options are available:
+
+namespace
+---------
+
+   The value of this option is used as the global default namespace.  For
+example,
+
+     my $html = XML::Generator->new(namespace => 'HTML');
+     print $html->font({ face => 'Arial' }, "Hello, there");
+
+   would yield
+
+     <HTML:font HTML:face="Arial">Hello, there</HTML:font>
+
+   See HTML::Generator for routines specific to HTML generation.
+
+escape
+------
+
+   The contents and the values of each attribute have any illegal XML
+characters escaped if this option is supplied.  If the value is 'always',
+then &, < and > (and " within attribute values) will be converted into the
+corresponding XML entity.  If the value is any other true value, then the
+escaping will be turned off character-by-character if the character in
+question is preceded by a backslash, or for the entire string if it is
+supplied as a scalar reference.  So, for example,
+
+     my $a = XML::Generator->new(escape => 'always');
+     my $b = XML::Generator->new(escape => 'true');
+     print $a->foo('<', $b->bar('3 \> 4', \" && 6 < 5"), '\&', '>');
+
+   would yield
+
+     <foo>&lt;<bar>3 > 4 && 6 < 5</bar>\&amp;&gt;</foo>
+
+pretty
+------
+
+   To have nice pretty printing of the output XML (great for config files
+that you might also want to edit by hand), pass an integer for the number
+of spaces per level of indenting, eg.
+
+     my $gen = XML::Generator->new(pretty => 2);
+     print $gen->foo($gen->bar('baz'),
+                     $gen->qux({ tricky => 'no'}, 'quux'));
+
+   would yield
+
+     <foo>
+       <bar>baz</bar>
+       <qux tricky="no">quux</qux>
+     </foo>
+
+   Pretty printing does not apply to CDATA sections or Processing
+Instructions.
+
+conformance
+-----------
+
+   If the value of this option is 'strict', a number of syntactic checks
+are performed to ensure that generated XML conforms to the formal XML
+specification.  In addition, since entity names beginning with 'xml' are
+reserved by the W3C, inclusion of this option enables several special tag
+names: xmlpi, xmlcmnt, xmldecl, xmldtd, xmlcdata, and xml to allow
+generation of processing instructions, comments, XML declarations, DTD's,
+character data sections and "final" XML documents, respectively.
+
+   See `"XML CONFORMANCE"' in this node and `"SPECIAL TAGS"' in this node
+for more information.
+
+empty
+-----
+
+   There are 5 possible values for this option:
+
+     self    -  create empty tags as <tag />  (default)
+     compact -  create empty tags as <tag/>
+     close   -  close empty tags as <tag></tag>
+     ignore  -  don't do anything (non-compliant!)
+     args    -  use count of arguments to decide between <x /> and <x></x>
+
+   Many web browsers like the 'self' form, but any one of the forms besides
+'ignore' is acceptable under the XML standard.
+
+   'ignore' is intended for subclasses that deal with HTML and other SGML
+subsets which allow atomic tags.  It is an error to specify both
+'conformance' => 'strict' and 'empty' => 'ignore'.
+
+   'args' will produce <x /> if there are no arguments at all, or if there
+is just a single undef argument, and <x></x> otherwise.
+
+XML CONFORMANCE
+===============
+
+   When the 'conformance' => 'strict' option is supplied, a number of
+syntactic checks are enabled.  All entity and attribute names are checked
+to conform to the XML specification, which states that they must begin
+with either an alphabetic character or an underscore and may then consist
+of any number of alphanumerics, underscores, periods or hyphens.
+Alphabetic and alphanumeric are interpreted according to the current
+locale if 'use locale' is in effect and according to the Unicode standard
+for Perl versions >= 5.6.  Furthermore, entity or attribute names are not
+allowed to begin with 'xml' (in any case), although a number of special
+tags beginning with 'xml' are allowed (see `"SPECIAL TAGS"' in this node).
+
+   In addition, only one namespace component will be allowed when strict
+conformance is in effect, and attribute names can be given a specific
+namespace, which will override both the default namespace and the tag-
+specific namespace.  For example,
+
+     my $gen = XML::Generator->new(conformance => 'strict',
+     				 namespace   => 'foo');
+     my $xml = $gen->bar({ a => 1 },
+                 $gen->baz(['bam'], { b => 2, 'name:c' => 3 })
+                );
+
+   will generate:
+
+     <foo:bar foo:a="1"><bam:baz bam:b="2" name:c="3" /></foo:bar>
+
+SPECIAL TAGS
+============
+
+   The following special tags are available when running under strict
+conformance (otherwise they don't act special):
+
+xmlpi
+-----
+
+   Processing instruction; first argument is target, remaining arguments
+are attribute, value pairs.  Attribute names are syntax checked, values
+are escaped.
+
+xmlcmnt
+-------
+
+   Comment.  Arguments are concatenated and placed inside <!- ... ->
+comment delimiters.  Any occurences of '-' in the concatenated arguments
+are converted to '-&#45;'
+
+xmldecl
+-------
+
+   Declaration.  This can be used to specify the version, encoding, and
+other XML-related declarations (i.e., anything inside the <?xml?> tag).
+
+xmldtd
+------
+
+   DTD <!DOCTYPE> tag creation. The format of this method is different from
+others. Since DTD's are global and cannot contain namespace information,
+the first argument arrayref is concatenated together to form the DTD:
+
+     print $xml->xmldtd([ 'html', 'PUBLIC', $xhtml_w3c, $xhtml_dtd ])
+
+   This would produce the following declaration:
+
+     <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+          "DTD/xhtml1-transitional.dtd">
+
+   Assuming that $xhtml_w3c and $xhtml_dtd had the correct values. For
+shortcuts to <!DOCTYPE> generation, see the HTML::Generator module.  Note
+that you can also specify a DTD on creation using the new() method's dtd
+option.
+
+xmlcdata
+--------
+
+   Character data section; arguments are concatenated and placed inside
+<![CDATA[ ... ]]> character data section delimiters.  Any occurences of
+']]>' in the concatenated arguments are converted to ']]&gt;'.
+
+xml
+---
+
+   "Final" XML document.  Must be called with one and exactly one
+XML::Generator-produced XML document.  Any combination of
+XML::Generator-produced XML comments or processing instructions may also
+be supplied as arguments.  Prepends an XML declaration, and re-blesses the
+argument into a "final" class that can't be embedded.
+
+CREATING A SUBCLASS
+===================
+
+   For an example of how to subclass XML::Generator, see Nathan Wiger's
+HTML::Generator module.
+
+   At times, you may find it desireable to subclass XML::Generator. For
+example, you might want to provide a more application-specific interface
+to the XML generation routines provided. Perhaps you have a custom
+database application and would really like to say:
+
+     my $dbxml = new XML::Generator::MyDatabaseApp;
+     print $dbxml->xml($dbxml->custom_tag_handler(@data));
+
+   Here, custom_tag_handler() may be a method that builds a recursive XML
+structure based on the contents of @data. In fact, it may even be named
+for a tag you want generated, such as authors(), whose behavior changes
+based on the contents (perhaps creating recursive definitions in the case
+of multiple elements).
+
+   Creating a subclass of XML::Generator is actually relatively
+straightforward, there are just three things you have to remember:
+
+     1. All of the useful utilities are in XML::Generator::util.
+
+     2. To construct a tag you simply have to call SUPER::tagname,
+        where "tagname" is the name of your tag.
+
+     3. You must fully-qualify the methods in XML::Generator::util.
+
+   So, let's assume that we want to provide a custom HTML table() method:
+
+     package XML::Generator::CustomHTML;
+     use base 'XML::Generator';
+
+     sub table {
+         my $self = shift;
+     
+         # parse our args to get namespace and attribute info
+         my($namespace, $attr, @content) =
+            $self->XML::Generator::util::parse_args(@_)
+
+     # check for strict conformance
+     if ( $self->XML::Generator::util::config('conformance') eq 'strict' ) {
+        # ... special checks ...
+     }
+
+     # ... special formatting magic happens ...
+
+     # construct our custom tags
+     return $self->SUPER::table($attr, $self->tr($self->td(@content)));
+        }
+
+   That's pretty much all there is to it. We have to explicitly call
+SUPER::table() since we're inside the class's table() method. The others
+can simply be called directly, assuming that we don't have a tr() in the
+current package.
+
+   If you want to explicitly create a specific tag by name, or just want a
+faster approach than AUTOLOAD provides, you can use the tag() method
+directly. So, we could replace that last line above with:
+
+     # construct our custom tags
+     return $self->XML::Generator::util::tag('table', $attr, ...);
+
+   Here, we must explicitly call tag() with the tag name itself as its
+first argument so it knows what to generate. These are the methods that
+you might find useful:
+
+XML::Generator::util::parse_args()
+     This parses the argument list and returns the namespace (arrayref),
+     attributes (hashref), and remaining content (array), in that order.
+
+XML::Generator::util::tag()
+     This does the work of generating the appropriate tag. The first
+     argument must be the name of the tag to generate.
+
+XML::Generator::util::config()
+     This retrieves options as set via the new() method.
+
+XML::Generator::util::escape()
+     This escapes any illegal XML characters.
+
+   Remember that all of these methods must be fully-qualified with the
+XML::Generator::util package name. This is because AUTOLOAD is used by the
+main XML::Generator package to create tags. Simply calling parse_args()
+will result in a set of XML tags called <parse_args>.
+
+   Finally, remember that since you are subclassing XML::Generator, you do
+not need to provide your own new() method. The one from XML::Generator is
+designed to allow you to properly subclass it.
+
+AUTHORS
+=======
+
+Benjamin Holzman <bholzman@earthlink.net>
+     Original author and maintainer
+
+Bron Gondwana <perlcode@brong.net>
+     First modular version
+
+Nathan Wiger <nate@nateware.com>
+     Modular rewrite to enable subclassing
+
+SEE ALSO
+========
+
+Perl-XML FAQ
+     http://www.perlxml.com/faq/perl-xml-faq.html
+
+The XML::Writer module
+     http://search.cpan.org/search?mode=module&query=XML::Writer
+
+The XML::Handler::YAWriter module
+     http://search.cpan.org/search?mode=module&query=XML::Handler::YAWriter
+
+The HTML::Generator module
+     http://search.cpan.org/search?mode=module&query=HTML::Generator
+
+
+File: pm.info,  Node: XML/Generator/DOM,  Next: XML/Grove,  Prev: XML/Generator,  Up: Module List
+
+XML::Generator subclass for producing DOM trees instead of strings.
+*******************************************************************
+
+NAME XML::Generator::DOM
+========================
+
+   XML::Generator subclass for producing DOM trees instead of strings.
+
+SYNOPSIS
+========
+
+     use XML::Generator::DOM;
+
+     my $dg  = XML::Generator::DOM->new();
+     my $doc = $dg->xml($dg->xmlcmnt("Test document."),
+     		   $dg->foo({'baz' => 'bam'}, 42));
+     print $doc->toString;
+
+   yields:
+
+     <?xml version="1.0" standalone="yes"?>
+     <!--Test document-->
+     <foo baz="bam">42</foo>
+
+DESCRIPTION
+===========
+
+   XML::Generator::DOM subclasses XML::Generator in order to produce DOM
+trees instead of strings (see *Note XML/Generator: XML/Generator, and
+*Note XML/DOM: XML/DOM,).  This module is still experimental and its
+semantics might change.
+
+   Essentially, tag methods return XML::DOM::DocumentFragment objects,
+constructed either from a DOM document passed into the constructor or a
+default document that XML::Generator::DOM will automatically construct.
+
+   Calling the xml() method will return this automatically constructed
+document and cause a fresh one to be constructed for future tag method
+calls.  If you passed in your own document, you may not call the xml()
+method.
+
+   Below, we just note the remaining differences in semantics between
+XML::Generator methods and XML::Generator::DOM methods.
+
+CONSTRUCTOR
+===========
+
+   These configuration options are accepted but have no effect on the
+semantics of the returned object: escape, pretty, conformance and empty.
+
+TAG METHODS
+===========
+
+   Subsequently, tag method semantics are somewhat different for this
+module compared to XML::Generator.  The primary difference is that tag
+method return XML::DOM::DocumentFragment objects.  Namespace and attribute
+processing remains the same, but remaining arguments to tag methods must
+either be text or other XML::DOM::DocumentFragment objects.  No escape
+processing, syntax checking, or output control is done; this is all left
+up to XML::DOM.
+
+SPECIAL TAGS
+============
+
+   All special tags are available by default with XML::Generator::DOM; you
+don't need to use 'conformance' => 'strict'.
+
+xmlpi(@args)
+------------
+
+   Arguments will simply be concatenated and passed as the data to the
+XML::DOM::ProcessingInstruction object that is returned.
+
+xmlcmnt
+-------
+
+   Escaping of '-' is done by XML::DOM::Comment, which replaces both
+hyphens with '&#45;'.  An XML::DOM::Comment object is returned.
+
+xmldecl
+-------
+
+   Returns an XML::DOM::XMLDecl object.  Respects 'version', 'encoding'
+and 'dtd' settings in the object.
+
+xmldecl
+-------
+
+   Returns an XML::DOM::DocumentType object.
+
+xmlcdata
+--------
+
+   Returns an XML::DOM::CDATASection object.
+
+xml
+---
+
+   As described above, xml() can only be used when dom_document was not
+set in the object.  The automatically created document will have its XML
+Declaration set and the arguments to xml() will be appended to it.  Then a
+new DOM document is automatically generated and the old one is returned.
+This is the only way to get a DOM document from this module.
+
+
+File: pm.info,  Node: XML/Grove,  Next: XML/Grove/AsCanonXML,  Prev: XML/Generator/DOM,  Up: Module List
+
+Perl-style XML objects
+**********************
+
+NAME
+====
+
+   XML::Grove - Perl-style XML objects
+
+SYNOPSIS
+========
+
+     use XML::Grove;
+
+     # Basic parsing and grove building
+     use XML::Grove::Builder;
+     use XML::Parser::PerlSAX;
+     $grove_builder = XML::Grove::Builder->new;
+     $parser = XML::Parser::PerlSAX->new ( Handler => $grove_builder );
+     $document = $parser->parse ( Source => { SystemId => 'filename' } );
+
+     # Creating new objects
+     $document = XML::Grove::Document->new ( Contents => [ ] );
+     $element = XML::Grove::Element->new ( Name => 'tag',
+                                           Attributes => { },
+     				       Contents => [ ] );
+
+     # Accessing XML objects
+     $tag_name = $element->{Name};
+     $contents = $element->{Contents};
+     $parent = $element->{Parent};
+     $characters->{Data} = 'XML is fun!';
+
+DESCRIPTION
+===========
+
+   XML::Grove is a tree-based object model for accessing the information
+set of parsed or stored XML, HTML, or SGML instances.  XML::Grove objects
+are Perl hashes and arrays where you access the properties of the objects
+using normal Perl syntax:
+
+     $text = $characters->{Data};
+
+How To Create a Grove
+---------------------
+
+   There are several ways for groves to come into being, they can be read
+from a file or string using a parser and a grove builder, they can be
+created by your Perl code using the `new()' methods of
+XML::Grove::Objects, or databases or other sources can act as groves.
+
+   The most common way to build groves is using a parser and a grove
+builder.  The parser is the package that reads the characters of an XML
+file, recognizes the XML syntax, and produces "events" reporting when
+elements (tags), text (characters), processing instructions, and other
+sequences occur.  A grove builder receives ("consumes" or "handles") these
+events and builds XML::Grove objects.  The last thing the parser does is
+return the XML::Grove::Document object that the grove builder created,
+with all of it's elements and character data.
+
+   The most common parser and grove builder are XML::Parser::PerlSAX (in
+libxml-perl) and XML::Grove::Builder.  To build a grove, create the grove
+builder first:
+
+     $grove_builder = XML::Grove::Builder->new;
+
+   Then create the parser, passing it the grove builder as it's handler:
+
+     $parser = XML::Parser::PerlSAX->new ( Handler => $grove_builder );
+
+   This associates the grove builder with the parser so that every time
+you parse a document with this parser it will return an
+XML::Grove::Document object.  To parse a file, use the `Source' parameter
+to the `parse()' method containing a `SystemId' parameter (URL or path) of
+the file you want to parse:
+
+     $document = $parser->parse ( Source => { SystemId => 'kjv.xml' } );
+
+   To parse a string held in a Perl variable, use the `Source' parameter
+containing a `String' parameter:
+
+     $document = $parser->parse ( Source => { String => $xml_text } );
+
+   The following are all parsers that work with XML::Grove::Builder:
+
+     XML::Parser::PerlSAX (in libxml-perl, uses XML::Parser)
+     XML::ESISParser      (in libxml-perl, uses James Clark's `nsgmls')
+     XML::SAX2Perl        (in libxml-perl, translates SAX 1.0 to PerlSAX)
+
+   Most parsers supply more properties than the standard information set
+below and XML::Grove will make available all the properties given by the
+parser, refer to the parser documentation to find out what additional
+properties it may provide.
+
+   Although there are not any available yet (August 1999), PerlSAX filters
+can be used to process the output of a parser before it is passed to
+XML::Grove::Builder.  XML::Grove::PerlSAX can be used to provide input to
+PerlSAX filters or other PerlSAX handlers.
+
+Using Groves
+------------
+
+   The properties provided by parsers are available directly using Perl's
+normal syntax for accessing hashes and arrays.  For example, to get the
+name of an element:
+
+     $element_name = $element->{Name};
+
+   By convention, all properties provided by parsers are in mixed case.
+`Parent' properties are available using the ``Data::Grove::Parent'' module.
+
+   The following is the minimal set of objects and their properties that
+you are likely to get from all parsers:
+
+XML::Grove::Document
+--------------------
+
+   The Document object is parent of the root element of the parsed XML
+document.
+
+Contents
+     An array containing the root element.
+
+   A document's `Contents' may also contain processing instructions,
+comments, and whitespace.
+
+   Some parsers provide information about the document type, the XML
+declaration, or notations and entities.  Check the parser documentation
+for property names.
+
+XML::Grove::Element
+-------------------
+
+   The Element object represents elements from the XML source.
+
+Parent
+     The parent object of this element.
+
+Name
+     A string, the element type name of this element
+
+Attributes
+     A hash of strings or arrays
+
+Contents
+     An array of elements, characters, processing instructions, etc.
+
+   In a purely minimal grove, the attributes of an element will be plain
+text (Perl scalars).  Some parsers provide access to notations and
+entities in attributes, in which case the attribute may contain an array.
+
+XML::Grove::Characters
+----------------------
+
+   The Characters object represents text from the XML source.
+
+Parent
+     The parent object of this characters object
+
+Data
+     A string, the characters
+
+XML::Grove::PI
+--------------
+
+   The PI object represents processing instructions from the XML source.
+
+Parent
+     The parent object of this PI object.
+
+Target
+     A string, the processing instruction target.
+
+Data
+     A string, the processing instruction data, or undef if none was
+     supplied.
+
+   In addition to the minimal set of objects above, XML::Grove knows about
+and parsers may provide the following objects.  Refer to the parser
+documentation for descriptions of the properties of these objects.
+
+     XML::Grove::
+     ::Entity::External  External entity reference
+     ::Entity::SubDoc    External SubDoc reference (SGML)
+     ::Entity::SGML      External SGML reference (SGML)
+     ::Entity            Entity reference
+     ::Notation          Notation declaration
+     ::Comment           <!-- A Comment -->
+     ::SubDoc            A parsed subdocument (SGML)
+     ::CData             A CDATA marked section
+     ::ElementDecl       An element declaration from the DTD
+     ::AttListDecl       An element's attribute declaration, from the DTD
+
+METHODS
+=======
+
+   XML::Grove by itself only provides one method, new(), for creating new
+XML::Grove objects.  There are Data::Grove and XML::Grove extension
+modules that give additional methods for working with XML::Grove objects
+and new extensions can be created as needed.
+
+$obj = XML::Grove::OBJECT->new( [PROPERTIES] )
+     `new' creates a new XML::Grove object with the type OBJECT, and with
+     the initial PROPERTIES.  PROPERTIES may be given as either a list of
+     key-value pairs, a hash, or an XML::Grove object to copy.  OBJECT may
+     be any of the objects listed above.
+
+   This is a list of available extensions and the methods they provide (as
+of Feb 1999).  Refer to their module documentation for more information on
+how to use them.
+
+     XML::Grove::AsString
+       as_string       return portions of groves as a string
+       attr_as_string  return an element's attribute as a string
+
+     XML::Grove::AsCanonXML
+       as_canon_xml    return XML text in canonical XML format
+
+     XML::Grove::PerlSAX
+       parse           emulate a PerlSAX parser using the grove objects
+
+     Data::Grove::Parent
+       root            return the root element of a grove
+       rootpath        return an array of all objects between the root
+                       element and this object, inclusive
+
+     Data::Grove::Parent also adds `C<Parent>' and `C<Raw>' properties
+     to grove objects.
+
+     Data::Grove::Visitor
+       accept          call back a subroutine using an object type name
+       accept_name     call back using an element or tag name
+       children_accept for each child in Contents, call back a sub
+       children_accept_name  same, but using tag names
+       attr_accept     call back for the objects in attributes
+
+     XML::Grove::IDs
+       get_ids         return a list of all ID attributes in grove
+
+     XML::Grove::Path
+       at_path         $el->at_path('/html/body/ul/li[4]')
+
+     XML::Grove::Sub
+       filter          run a sub against all the objects in the grove
+
+WRITING EXTENSIONS
+==================
+
+   The class `XML::Grove' is the superclass of all classes in the
+XML::Grove module.  `XML::Grove' is a subclass of ``Data::Grove''.
+
+   If you create an extension and you want to add a method to all
+XML::Grove objects, then create that method in the XML::Grove package.
+Many extensions only need to add methods to XML::Grove::Document and/or
+XML::Grove::Element.
+
+   When you create an extension you should definitly provide a way to
+invoke your module using objects from your package too.  For example,
+XML::Grove::AsString's `as_string()' method can also be called using an
+XML::Grove::AsString object:
+
+     $writer= new XML::Grove::AsString;
+     $string = $writer->as_string ( $xml_object );
+
+AUTHOR
+======
+
+   Ken MacLeod, ken@bitsko.slc.ut.us
+
+SEE ALSO
+========
+
+   perl(1), XML::Grove(3)
+
+   Extensible Markup Language (XML) <http://www.w3c.org/XML>
+
+
+File: pm.info,  Node: XML/Grove/AsCanonXML,  Next: XML/Grove/AsString,  Prev: XML/Grove,  Up: Module List
+
+output XML objects in canonical XML
+***********************************
+
+NAME
+====
+
+   XML::Grove::AsCanonXML - output XML objects in canonical XML
+
+SYNOPSIS
+========
+
+     use XML::Grove::AsCanonXML;
+
+     # Using as_canon_xml method on XML::Grove objects:
+     $string = $xml_object->as_canon_xml( OPTIONS );
+
+     # Using an XML::Grove::AsCanonXML instance:
+     $writer = XML::Grove::AsCanonXML->new( OPTIONS );
+
+     $string = $writer->as_canon_xml($xml_object);
+     $writer->as_canon_xml($xml_object, $file_handle);
+
+DESCRIPTION
+===========
+
+   `XML::Grove::AsCanonXML' will return a string or write a stream of
+canonical XML for an XML object and it's content (if any).
+
+   `XML::Grove::AsCanonXML' objects hold the options used for writing the
+XML objects.  Options can be supplied when the the object is created,
+
+     $writer = XML::Grove::AsCanonXML->new( Comments => 1 );
+
+   or modified at any time before writing an XML object by setting the
+option directly in the `$writer' hash.
+
+OPTIONS
+=======
+
+Comments
+     By default comments are not written to the output.  Setting comment to
+     TRUE will include comments in the output.
+
+AUTHOR
+======
+
+   Ken MacLeod, ken@bitsko.slc.ut.us
+
+SEE ALSO
+========
+
+   perl(1), XML::Parser(3), XML::Grove(3).
+
+   James Clark's Canonical XML definition
+<http://www.jclark.com/xml/canonxml.html>
+
+
+File: pm.info,  Node: XML/Grove/AsString,  Next: XML/Grove/Builder,  Prev: XML/Grove/AsCanonXML,  Up: Module List
+
+output content of XML objects as a string
+*****************************************
+
+NAME
+====
+
+   XML::Grove::AsString - output content of XML objects as a string
+
+SYNOPSIS
+========
+
+     use XML::Grove::AsString;
+
+     # Using as_string method on XML::Grove::Document or XML::Grove::Element:
+     $string = $xml_object->as_string OPTIONS;
+     $string = $element->attr_as_string $attr, OPTIONS;
+
+     # Using an XML::Grove::AsString instance:
+     $writer = new XML::Grove::AsString OPTIONS;
+
+     $string = $writer->as_string($xml_object);
+     $writer->as_string($xml_object, $file_handle);
+
+DESCRIPTION
+===========
+
+   Calling `as_string' on an XML object returns the character data
+contents of that object as a string, including all elements below that
+object.  Calling ``attr_as_string'' on an element returns the contents of
+the named attribute as a string.  Comments, processing instructions, and,
+by default, entities all return an empty string.
+
+   OPTIONS may either be a key-value list or a hash containing the options
+described below.  OPTIONS may be modified directly in the object.  The
+default options are no filtering and entities are mapped to empty strings.
+
+OPTIONS
+=======
+
+Filter
+     `Filter' is an anonymous sub that gets called to process character
+     data before it is appended to the string to be returned.  This can be
+     used, for example, to escape characters that are special in output
+     formats.  The `Filter' sub is called like this:
+
+          $string = &$filter ($character_data);
+
+EntityMap
+     `EntityMap' is an object that accepts `lookup' methods or an
+     anonymous sub that gets called with the entity replacement text (data)
+     and mapper options as arguments and returns the corresponding
+     character replacements.  It is called like this if it is an object:
+
+          $replacement_text = $entity_map->lookup ($entity_data,
+          					     $entity_map_options);
+
+     or this if it is a sub:
+
+          $replacement_text = &$entity_map ($entity_data,
+          				      $entity_map_options);
+
+EntityMapOptions
+     `EntityMapOptions' is a hash passed through to the `lookup' method or
+     anonymous sub, the type of value is defined by the entity mapping
+     package or the anonymous sub.
+
+EntityMapFilter
+     `EntityMapFilter' is a flag to indicate if mapped entities should be
+     filtered after mapping.
+
+EXAMPLES
+========
+
+   Here is an example of entity mapping using the Text::EntityMap module:
+
+     use Text::EntityMap;
+     use XML::Grove::AsString;
+
+     $html_iso_dia = Text::EntityMap->load ('ISOdia.2html');
+     $html_iso_pub = Text::EntityMap->load ('ISOpub.2html');
+     $html_map = Text::EntityMap->group ($html_iso_dia,
+     					$html_iso_pub);
+
+     $element->as_string (EntityMap => $html_map);
+
+AUTHOR
+======
+
+   Ken MacLeod, ken@bitsko.slc.ut.us
+
+SEE ALSO
+========
+
+   perl(1), XML::Grove(3)
+
+   Extensible Markup Language (XML) <http://www.w3c.org/XML>
+
+
+File: pm.info,  Node: XML/Grove/Builder,  Next: XML/Grove/Factory,  Prev: XML/Grove/AsString,  Up: Module List
+
+PerlSAX handler for building an XML::Grove
+******************************************
+
+NAME
+====
+
+   XML::Grove::Builder - PerlSAX handler for building an XML::Grove
+
+SYNOPSIS
+========
+
+     use PerlSAXParser;
+     use XML::Grove::Builder;
+
+     $builder = XML::Grove::Builder->new();
+     $parser = PerlSAXParser->new( Handler => $builder );
+
+     $grove = $parser->parse( Source => [SOURCE] );
+
+DESCRIPTION
+===========
+
+   `XML::Grove::Builder' is a PerlSAX handler for building an XML::Grove.
+
+   `XML::Grove::Builder' is used by creating a new instance of
+`XML::Grove::Builder' and providing it as the Handler for a PerlSAX
+parser.  Calling `parse()' on the PerlSAX parser will return the grove
+built from that parse.
+
+AUTHOR
+======
+
+   Ken MacLeod, ken@bitsko.slc.ut.us
+
+SEE ALSO
+========
+
+   perl(1), XML::Grove(3), PerlSAX.pod
+
+   Extensible Markup Language (XML) <http://www.w3c.org/XML>
+
+
+File: pm.info,  Node: XML/Grove/Factory,  Next: XML/Grove/IDs,  Prev: XML/Grove/Builder,  Up: Module List
+
+simplify creation of XML::Grove objects
+***************************************
+
+NAME
+====
+
+   XML::Grove::Factory - simplify creation of XML::Grove objects
+
+SYNOPSIS
+========
+
+     use XML::Grove::Factory;
+
+     ### An object that creates Grove objects directly
+     my $gf = XML::Grove::Factory->grove_factory;
+
+     $grove = $gf->document( CONTENTS );
+     $element = $gf->element( $name, { ATTRIBUTES }, CONTENTS );
+     $pi = $gf->pi( $target, $data );
+     $comment = $gf->comment( $data );
+
+     ### An object that creates elements by method name
+     my $ef = XML::Grove::Factory->element_factory();
+
+     $element = $ef->NAME( { ATTRIBUTES }, CONTENTS);
+
+     ### Similar to `element_factory', but creates functions in the
+     ### current package
+     XML::Grove::Factory->element_functions( PREFIX, ELEMENTS );
+
+     $element = NAME( { ATTRIBUTES }, CONTENTS );
+
+DESCRIPTION
+===========
+
+   `XML::Grove::Factory' provides objects or defines functions that let
+you simply and quickly create the most commonly used XML::Grove objects.
+`XML::Grove::Factory' supports three types of object creation.  The first
+type is to create raw XML::Grove objects.  The second type creates XML
+elements by element name.  The third type is like the second, but defines
+local functions for you to call instead of using an object, which might
+save typing in some cases.
+
+   The three types of factories can be mixed.  For example, you can use
+local functions for all element names that don't conflict with your own
+sub names or contain special characters, and then use a
+``grove_factory()'' object for those elements that do conflict.
+
+   In the examples that follow, each example is creating an XML instance
+similar to the following, assuming it's pretty printed:
+
+     <?xml version="1.0"?>
+     <HTML>
+       <HEAD>
+         <TITLE>Some Title</TITLE>
+       </HEAD>
+       <BODY bgcolor="#FFFFFF">
+         <P>A paragraph.</P>
+       </BODY>
+     </HTML>
+
+GROVE FACTORY
+=============
+
+$gf = XML::Grove::Factory->grove_factory()
+     Creates a new grove factory object that creates raw XML::Grove
+     objects.
+
+$gf->document( CONTENTS );
+     Creates an XML::Grove::Document object.  CONTENTS may contain
+     processing instructions, strings containing only whitespace
+     characters, and a single element object (but note that there is no
+     checking).  Strings are converted to XML::Grove::Characters objects.
+
+$gf->element($name, CONTENTS);
+$gf->element($name, { ATTRIBUTES }, CONTENTS);
+     Creates an XML::Grove::Element object with the name `$name'.  If the
+     argument following `$name' is an anonymous hash, ATTRIBUTES, then
+     they will be copied to the elements attributes.  CONTENTS will be
+     stored in the element's content (note that there is no validity
+     checking).  Strings in CONTENTS are converted to
+     XML::Grove::Characters objects.
+
+$gf->pi( *TARGET*, DATA)
+$gf->pi( DATA )
+     Create an XML::Grove::PI object with *TARGET* and DATA.
+
+$gf->comment( DATA )
+     Create an XML::Grove::Comment object with DATA.
+
+GROVE FACTORY EXAMPLE
+---------------------
+
+     use XML::Grove::Factory;
+
+     $gf = XML::Grove::Factory->grove_factory;
+
+     $element =
+       $gf->element('HTML',
+         $gf->element('HEAD',
+           $gf->element('TITLE', 'Some Title')),
+         $gf->element('BODY', { bgcolor => '#FFFFFF' },
+           $gf->element('P', 'A paragraph.')));
+
+ELEMENT FACTORY
+===============
+
+$ef = XML::Grove::Factory->element_factory()
+     Creates a new element factory object for creating elements.
+     ``element_factory()'' objects work by creating an element for any
+     name used to call the object.
+
+$ef->NAME( CONTENTS )
+$ef->NAME( { ATTRIBUTES }, CONTENTS)
+     Creates an XML::Grove::Element object with the given NAME,
+     ATTRIBUTES, and CONTENTS.  The hash containing ATTRIBUTES is optional
+     if this element doesn't need attributes.  Strings in CONTENTS are
+     converted to XML::Grove::Characters objects.
+
+ELEMENT FACTORY EXAMPLE
+-----------------------
+
+     use XML::Grove::Factory;
+
+     $ef = XML::Grove::Factory->element_factory();
+
+     $element =
+       $ef->HTML(
+         $ef->HEAD(
+           $ef->TITLE('Some Title')),
+         $ef->BODY({ bgcolor => '#FFFFFF' },
+           $ef->P('A paragraph.')));
+
+ELEMENT FUNCTIONS
+=================
+
+XML::Grove::Factory->element_functions (PREFIX, ELEMENTS)
+     Creates functions in the current package for creating elements with
+     the names provided in the list ELEMENTS.  PREFIX will be prepended to
+     every function name, or PREFIX can be an empty string (") if you're
+     confident that there won't be any conflicts with functions in your
+     package.
+
+NAME( CONTENTS )
+NAME( { ATTRIBUTES }, CONTENTS )
+PREFIXNAME( CONTENTS )
+PREFIXNAME( { ATTRIBUTES }, CONTENTS )
+     Functions created for ``*NAME*'' or ``*PREFIX**NAME*'' can be called
+     to create XML::Grove::Element objects with the given NAME,
+     ATTRIBUTES, and CONTENT.  The hash containing ATTRIBUTES is optional
+     if this element doesn't need attributes.  Strings in CONTENT are
+     converted to XML::Grove::Characters objects.
+
+ELEMENT FACTORY EXAMPLE
+-----------------------
+
+     use XML::Grove::Factory;
+
+     XML::Grove::Factory->element_functions('', qw{ HTML HEAD TITLE BODY P });
+
+     $element =
+       HTML(
+         HEAD(
+           TITLE('Some Title')),
+         BODY({ bgcolor => '#FFFFFF' },
+           P('A paragraph.')));
+
+AUTHOR
+======
+
+   Ken MacLeod, ken@bitsko.slc.ut.us
+
+   Inspired by the HTML::AsSubs module by Gisle Aas.
+
+SEE ALSO
+========
+
+   perl(1), XML::Grove(3).
+
+   Extensible Markup Language (XML) <http://www.w3c.org/XML>
+
+
+File: pm.info,  Node: XML/Grove/IDs,  Next: XML/Grove/Iter,  Prev: XML/Grove/Factory,  Up: Module List
+
+return an index of `id' attributes in a grove
+*********************************************
+
+NAME
+====
+
+   XML::Grove::IDs - return an index of `id' attributes in a grove
+
+SYNOPSIS
+========
+
+     use XML::Grove::IDs;
+
+     # Using get_ids method on XML::Grove::Document or XML::Grove::Element:
+     $hash = $grove_object->get_ids($attr_name, $elements);
+
+     # Using an XML::Grove::IDs instance:
+     $indexer = XML::Grove::IDs->new($attr_name, $elements);
+     my $hash = {};
+     $grove_object->accept($indexer, $hash);
+
+DESCRIPTION
+===========
+
+   `XML::Grove::IDs' returns a hash index of all nodes in a grove with an
+`id' attribute.  The keys of the hash are the ID attribute value and the
+value at that key is the element.  ``$attr_name'' and ``$elements'' are
+optional.  The attribute name defaults to `id' if ``$attr_name'' is not
+supplied.  Indexing can be restricted to only certain elements, by name,
+by providing a hash containing NAME=>1 values.
+
+AUTHOR
+======
+
+   Ken MacLeod, ken@bitsko.slc.ut.us
+
+SEE ALSO
+========
+
+   perl(1), XML::Grove(3), Data::Grove::Visitor(3)
+
+   Extensible Markup Language (XML) <http://www.w3c.org/XML>
+
+
+File: pm.info,  Node: XML/Grove/Iter,  Next: XML/Grove/Path,  Prev: XML/Grove/IDs,  Up: Module List
+
+add tree iteration methods to XML objects
+*****************************************
+
+NAME
+====
+
+   XML::Grove::Iter - add tree iteration methods to XML objects
+
+SYNOPSIS
+========
+
+     use XML::Grove::Iter;
+
+     $iter = $xml_object->iter;
+
+     $iter2 = $iter->parent;
+     $iter2 = $iter->next;
+     $iter2 = $iter->previous;
+
+     $iter2 = $element_iter->first_child;
+     $iter2 = $element_iter->last_child;
+     $iter2 = $element_iter->attr_first ($attr);
+     $iter2 = $element_iter->attr_last ($attr);
+
+     $obj = $iter->delegate;
+     $root = $iter->root;
+     @path = $iter->rootpath;
+
+     $bool = $iter->is_iter;
+     $bool = $iter->is_same ($obj);
+     $bool = $iter->at_last;
+     $bool = $iter->at_first;
+
+DESCRIPTION
+===========
+
+   XML::Grove::Iter is a proxy-based tree iterator.  "Proxy based" means
+that the iterator "stands in" for the real object and is used as you would
+normally use the real object.  The iterator handles moving around the tree
+and forwards all other methods to the real object.
+
+   `parent' returns the parent iterator of this iterator, or `undef' if
+this is the root iterator.  `next' and `previous' return the iterator of
+the next object or the previous object, respectively, in the parent's
+content (the sibling objects), or `undef' if there is no next or previous
+sibling.
+
+   `first_child' and `last_child' return the iterator of the first child
+or the last child of the contents of this element or document.
+``attr_first'' and ``attr_last'' return the iterator of the first child or
+last child of the named attribute.  These all return `undef' if the
+contents are empty.
+
+   `delegate' returns the object that this iterator stands-in for, "the
+delegate".
+
+   `root' returns the iterator of the top-most object of the sub-tree
+being iterated.  Note that this may not be the root of the document tree
+if the first iterator was created using a nested object.
+
+   ``rootpath'' returns a list of the parent iterators between and
+including the root and this iterator.
+
+   ``is_iter'' returns true if this object is an iterator.  Ordinary XML
+objects have been extended with an ``is_iter'' method that returns false.
+
+   ``is_same'' returns true if `$obj' is this iterator's delegate, or if
+`$obj' is an iterator that points to the same delegate.
+
+   ``at_last'' and ``at_first'' return true if calling `next' or
+`previous', respectively, would return `undef'.  Or in other words, they
+return true if this iterator is at the end or the beginning of the parent
+element's content.
+
+AUTHOR
+======
+
+   Ken MacLeod, ken@bitsko.slc.ut.us
+
+SEE ALSO
+========
+
+   perl(1), XML::Parser(3), XML::Parser::Grove(3).
+
+   Extensible Markup Language (XML) <http://www.w3c.org/XML>
+
+
+File: pm.info,  Node: XML/Grove/Path,  Next: XML/Grove/PerlSAX,  Prev: XML/Grove/Iter,  Up: Module List
+
+return the object at a path
+***************************
+
+NAME
+====
+
+   XML::Grove::Path - return the object at a path
+
+SYNOPSIS
+========
+
+     use XML::Grove::Path;
+
+     # Using at_path method on XML::Grove::Document or XML::Grove::Element:
+     $xml_obj = $grove_object->at_path("/some/path");
+
+     # Using an XML::Grove::Path instance:
+     $pather = XML::Grove::Path->new();
+     $xml_obj = $pather->at_path($grove_object);
+
+DESCRIPTION
+===========
+
+   `XML::Grove::Path' returns XML objects located at paths.  Paths are
+strings of element names or XML object types seperated by slash ("/")
+characters.  Paths must always start at the grove object passed to
+``at_path()''.  `XML::Grove::Path' is not XPath, but it should become
+obsolete when an XPath implementation is available.
+
+   Paths are like URLs
+
+     /html/body/ul/li[4]
+     /html/body/#pi[2]
+
+   The path segments can be element names or object types, the objects
+types are named using:
+
+     #element
+     #pi
+     #comment
+     #text
+     #cdata
+     #any
+
+   The ``#any'' object type matches any type of object, it is essentially
+an index into the contents of the parent object.
+
+   The ``#text'' object type treats text objects as if they are not
+normalized.  Two consecutive text objects are seperate text objects.
+
+AUTHOR
+======
+
+   Ken MacLeod, ken@bitsko.slc.ut.us
+
+SEE ALSO
+========
+
+   perl(1), XML::Grove(3)
+
+   Extensible Markup Language (XML) <http://www.w3c.org/XML>
+
+

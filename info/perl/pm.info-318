@@ -1,0 +1,1388 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: PostScript/MailLabels,  Next: PostScript/MailLabels/BasicData,  Prev: PostScript/FontMetrics,  Up: Module List
+
+Modules for creating PostScript(tm) files of mailing address labels.
+********************************************************************
+
+NAME
+====
+
+   PostScript::MailLabels - Modules for creating PostScript(tm) files of
+mailing address labels.
+
+SYNOPSIS
+========
+
+   Modules for creating PostScript(tm) files of mailing address labels, to
+be printed on standard adhesive-backed mailing label stock.  Flexible
+enough to tackle other printing tasks, basically anything requiring a set
+fields be printed on a regular grid.  Also creates PostScript(tm) code for
+calibrating and testing mailing label printing.
+
+DESCRIPTION
+===========
+
+   The module has three distinct output modes. In my experience, printing
+mailing labels is a matter of tweaking parameters to get them all to fit
+properly on the page. This module is designed with this in mind.
+
+   The first output is the calibration sheet. This is a pair of annotated
+axes, either in inches or centimeters, centered on the page and covering
+the whole page in X and Y directions. The intent is for you to output this
+page first, and simply read off the relevant page dimensions directly.
+
+   The second output is the label test. This output is a series of boxes
+drawn on the page, meant to outline the edges of all the mailing labels.
+Take this sheet and line it up with a sheet of labels to see if they
+actually match perfectly. If not, tweak the parameters until they do. Note
+that sometimes you will get a message at the bottom of the sheet saying
+"Bottom gap too large, last row cannot be printed". This means that the
+printable area of your printer is too small to utilize the last row of
+labels. I have this problem. But I handle it for you. Note also the arrows
+on the test sheet. As you hold the test sheet over a sheet of labels, hold
+it up to the light and slide the test sheet so that the boxes match the
+edges of the labels. If you slide in the arrow direction, that is a
+positive adjustment. The other direction is negative. If the edges of some
+boxes come out dashed, that means that the non-printing border cuts off
+the end of the label, so I will adjust the printing area appropriately.
+Don't try to line up the dashed lines with label edges - it won't work.
+Just line up the solid lines.
+
+   The third output is the labels themselves. By default, I have set up a
+US-centric address definition :
+
+     firstname, lastname, street address, city, state, zipcode
+
+   But with version 2.0, you can now create your own definition. You can
+define new fields, and you can define how those fields land on a label.
+You can also control the fonts on a per-field basis. Not the size, yet -
+later pilgrim.
+
+   Parameters you can set :
+
+   Paper size, borders on the printable area (many printers will not print
+right up to the edge of the paper), where the labels live on the page and
+how big they are, overall x-y shift of page, whether or not to print
+PostNET barcode, font, fontsize, units (english or metric), which
+Avery(tm) product code to use, and where the first label starts.
+
+   This last needs explanation. If you have a partially used sheet of
+labels, you might want to use it up. So you count the missing labels,
+starting at the upper left, and counting across, and then down. For
+example, if I have 3 columns of labels, label five is the second label in
+the second row.
+
+   The Avery(tm) label codes are woefully incomplete. I can't find the
+Avery(tm) specs anywhere, so the ones that are in there are for products I
+personally own.  I e-mailed Avery(tm) and they gave me a long distance
+phone number to call.
+
+   If you have an Avery(tm) product that I haven't defined, send me the
+specs and I'll add it.
+
+   Also, if there is another brand of labels that you use, send me the
+relevant data and I'll add that as well. I suspect that there must be some
+other vendor in Europe, but I don't know who that would be.
+
+   When setting up the addresses, I check to see if they will fit on the
+label.  If not, I try to shorten them semi-intelligently until they fit.
+This part could use quite a bit more work, if done right it probably
+merits a module all it's own.
+
+   Briefly, for the name line, I start trimming the ends off the first
+name, and leave the last name alone.
+
+   For the street, I look for things like Road or Avenue and nuke those
+first, then I trim the street name from the right.
+
+   For the last line, I trim the city and leave the state and zip alone.
+
+   The barcode will be either a 5-digit zip or 9 digit zip-plus code. I
+could also create the delivery point code, but since my mailing labels are
+not even wide enough for the 9 digit zip-plus, I haven't bothered. I have
+read the USPS spec on the barcode, and so far as I can tell, I meet the
+spec.
+
+   labelsetup :
+
+   All the distances are in units of inches or centimeters, depending on
+the Units flag.  A hash of the label definition will be returned.
+
+   my $setup = $labels -> labelsetup(
+
+     #    paper size
+
+     PaperSize        => 'Letter',
+     options are :
+                 Letter Legal Ledger Tabloid A0 A1 A2 A3 A4 A5 A6 A7 A8
+                 A9 B0 B1 B2 B3 B4 B5 B6 B7 B8 B9 Envelope10 EnvelopeC5
+                 EnvelopeDL Folio Executive
+     
+     #   printable area on physical page - these numbers represent border widths
+     #    typical values might be 0.25 inches
+
+     Printable_Left   => 0.0,
+     Printable_Right  => 0.0,
+     Printable_Top    => 0.0,
+     Printable_Bot    => 0.0,
+
+     #    define where the labels live (ideally)
+
+     Output_Top     => 1.0, where does the top of the first label sit?
+     Output_Left    => 0.5, where is the left edge of the first label?
+     Output_Width   => 3.0, how wide are the labels?
+     Output_Height  => 2.0, how tall are the labels?
+     X_Gap          => 0.1, what is the vertical gap between labels?
+     Y_Gap          => 0.0, what is the horizontal gap between labels?
+     Number         => 30,  how many labels per page?
+     Columns        => 3,   how many columns per page? (optional)
+
+     if the number of columns are given, I'll check your math to see if the page
+     width approximately equals the sum of the label widths plus gaps etc.
+
+     #    Adjustments for printer idiosyncracies
+
+     X_Adjust       => 0.0, shift the whole thing over by this amount.
+     Y_Adjust       => 0.0  shift the whole thing down by this amount.
+
+     #    Other controls
+
+     Postnet    => 'yes',  barcodes? yes or no
+     Font       => 'Helvetica', which default font? see below for generating a list
+     FontSize   => 12, how big are they?
+     Units      => 'english', english or metric
+     FirstLabel => 1, where is the first label (begins at 1).
+
+     # set equal to the Avery(tm) product code, and the label description
+     # will be updated from the database.
+     Avery        => undef,
+     );
+
+     generate a PostScript(tm) file with rulers on it for making measurements
+         $output = $labels->labelcalibration ;
+     generate a PostScript(tm) file with boxes showing where the text will land
+         $output = $labels->labeltest ;
+     the main event - make me a label file
+         $output = $labels->makelabels(\@addrs) ;
+
+     translate an Avery(tm) product code into a template code.
+         $templatecode = $labels->averycode($product_code) ;
+     retrieve an array of the paper width, height (in points)
+         @width_height = @{ $labels->papersize } ;
+     get the length of a string in points using the current font
+         $stringwidth = $labels->stringwidth("This is a string") ;
+     get a list of the available fonts
+         @fontname = $labels->ListFonts;
+
+     Components:
+
+     Each component has a name, and four attributes. The attributes are :
+         type : must be name, road, place, or bar. This defines the trimming
+                strategy.
+         adj : yes or no. Is trimming allowed?
+         font : what font to use
+         index : which entry in the input array will contain this component?
+
+     Default components :
+         #    first name
+         fname    => { type => 'name', adj => 'yes', font => 'Helvetica', 'index' => 0 },
+         #    last name
+         lname    => { type => 'name', adj => 'yes', font => 'Helvetica', 'index' => 1 },
+         #    street address and street
+         street    => { type => 'road', adj => 'yes', font => 'Helvetica', 'index' => 2 },
+         #    city
+         city    => { type => 'place', adj => 'yes', font => 'Helvetica', 'index' => 3 },
+         #    state
+         state    => { type => 'place', adj => 'no', font => 'Helvetica', 'index' => 4 },
+         #    country
+         country    => { type => 'place', adj => 'no', font => 'Helvetica', 'index' => 6 },
+         #    zip
+         zip    => { type => 'place', adj => 'no', font => 'Helvetica', 'index' => 5 },
+         #    postnet (bar code)
+         postnet    => { type => 'bar', adj => 'no', font => 'PostNetJHC', 'index' => 5 },
+
+     Editing components : with editcomponent
+
+     #    What address components are available?
+     print "components : ",join(' : ',@{$labels->editcomponent()}),"\n";
+
+     #    Lets make the lname (lastname) bold-faced
+     $labels->editcomponent('lname', 'name', 'no', 1, 'Times-Bold' );
+
+     #    Lets create a new component
+     $labels->editcomponent('company_name', 'name', 'yes', 7, 'Times-Bold');
+
+     Label definition
+
+     We define the label layout line by line, by describing for each line which
+     components we want printed, and in what order.
+
+     #    Default label definition
+         #    line 1
+         [ 'fname', 'lname' ],
+         #    line 2
+         [ 'street', ],
+         #    line 3
+         [ 'city', 'state', 'zip' ],
+         #    line 4
+         [ 'postnet', ],
+
+     edit the label definition with definelabel :
+
+     definelabel(line number, component, component, ...)
+
+     #    first clear the old (default) definition
+     $labels->definelabel('clear');
+     #                   line number, component list
+     $labels->definelabel(0,'pgm_name','version');
+     $labels->definelabel(1,'blank',);
+     $labels->definelabel(2,'author',);
+     $labels->definelabel(3,'blank',);
+     $labels->definelabel(4,'comments-1',);
+     $labels->definelabel(5,'comments-2',);
+     $labels->definelabel(6,'comments-3',);
+
+EXAMPLE
+=======
+
+     #!/usr/bin/perl -w
+
+     #        This shows the capabilities of the program...
+
+     use PostScript::MailLabels 2.0;
+
+     $labels = PostScript::MailLabels->new;
+
+     #####################################################################`
+     #    Dumping information from the modules
+     #####################################################################`
+
+     #    What address components are available?
+     print "\n****** components ******\n";
+     print join(' : ',@{$labels->editcomponent()}),"\n";
+
+     #    What is the current label layout?
+     print "\n****** layout ******\n";
+     my @layout = @{$labels->definelabel()};
+     foreach (@layout) {
+         print join(' : ',@{$_}),"\n";
+     }
+
+     #    Here is how to list the available fonts
+     print "\n****** fonts ******\n";
+     @fonts = $labels->ListFonts;
+     foreach (@fonts) {
+         print "$_\n";
+     }
+
+     #    Here is how to list the available papers
+     print "\n****** papers ******\n";
+     print join(' : ',@{$labels->papers}),"\n";
+
+     #    Here is how to list all th Avery data
+      # layout=>[paper-size,[list of product codes], description,
+      #          number per sheet, left-offset, top-offset, width, height]
+      #            distances measured in points
+
+     my %avery = %{$labels->averydata};
+     print "\n****** Avery(tm) data ******\n";
+     foreach (keys %avery) {
+         print "$_ : $avery{$_}->[0] : ",
+                join(', ',@{$avery{$_}->[1]})," : ",
+                join(' : ',@{$avery{$_}}[2-7]),"\n";
+     }
+
+     #    Here are some more utilities
+
+     print "\nString width of 'this is a test' = ",
+             $labels->stringwidth("this is a test",)/72," inches\n";
+
+     my $setup = $labels -> labelsetup( Font => 'PostNetJHC');
+
+     print "\nzip code tests, 6,9, and 12 digit lengths barcodes:  ",
+             $labels->stringwidth("123456",)/72," : ",
+             $labels->stringwidth("123456789",)/72," : ",
+             $labels->stringwidth("123456789012",)/72,
+             " inches\n";
+
+     print "\nPaper size Letter = ",($labels->papersize)->[0]," x ",
+                                  ($labels->papersize)->[1]," in points\n";
+
+     print "\nAvery(t) code for 8460 is >",$labels->averycode(8460),"<\n";
+
+     #    Simple setup using predefined Avery label
+     $labels -> labelsetup(
+                 Avery       => $labels->averycode(8460),
+                 PaperSize   => 'letter',
+                 Font        => 'Times-Roman',
+                 );
+
+     print "\n                 num, left, top, width, height\n";
+     print "label description : ", $setup->{number}, " : ",
+                                   $setup->{output_left}, " : ",
+                                   $setup->{output_top}, " : ",
+                                   $setup->{output_width}, " : ",
+                                   $setup->{output_height}, "\n";
+
+     #    More hands-on setup defining everything. Note that Columns is optional
+     $labels->labelsetup(
+                         Units           => 'English',
+                         PaperSize       => 'A4',
+
+     Printable_Left  => 0.25,
+     Printable_Right => 0.25,
+     Printable_Top   => 0.0,
+     Printable_Bot   => 0.55,
+     
+     Output_Top      => 0.5,
+     Output_Left     => 0.0,
+     Output_Width    => 2.625,
+     Output_Height   => 1.0,
+     X_Gap           => 0.16,
+     Y_Gap           => 0.0,
+     Number          => 30,
+     Columns         => 3,
+
+     #    Adjustments for printer idiosyncracies
+
+     X_Adjust   => 0.05,
+     Y_Adjust   => 0.05,
+
+     PostNet    => 'yes',
+     Font       => 'Helvetica',
+     FontSize   => 12,
+     FirstLabel => 1,
+                            );
+
+     #    We can fiddle the components...
+
+     #    Lets make the lname (lastname) bold-faced
+     print "\n******* make the lname field boldfaced *******\n";
+     print "lname : ",join(' : ',@{$labels->editcomponent('lname')}),"\n";
+     $labels->editcomponent('lname', 'name', 'no', 1, 'Times-Bold' );
+     print "lname : ",join(' : ',@{$labels->editcomponent('lname')}),"\n";
+
+     #    Lets switch the default ordering on the label from first-last to last-first
+     print "\n******* swap order from first-last to last-first *******\n";
+     print "Line 1 : ",join(' : ',@{$labels->definelabel(0)}),"\n";
+     $labels->definelabel(0,'lname','fname');
+     print "Line 1 : ",join(' : ',@{$labels->definelabel(0)}),"\n";
+
+     #        print calibration sheet, in metric
+
+     $labels->labelsetup( Units =>'metric');
+     my $output = $labels->labelcalibration;
+     open (FILE,"> calibration.ps") || warn "Can't open calibration.ps, $!\n";
+     print FILE $output;
+     close FILE;
+     print "\n******* metric Letter sized calibration sheet in calibration.ps *******\n";
+
+     #        adjust printable area and draw test boxes
+
+     $output = $labels->labeltest;
+     open (FILE,"> boxes.ps") || warn "Can't open boxes.ps, $!\n";
+     print FILE $output;
+     close FILE;
+     print "\n******* Letter sized test boxes sheet in boxes.ps *******\n";
+
+     #########################################################################
+     #    Build a test address array
+     # address array elements are : first,last,street_addr,city,state,zip
+     my @addrs;
+     my @address;
+     my $indx = 0;
+     foreach (<DATA>) {
+         chomp;
+         if ($indx%4 == 0) {
+             @address = (split(':',$_));
+         }
+         elsif ($indx%4 == 1) {
+             push @address,$_;
+         }
+         elsif ($indx%4 == 2) {
+             push @address,(split(':',$_));
+         }
+         elsif ($indx%4 == 3) {
+             push @addrs,[@address];
+         }
+         $indx++;
+     }
+
+     foreach (@addrs) {
+         print "Address : $_->[0] $_->[1] $_->[2] $_->[3] $_->[4] $_->[5]\n";
+     }
+
+     #    Set up a few things...
+
+     $setup = $labels -> labelsetup( Font         => 'Helvetica');
+     $setup = $labels -> labelsetup( FirstLabel   => 25);
+     $setup = $labels -> labelsetup( Output_Width => 2.625),
+     $setup = $labels -> labelsetup( Columns      => 3),
+
+     $output = $labels->makelabels(\@addrs);
+     open (OUT,">labeltest.ps") || die "Can't open labeltest.ps, $!\n";
+     print OUT $output;
+     close OUT;
+     print "\n******* label output in  labeltest.ps *******\n";
+
+     1;
+
+     __DATA__
+     John and Jane:Doe
+     1234 Robins Nest Sitting In a Tree Ave
+     Katy:Tx:77453
+
+     William:Clinton
+     1300 Pennsylvania Ave.
+     Washington:DC:10000
+
+     Shirley:Temple
+     98765 Birch Point Drive
+     Houston:TX:78450
+
+     Fred & June:Cleaver
+     11221 Beaver Rd
+     Columbus:OH:07873-6305
+
+     Ernest and Julio:Gallo
+     1987 Chardonnay
+     San Jose:CA:80880
+
+     Orville and Wilbur:Wright
+     7715 Kitty Hawk Dr
+     Kitty Hawk:NC:87220
+
+     Ulysses:Grant
+     1856 Tomb Park Rd
+     Washington:DC:10012
+
+BUGS AND TODO LIST
+==================
+
+   No bugs, that I am aware of.
+
+   To do list :
+
++
+     Need to be able to get the length of a string in ISOLatin1
+
++
+     Add fontsize to each component
+
++
+     Account for label height - currently will run off bottom
+
++
+     Separate module for address compression/abbreviation
+
++
+     Add bitmaps or images?
+
+REVISION HISTORY
+================
+
+     Version 2.01 - January 2001
+     Added y_gap tp Avery(tm) labels
+     Updated calibration plot in BasicData to arbitrary paper size
+     Minor repairs to test routine
+     
+     Version 2.0 - December 2000
+     Major revision. Added all of the component and label definition stuff.
+     Thanks to "Andrew Smith" <asmith at wpequity.com> for suggesting
+     additional fields and inspiring the generalization.
+     Thanks to Nuno Faria for assisting with the "Europeanization" of
+     the code - it now works for Portuguese, and hopefully for other
+     alphabets as well.
+     Added pagesize so that various paper sizes are actually handled correctly.
+
+     Version 1.0.1 - December 2000
+     Bug reported by John Summerfield <summer at OS2.ami.com.au>
+     Lowercase all SETUP parameters to avoid problems with mis-spellings.
+     Do real parameter checks to check simple spelling errors.
+
+     Bug reported by Nuno Faria <nfaria at fe.up.pt>
+     Boxes plot did not work. Frankly I can't figure out how it ever did. Anyway
+     it breaks on more modern versions of ghostscript, so I fixed it. Basically
+     rewrote part of the PostScript(tm) code.
+
+AUTHOR
+======
+
+     Alan Jackson
+     October 1999
+     alan@ajackson.org
+
+     The PostNET font was gotten (under Gnu copyleft) from
+     James H. Cloos, Jr. <cloos@jhcloos.com>
+
+     The font metrics and paper sizes were pulled from the
+     PostScript::Metrics module written by Shawn Wallace
+
+
+File: pm.info,  Node: PostScript/MailLabels/BasicData,  Next: PostScript/Metrics,  Prev: PostScript/MailLabels,  Up: Module List
+
+Basic data that is used by the MailLabels                                     module.
+*************************************************************************************
+
+NAME
+====
+
+   PostScript::MailLabels::BasicData - Basic data that is used by the
+MailLabels                                     module.
+
+SYNOPSIS
+========
+
+     Loads up a few basic data items :
+
+     Font metrics
+
+     PS code for generating a calibration page
+
+     PS code for generating a test page
+
+     PS code for PostNET font
+
+     Standard paper sizes
+
+     Specs for Avery (tm) forms (incomplete)
+
+DESCRIPTION
+===========
+
+     All this does is initialize a bunch of data items. Not intended to be
+     used by normal people. It just makes the MailLabel.pm code more
+     compact. The documentation is probably not too complete.
+
+     Note that the font metrics camne from PostScript::Metrics by Shawn Wallace.
+     The PostNET barcode font came from James H. Cloos, Jr.
+
+EXAMPLE
+=======
+
+     require PostScript::MailLabels::BasicData;
+
+     $data = new PostScript::MailLabels::BasicData;
+
+     $code = '8460';
+       @layout = @{$data{AVERY}{$code}};
+
+     # layout=>[paper-size,[list of product codes], description,
+     #          number per sheet, left-offset, top-offset, width, height]
+     #			distances measured in points
+
+     $testpage = $data{TESTPAGE};
+
+REVISION HISTORY
+================
+
+     Version 1.02 - January 2001
+     Fixed calibration axis labels to work for arbitrary paper size
+     Added y_gap to Avery data
+     Version 1.01 - December 2000
+     Added pagesize parameter to handle paper other than Letter.
+     Added more axis labels so that A4 calibration plot would work.
+
+AUTHOR
+======
+
+     Alan Jackson
+     October 1999
+     alan@ajackson.org
+
+SEE ALSO
+========
+
+
+File: pm.info,  Node: PostScript/Metrics,  Next: PostScript/Resources,  Prev: PostScript/MailLabels/BasicData,  Up: Module List
+
+helper module for PostScript::TextBlock
+***************************************
+
+NAME
+====
+
+   PostScript::Metrics - helper module for PostScript::TextBlock
+
+SYNOPSIS
+========
+
+   Fix me.
+
+DESCRIPTION
+===========
+
+   Fix me.
+
+AUTHOR
+======
+
+   Shawn Wallace (shawn@as220.org)
+
+SEE ALSO
+========
+
+   PostScript::TextBlock, PostScript::Element, PostScript::Document
+
+
+File: pm.info,  Node: PostScript/Resources,  Next: PostScript/TextBlock,  Prev: PostScript/Metrics,  Up: Module List
+
+module to fetch data from Unix PostScript Resource '`.upr'' files
+*****************************************************************
+
+NAME
+====
+
+   PostScript::FontResources - module to fetch data from Unix PostScript
+Resource '`.upr'' files
+
+SYNOPSIS
+========
+
+     my $rsc = new PostScript::FontResources (options);
+     print STDOUT $rsc->FontAFM ("Times-Roman"), "\n";
+
+DESCRIPTION
+===========
+
+   This package allows Unix font resource files, so called '`.upr'' files,
+to be read and parsed.
+
+CONSTRUCTOR
+===========
+
+new ( OPTIONS )
+     The constructor will initialise the PostScript resource context by
+     loading all resource files.
+
+OPTIONS
+=======
+
+path => path
+     path is a colon-separated list of locations where resource files are
+     kept. It defaults to the value of the environment variable
+     PSRESOURCEPATH, which defaults to '`::''.
+
+     Two adjacent colons in the path represent the list of default places
+     in which a component looks for resources. This is also the default
+     value for users who have not installed private resources. Users with
+     private resources should end the path with a double colon if they want
+     their resources to override the system defaults, or begin it with a
+     double colon if they don't want to override system defaults.
+
+     On Unix systems, resource files end with the suffix '`.upr'' (for
+     Unix PostScript resources). The principal resource file in a directory
+     is named '`PSres.upr''.
+
+     If the first line of a principal resource file is
+     '`PS-Resources-Exclusive-1.0'', only this file will be loaded and
+     processing continues with the next entry from the path.
+
+     If, however, the first line of the principal resource file is
+     '`PS-Resources-1.0'', or if there is no such file, all files in the
+     directory with the suffix '`.upr'' will be loaded.
+
+stdpath => path
+     The standard locations for resource files.
+
+error => [ 'die' | 'warn' | 'ignore' ]
+     How errors must be handled.
+
+     Invalid entries in the file are always reported unless the error
+     handling strategy is set to 'ignore'.
+
+verbose => value
+     Prints verbose info if value is true.
+
+trace => value
+     Prints tracing info if value is true.  trace' and 'Implies 'verbose'.
+
+debug => value
+     Prints debugging info if value is true.  Implies 'trace' and
+     'verbose'.
+
+INSTANCE METHODS
+================
+
+   Each of these methods can return undef if the corresponding information
+could not be found in the file.
+
+FontAFM ( FONTNAME )
+     The name of the Adobe Font Metrics (.afm) file for the named font.
+
+FontOutline ( FONTNAME )
+     The name of the PostScript Font program for the named font.
+
+ENVIRONMENT VARIABLES
+=====================
+
+PSRESOURCEPATH
+     The list of directories where resource files are kept. Semantics are
+     as defined in appendix A of *Display PostScript Toolkit for X*, Adobe
+     Technical Note `DPS.refmanuals.TK.pdf'.
+
+KNOWN BUGS AND LIMITATIONS
+==========================
+
+   Only FontAFM and FontOutline resources are implemented. All other
+resource sections are ignored.
+
+   All info is loaded in memory structures. This is okay for small files
+or if several lookups are done on the same file.
+
+   Backslash escape processing is not yet implemented, except for the
+handling of line continuation.
+
+   This module is intended to be used on Unix systems only.  Your mileage
+on other platforms may vary.
+
+SEE ALSO
+========
+
+http://www.adobe.com/supportservice/devrelations/PDFS/TN/DPS.refmanuals.TK.pdf
+     The specification of the Adobe Display PostScript Toolkit for X. The
+     format of the font resources file is described in appendix A of this
+     document.
+
+AUTHOR
+======
+
+   Johan Vromans, Squirrel Consultancy <jvromans@squirrel.nl>
+
+COPYRIGHT and DISCLAIMER
+========================
+
+   This program is Copyright 2000,1999 by Squirrel Consultancy. All rights
+reserved.
+
+   This program is free software; you can redistribute it and/or modify it
+under the terms of either: a) the GNU General Public License as published
+by the Free Software Foundation; either version 1, or (at your option) any
+later version, or b) the "Artistic License" which comes with Perl.
+
+   This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE. See either the GNU General Public
+License or the Artistic License for more details.
+
+
+File: pm.info,  Node: PostScript/TextBlock,  Next: Postgres,  Prev: PostScript/Resources,  Up: Module List
+
+An object that may be used to construct a block of                 text in PostScript.
+**************************************************************************************
+
+NAME
+====
+
+   PostScript::TextBlock - An object that may be used to construct a block
+of                 text in PostScript.
+
+SYNOPSIS
+========
+
+     use PostScript::TextBlock;
+     my $tb = new PostScript::TextBlock;
+     $tb->addText( text => "Hullaballo in Hoosick Falls.\n",
+                   font => 'CenturySchL-Ital',
+                   size => 24,
+                   leading => 26
+                  );
+     $tb->addText( text => "by Charba Gaspee.\n",
+                   font => 'URWGothicL-Demi',
+                   size => 12,
+                   leading => 14
+                  );
+     print 'There are '.$tb->numElements.' elements in this object.';
+     open OUT, '>psoutput.ps';
+     my ($code, $remainder) = $tb->Write(572, 752, 20, 772);
+     print OUT $code;
+
+DESCRIPTION
+===========
+
+   The PostScript::TextBlock module implements four methods:
+
+new() - Create a New PostScript::TextBlock object
+     This method instantiates a new object of class PostScript::TextBlock.
+
+addText( text=>$text,                [ font=>$font ],                [ size=>$size ],                [ leading=>$leading ] )
+     The addText() method will add a new 'text element' to the TextBlock
+     object. A 'text element' can be thought of as a section of text that
+     has the same characteristics, i.e. all the characters are the same
+     font, size and leading.  this representation allows you to include
+     text rendered in multiple fonts at multiple sizes within the same
+     text block by including them as separate elements.
+
+     This method takes up to four attributes (note that the '[]' brackets
+     above indicate that a parameter is optional, not an array reference):
+
+     text The text attribute is required, though nothing bad will happen
+     if you leave it out. This is simply the text to be rendered in the
+     text block. Line breaks may be inserted by including a newline "\n".
+
+     font The font attribute is a string indicating the name of the font
+     to be used to render this element. The PS package uses an internal
+     description of the Font Metrics of various fonts that is contained in
+     the PostScript::Metrics module. As of this writing, the
+     PostScript::Metrics module supports the following fonts (basically,
+     the default GhostScript fonts that have AFM files):
+
+     NimbusSanL-ReguCond	  URWGothicL-Book CenturySchL-Bold
+     CharterBT-Italic URWBookmanL-Ligh          CharterBT-BoldItalic
+     NimbusRomNo9L-ReguItal    URWBookmanL-DemiBoldItal CharterBT-Roman
+           NimbusMonL-ReguObli NimbusSanL-ReguCondItal   CenturySchL-Ital
+     CenturySchL-BoldItal      URWPalladioL-Roma URWBookmanL-LighItal
+     CharterBT-Bold NimbusSanL-BoldCond       NimbusMonL-BoldObli
+     NimbusSanL-BoldCondItal   URWGothicL-DemiObli NimbusSanL-Regu
+      URWPalladioL-Bold NimbusMonL-Regu           NimbusSanL-ReguItal
+     URWGothicL-BookObli       URWPalladioL-Ital
+
+     You can get a list of the currently supported fonts with the
+     following:
+
+          use PostScript::Metrics;
+          @okfonts = PostScript::Metrics->listFonts();
+
+     NOTE: The font must be available to the PostScript interpreter that
+     is used to render the page described by the program. If the
+     interpreter cannot load the font, it will ususally attempt to
+     substitute a similar font. If a font is substituted with a font with
+     different metrics, lines of text may overrun the right margin of the
+     text block. You have been warned.
+
+     It is very easy to create stylesheets for a document:
+
+          # Define the styles
+          #
+          %body = ( font => 'URWGothicL-DemiObli', size => 12, leading => 16 );
+          %head1 = ( font => 'NimbusSanL-BoldCond', size => 24, leading => 36 );
+          %head2 = ( font => 'NimbusSanL-BoldCond', size => 18, leading => 30 );
+
+          # Use them where appropriate
+          #
+          $tb->addText(text => "Chapter 10\n", %head1);
+          $tb->addText(text => "Spokane Sam and His Spongepants\n", %head2);
+          $tb->addText(text => "It was a dark and stormy night and Spokane Sam\'s
+          Spongepants were thirsty...", %body);
+
+    numElements()
+          Returns the number of elements in the text block object. An
+          'element' is created each time the addText() method is called.
+
+    Write( $width, $height, $xoffset, $yoffset )
+          The Write() method will generate the PostScript code that will
+          render the text on a page when passed to a PostScript
+          interpreter such as Ghostscript. The four parameters are
+          expressed in points (1/72 inch) and indicate the width and
+          height of the box within which the text should be printed, and
+          the x and y offset of the upper left corner of this box.
+
+          Important: PostScript defines the orgin (0,0) as the lower left
+          corner of the page! This *will* mess you up.
+
+          Standard page sizes in points are:
+
+               Paper Size                      Width, Height (in points)
+               .........................       .........................
+               Letter                          612, 792
+               Legal                           612, 1008
+               Ledger                          1224, 792
+               Tabloid                         792, 1224
+               A0                              2384, 3370
+               A1                              1684, 2384
+               A2                              1191, 1684
+               A3                              842, 1191
+               A4                              595, 842
+               A5                              420, 595
+               A6                              297, 420
+               A7                              210, 297
+               A8                              148, 210
+               A9                              105, 148
+               B0                              2920, 4127
+               B1                              2064, 2920
+               B2                              1460, 2064
+               B3                              1032, 1460
+               B4                              729, 1032
+               B5                              516, 729
+               B6                              363, 516
+               B7                              258, 363
+               B8                              181, 258
+               B9                              127, 181
+               B10                             91, 127
+               #10 Envelope                    297, 684
+               C5 Envelope                     461, 648
+               DL Envelope                     312, 624
+               Folio                           595, 935
+               Executive                       522, 756
+
+          The write() method returns two values: a string consisting of
+          the PostScript code (suitable for printing to a file), and a
+          TextBlock object containing the elements (and partial elements)
+          that did not fit within the specified area, if any. If the
+          entire text block fits with the area, the remainder will be
+          undef. The remainder can be used to layout multiple pages and
+          columns, etc. in a similar manner to most modern desktop
+          publishing programs. In general, the write() method should be
+          called as in the following, which writes the PostScript code to
+          a file called 'psoutput.ps':
+
+               open OUT, '>psoutput.ps';
+               my ($code, $remainder) = $tb->Write(572, 752, 20, 772);
+               print OUT $code;
+
+          To print an entire text block that spans multiple pages, you
+          could do something like this:
+
+          (add enough text to the text block first..)
+
+               open OUT, '>psoutput.ps';
+               my $pages = 1;
+
+               # Create the first page
+               #
+               my ($code, $remainder) = $tb->Write(572, 752, 20, 772);
+               print OUT "%%Page:$pages\n";      # this is required by the Adobe
+                                                 # Document Structuring Conventions
+               print OUT $code;
+               print OUT "showpage\n";
+
+               # Print the rest of the pages, if any
+               #
+               while ($remainder->numElements) {
+                   $pages++;
+                   print OUT "%%Page:$pages\n";
+                   ($code, $remainder) = $remainder->Write(572, 752, 20, 772);
+                   print OUT $code;
+                   print OUT "showpage\n";
+               }
+
+          However, if you use the PostScript::Document module to construct
+          generic multi-page PostScript documents, you don't have to worry
+          about this.
+
+A NOTE ABOUT FONT METRICS
+=========================
+
+   The write() method uses the module PostScript::Metrics to determine the
+width of each character; widths vary from font to font and character to
+character.  If you were writing a stright PostScript program, you would
+let the PostScript interpreter do this for you, but in the case of this
+program, we need to know the width of each character in a font within the
+Perl script. The PostScript::Metrics module contains the font metrics
+(i.e., a list containing the width of each character in the font) for a
+bunch of fonts that are listed above under the description of the
+addText() method. This set started with the metrics for all of the default
+fonts with AFM files that came with GhostScript. It is slowly growing as
+more fonts are mapped. To add support for a new font, you must create the
+array with the metrics for that font and add it to the PostScript::Metrics
+module. For a font with an AFM file, the AFM file can be parsed with Gisle
+Aas' Font::AFM module, available on CPAN.
+
+   Please send all PostScript::Metrics patches to the author at
+shawn@as220.org.
+
+TODO
+====
+
+   * better compliance with Adobe's Document Structuring Conventions *
+more font metrics descriptions * make font loading code smarter and more
+efficient for the interpreter * support a larger character set * it would
+be nice to add more functions, e.g. Clone() * how about settable defaults?
+
+AUTHOR
+======
+
+   Copyright 1998, 1999 Shawn Wallace. All rights reserved.
+
+   Contact the author: shawn@as220.org http://www.as220.org/shawn
+
+   Portions of code contributed by Dan Smeltz.
+
+   This is free software. You may use, modify, and redistribute this
+package under the same terms as Perl itself.
+
+   PostScript is a trademark of Adobe Systems.
+
+
+File: pm.info,  Node: Postgres,  Next: Pquota,  Prev: PostScript/TextBlock,  Up: Module List
+
+Perl interface to the Postgres95 SQL database engine
+****************************************************
+
+NAME
+====
+
+   Postgres - Perl interface to the Postgres95 SQL database engine
+
+SYNOPSIS
+========
+
+     use Postgres;
+
+     $conn = db_connect($database,$host,$port)
+       or die "could not connect -- $Postgres::error";
+
+     The parameters $host and $port are optional (or may be undef).
+     This will use the default Postgres95 values for them.
+
+     print "Connected Database: ", $conn->db();
+     print "Connected Host: ", $conn->host();
+     print "Connection Options: ", $conn->options();
+     print "Connected Port: ", $conn->port();
+     print "Connected tty: ", $conn->tty();
+     print "Connection Error Message: ", $conn->errorMessage();
+
+   This method is identical to PQreset(conn)
+
+     $conn->reset();
+
+   This method executes an SQL statement or query.
+
+     $query = $conn->execute($sql_statement)
+       or die "Error -- $Postgres::error";
+
+   Retrieve the values from a SELECT query.
+
+     @array = $query->fetchrow();
+
+   Get information from the results of the last query.
+
+     $val = $query->cmdStatus();
+     $val = $query->oidStatus();
+
+   Calling the following functions on a result handle that is not from a
+SELECT is undefined.
+
+     $val = $query->ntuples();
+     $val = $query->nfields();
+     $val = $query->fname($column_index);
+     $val = $query->fnumber($column_name);
+     $val = $query->ftype($column_index);
+     $val = $query->fsize($column_index);
+
+   These functions are provided for completeness but are not intended to be
+used.  The fetchrow() method will return undef for a field which is null.
+
+     $val = $query->getvalue($tuple_index,$column_index);
+     $val = $query->getlength($tuple_index,$column_index);
+     $val = $query->getisnull($tuple_index,$column_index);
+
+   The putline() and getline() functions are called as follows:
+
+     $query->putline($string);
+     $value = $query->getline();
+     $query->endcopy();
+
+DESCRIPTION
+===========
+
+   This package is designed as close as possible to its C API counterpart,
+but be more like Perl in how you interact with the API.  The C Programmer
+Guide that comes with Postgres describes most things you need.
+
+   The following functions are currently not implemented: PQtrace(),
+PQendtrace(), and the asynchronous notification.  I do not believe that
+binary cursors will work, either.
+
+   Once you db_connect() to a database, you can then issue commands to the
+execute() method.  If either of them returns an error from the underlying
+API, the value returned will be undef and the variable `$Postgres::error'
+will contain the error message from the database.  The $port parameter to
+db_connect() is optional and will use the default port if not specified.
+All environment variables used by the PQsetdb() function are honored.
+
+   The method fetchrow() returns an array of the values from the next row
+fetched from the server.  It returns an empty list when there is no more
+data available.  Fields which have a NULL value return undef as their
+value in the array.  Calling fetchrow() or the other tuple-related
+functions on a statement handle which is not from a SELECT statement has
+undefined behavior, and may well crash your program.  Other functions work
+identically to their similarly-named C API functions.
+
+No finish or clear statements
+-----------------------------
+
+   Whenever the scalar that holds the statement or connection handle loses
+its value, the underlying data structures will be freed and appropriate
+connections closed.  This can be accomplished by performing one of these
+actions:
+
+undef the handle
+use the handle for another purpose
+let the handle run out of scope
+exit the program.
+Error messages
+--------------
+
+   A global variable `$Postgres::error' always holds the last error
+message.  It is never reset except on the next error.  The only time it
+holds a valid message is after execute() or db_connect() returns undef.
+
+PREREQUISITES
+=============
+
+   You need to have the Postgres95 database server installed and
+configured on your system to use this module.
+
+   Be sure to set the proper directory locations in the Makefile.PL file
+for your installation.
+
+AUTHOR
+======
+
+   Vivek Khera (`vivek@khera.org').  Many ideas were taken from the
+MsqlPerl module.  I am no longer maintaining this module.  If you would
+like to take over, please let me know.
+
+
+File: pm.info,  Node: Pquota,  Next: Pragmatic,  Prev: Postgres,  Up: Module List
+
+a UNIX print quota module
+*************************
+
+NAME
+====
+
+   Pquota - a UNIX print quota module
+
+SYNOPSIS
+========
+
+     use Pquota;
+
+     # object creator and destructor
+     $pquota = Pquota->new ("/path/to/quota/directory"[, $opts]);
+     $pquota->close ();
+
+     # printers database commands
+     $pquota->printer_add ($printer, $page_cost, $user_db);
+     $pquota->printer_rm ($printer);
+     $pquota->printer_set_cost ($printer, $cost);
+     $pquota->printer_get_cost ($printer);
+     $pquota->printer_get_cost_list ();
+     $pquota->printer_set_user_database ($printer, $user_db);
+     $pquota->printer_get_user_database ($printer);
+     $pquota->printer_get_user_database_list ();
+     $pquota->printer_set_field ($printer, $key, $value);
+     $pquota->printer_get_field ($printer, $key);
+
+     # user database commands
+     $pquota->user_add ($user, $user_db, $periodic_quota);
+     $pquota->user_rm ($user, $user_db);
+     $pquota->user_print_pages ($user, $printer, $num_pages);
+     $pquota->user_add_to_current ($user, $user_db, $amount);
+     $pquota->user_set_current ($user, $user_db, $periodic_quota);
+     $pquota->user_get_current_by_dbm ($user, $user_db);
+     $pquota->user_get_current_by_printer ($user, $printer);
+     $pquota->user_reset_current ($user, $user_db);
+     $pquota->user_add_to_periodic ($user, $user_db, $amount);
+     $pquota->user_set_periodic ($user, $user_db, $amount);
+     $pquota->user_get_periodic ($user, $user_db);
+     $pquota->user_reset_total ($user, $user_db);
+     $pquota->user_set_field ($user, $user_db, $key, $value);
+     $pquota->user_get_field ($user, $user_db, $key);
+
+DESCRIPTION
+===========
+
+   This module is an attempt to provide an easy interface to a group of
+DBM files used to store print quota information on a UNIX system.  It
+makes writing printer interface scripts a lot easier.  Pquota requires the
+MLDBM module.
+
+   As we've said, Pquota is a wrapper module for handling DBM files.  We've
+structured it so that there is one database that contains information about
+the different printers on your system, and any number of user databases.
+The printers database, which we've named _printers to (hopefully) avoid any
+namespace clashes.  An entry in the _printers database looks something like
+this:
+
+     $printer_entry = {'cost'        =>      5,
+                       'dbm'         =>      'students'};
+
+   Every printer has a cost per page, and an associated user database.
+Multiple printers can point to the same user database, but you can't have
+multiple databases for the same printer.
+
+   Pquota is designed with a periodic allotment of quota in mind.  On our
+systems, students get a couple dollars worth every week.  So every entry
+in a user database looks like this:
+
+     $user_entry = {'periodic'       =>      300,
+                    'current'        =>      273,
+                    'total'          =>      27      };
+
+   And once a week, we run a cron job to reset all the current values to
+be equal to the periodic values.
+
+   Pquota also has pessimistic file locking internal to its DBM accesses,
+so there won't be any problems with corrupt DBM files.  However, we
+decided not to register any signal handlers to deal with signals when the
+files are locked, because we didn't want to be overriding any handlers in
+the enclosing program.  Just in case, all of the lock files are named
+dbm.lock, where dbm is the name of the DBM that is locked.  They reside in
+the same directory as the DBMs themselves.
+
+MLDBM Notes
+-----------
+
+   MLDBM by default uses Data::Dumper to translate Perl data structures
+into strings, and SDBM_File to store them to disk.  This is because
+SDBM_File comes with all UNIX installs of Perl, and Data::Dumper was
+originally the only module which could serialize Perl's data structures.
+However, it also has the option of using any of the other DBM modules for
+storage, and either Storable or FreezeThaw to serialize the structures.
+As such, we've added the $opts option to the new method.  Just give it a
+hash reference, with the keys 'UseDB' or 'Serializer', to set either the
+DBM module or the serializing module, respectively.  For example,
+
+     $pquota = Pquota->new ("/var/spool/pquota", {'UseDB' => 'DB_File'});
+
+   would tell MLDBM to use the DB_File module to store the structures to
+disk.
+
+   Also, to avoid unnecessary locking, we've added an option to open the
+databases in read-only mode, so that scripts that won't be writing to the
+databases don't lock it.  Simply set the 'RO' option to 'true' in order to
+open the databases in read-only mode.
+
+     $pquota = Pquota->new ("/var/spool/pquota", {'RO' => 'true'});
+
+Method Notes
+------------
+
+   All methods return either the requested information or 1 in case of
+success, and undef in case of failure.
+
+Object Methods
+--------------
+
+Pquota::new ($quotadir[, $opts])
+     Standard object constructor.  $quotadir should contain the path to a
+     directory to store the DBMs.  The optional $opts should be a
+     reference to a hash, as described in MLDBM Notes.
+
+Pquota::close ()
+     Closes all open databases.  The database methods will open the DBMs
+     as needed, but you must call Pquota::close() before exiting your
+     program in order to make sure the DBMs are properly closed.
+
+Printer Database Methods
+------------------------
+
+Pquota::printer_add ($printer, $page_cost, $user_db)
+     Adds a printer to the printers DBM, with the associated per-page cost
+     and user database.
+
+Pquota::printer_rm ($printer)
+     Removes a printer from the printers DBM.
+
+Pquota::printer_set_cost ($printer, $cost)
+     Sets the per-page cost for the printer.
+
+Pquota::printer_get_cost ($printer)
+     Returns the per-page cost for the printer.
+
+Pquota::printer_get_cost_list ()
+     Returns a reference to a hash, with printer names as keys, and their
+     per-page costs as the values.
+
+Pquota::printer_set_user_database ($printer, $user_db)
+     Sets the printer's associated user database.
+
+Pquota::printer_get_user_database ($printer)
+     Returns the name of the printer's associated user database.
+
+Pquota::printer_get_user_database_list ()
+     Returns a reference to a hash, with printer names as keys, and their
+     per-page costs as the values.
+
+Pquota::printer_set_field ($printer, $key, $value)
+     Sets an arbitrary field in the printer's record.  This is in case you
+     want to store more information about your printers than Pquota
+     supports natively.
+
+Pquota::printer_get_field ($printer, $key);
+     Returns the value store in an arbitrary field in the printer's record.
+
+User Database Methods
+---------------------
+
+Pquota::user_add ($user, $user_db, $periodic_quota)
+     Adds an entry to a user database, with the indicated periodic quouta.
+
+Pquota::user_rm ($user, $user_db)
+     Removes a user from the specified user database.
+
+Pquota::user_print_pages ($user, $printer, $num_pages)
+     Modifies the user database to reflect the fact that the user has
+     printed the indicated number of pages on the specified printer.
+
+Pquota::user_add_to_current ($user, $user_db, $amount)
+     Adds the specified amount to the user's current remaining quota.
+
+Pquota::user_set_current ($user, $user_db. $amount)
+     Sets the user's current remaining quota.
+
+Pquota::user_get_current_by_dbm ($user, $user_db)
+     Returns the user's current remaining quota.
+
+Pquota::user_get_current_by_printer ($user, $printer)
+     Returns the user's current remaining quota in the user database
+     associated with that printer.
+
+Pquota::user_reset_current ($user, $user_db)
+     Resets the user's current remaining quota to his periodic quota value.
+
+Pquota::user_add_to_periodic ($user, $user_db, $amount)
+     Adds the specified amount to the user's periodic quota allotment.
+
+Pquota::user_set_periodic ($user, $user_db, $amount)
+     Sets the user's periodic quota allotment.
+
+Pquota::user_get_periodic ($user, $user_db)
+     Returns the user's periodic quota allotment.
+
+Pquota::user_reset_total
+     Sets the user's total quota used to 0.
+
+Pquota::user_set_field ($user, $user_db, $key, $value)
+     Sets an arbitrary field in the user's record.
+
+Pquota::user_get_field ($user, $user_db, $key)
+     Returns the value stored in an arbitrary field in the user's record.
+
+TO DO
+=====
+
+   * Come up with more functionality.  Pquota currently does everything we
+     need, but we're sure there must be features it lacks.
+
+BUGS
+====
+
+   None that we know of.  Please feel free to mail us with any bugs,
+patches, suggestions, comments, flames, death threats, etc.
+
+AUTHORS
+=======
+
+   David Bonner <`dbonner@cs.bu.edu'> and Scott Savarese
+<`savarese@cs.bu.edu'>
+
+VERSION
+=======
+
+   Version 1.00  April 30, 1999
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1998, 1999 by David Bonner and Scott Savarese.  All rights
+reserved. This program is free software; you can redistribute and/or modify
+it under the same terms as Perl itself.
+
+

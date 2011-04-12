@@ -1,0 +1,1832 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Expect_FAQ,  Next: Expect_intro,  Prev: Expect,  Up: Module List
+
+Frequently Asked Questions
+**************************
+
+NAME
+====
+
+   Expect.pm - Frequently Asked Questions
+
+SYNOPSIS
+========
+
+   This is a growing collection of things that might help.  Please send
+you questions that are not answered here to RGiersig@cpan.org
+
+DESCRIPTION
+===========
+
+Can I use this module with ActivePerl on Windows?
+-------------------------------------------------
+
+   I don't know.  Probably not.  There is no native support for ptys
+available under Windows.  On the other hand, Cygwin
+(http://sourceware.cygnus.com) promises to provide POSIX ptys for NT, so
+it should be possible to run Expect.pm under Cygwin.
+
+   The Tcl/Expect homepage at http://expect.nist.gov gives two links to
+porting projects that might be of interest (one being DejaGnu on Cygwin).
+
+How can I find out what Expect is doing?
+----------------------------------------
+
+   If you set
+
+     $Expect::Exp_Internal = 1;
+
+   Expect will tell you very verbosely what it is receiving and sending,
+what matching it is trying and what it found.  You can do this on a
+per-command base with
+
+     $exp->exp_internal(1);
+
+   You can also set
+
+     $Expect::Debug = 1;
+
+   which gives you even more output.
+
+I am seeing the output of the command I spawned.  Can I turn that off?
+----------------------------------------------------------------------
+
+   Yes, just set
+
+     $Expect::Log_Stdout = 0;
+
+   to globally disable it or
+
+     $exp->log_stdout(0);
+
+   for just that command.  'log_user' is provided as an alias so
+Tcl/Expect user get a DWIM experience... :-)
+
+I want to log the whole session to a file.
+------------------------------------------
+
+   Use
+
+     $exp->log_file("filename");
+
+   or
+
+     $exp->log_file($filehandle);
+
+   to start logging.  Note that the log is appended by default, but you can
+specify an optional mode "w" to truncate the logfile:
+
+     $exp->log_file("filename", "w");
+
+   To stop logging, just call it with a false argument:
+
+     $exp->log_file(undef);
+
+How can I turn off multi-line matching for my regexps?
+------------------------------------------------------
+
+   To globally unset multi-line matching for all regexps:
+
+     $Expect::Multiline_Matching = 0;
+
+   You can do that on a per-regexp basis by stating `(?-m)' inside the
+regexp (you need perl5.00503 or later for that).
+
+How can I expect on multiple spawned commands?
+----------------------------------------------
+
+   You can use the -i parameter to specify a single object or a list of
+Expect objects.  All following patterns will be evaluated against that
+list.
+
+   You can specify -i multiple times to create groups of objects and
+patterns to match against within the same expect statement.
+
+   This works just like in Tcl/Expect.
+
+   See the source example below.
+
+I seem to have problems with ptys!
+----------------------------------
+
+   [You're on HP-UX, right?]  Well, pty handling is really a black magic,
+as it is extremely system dependend.  I'm thinking about stealing the pty
+stuff from Tcl/Expect (Hi, Don!), as that code looks much more mature than
+what gets done in Expect and/or IO::[TP]ty.  Please be patient, this may
+take a while...
+
+Source Examples
+===============
+
+How to automate login
+---------------------
+
+     $obj->expect($timeout,
+     	       [
+     		qr'login: $',
+     		sub {
+     		  my $fh = shift;
+     		  print $fh "$username\r"; exp_continue;
+     		}
+     	       ],
+     	       [
+     		'Password: $',
+     		sub {
+     		  my $fh = shift;
+     		  print $fh "$password\r"; exp_continue;
+     		}
+     	       ],
+     	       [
+     		timeout =>
+     		sub {
+     		  die "No login.\n";
+     		}
+     	       ],
+     	       '-re', qr'[#>:] $', #' wait for shell prompt, then exit expect
+     	      );
+
+How to expect on multiple spawned commands
+------------------------------------------
+
+     foreach my $cmd (@list_of_commands) {
+       push @commands, new Expect $cmd;
+     }
+
+     expect($timeout,
+     	 '-i', \@commands,
+     	 [
+     	  qr"pattern",		# find this pattern in output of all commands
+     	  sub {
+     	    my $obj = shift;	# object that matched
+     	    print $obj "something\r";
+     	    exp_continue;	# we don't want to terminate the expect call
+     	  }
+     	 ],
+     	 '-i', $some_other_command,
+     	 [
+     	  "some other pattern",
+     	  sub {
+     	    my ($obj, $parmref) = @_;
+     	    # ...
+
+     # now we exit the expect command
+     	  },
+     	  \$parm
+     	 ],
+     	);
+
+
+File: pm.info,  Node: Expect_intro,  Next: Exporter,  Prev: Expect_FAQ,  Up: Module List
+
+Perl Expect interface
+*********************
+
+NAME
+====
+
+   Expect.pm (1.08) - Perl Expect interface
+
+SYNOPSIS
+========
+
+     use Expect.pm
+
+NOTE
+====
+
+   This document is obsolete and left in for hysterical raisins.
+Expect.pod now is the officially maintained document.  Expect_FAQ.pod
+should be of value too.
+
+DESCRIPTION
+===========
+
+   The Expect module is a successor of Comm.pl and a descendent of
+Chat.pl. It more closely ressembles the Tcl Expect language than its
+predecessors. It does not contain any of the networking code found in
+Comm.pl. I suspect this would be obsolete anyway given the advent of
+IO::Socket and external tools such as netcat.
+
+   Expect.pm is an attempt to have more of a switch() & case: feel to make
+decision processing more fluid. three separate types of debugging have
+been implemented to make code production easier.
+
+   It is now possible to interconnect multiple file handles (and
+processes) much like Tcl's expect. An attempt was made to enable all the
+features of Tcl's expect without forcing Tcl on the victim programmer :-) .
+
+CAVEATS
+=======
+
+   Expect.pm was designed to be generally portable across Unixes.
+
+   1. The operating system must include  ptys. This excludes non-Unix
+operating systems as far as I know.
+
+   2. The operating system must be POSIX compliant and include the Perl 5
+POSIX.pm module. The Fcntl.pm module is also used. My understanding is
+that there is no POSIX for Microsoft stuff. Bummer.
+
+   3. Perl 5.00401+ must be used. This module has been tested with 5.001
+and 5.003 under Linux and SunOS 5 and worked fine, but with the new IO::Pty
+support 5.00401 is required. Expect itself doesn't require this in case at
+some point IO::Pty should become backwards compatible with earlier versions
+of Perl. Please read the FAQ if you have trouble before going any further.
+
+   The old perl 4 Comm.pl was only compatible with SunOS 4 and 5 due to
+heavy use of ioctl() calls. It is the author's wish that this lack of
+portability be fixed as much as possible.
+
+CAVEATS PART 2
+==============
+
+   Tty settings are a major pain to keep track of. If you find unexpected
+behavior such as double-echoing or a frozen session doublecheck the
+documentation for default settings. When in doubt handle them yourself
+using the exp_stty() and manual_stty() functions. As of .98 you shouldn't
+have to worry about stty settings getting fouled unless you use
+interconnect or intentionally change them (like doing -echo to get a
+password).
+
+   If you foul your terminal's tty settings kill any hung processes and
+enter stty sane at a shell prompt. This should make your terminal
+manageable again.
+
+HOMEPAGE
+========
+
+   http://sourceforge.net/projects/expectperl/
+
+BUGS
+====
+
+   This module has not been tested on a great variety of platforms and
+doesn't seem to have a wide spread yet.  You may want to check the modules
+homepage at http://sourceforge.net/projects/expectperl/ and submit any
+questions or bugreports there.
+
+AUTHORS
+=======
+
+   Austin Schutz <tex@habit.com>: (retired)
+
+   Partner/Mad Scientist, The Habit Internet Cafe.  Feel free to send any
+compliments/gripes my way.  And now my shameless commercial plug: Check
+out Portland's First and Finest 'Net cafe at http://*www.habit.com*
+
+   Roland Giersig <RGiersig@users.sourceforge.net>:
+
+   I have added the multi-match functionality and also now taken over
+maintainance and further development of Expect.pm. There will be a
+complete clean rewrite in the near future (cannot promise any date) that
+may break some backward-compatibility for cleaner design.  For example, I
+would like to break it up somewhat, probably move the interconnect-stuff
+to a separate module to slim down the core functionality.  I still want to
+keep it as close to Tcl/Expect as possible to make switching real easy.
+
+   =head1 CONTRIBUTORS
+
+   There are still a few lines of code dating back to the inspirational
+Comm.pl and Chat.pl modules without which this would not have been
+possible.  Kudos to Eric Arnold <Eric.Arnold@Sun.com> and Randal 'Nuke
+your NT box with one line of perl code' Schwartz<merlyn@stonehenge.com>
+for making these available to the perl public.
+
+   As of .98 I think all the old code is toast. No way could this have
+been done without it though. Special thanks to Graham Barr for helping
+make sense of the IO::Handle stuff as well as providing the highly
+recommended IO::Tty module.
+
+
+File: pm.info,  Node: Exporter,  Next: Exporter/Heavy,  Prev: Expect_intro,  Up: Module List
+
+Implements default import method for modules
+********************************************
+
+NAME
+====
+
+   Exporter - Implements default import method for modules
+
+SYNOPSIS
+========
+
+   In module ModuleName.pm:
+
+     package ModuleName;
+     require Exporter;
+     @ISA = qw(Exporter);
+
+     @EXPORT = qw(...);            # symbols to export by default
+     @EXPORT_OK = qw(...);         # symbols to export on request
+     %EXPORT_TAGS = tag => [...];  # define names for sets of symbols
+
+   In other files which wish to use ModuleName:
+
+     use ModuleName;               # import default symbols into my package
+
+     use ModuleName qw(...);       # import listed symbols into my package
+
+     use ModuleName ();            # do not import any symbols
+
+DESCRIPTION
+===========
+
+   The Exporter module implements a default import method which many
+modules choose to inherit rather than implement their own.
+
+   Perl automatically calls the import method when processing a use
+statement for a module. Modules and use are documented in *Note Perlfunc:
+(perl.info)perlfunc, and *Note Perlmod: (perl.info)perlmod,. Understanding
+the concept of modules and how the use statement operates is important to
+understanding the Exporter.
+
+How to Export
+-------------
+
+   The arrays `@EXPORT' and `@EXPORT_OK' in a module hold lists of symbols
+that are going to be exported into the users name space by default, or
+which they can request to be exported, respectively.  The symbols can
+represent functions, scalars, arrays, hashes, or typeglobs.  The symbols
+must be given by full name with the exception that the ampersand in front
+of a function is optional, e.g.
+
+     @EXPORT    = qw(afunc $scalar @array);   # afunc is a function
+     @EXPORT_OK = qw(&bfunc %hash *typeglob); # explicit prefix on &bfunc
+
+Selecting What To Export
+------------------------
+
+   Do not export method names!
+
+   Do not export anything else by default without a good reason!
+
+   Exports pollute the namespace of the module user.  If you must export
+try to use @EXPORT_OK in preference to @EXPORT and avoid short or common
+symbol names to reduce the risk of name clashes.
+
+   Generally anything not exported is still accessible from outside the
+module using the ModuleName::item_name (or $blessed_ref->method) syntax.
+By convention you can use a leading underscore on names to informally
+indicate that they are 'internal' and not for public use.
+
+   (It is actually possible to get private functions by saying:
+
+     my $subref = sub { ... };
+     &$subref;
+
+   But there's no way to call that directly as a method, since a method
+must have a name in the symbol table.)
+
+   As a general rule, if the module is trying to be object oriented then
+export nothing. If it's just a collection of functions then  @EXPORT_OK
+anything but use @EXPORT with caution.
+
+   Other module design guidelines can be found in *Note Perlmod:
+(perl.info)perlmod,.
+
+Specialised Import Lists
+------------------------
+
+   If the first entry in an import list begins with !, : or / then the
+list is treated as a series of specifications which either add to or
+delete from the list of names to import. They are processed left to right.
+Specifications are in the form:
+
+     [!]name         This name only
+     [!]:DEFAULT     All names in @EXPORT
+     [!]:tag         All names in $EXPORT_TAGS{tag} anonymous list
+     [!]/pattern/    All names in @EXPORT and @EXPORT_OK which match
+
+   A leading ! indicates that matching names should be deleted from the
+list of names to import.  If the first specification is a deletion it is
+treated as though preceded by :DEFAULT. If you just want to import extra
+names in addition to the default set you will still need to include
+:DEFAULT explicitly.
+
+   e.g., Module.pm defines:
+
+     @EXPORT      = qw(A1 A2 A3 A4 A5);
+     @EXPORT_OK   = qw(B1 B2 B3 B4 B5);
+     %EXPORT_TAGS = (T1 => [qw(A1 A2 B1 B2)], T2 => [qw(A1 A2 B3 B4)]);
+
+     Note that you cannot use tags in @EXPORT or @EXPORT_OK.
+     Names in EXPORT_TAGS must also appear in @EXPORT or @EXPORT_OK.
+
+   An application using Module can say something like:
+
+     use Module qw(:DEFAULT :T2 !B3 A3);
+
+   Other examples include:
+
+     use Socket qw(!/^[AP]F_/ !SOMAXCONN !SOL_SOCKET);
+     use POSIX  qw(:errno_h :termios_h !TCSADRAIN !/^EXIT/);
+
+   Remember that most patterns (using //) will need to be anchored with a
+leading ^, e.g., `/^EXIT/' rather than `/EXIT/'.
+
+   You can say `BEGIN { $Exporter::Verbose=1 }' to see how the
+specifications are being processed and what is actually being imported
+into modules.
+
+Exporting without using Export's import method
+----------------------------------------------
+
+   Exporter has a special method, 'export_to_level' which is used in
+situations where you can't directly call Export's import method. The
+export_to_level method looks like:
+
+   MyPackage->export_to_level($where_to_export, $package, @what_to_export);
+
+   where $where_to_export is an integer telling how far up the calling
+stack to export your symbols, and @what_to_export is an array telling what
+symbols *to* export (usually this is @_).  The $package argument is
+currently unused.
+
+   For example, suppose that you have a module, A, which already has an
+import function:
+
+   package A;
+
+   @ISA = qw(Exporter);  @EXPORT_OK = qw ($b);
+
+   sub import {     $A::b = 1;     # not a very useful import method }
+
+   and you want to Export symbol $A::b back to the module that called
+package A. Since Exporter relies on the import method to work, via
+inheritance, as it stands Exporter::import() will never get called.
+Instead, say the following:
+
+   package A;  @ISA = qw(Exporter);  @EXPORT_OK = qw ($b);
+
+   sub import {     $A::b = 1;     A->export_to_level(1, @_); }
+
+   This will export the symbols one level 'above' the current package -
+ie: to the program or module that used package A.
+
+   Note: Be careful not to modify '@_' at all before you call
+export_to_level - or people using your package will get very unexplained
+results!
+
+Module Version Checking
+-----------------------
+
+   The Exporter module will convert an attempt to import a number from a
+module into a call to $module_name->require_version($value). This can be
+used to validate that the version of the module being used is greater than
+or equal to the required version.
+
+   The Exporter module supplies a default require_version method which
+checks the value of $VERSION in the exporting module.
+
+   Since the default require_version method treats the $VERSION number as
+a simple numeric value it will regard version 1.10 as lower than 1.9. For
+this reason it is strongly recommended that you use numbers with at least
+two decimal places, e.g., 1.09.
+
+Managing Unknown Symbols
+------------------------
+
+   In some situations you may want to prevent certain symbols from being
+exported. Typically this applies to extensions which have functions or
+constants that may not exist on some systems.
+
+   The names of any symbols that cannot be exported should be listed in
+the `@EXPORT_FAIL' array.
+
+   If a module attempts to import any of these symbols the Exporter will
+give the module an opportunity to handle the situation before generating
+an error. The Exporter will call an export_fail method with a list of the
+failed symbols:
+
+     @failed_symbols = $module_name->export_fail(@failed_symbols);
+
+   If the export_fail method returns an empty list then no error is
+recorded and all the requested symbols are exported. If the returned list
+is not empty then an error is generated for each symbol and the export
+fails. The Exporter provides a default export_fail method which simply
+returns the list unchanged.
+
+   Uses for the export_fail method include giving better error messages
+for some symbols and performing lazy architectural checks (put more
+symbols into @EXPORT_FAIL by default and then take them out if someone
+actually tries to use them and an expensive check shows that they are
+usable on that platform).
+
+Tag Handling Utility Functions
+------------------------------
+
+   Since the symbols listed within %EXPORT_TAGS must also appear in either
+@EXPORT or @EXPORT_OK, two utility functions are provided which allow you
+to easily add tagged sets of symbols to @EXPORT or @EXPORT_OK:
+
+     %EXPORT_TAGS = (foo => [qw(aa bb cc)], bar => [qw(aa cc dd)]);
+
+     Exporter::export_tags('foo');     # add aa, bb and cc to @EXPORT
+     Exporter::export_ok_tags('bar');  # add aa, cc and dd to @EXPORT_OK
+
+   Any names which are not tags are added to @EXPORT or @EXPORT_OK
+unchanged but will trigger a warning (with -w) to avoid misspelt tags
+names being silently added to @EXPORT or @EXPORT_OK. Future versions may
+make this a fatal error.
+
+
+File: pm.info,  Node: Exporter/Heavy,  Next: ExtUtils/Command,  Prev: Exporter,  Up: Module List
+
+Exporter guts
+*************
+
+NAME
+====
+
+   Exporter::Heavy - Exporter guts
+
+SYNOPIS
+=======
+
+   (internal use only)
+
+DESCRIPTION
+===========
+
+   No user-serviceable parts inside.
+
+
+File: pm.info,  Node: ExtUtils/Command,  Next: ExtUtils/DynaGlue,  Prev: Exporter/Heavy,  Up: Module List
+
+utilities to replace common UNIX commands in Makefiles etc.
+***********************************************************
+
+NAME
+====
+
+   ExtUtils::Command - utilities to replace common UNIX commands in
+Makefiles etc.
+
+SYNOPSIS
+========
+
+     perl -MExtUtils::Command -e cat files... > destination
+     perl -MExtUtils::Command -e mv source... destination
+     perl -MExtUtils::Command -e cp source... destination
+     perl -MExtUtils::Command -e touch files...
+     perl -MExtUtils::Command -e rm_f file...
+     perl -MExtUtils::Command -e rm_rf directories...
+     perl -MExtUtils::Command -e mkpath directories...
+     perl -MExtUtils::Command -e eqtime source destination
+     perl -MExtUtils::Command -e chmod mode files...
+     perl -MExtUtils::Command -e test_f file
+
+DESCRIPTION
+===========
+
+   The module is used in the Win32 port to replace common UNIX commands.
+Most commands are wrappers on generic modules File::Path and
+File::Basename.
+
+cat
+     Concatenates all files mentioned on command line to STDOUT.
+
+eqtime src dst
+     Sets modified time of dst to that of src
+
+rm_f files....
+     Removes directories - recursively (even if readonly)
+
+rm_f files....
+     Removes files (even if readonly)
+
+touch files ...
+     Makes files exist, with current timestamp
+
+mv source... destination
+     Moves source to destination.  Multiple sources are allowed if
+     destination is an existing directory.
+
+cp source... destination
+     Copies source to destination.  Multiple sources are allowed if
+     destination is an existing directory.
+
+chmod mode files...
+     Sets UNIX like permissions 'mode' on all the files.
+
+mkpath directory...
+     Creates directory, including any parent directories.
+
+test_f file
+     Tests if a file exists
+
+BUGS
+====
+
+   Should probably be Auto/Self loaded.
+
+SEE ALSO
+========
+
+   ExtUtils::MakeMaker, ExtUtils::MM_Unix, ExtUtils::MM_Win32
+
+AUTHOR
+======
+
+   Nick Ing-Simmons <`nick@ni-s.u-net.com'>.
+
+
+File: pm.info,  Node: ExtUtils/DynaGlue,  Next: ExtUtils/Embed,  Prev: ExtUtils/Command,  Up: Module List
+
+Methods for generating Perl extension files
+*******************************************
+
+NAME
+====
+
+   ExtUtils::DynaGlue - Methods for generating Perl extension files
+
+SYNOPSIS
+========
+
+     use ExtUtils::DynaGlue ();
+
+DESCRIPTION
+===========
+
+AUTHOR
+======
+
+   Doug MacEachern <dougm@osf.org> based on h2xs written by Larry Wall and
+others
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: ExtUtils/Embed,  Next: ExtUtils/F77,  Prev: ExtUtils/DynaGlue,  Up: Module List
+
+Utilities for embedding Perl in C/C++ applications
+**************************************************
+
+NAME
+====
+
+   ExtUtils::Embed - Utilities for embedding Perl in C/C++ applications
+
+SYNOPSIS
+========
+
+     perl -MExtUtils::Embed -e xsinit
+     perl -MExtUtils::Embed -e ldopts
+
+DESCRIPTION
+===========
+
+   ExtUtils::Embed provides utility functions for embedding a Perl
+interpreter and extensions in your C/C++ applications.  Typically, an
+application *Makefile* will invoke ExtUtils::Embed functions while
+building your application.
+
+@EXPORT
+=======
+
+   ExtUtils::Embed exports the following functions:
+
+   xsinit(), ldopts(), ccopts(), perl_inc(), ccflags(), ccdlflags(),
+xsi_header(), xsi_protos(), xsi_body()
+
+FUNCTIONS
+=========
+
+xsinit()
+     Generate C/C++ code for the XS initializer function.
+
+     When invoked as ``perl -MExtUtils::Embed -e xsinit --`' the following
+     options are recognized:
+
+     -o <output filename> (Defaults to *perlxsi.c*)
+
+     *-o STDOUT* will print to STDOUT.
+
+     *-std* (Write code for extensions that are linked with the current
+     Perl.)
+
+     Any additional arguments are expected to be names of modules to
+     generate code for.
+
+     When invoked with parameters the following are accepted and optional:
+
+     `xsinit($filename,$std,[@modules])'
+
+     Where,
+
+     $filename is equivalent to the -o option.
+
+     *$std* is boolean, equivalent to the *-std* option.
+
+     *[@modules]* is an array ref, same as additional arguments mentioned
+     above.
+
+Examples
+          perl -MExtUtils::Embed -e xsinit -- -o xsinit.c Socket
+
+     This will generate code with an *xs_init* function that glues the
+     perl *Socket::bootstrap* function to the C *boot_Socket* function and
+     writes it to a file named "xsinit.c".
+
+     Note that DynaLoader is a special case where it must call
+     *boot_DynaLoader* directly.
+
+          perl -MExtUtils::Embed -e xsinit
+
+     This will generate code for linking with DynaLoader and each static
+     extension found in *$Config{static_ext}*.  The code is written to the
+     default file name *perlxsi.c*.
+
+          perl -MExtUtils::Embed -e xsinit -- -o xsinit.c -std DBI DBD::Oracle
+
+     Here, code is written for all the currently linked extensions along
+     with code for DBI and *DBD::Oracle*.
+
+     If you have a working DynaLoader then there is rarely any need to
+     statically link in any other extensions.
+
+ldopts()
+     Output arguments for linking the Perl library and extensions to your
+     application.
+
+     When invoked as ``perl -MExtUtils::Embed -e ldopts --`' the following
+     options are recognized:
+
+     *-std*
+
+     Output arguments for linking the Perl library and any extensions
+     linked with the current Perl.
+
+     -I <path1:path2>
+
+     Search path for ModuleName.a archives.  Default path is *@INC*.
+     Library archives are expected to be found as
+     */some/path/auto/ModuleName/ModuleName.a* For example, when looking
+     for *Socket.a* relative to a search path, we should find
+     *auto/Socket/Socket.a*
+
+     When looking for *DBD::Oracle* relative to a search path, we should
+     find *auto/DBD/Oracle/Oracle.a*
+
+     Keep in mind, you can always supply */my/own/path/ModuleName.a* as an
+     additional linker argument.
+
+     -  <list of linker args>
+
+     Additional linker arguments to be considered.
+
+     Any additional arguments found before the - token are expected to be
+     names of modules to generate code for.
+
+     When invoked with parameters the following are accepted and optional:
+
+     `ldopts($std,[@modules],[@link_args],$path)'
+
+     Where,
+
+     *$std* is boolean, equivalent to the *-std* option.
+
+     *[@modules]* is equivalent to additional arguments found before the -
+     token.
+
+     *[@link_args]* is equivalent to arguments found after the - token.
+
+     $path is equivalent to the -I option.
+
+     In addition, when ldopts is called with parameters, it will return
+     the argument string rather than print it to STDOUT.
+
+Examples
+          perl -MExtUtils::Embed -e ldopts
+
+     This will print arguments for linking with *libperl.a*, DynaLoader and
+     extensions found in *$Config{static_ext}*.  This includes libraries
+     found in *$Config{libs}* and the first ModuleName.a library for each
+     extension that is found by searching *@INC* or the path specifed by
+     the -I option.  In addition, when ModuleName.a is found, additional
+     linker arguments are picked up from the *extralibs.ld* file in the
+     same directory.
+
+          perl -MExtUtils::Embed -e ldopts -- -std Socket
+
+     This will do the same as the above example, along with printing
+     additional arguments for linking with the Socket extension.
+
+          perl -MExtUtils::Embed -e ldopts -- DynaLoader
+
+     This will print arguments for linking with just the DynaLoader
+     extension and *libperl.a*.
+
+          perl -MExtUtils::Embed -e ldopts -- -std Msql -- -L/usr/msql/lib -lmsql
+
+     Any arguments after the second '-' token are additional linker
+     arguments that will be examined for potential conflict.  If there is
+     no conflict, the additional arguments will be part of the output.
+
+perl_inc()
+     For including perl header files this function simply prints:
+
+          -I$Config{archlibexp}/CORE
+
+     So, rather than having to say:
+
+          perl -MConfig -e 'print "-I$Config{archlibexp}/CORE"'
+
+     Just say:
+
+          perl -MExtUtils::Embed -e perl_inc
+
+ccflags(), ccdlflags()
+     These functions simply print $Config{ccflags} and $Config{ccdlflags}
+
+ccopts()
+     This function combines perl_inc(), ccflags() and ccdlflags() into one.
+
+xsi_header()
+     This function simply returns a string defining the same *EXTERN_C*
+     macro as *perlmain.c* along with #including *perl.h* and *EXTERN.h*.
+
+xsi_protos(@modules)
+     This function returns a string of *boot_$ModuleName* prototypes for
+     each @modules.
+
+xsi_body(@modules)
+     This function returns a string of calls to *newXS()* that glue the
+     module bootstrap function to *boot_ModuleName* for each @modules.
+
+     xsinit() uses the xsi_* functions to generate most of it's code.
+
+EXAMPLES
+========
+
+   For examples on how to use ExtUtils::Embed for building C/C++
+applications with embedded perl, see the eg/ directory and *Note
+Perlembed: (perl.info)perlembed,.
+
+SEE ALSO
+========
+
+   *Note Perlembed: (perl.info)perlembed,
+
+AUTHOR
+======
+
+   Doug MacEachern <`dougm@osf.org'>
+
+   Based on ideas from Tim Bunce <`Tim.Bunce@ig.co.uk'> and *minimod.pl*
+by Andreas Koenig <`k@anna.in-berlin.de'> and Tim Bunce.
+
+
+File: pm.info,  Node: ExtUtils/F77,  Next: ExtUtils/Install,  Prev: ExtUtils/Embed,  Up: Module List
+
+Simple interface to F77 libs
+****************************
+
+NAME
+====
+
+   ExtUtils::F77 - Simple interface to F77 libs
+
+DESCRIPTION
+===========
+
+   This module tries to figure out how to link C programs with Fortran
+subroutines on your system. Basically one must add a list of Fortran
+runtime libraries. The problem is their location and name varies with each
+OS/compiler combination!
+
+   This module tries to implement a simple 'rule-of-thumb' database for
+various flavours of UNIX systems.  A simple self-documenting Perl database
+of knowledge/code for figuring out how to link for various combinations of
+OS and compiler is embedded in the modules Perl code. Please help save the
+world by sending database entries for your system to kgb@aaoepp.aao.gov.au
+
+   The library list which the module returns can be explicitly overridden
+by setting the environment variable F77LIBS, e.g.
+
+     % setenv F77LIBS "-lfoo -lbar"
+     % perl Makefile.PL
+     ...
+
+SYNOPSIS
+========
+
+     use ExtUtils::F77;               # Automatic guess
+     use ExtUtils::F77 qw(sunos);     # Specify system
+     use ExtUtils::F77 qw(linux g77); # Specify system and compiler
+     $fortranlibs = ExtUtils::F77->runtime;
+
+METHODS
+=======
+
+   The following methods are provided:
+
+   * *runtime*
+
+     Returns a list of F77 runtime libraries.
+
+          $fortranlibs = ExtUtils::F77->runtime;
+
+   * *runtimeok*
+
+     Returns TRUE only if runtime libraries have been found successfully.
+
+   * *trail_*
+
+     Returns true if F77 names have trailing underscores.
+
+   * *compiler*
+
+     Returns command to execute the compiler (e.g. 'f77').
+
+   * cflags
+
+     Returns compiler flags.
+
+   * *testcompiler*
+
+     Test to see if compiler actually works.
+
+   More methods  will probably be added in the future.
+
+AUTHOR
+======
+
+   Karl Glazebrook (kgb@aaoepp.aao.GOV.AU).
+
+
+File: pm.info,  Node: ExtUtils/Install,  Next: ExtUtils/Installed,  Prev: ExtUtils/F77,  Up: Module List
+
+install files from here to there
+********************************
+
+NAME
+====
+
+   ExtUtils::Install - install files from here to there
+
+SYNOPSIS
+========
+
+   *use ExtUtils::Install;*
+
+   *install($hashref,$verbose,$nonono);*
+
+   *uninstall($packlistfile,$verbose,$nonono);*
+
+   *pm_to_blib($hashref);*
+
+DESCRIPTION
+===========
+
+   Both install() and uninstall() are specific to the way
+ExtUtils::MakeMaker handles the installation and deinstallation of perl
+modules. They are not designed as general purpose tools.
+
+   install() takes three arguments. A reference to a hash, a verbose
+switch and a don't-really-do-it switch. The hash ref contains a mapping of
+directories: each key/value pair is a combination of directories to be
+copied. Key is a directory to copy from, value is a directory to copy to.
+The whole tree below the "from" directory will be copied preserving
+timestamps and permissions.
+
+   There are two keys with a special meaning in the hash: "read" and
+"write". After the copying is done, install will write the list of target
+files to the file named by `$hashref->{write}'. If there is another file
+named by `$hashref->{read}', the contents of this file will be merged into
+the written file. The read and the written file may be identical, but on
+AFS it is quite likely that people are installing to a different directory
+than the one where the files later appear.
+
+   install_default() takes one or less arguments.  If no arguments are
+specified, it takes $ARGV[0] as if it was specified as an argument.  The
+argument is the value of MakeMaker's `FULLEXT' key, like `Tk/Canvas'.
+This function calls install() with the same arguments as the defaults the
+MakeMaker would use.
+
+   The argument-less form is convenient for install scripts like
+
+     perl -MExtUtils::Install -e install_default Tk/Canvas
+
+   Assuming this command is executed in a directory with a populated blib
+directory, it will proceed as if the blib was build by MakeMaker on this
+machine.  This is useful for binary distributions.
+
+   uninstall() takes as first argument a file containing filenames to be
+unlinked. The second argument is a verbose switch, the third is a
+no-don't-really-do-it-now switch.
+
+   pm_to_blib() takes a hashref as the first argument and copies all keys
+of the hash to the corresponding values efficiently. Filenames with the
+extension pm are autosplit. Second argument is the autosplit directory.
+
+
+File: pm.info,  Node: ExtUtils/Installed,  Next: ExtUtils/Liblist,  Prev: ExtUtils/Install,  Up: Module List
+
+Inventory management of installed modules
+*****************************************
+
+NAME
+====
+
+   ExtUtils::Installed - Inventory management of installed modules
+
+SYNOPSIS
+========
+
+     use ExtUtils::Installed;
+     my ($inst) = ExtUtils::Installed->new();
+     my (@modules) = $inst->modules();
+     my (@missing) = $inst->validate("DBI");
+     my $all_files = $inst->files("DBI");
+     my $files_below_usr_local = $inst->files("DBI", "all", "/usr/local");
+     my $all_dirs = $inst->directories("DBI");
+     my $dirs_below_usr_local = $inst->directory_tree("DBI", "prog");
+     my $packlist = $inst->packlist("DBI");
+
+DESCRIPTION
+===========
+
+   ExtUtils::Installed  provides a standard way to find out what core and
+module files have been installed.  It uses the information stored in
+.packlist files created during installation to provide this information.
+In addition it provides facilities to classify the installed files and to
+extract directory information from the .packlist files.
+
+USAGE
+=====
+
+   The new() function searches for all the installed .packlists on the
+system, and stores their contents. The .packlists can be queried with the
+functions described below.
+
+FUNCTIONS
+=========
+
+new()
+     This takes no parameters, and searches for all the installed
+     .packlists on the system.  The packlists are read using the
+     ExtUtils::packlist module.
+
+modules()
+     This returns a list of the names of all the installed modules.  The
+     perl 'core' is given the special name 'Perl'.
+
+files()
+     This takes one mandatory parameter, the name of a module.  It returns
+     a list of all the filenames from the package.  To obtain a list of
+     core perl files, use the module name 'Perl'.  Additional parameters
+     are allowed.  The first is one of the strings "prog", "man" or "all",
+     to select either just program files, just manual files or all files.
+     The remaining parameters are a list of directories. The filenames
+     returned will be restricted to those under the specified directories.
+
+directories()
+     This takes one mandatory parameter, the name of a module.  It returns
+     a list of all the directories from the package.  Additional
+     parameters are allowed.  The first is one of the strings "prog",
+     "man" or "all", to select either just program directories, just
+     manual directories or all directories.  The remaining parameters are
+     a list of directories. The directories returned will be restricted to
+     those under the specified directories.  This method returns only the
+     leaf directories that contain files from the specified module.
+
+directory_tree()
+     This is identical in operation to directory(), except that it
+     includes all the intermediate directories back up to the specified
+     directories.
+
+validate()
+     This takes one mandatory parameter, the name of a module.  It checks
+     that all the files listed in the modules .packlist actually exist,
+     and returns a list of any missing files.  If an optional second
+     argument which evaluates to true is given any missing files will be
+     removed from the .packlist
+
+packlist()
+     This returns the ExtUtils::Packlist object for the specified module.
+
+version()
+     This returns the version number for the specified module.
+
+EXAMPLE
+=======
+
+   See the example in *Note ExtUtils/Packlist: ExtUtils/Packlist,.
+
+AUTHOR
+======
+
+   Alan Burlison <Alan.Burlison@uk.sun.com>
+
+
+File: pm.info,  Node: ExtUtils/Liblist,  Next: ExtUtils/MM_Cygwin,  Prev: ExtUtils/Installed,  Up: Module List
+
+determine libraries to use and how to use them
+**********************************************
+
+NAME
+====
+
+   ExtUtils::Liblist - determine libraries to use and how to use them
+
+SYNOPSIS
+========
+
+   `require ExtUtils::Liblist;'
+
+   `ExtUtils::Liblist::ext($self, $potential_libs, $verbose);'
+
+DESCRIPTION
+===========
+
+   This utility takes a list of libraries in the form `-llib1 -llib2
+-llib3' and prints out lines suitable for inclusion in an extension
+Makefile.  Extra library paths may be included with the form
+`-L/another/path' this will affect the searches for all subsequent
+libraries.
+
+   It returns an array of four scalar values: EXTRALIBS, BSLOADLIBS,
+LDLOADLIBS, and LD_RUN_PATH.  Some of these don't mean anything on VMS and
+Win32.  See the details about those platform specifics below.
+
+   Dependent libraries can be linked in one of three ways:
+
+   * For static extensions
+
+     by the ld command when the perl binary is linked with the extension
+     library. See EXTRALIBS below.
+
+   * For dynamic extensions
+
+     by the ld command when the shared object is built/linked. See
+     LDLOADLIBS below.
+
+   * For dynamic extensions
+
+     by the DynaLoader when the shared object is loaded. See BSLOADLIBS
+     below.
+
+EXTRALIBS
+---------
+
+   List of libraries that need to be linked with when linking a perl
+binary which includes this extension. Only those libraries that actually
+exist are included.  These are written to a file and used when linking
+perl.
+
+LDLOADLIBS and LD_RUN_PATH
+--------------------------
+
+   List of those libraries which can or must be linked into the shared
+library when created using ld. These may be static or dynamic libraries.
+LD_RUN_PATH is a colon separated list of the directories in LDLOADLIBS. It
+is passed as an environment variable to the process that links the shared
+library.
+
+BSLOADLIBS
+----------
+
+   List of those libraries that are needed but can be linked in
+dynamically at run time on this platform.  SunOS/Solaris does not need
+this because ld records the information (from LDLOADLIBS) into the object
+file.  This list is used to create a .bs (bootstrap) file.
+
+PORTABILITY
+===========
+
+   This module deals with a lot of system dependencies and has quite a few
+architecture specific ifs in the code.
+
+VMS implementation
+------------------
+
+   The version of ext() which is executed under VMS differs from the
+Unix-OS/2 version in several respects:
+
+   * Input library and path specifications are accepted with or without the
+     -l and -L prefixes used by Unix linkers.  If neither prefix is
+     present, a token is considered a directory to search if it is in fact
+     a directory, and a library to search for otherwise.  Authors who wish
+     their extensions to be portable to Unix or OS/2 should use the Unix
+     prefixes, since the Unix-OS/2 version of ext() requires them.
+
+   * Wherever possible, shareable images are preferred to object libraries,
+     and object libraries to plain object files.  In accordance with VMS
+     naming conventions, ext() looks for files named libshr and librtl; it
+     also looks for liblib and liblib to accommodate Unix conventions used
+     in some ported software.
+
+   * For each library that is found, an appropriate directive for a linker
+     options file is generated.  The return values are space-separated
+     strings of these directives, rather than elements used on the linker
+     command line.
+
+   * LDLOADLIBS contains both the libraries found based on
+     `$potential_libs' and the CRTLs, if any, specified in Config.pm.
+     EXTRALIBS contains just those libraries found based on
+     `$potential_libs'.  BSLOADLIBS and LD_RUN_PATH are always empty.
+
+   In addition, an attempt is made to recognize several common Unix library
+names, and filter them out or convert them to their VMS equivalents, as
+appropriate.
+
+   In general, the VMS version of ext() should properly handle input from
+extensions originally designed for a Unix or VMS environment.  If you
+encounter problems, or discover cases where the search could be improved,
+please let us know.
+
+Win32 implementation
+--------------------
+
+   The version of ext() which is executed under Win32 differs from the
+Unix-OS/2 version in several respects:
+
+   * If `$potential_libs' is empty, the return value will be empty.
+     Otherwise, the libraries specified by `$Config{libs}' (see Config.pm)
+     will be appended to the list of `$potential_libs'.  The libraries
+     will be searched for in the directories specified in
+     `$potential_libs', `$Config{libpth}', and in
+     `$Config{installarchlib}/CORE'.  For each library that is found,  a
+     space-separated list of fully qualified library pathnames is
+     generated.
+
+   * Input library and path specifications are accepted with or without the
+     -l and -L prefixes used by Unix linkers.
+
+     An entry of the form `-La:\foo' specifies the `a:\foo' directory to
+     look for the libraries that follow.
+
+     An entry of the form `-lfoo' specifies the library foo, which may be
+     spelled differently depending on what kind of compiler you are using.
+     If you are using GCC, it gets translated to `libfoo.a', but for
+     other win32 compilers, it becomes `foo.lib'.  If no files are found
+     by those translated names, one more attempt is made to find them
+     using either `foo.a' or `libfoo.lib', depending on whether GCC or
+     some other win32 compiler is being used, respectively.
+
+     If neither the -L or -l prefix is present in an entry, the entry is
+     considered a directory to search if it is in fact a directory, and a
+     library to search for otherwise.  The `$Config{lib_ext}' suffix will
+     be appended to any entries that are not directories and don't already
+     have the suffix.
+
+     Note that the -L and -l prefixes are *not required*, but authors who
+     wish their extensions to be portable to Unix or OS/2 should use the
+     prefixes, since the Unix-OS/2 version of ext() requires them.
+
+   * Entries cannot be plain object files, as many Win32 compilers will
+     not handle object files in the place of libraries.
+
+   * Entries in `$potential_libs' beginning with a colon and followed by
+     alphanumeric characters are treated as flags.  Unknown flags will be
+     ignored.
+
+     An entry that matches `/:nodefault/i' disables the appending of
+     default libraries found in `$Config{libs}' (this should be only
+     needed very rarely).
+
+     An entry that matches `/:nosearch/i' disables all searching for the
+     libraries specified after it.  Translation of `-Lfoo' and `-lfoo'
+     still happens as appropriate (depending on compiler being used, as
+     reflected by `$Config{cc}'), but the entries are not verified to be
+     valid files or directories.
+
+     An entry that matches `/:search/i' reenables searching for the
+     libraries specified after it.  You can put it at the end to enable
+     searching for default libraries specified by `$Config{libs}'.
+
+   * The libraries specified may be a mixture of static libraries and
+     import libraries (to link with DLLs).  Since both kinds are used
+     pretty transparently on the Win32 platform, we do not attempt to
+     distinguish between them.
+
+   * LDLOADLIBS and EXTRALIBS are always identical under Win32, and
+     BSLOADLIBS and LD_RUN_PATH are always empty (this may change in
+     future).
+
+   * You must make sure that any paths and path components are properly
+     surrounded with double-quotes if they contain spaces. For example,
+     `$potential_libs' could be (literally):
+
+          "-Lc:\Program Files\vc\lib" msvcrt.lib "la test\foo bar.lib"
+
+     Note how the first and last entries are protected by quotes in order
+     to protect the spaces.
+
+   * Since this module is most often used only indirectly from extension
+     Makefile.PL files, here is an example Makefile.PL entry to add a
+     library to the build process for an extension:
+
+          LIBS => ['-lgl']
+
+     When using GCC, that entry specifies that MakeMaker should first look
+     for `libgl.a' (followed by `gl.a') in all the locations specified by
+     `$Config{libpth}'.
+
+     When using a compiler other than GCC, the above entry will search for
+     `gl.lib' (followed by `libgl.lib').
+
+     If the library happens to be in a location not in `$Config{libpth}',
+     you need:
+
+          LIBS => ['-Lc:\gllibs -lgl']
+
+     Here is a less often used example:
+
+          LIBS => ['-lgl', ':nosearch -Ld:\mesalibs -lmesa -luser32']
+
+     This specifies a search for library `gl' as before.  If that search
+     fails to find the library, it looks at the next item in the list. The
+     `:nosearch' flag will prevent searching for the libraries that follow,
+     so it simply returns the value as `-Ld:\mesalibs -lmesa -luser32',
+     since GCC can use that value as is with its linker.
+
+     When using the Visual C compiler, the second item is returned as
+     `-libpath:d:\mesalibs mesa.lib user32.lib'.
+
+     When using the Borland compiler, the second item is returned as
+     `-Ld:\mesalibs mesa.lib user32.lib', and MakeMaker takes care of
+     moving the `-Ld:\mesalibs' to the correct place in the linker command
+     line.
+
+SEE ALSO
+========
+
+   *Note ExtUtils/MakeMaker: ExtUtils/MakeMaker,
+
+
+File: pm.info,  Node: ExtUtils/MM_Cygwin,  Next: ExtUtils/MM_OS2,  Prev: ExtUtils/Liblist,  Up: Module List
+
+methods to override UN*X behaviour in ExtUtils::MakeMaker
+*********************************************************
+
+NAME
+====
+
+   ExtUtils::MM_Cygwin - methods to override UN*X behaviour in
+ExtUtils::MakeMaker
+
+SYNOPSIS
+========
+
+     use ExtUtils::MM_Cygwin; # Done internally by ExtUtils::MakeMaker if needed
+
+DESCRIPTION
+===========
+
+   See ExtUtils::MM_Unix for a documentation of the methods provided there.
+
+canonpath
+     replaces backslashes with forward ones.  then acts as *nixish.
+
+cflags
+     if configured for dynamic loading, triggers #define EXT in EXTERN.h
+
+manifypods
+     replaces strings '::' with '.' in man page names
+
+perl_archive
+     points to libperl.a
+
+
+File: pm.info,  Node: ExtUtils/MM_OS2,  Next: ExtUtils/MM_Unix,  Prev: ExtUtils/MM_Cygwin,  Up: Module List
+
+methods to override UN*X behaviour in ExtUtils::MakeMaker
+*********************************************************
+
+NAME
+====
+
+   ExtUtils::MM_OS2 - methods to override UN*X behaviour in
+ExtUtils::MakeMaker
+
+SYNOPSIS
+========
+
+     use ExtUtils::MM_OS2; # Done internally by ExtUtils::MakeMaker if needed
+
+DESCRIPTION
+===========
+
+   See ExtUtils::MM_Unix for a documentation of the methods provided
+there. This package overrides the implementation of these methods, not the
+semantics.
+
+
+File: pm.info,  Node: ExtUtils/MM_Unix,  Next: ExtUtils/MM_VMS,  Prev: ExtUtils/MM_OS2,  Up: Module List
+
+methods used by ExtUtils::MakeMaker
+***********************************
+
+NAME
+====
+
+   ExtUtils::MM_Unix - methods used by ExtUtils::MakeMaker
+
+SYNOPSIS
+========
+
+   `require ExtUtils::MM_Unix;'
+
+DESCRIPTION
+===========
+
+   The methods provided by this package are designed to be used in
+conjunction with ExtUtils::MakeMaker. When MakeMaker writes a Makefile, it
+creates one or more objects that inherit their methods from a package
+`MM'. MM itself doesn't provide any methods, but it ISA ExtUtils::MM_Unix
+class. The inheritance tree of MM lets operating specific packages take
+the responsibility for all the methods provided by MM_Unix. We are trying
+to reduce the number of the necessary overrides by defining rather
+primitive operations within ExtUtils::MM_Unix.
+
+   If you are going to write a platform specific MM package, please try to
+limit the necessary overrides to primitive methods, and if it is not
+possible to do so, let's work out how to achieve that gain.
+
+   If you are overriding any of these methods in your Makefile.PL (in the
+MY class), please report that to the makemaker mailing list. We are trying
+to minimize the necessary method overrides and switch to data driven
+Makefile.PLs wherever possible. In the long run less methods will be
+overridable via the MY class.
+
+METHODS
+=======
+
+   The following description of methods is still under development. Please
+refer to the code for not suitably documented sections and complain loudly
+to the makemaker mailing list.
+
+   Not all of the methods below are overridable in a Makefile.PL.
+Overridable methods are marked as (o). All methods are overridable by a
+platform specific MM_*.pm file (See *Note ExtUtils/MM_VMS:
+ExtUtils/MM_VMS,) and *Note ExtUtils/MM_OS2: ExtUtils/MM_OS2,).
+
+Preloaded methods
+-----------------
+
+canonpath
+     No physical check on the filesystem, but a logical cleanup of a path.
+     On UNIX eliminated successive slashes and successive "/.".
+
+catdir
+     Concatenate two or more directory names to form a complete path ending
+     with a directory. But remove the trailing slash from the resulting
+     string, because it doesn't look good, isn't necessary and confuses
+     OS2. Of course, if this is the root directory, don't cut off the
+     trailing slash :-)
+
+catfile
+     Concatenate one or more directory names and a filename to form a
+     complete path ending with a filename
+
+curdir
+     Returns a string representing of the current directory.  "." on UNIX.
+
+rootdir
+     Returns a string representing of the root directory.  "/" on UNIX.
+
+updir
+     Returns a string representing of the parent directory.  ".." on UNIX.
+
+SelfLoaded methods
+------------------
+
+c_o (o)
+     Defines the suffix rules to compile different flavors of C files to
+     object files.
+
+cflags (o)
+     Does very much the same as the cflags script in the perl
+     distribution. It doesn't return the whole compiler command line, but
+     initializes all of its parts. The const_cccmd method then actually
+     returns the definition of the CCCMD macro which uses these parts.
+
+clean (o)
+     Defines the clean target.
+
+const_cccmd (o)
+     Returns the full compiler call for C programs and stores the
+     definition in CONST_CCCMD.
+
+const_config (o)
+     Defines a couple of constants in the Makefile that are imported from
+     %Config.
+
+const_loadlibs (o)
+     Defines EXTRALIBS, LDLOADLIBS, BSLOADLIBS, LD_RUN_PATH. See *Note
+     ExtUtils/Liblist: ExtUtils/Liblist, for details.
+
+constants (o)
+     Initializes lots of constants and .SUFFIXES and .PHONY
+
+depend (o)
+     Same as macro for the depend attribute.
+
+dir_target (o)
+     Takes an array of directories that need to exist and returns a
+     Makefile entry for a .exists file in these directories. Returns
+     nothing, if the entry has already been processed. We're helpless
+     though, if the same directory comes as $(FOO) _and_ as "bar". Both of
+     them get an entry, that's why we use "::".
+
+dist (o)
+     Defines a lot of macros for distribution support.
+
+dist_basics (o)
+     Defines the targets distclean, distcheck, skipcheck, manifest.
+
+dist_ci (o)
+     Defines a check in target for RCS.
+
+dist_core (o)
+     Defines the targets dist, tardist, zipdist, uutardist, shdist
+
+dist_dir (o)
+     Defines the scratch directory target that will hold the distribution
+     before tar-ing (or shar-ing).
+
+dist_test (o)
+     Defines a target that produces the distribution in the
+     scratchdirectory, and runs 'perl Makefile.PL; make ;make test' in that
+     subdirectory.
+
+dlsyms (o)
+     Used by AIX and VMS to define DL_FUNCS and DL_VARS and write the *.exp
+     files.
+
+dynamic (o)
+     Defines the dynamic target.
+
+dynamic_bs (o)
+     Defines targets for bootstrap files.
+
+dynamic_lib (o)
+     Defines how to produce the *.so (or equivalent) files.
+
+exescan
+     Deprecated method. Use libscan instead.
+
+extliblist
+     Called by init_others, and calls ext ExtUtils::Liblist. See *Note
+     ExtUtils/Liblist: ExtUtils/Liblist, for details.
+
+file_name_is_absolute
+     Takes as argument a path and returns true, if it is an absolute path.
+
+find_perl
+     Finds the executables PERL and FULLPERL
+
+Methods to actually produce chunks of text for the Makefile
+-----------------------------------------------------------
+
+   The methods here are called for each MakeMaker object in the order
+specified by @ExtUtils::MakeMaker::MM_Sections.
+
+fixin
+     Inserts the sharpbang or equivalent magic number to a script
+
+force (o)
+     Just writes FORCE:
+
+guess_name
+     Guess the name of this package by examining the working directory's
+     name. MakeMaker calls this only if the developer has not supplied a
+     NAME attribute.
+
+has_link_code
+     Returns true if C, XS, MYEXTLIB or similar objects exist within this
+     object that need a compiler. Does not descend into subdirectories as
+     needs_linking() does.
+
+htmlifypods (o)
+     Defines targets and routines to translate the pods into HTML manpages
+     and put them into the INST_HTMLLIBDIR and INST_HTMLSCRIPTDIR
+     directories.
+
+init_dirscan
+     Initializes DIR, XS, PM, C, O_FILES, H, PL_FILES, HTML*PODS,
+     MAN*PODS, EXE_FILES.
+
+init_main
+     Initializes NAME, FULLEXT, BASEEXT, PARENT_NAME, DLBASE, PERL_SRC,
+     PERL_LIB, PERL_ARCHLIB, PERL_INC, INSTALLDIRS, INST_*, INSTALL*,
+     PREFIX, CONFIG, AR, AR_STATIC_ARGS, LD, OBJ_EXT, LIB_EXT, EXE_EXT,
+     MAP_TARGET, LIBPERL_A, VERSION_FROM, VERSION, DISTNAME, VERSION_SYM.
+
+init_others
+     Initializes EXTRALIBS, BSLOADLIBS, LDLOADLIBS, LIBS, LD_RUN_PATH,
+     OBJECT, BOOTDEP, PERLMAINCC, LDFROM, LINKTYPE, NOOP, FIRST_MAKEFILE,
+     MAKEFILE, NOECHO, RM_F, RM_RF, TEST_F, TOUCH, CP, MV, CHMOD,
+     UMASK_NULL
+
+install (o)
+     Defines the install target.
+
+installbin (o)
+     Defines targets to make and to install EXE_FILES.
+
+libscan (o)
+     Takes a path to a file that is found by init_dirscan and returns false
+     if we don't want to include this file in the library. Mainly used to
+     exclude RCS, CVS, and SCCS directories from installation.
+
+linkext (o)
+     Defines the linkext target which in turn defines the LINKTYPE.
+
+lsdir
+     Takes as arguments a directory name and a regular expression. Returns
+     all entries in the directory that match the regular expression.
+
+macro (o)
+     Simple subroutine to insert the macros defined by the macro attribute
+     into the Makefile.
+
+makeaperl (o)
+     Called by staticmake. Defines how to write the Makefile to produce a
+     static new perl.
+
+     By default the Makefile produced includes all the static extensions in
+     the perl library. (Purified versions of library files, e.g.,
+     DynaLoader_pure_p1_c0_032.a are automatically ignored to avoid link
+     errors.)
+
+makefile (o)
+     Defines how to rewrite the Makefile.
+
+manifypods (o)
+     Defines targets and routines to translate the pods into manpages and
+     put them into the INST_* directories.
+
+maybe_command
+     Returns true, if the argument is likely to be a command.
+
+maybe_command_in_dirs
+     method under development. Not yet used. Ask Ilya :-)
+
+needs_linking (o)
+     Does this module need linking? Looks into subdirectory objects (see
+     also has_link_code())
+
+nicetext
+     misnamed method (will have to be changed). The MM_Unix method just
+     returns the argument without further processing.
+
+     On VMS used to insure that colons marking targets are preceded by
+     space - most Unix Makes don't need this, but it's necessary under VMS
+     to distinguish the target delimiter from a colon appearing as part of
+     a filespec.
+
+parse_version
+     parse a file and return what you think is $VERSION in this file set
+     to.  It will return the string "undef" if it can't figure out what
+     $VERSION is.
+
+parse_abstract
+     parse a file and return what you think is the ABSTRACT
+
+pasthru (o)
+     Defines the string that is passed to recursive make calls in
+     subdirectories.
+
+path
+     Takes no argument, returns the environment variable PATH as an array.
+
+perl_script
+     Takes one argument, a file name, and returns the file name, if the
+     argument is likely to be a perl script. On MM_Unix this is true for
+     any ordinary, readable file.
+
+perldepend (o)
+     Defines the dependency from all *.h files that come with the perl
+     distribution.
+
+ppd
+     Defines target that creates a PPD (Perl Package Description) file for
+     a binary distribution.
+
+perm_rw (o)
+     Returns the attribute PERM_RW or the string `644'.  Used as the
+     string that is passed to the chmod command to set the permissions for
+     read/writeable files.  MakeMaker chooses `644' because it has turned
+     out in the past that relying on the umask provokes hard-to-track bug
+     reports.  When the return value is used by the perl function chmod,
+     it is interpreted as an octal value.
+
+perm_rwx (o)
+     Returns the attribute PERM_RWX or the string `755', i.e. the string
+     that is passed to the chmod command to set the permissions for
+     executable files.  See also perl_rw.
+
+pm_to_blib
+     Defines target that copies all files in the hash PM to their
+     destination and autosplits them. See `DESCRIPTION', *Note
+     ExtUtils/Install: ExtUtils/Install,
+
+post_constants (o)
+     Returns an empty string per default. Dedicated to overrides from
+     within Makefile.PL after all constants have been defined.
+
+post_initialize (o)
+     Returns an empty string per default. Used in Makefile.PLs to add some
+     chunk of text to the Makefile after the object is initialized.
+
+postamble (o)
+     Returns an empty string. Can be used in Makefile.PLs to write some
+     text to the Makefile at the end.
+
+prefixify
+     Check a path variable in $self from %Config, if it contains a prefix,
+     and replace it with another one.
+
+     Takes as arguments an attribute name, a search prefix and a
+     replacement prefix. Changes the attribute in the object.
+
+processPL (o)
+     Defines targets to run *.PL files.
+
+realclean (o)
+     Defines the realclean target.
+
+replace_manpage_separator
+     Takes the name of a package, which may be a nested package, in the
+     form Foo/Bar and replaces the slash with `::'. Returns the
+     replacement.
+
+static (o)
+     Defines the static target.
+
+static_lib (o)
+     Defines how to produce the *.a (or equivalent) files.
+
+staticmake (o)
+     Calls makeaperl.
+
+subdir_x (o)
+     Helper subroutine for subdirs
+
+subdirs (o)
+     Defines targets to process subdirectories.
+
+test (o)
+     Defines the test targets.
+
+test_via_harness (o)
+     Helper method to write the test targets
+
+test_via_script (o)
+     Other helper method for test.
+
+tool_autosplit (o)
+     Defines a simple perl call that runs autosplit. May be deprecated by
+     pm_to_blib soon.
+
+tools_other (o)
+     Defines SHELL, LD, TOUCH, CP, MV, RM_F, RM_RF, CHMOD, UMASK_NULL in
+     the Makefile. Also defines the perl programs MKPATH,
+     WARN_IF_OLD_PACKLIST, MOD_INSTALL. DOC_INSTALL, and UNINSTALL.
+
+tool_xsubpp (o)
+     Determines typemaps, xsubpp version, prototype behaviour.
+
+top_targets (o)
+     Defines the targets all, subdirs, config, and O_FILES
+
+writedoc
+     Obsolete, deprecated method. Not used since Version 5.21.
+
+xs_c (o)
+     Defines the suffix rules to compile XS files to C.
+
+xs_cpp (o)
+     Defines the suffix rules to compile XS files to C++.
+
+xs_o (o)
+     Defines suffix rules to go from XS to object files directly. This is
+     only intended for broken make implementations.
+
+perl_archive
+     This is internal method that returns path to libperl.a equivalent to
+     be linked to dynamic extensions. UNIX does not have one but OS2 and
+     Win32 do.
+
+export_list
+     This is internal method that returns name of a file that is passed to
+     linker to define symbols to be exported.  UNIX does not have one but
+     OS2 and Win32 do.
+
+SEE ALSO
+========
+
+   *Note ExtUtils/MakeMaker: ExtUtils/MakeMaker,
+
+

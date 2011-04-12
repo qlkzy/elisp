@@ -1,0 +1,1656 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Mail/Box/Index,  Next: Mail/Box/Locker,  Prev: Mail/Box,  Up: Module List
+
+Keep indexfiles on messages.
+****************************
+
+NAME
+====
+
+   Mail::Box::Index - Keep indexfiles on messages.
+
+SYNOPSIS
+========
+
+     $folder->readIndex(...)
+     $folder->writeIndex(...)
+
+DESCRIPTION
+===========
+
+   Message-folders which store their data in one single file per message
+are very inefficient for producing subject overviews and detecting
+message-threads.  The Mail::Box::Index is able to store and read a the
+headers of all messages in one file.
+
+   When Mail::Box::Index functionality is switched on (specify `keep_index'
+when creating a folder), the index-file is automatically read.  When the
+folder is closed, a new index-file is created.
+
+   Special care is taken to avoid a problems when the user changed or
+removed message-files without updating the index.  If the index is not
+trusted, it will not be used (and so cost performance to the reader of the
+folder).
+
+METHODS
+=======
+
+new ARGS
+     You will not call this method yourself, unless you implement a folder
+     yourself.  The following options can be specified when you create a
+     folder.
+
+        * keep_index => BOOL
+
+          Keep an index-file in the specified file, one file per
+          directory.  Using an index-file will speed-up things
+          considerably, because it avoids that all message-files have to
+          be read on the moment that you open the folder.  When you open a
+          folder, you need information like the the subject of each
+          message, and it is not pleasant to open all thousands of
+          messages to read them.
+
+        * index_filename => FILENAME
+
+          The FILENAME which is used in each directory to store the
+          headers of all mails.  The filename shall not contain a
+          directory path (so: do not use `/usr/people/jan/.index', nor
+          `subdir/.index', but say `.index')
+
+indexFilename
+     Returns the index-file for a folder.  If the `keep_index' option was
+     not used when the folder was read, this returns undef.
+
+writeIndex MESSAGE [,MESSAGE]
+     Write an index-file containing the specified messages, but only if the
+     user requested it: the `keep_index' option of new() must have been
+     specified.
+
+readIndex [HEADERCLASS]
+     Read the index-file if it exists and the user has specified
+     `keep_index' with the constructor (new) of this folder.  If that
+     option is not specified, the readIndex does not know under what name
+     the index is stored, and therefore not work.
+
+     The headers which are read are created into the specified HEADERCLASS,
+     which may be different for each folder-type, but by default a
+     `MIME::Head'.
+
+AUTHOR
+======
+
+   Mark Overmeer (`Mark@Overmeer.net').  All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+VERSION
+=======
+
+   This code is beta, version 1.100
+
+
+File: pm.info,  Node: Mail/Box/Locker,  Next: Mail/Box/MH,  Prev: Mail/Box/Index,  Up: Module List
+
+Manage the locking of mail-folders
+**********************************
+
+NAME
+====
+
+   Mail::Box::Locker - Manage the locking of mail-folders
+
+SYNOPSIS
+========
+
+     use Mail::Box::Locker;
+     my $locker = new Mail::Box::Locker;
+
+     $locker->lock($folder);
+     $locker->isLocked($folder);
+     $locker->hasLock($folder);
+     $locker->unlock($folder);
+
+     Mail::Box::Locker->addLockingMethod(...);
+
+     # Because Mail::Box inherits from this class:
+     my $folder = new Mail::Box(lock_method => 'dotlock');
+     $folder->lock;
+     $folder->isLocked;
+     $folder->hasLock;
+     $folder->unlock;
+
+DESCRIPTION
+===========
+
+   Read *Note Mail/Box/Manager: Mail/Box/Manager, first.  The locker
+module contains the various locking functionalities as needed when
+handling folders.
+
+   Because `Mail::Box' inherits from Mail::Box::Locker, this example works:
+
+     my $folder
+     $folder->lock;
+
+METHOD
+======
+
+new ARGS
+     Create a new lock.  You may do this, however, in most cases the lock
+     will not be seperately instantiated but be the second class in a
+     multiple inheritance construction with a *Note Mail/Box: Mail/Box,.
+
+     ARGS is a reference to a hash, where the following fields are used
+     for the locker information:
+
+        * lock_method => METHOD
+
+          Which METHOD has to be used for locking.  Supported are
+
+         'dotlock'
+               The folder handler creates a file which signals that it is
+               in use.  This is a bit problematic, because all
+               mail-handling software should agree on the name of the file
+               to be created.
+
+               On various folder-types, the lockfile differs.  See each
+               manual-page and special options to change their default
+               behavior.
+
+         'file'
+               For some folder handlers, locking is based on simply
+               file-locking mechanism.  However, this does not work on
+               network filesystems, and such.  This also doesn't work on
+               directory-type of folders (Mail::Box::Dir and derived).
+
+         'nfs'
+               A kind of `dotlock' file-locking mechanism, but adapted to
+               work over NFS.  Extra precaution is needed because an `open
+               O_EXCL' on NFS is not an atomic action.
+
+         'NONE'
+               Disable locking.
+
+        * lock_timeout => SECONDS
+
+          How long can a lock stand?  When an different e-mail program
+          left a lock, then this will be removed automatically after the
+          specified seconds.  The default is one hour.
+
+        * lock_wait => SECONDS|'NOTIMEOUT'
+
+          How long to wait for receiving the lock.  The lock-request may
+          fail, when the specified number of seconds is reached.  If
+          'NOTIMEOUT' is specified, we wait till the lock can be taken.
+
+          It is platform and locking method specific whether it is
+          possible at all to limit the trials to the specified number of
+          seconds.  For instance, the `dotlock' method on Windows will
+          always wait until the lock has been received.
+
+        * lockfile => FILENAME
+
+          Name of the file to take the lock on or to represent a lock
+          (depends on the kind of lock used).
+
+lockingMethod NAME, CODE, CODE, CODE
+     (class method)  Add locking methods to the set of know methods.  You
+     need to specify a method-name and three code references, respectively
+     for the get, test, and un method.  You may also specify method-names
+     instead of code-references.
+
+Basic functions
+---------------
+
+   The lock, `test_lock', and unlock methods are to be used.  They call
+specific methods which implement the right locking mechanism.   *Do not
+call* the various locking methods directly.
+
+lock [FOLDER] [METHOD]
+     Get a lock on a folder, by using the predefined method, or a specific
+     METHOD.  If you do not specify a FOLDER, it is assumed the locking
+     functionality is inherited.
+
+     Examples:
+
+          $locker->lock($folder);
+          $folder->lock;
+
+isLocked [FOLDER] [METHOD]
+     Test if the folder is locked.
+
+     Examples:
+
+          $locker->isLocked($folder);
+          $folder->isLocked;
+
+hasLock [FOLDER]
+     Check wheter the folder has the lock.
+
+     Examples:
+
+          $locker->hasLock($folder);
+          $folder->hasLock;
+
+unlock [FOLDER] [METHOD]
+     un the lock on a folder.
+
+     Examples:
+
+          $locker->unlock($folder);
+          $folder->unlock;
+
+lockFilename [FILENAME]
+     Returns the filename which is used to lock the folder.  It depends on
+     the locking method how this file is used.
+
+AUTHOR
+======
+
+   Mark Overmeer (`Mark@Overmeer.net').  All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+VERSION
+=======
+
+   This code is beta, version 1.100
+
+
+File: pm.info,  Node: Mail/Box/MH,  Next: Mail/Box/MH/Message,  Prev: Mail/Box/Locker,  Up: Module List
+
+Handle folders with a file per message.
+***************************************
+
+NAME
+====
+
+   Mail::Box::MH - Handle folders with a file per message.
+
+SYNOPSIS
+========
+
+     use Mail::Box::MH;
+     my $folder = new Mail::Box::MH folder => $ENV{MAIL}, ...;
+
+DESCRIPTION
+===========
+
+   `Mail::Box::MH' extends *Note Mail/Box: Mail/Box, and *Note
+Mail/Box/Index: Mail/Box/Index, to implement MH-type folders.  Read *Note
+Mail/Box/Manager: Mail/Box/Manager, for the general overview, *Note
+Mail/Box: Mail/Box, for understanding mailboxes, and *Note
+Mail/Box/Message: Mail/Box/Message, about how messages are used, first.
+
+   `The internal organization and details|' in this node are found at the
+bottom of this manual-page.  The working of MH-messages are described in
+*Note Mail/Box/MH/Message: Mail/Box/MH/Message,.
+
+METHODS
+=======
+
+new ARGS
+     Create a new folder.  The are many options which are taken from other
+     objects.  For some, different options are set.  For MH-specific
+     options see below, but first the full list.
+
+          access            Mail::Box          'r'
+          create            Mail::Box          0
+          dummy_type        Mail::Box::Threads 'Mail::Box::Thread::Dummy'
+          folder            Mail::Box          $ENV{MAIL}
+          folderdir         Mail::Box          <no default>
+          index_filename    Mail::Box::Index   foldername.'/.index'
+          keep_index        Mail::Box::Index   0
+          labels_filename   Mail::Box::MH      foldername.'/.mh_sequence'
+          lazy_extract      Mail::Box          10000   (10kB)
+          lockfile          Mail::Box::Locker  foldername.'/.lock'
+          lock_method       Mail::Box::Locker  'dotlock'
+          lock_timeout      Mail::Box::Locker  3600    (1 hour)
+          lock_wait         Mail::Box::Locker  10      (seconds)
+          manager           Mail::Box          undef
+          message_type      Mail::Box          'Mail::Box::MH::Message'
+          notreadhead_type  Mail::Box          'Mail::Box::MH::NotReadHead'
+          notread_type      Mail::Box          'Mail::Box::MH::NotParsed'
+          realhead_type     Mail::Box          'MIME::Head'
+          remove_when_empty Mail::Box          1
+          save_on_exit      Mail::Box          1
+          take_headers      Mail::Box          'DELAY'
+          thread_body       Mail::Box::Threads 0
+          thread_timespan   Mail::Box::Threads '3 days'
+          thread_window     Mail::Box::Threads 10
+          <none>            Mail::Box::Tie
+
+     MH specific options:
+
+        * labels_filename => FILENAME
+
+          In MH-folders, messages can be labeled, for instance based on the
+          sender or whether it is read or not.  This status is kept in a
+          file which is usually called `.mh_sequences', but that name can
+          be overruled with this flag.
+
+readMessages
+     Read all messages from the folder.  This method is called at
+     instantiation of the folder, so do not call it yourself unless you
+     have a very good reason.
+
+readMessage MESSAGE-NR [, BOOL]
+     Read one message from its file.  This method is automatically
+     triggered by the AUTOLOAD mechanism, so will usually not be called
+     explicitly.
+
+     Although the name of the method seems to imply that also the message
+     body is read, this might not be true.  If BOOL is true (default
+     false), the body is certainly read.  Otherwise, it depends on the
+     content of the folder's `take_headers' and `lazy_extract' flags.
+
+     =cut
+
+     sub readMessage($;$) {   my ($self, $msgnr, $force_read_all) = @_;
+     my $message = $self->{MB_messages}[$msgnr];     my $mode    =
+     $self->{MB_header_mode};     my $head    = $message->{MB_head};
+     local $_;                       # protect global $_
+
+          unless(open MESSAGE, $message->filename)
+          {   warn "Unable to open ", $message->filename, ": $!\n";
+              return;
+          }
+
+          # Read the header.
+          my @header;
+          while(<MESSAGE>)
+          {   last if /^\r?\n$/;
+              push @header, $_;
+          }
+          $self->unfoldHeaders(\@header);
+
+          if($force_read_all || !$self->lazyExtract(\@header, undef, $message->size))
+          {   # Take the message immediately.
+              push @header, "\r\n", <MESSAGE>;
+              $message->load($self->{MB_message_type}, \@header);
+          }
+          elsif($mode eq 'SOME' || $mode eq 'ALL')
+          {   # Keep a delay-loaded message with some fields.
+              my $header = $self->{MB_notreadhead_type}
+                                ->new(expect => $self->{MB_expect});
+              my $take_headers = $self->{MB_header_scan};
+
+          if($mode eq 'SOME')
+          {   foreach (@header)
+              {   $header->setField($1, $2) if $_ =~ $take_headers;
+              }
+          }
+          else {  $header->setField(split ':', $_, 2) foreach @header }
+
+          $message->{MBM_head} = $header;
+              }
+              else
+              {   # Create a real header structure, but not yet the body.
+          $message->{MBM_head} = MIME::Head->new(\@header)->unfold;
+              }
+
+          close MESSAGE;
+
+          --$self->{MB_last_untouched}
+              if $message->seqnr == $self->{MB_last_untouched};
+
+          $message->head_init;
+
+          $self->messageID($message->messageID, $message);
+          $self->toBeThreaded($message);
+          $message->statusToLabels->XstatusToLabels;
+          $message;
+          }
+
+     #------------------------------------------
+
+addMessage MESSAGE
+     Add a message to the MH-folder.
+
+write [OPTIONS]
+     Write all messages to the folder-file.  Returns the folder when this
+     was successful.  As options you may specify (see `Mail::Box' for
+     explanation)
+
+        * keep_deleted => BOOL
+
+        * save_deleted => BOOL
+
+        * renumber => BOOL
+
+          Permit renumbering of message.  Bij default this is true, but
+          for some unknown reason, you may be thinking that messages
+          should not be renumbered.
+
+readAllHeaders
+     Force all messages to be read at least till their header information
+     is known.  The exact status reached depends on the `take_headers' of
+     new(), as described above.
+
+appendMessages OPTIONS
+     (Class method) Append one or more messages to this folder.  The folder
+     will not be opened.
+
+     If the folder does not exist, undef (or FALSE) is returned.
+
+        * folder => FOLDERNAME
+
+        * message => MESSAGE
+
+        * messages => ARRAY-OF-MESSAGES
+
+     Example:
+
+          my $message = Mail::Internet->new(...);
+          Mail::Box::Mbox->appendMessages
+            ( folder    => '=xyz'
+            , message   => $message
+            , folderdir => $ENV{FOLDERS}
+            );
+
+directory
+     Returns the directory related to this folder.
+
+     Example:
+
+          print $folder->directory;
+
+folderToDirectory FOLDERNAME, FOLDERDIR
+     (class method)  Translate a foldername into a filename, with use of
+     the FOLDERDIR to replace a leading =.
+
+highestMessageNumber
+     Returns the highest number which is used in the folder to store a
+     file.  This method may be called when the folder is read (then this
+     number can be derived without file-system access), but also when the
+     folder is not read (yet).
+
+messageID MESSAGE-ID [,MESSAGE]
+     Returns the message with the specified MESSAGE-ID.  If also a MESSAGE
+     is specified, the relationship between ID and MESSAGE will be stored
+     first.
+
+     Be warned, that if the message is not read at all (`take_headers' set
+     to DELAY), each message of the folder will be parsed, at least to get
+     its header.  The headers are read from back to front in the folder.
+
+allMessageIDs
+     Returns a list of all message-ids in the folder, including those
+     which are to be deleted.
+
+     Be warned that this will cause all message-headers to be read from
+     their files, if that was not done before.  This penalty can be
+     avoided keeping an index-file.  See the `keep_index' option of new().
+
+Manage message labels
+---------------------
+
+   MH-folder use one dedicated file per folder-directory to list special
+tags to messages in the folder.  Typically, this file is called
+`.mh_sequences'.  The messages are numbered from 1.
+
+   Example content of `.mh_sequences':
+
+     cur: 93
+     unseen: 32 35-56 67-80
+
+   To generalize labels on messages, two are treated specially:
+
+   * cur
+
+     The `cur' specifies the number of the message where the user stopped
+     reading mail from this folder at last access.  Internally in these
+     modules refered to as label current.
+
+   * unseen
+
+     With `unseen' is listed which message was never read.  This must be a
+     mistake in the design of MH: it must be a source of confusion.
+     People should never use labels with a negation in the name:
+
+          if($seen)           if(!$unseen)    #yuk!
+          if(!$seen)          if($unseen)
+          unless($seen)       unless($unseen) #yuk!
+
+     So: label `unseen' is translated into seen for internal use.
+
+labelsFilename [FILENAME]
+     Returns the filename of the dedicated file which contains the label
+     related to the messages in this folder-directory.
+
+readLabels
+     In MH-folders, messages can be labeled to easily select sets which
+     are, for instance, posted by who.  The file is usually called
+     `.mh_sequences' but that name can be overruled using the
+     `labels_filename' option of new().
+
+writeLabels HASH
+     Write the file which contains the relation between messages (actually
+     the messages' sequence-numbers) and the labels those messages have.
+     The parameter is a reference to an hash which contains for each label
+     a reference to a list of message-numbers which have to be written.
+
+folder management methods
+-------------------------
+
+   Read the Mail::Box manual for more details and more options on each
+method.
+
+foundIn FOLDERNAME [,OPTIONS]
+     Autodetect if there is a Mail::Box::MH folder specified here.  The
+     FOLDERNAME specifies the name of the folder, as is specified by the
+     application.  The OPTIONS is a list of extra parameters to the
+     request.
+
+     For this class, we use (if defined):
+
+        * folderdir => DIRECTORY
+
+     Example:
+
+          Mail::Box::MH->foundIn
+             ( '=markov'
+             , folderdir => "$ENV{HOME}/.mh"
+             );
+
+create FOLDERNAME [, OPTIONS]
+     (Class method) Create a folder.  If the folder already exists, it will
+     be left untouched.  As options, you may specify:
+
+        * folderdir => DIRECTORY
+
+listFolders [OPTIONS]
+     (Class and Instance method) List the folders in a certain directory.
+     As class method, you will use the folder option to indicate which
+     folder to list.  As instance method, the sub-folders of that folder
+     are returned.
+
+        * folder => FOLDERNAME
+
+        * folderdir => DIRECTORY
+
+        * check => BOOL
+
+        * skip_empty => BOOL
+
+openSubFolder NAME [,OPTIONS]
+     Open (or create, if it does not exist yet) a new subfolder to an
+     existing folder.
+
+     Example:
+
+          my $folder = Mail::Box::MH->new(folder => '=Inbox');
+          my $sub    = $folder->openSubFolder('read');
+          
+          =cut
+
+     sub openSubFolder($@) {   my ($self, $name) = (shift, shift);     my
+     $dir = $self->directory . '/' . $name;
+
+          unless(-d $dir || mkdir $dir, 0755)
+          {   warn "Cannot create subfolder $name for $self: $!\n";
+              return;
+          }
+
+          $self->clone( folder => File::Spec->catfile("$self",$name), @_ );
+          }
+
+IMPLEMENTATION
+==============
+
+   The explanation is complicated, but for normal use you should bother
+yourself with all details.
+
+How MH-folders work
+-------------------
+
+   MH-type folders use a directory to store the messages of one folder.
+Each message is stored in a seperate file.  This seems useful, because
+changes in a folder change only a few of these small files, in contrast
+with file-based folders where changes in a folder cause rewrites of huge
+folder-files.
+
+   However, MH-based folders perform very bad if you need
+header-information of all messages.  For instance, if you want to have
+full knowledge about all message-threads (see Mail::Box::Threads) in the
+folder, it requires to read all header-lines in all message-files.  And
+usually, reading in threads is desired.
+
+   So, each message is written in a seperate file.  The file-names are
+numbers, which count from 1.  Next to these message-files, a directory may
+contain a file named `.mh_sequences', storing labels which relate to the
+messages.  Furthermore, a folder-directory may contain sub-directories,
+which are seen as sub-folders.
+
+This implementation
+-------------------
+
+   This implementation supports the `.mh-sequences' file and sub-folders.
+Next to this, considerable effort it made to avoid reading each
+message-file.  This should boost performance of the Mail::Box module over
+other Perl-modules which are able to read folders.
+
+   Folder-types which store their messages each in one file, together in
+one directory, are bad for performance.  Consider that you want to know
+the subjects of all messages, while browser through a folder with your
+mail-reading client.  This would cause all message-files to be read.
+
+   Mail::Box::MH has two ways to try improve performance.  You can use an
+index-file, and use on delay-loading.  The combination performs even
+better.  Both are explained in the next sections.
+
+An index-file
+-------------
+
+   If you specify `keep_index' as option to the folder creation method
+new(), then all header-lines of all messages from the folder which have
+been read once, will also be written into one dedicated index-file (one
+file per folder).  The default filename is `.index'
+
+   However, index-files are not supported by any other reader which
+supports MH (as far as I know).  If you read the folders with such I
+client, it will not cause unrecoverable conflicts with this index-file,
+but at most be bad for performance.
+
+   If you do not (want to) use an index-file, then delay-loading may save
+your day.
+
+Delayed loading
+---------------
+
+   The delay-loading mechanism of messages tries to be as lazy as possible.
+When the folder is opened, none of the message-files will be read.  If
+there is an index-file, those headers will be taken.  The labels will be
+read from the `.mh-sequences'.  But from the messages, only the filenames
+are scanned.
+
+   Not before any header-line (or any other action on a message) is used,
+the message is read.  This is done using Perl's AUTOLOADing, and is
+transparent to users.  If the first thing you ask for is a header-line,
+then `lazy_extract' and `take_headers' determine what how far this message
+is parsed: into a `Mail::Box::MH::NotParsed' or a `Mail::Box::MH::Message'.
+
+   The index-file is farmost best performing, but also in the second case,
+performance can be ok.  When a mail-client opens a huge folder, only a few
+of the messages will be displayed on the screen as folder-list.  Only from
+the visible messages, header-lines like `Subject' are needed, so the
+AUTOLOAD automatically reads those message-files.  Other messages will
+only be read from file when they appear in the viewport.
+
+AUTHOR
+======
+
+   Mark Overmeer (`Mark@Overmeer.net').  All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+VERSION
+=======
+
+   This code is beta, version 1.100
+
+
+File: pm.info,  Node: Mail/Box/MH/Message,  Next: Mail/Box/Manager,  Prev: Mail/Box/MH,  Up: Module List
+
+a message in a MH-folder
+************************
+
+NAME
+====
+
+   Mail::Box::MH::Message - a message in a MH-folder
+
+SYNOPSIS
+========
+
+     my $folder = new Mail::Box::MH ...
+     my $message = $folder->message(10);
+
+DESCRIPTION
+===========
+
+   This manual-page describes the classes `Mail::Box::MH::Message',
+`Mail::Box::MH::Parsed', and `Mail::Box::MH::NotParsed'.  These objects are
+used to store messages which are not totally read, fully read, or to be
+written to a *Note Mail/Box/MH: Mail/Box/MH, type of folder.
+
+   During its life, a message will pass through certain stages.  These
+stages were introduced to reduce the access-time to the folder.  Changing
+from stage, the message changes from object-class (try to do this in any
+other language than Perl!).
+
+   All information which is required during the full life-span of the
+message is stored in a `Mail::Box::MH::Message', which is extended by the
+`Mail::Box::MH::NotParsed' and the `Mail::Box::MH::Parsed'.  The last
+object (`Mail::Box::MH::NotReadHead') maintains some header-lines of the
+message.
+
+   The bottom of this page provides more details about `details about the
+implementation|' in this node, but first the use.
+
+CLASS Mail::Box::MH::Message
+============================
+
+   This object contains methods which are part of as well delay-loaded
+(not-parsed) as loaded messages, but not general for all folders.
+
+METHODS
+-------
+
+new ARGS
+     Messages in directory-based folders use the following extra options
+     for creation:
+
+        * filename => FILENAME
+
+          The file where the message is stored in.
+
+print TO
+     Write one message to a file-handle.  Unmodified messages are taken
+     from the folder-file where they were stored in.  Modified messages
+     are written as in memory.  Specify a file-handle to write TO
+     (defaults to STDOUT).
+
+printIndex [FILEHANDLE]
+     Print the information of this message which is required to maintain
+     an index-file.  By default, this prints to STDOUT.
+
+readIndex CLASS [,FILEHANDLE]
+     Read the headers of one message from the index into a CLASS
+     structure.  CLASS is (a sub-class of) a MIME::Head.  If no FILEHANDLE
+     is specified, the data is read from STDIN.
+
+filename [FILENAME]
+     Returns the name of the file in which this message is actually
+     stored.  This will return undef when the message is not stored in a
+     file.
+
+CLASS Mail::Box::MH::Parsed
+===========================
+
+   This object extends a Mail::Box::Message with extra tools and facts on
+what is special to messages in file-based folders, with respect to
+messages in other types of folders.
+
+METHODS
+-------
+
+coerce FOLDER, MESSAGE [,OPTIONS]
+     (Class method) Coerce a MESSAGE into a Mail::Box::MH::Parsed, ready
+     to be stored in FOLDER.  When any message is offered to be stored in
+     the mailbox, it first should have all fields which are specific for
+     MH-folders.
+
+     The coerced message is returned on success, else undef.
+
+     Example:
+
+          my $mh = Mail::Box::MH->new(...);
+          my $message = Mail::Box::Mbox::Message->new(...);
+          Mail::Box::MH::Parsed->coerce($mh, $message);
+          # Now $message is ready to be stored in $mh.
+
+     However, you can better use
+
+          $mh->coerce($message);
+
+     which will call coerce on the right message type for sure.
+
+CLASS Mail::Box::MH::NotParsed
+==============================
+
+   Not parsed messages stay in the file until the message is used.  Because
+this folder structure uses many messages in the same file, the
+byte-locations are remembered.
+
+METHODS
+-------
+
+load CLASS [, ARRAY-OF-LINES]
+     This method is called by the autoloader then the data of the message
+     is required.  If you specified REAL for the `take_headers' option for
+     new(), you did have a MIME::Head in your hands, however this will be
+     destroyed when the whole message is loaded.
+
+     If an array of lines is provided, that is parsed as message.
+     Otherwise, the file of the message is opened and parsed.
+
+head
+     Get the head of the message.  This may return immediately, because the
+     head is already read.  However, when we do not have a header yet, we
+     read the message.  At this moment, the `lazy_extract' option of new
+     comes into action: will we read the whole message now, or only the
+     header?
+
+headIsRead
+     Checks if the head of the message is read.  This is true for fully
+     parsed messages and messages where the header was accessed once.
+
+messageID
+     Retreive the message's id.  Every message has a unique message-id.
+     This id is used mainly for recognizing discussion threads.
+
+IMPLEMENTATION
+==============
+
+   The user of a folder gets his hand on a message-object, and is not
+bothered with the actual data which is stored in the object at that
+moment.  As implementor of a mail-package, you might be.
+
+   A message is simple to use, but has a quite complex class structure.  A
+message is not a real message from the start, but only if you access the
+body from it.  Till then, you only have a hollow placeholder.  Below is
+depicted how the internal status of a message-object changes based on
+actions on the object and parameters.
+
+   The inheritance relation is like this:
+
+     read()
+     =====#
+          V              load()
+       ::MH::NotParsed ========> ::MH::Parsed
+           |       \               /    |
+           ^        \             /     ^
+           |          ::MH::Message     |
+           |                            |
+         ::Message                ::Message
+        ::NotParsed                ::Parsed
+                \                  /    |
+                 `--- ::Message --'     ^
+                           |            |
+                           ^        MIME::Entity
+                           |            |
+                       ::Thread         ^
+                                        |
+                                    Mail::Internet
+
+   The `Mail::Box::MH::Parsed' stage, means that the whole message is in
+memory.  It then is a full decendent of a `MIME::Entity'.  But at the same
+time, it consumes a considerable amount of memory, and spent quite some
+processor time.  All the intermediate stati are created to avoid full
+loading, so to be cheap in memory and time.  Random folder access will be
+much faster by this strategy, under normal circumstances.
+
+   For trained eyes only the transition diagram:
+
+     read()     !lazy && !DELAY
+     -------> +----------------------------------> Mail::Box::
+              |                                    MH::Parsed
+              | lazy && !DELAY && !index                ^
+              +--------------.                          |
+              |           \   \    NotParsed    load    |
+              |            \   `-> NotReadHead ------>-'|
+              |        REAL \                           |
+              |              \                          |
+              | index         v    NotParsed    load    |
+              +------------------> MIME::Head ------->-'|
+              |                       ^                 |
+              |                       |                 |
+              |                       |load_head        |
+              |                       |                 |
+              | DELAY && !index    NotParsed    load    |
+              +------------------> <no head> -------->--'
+
+     ,-------------------------+---.
+             |                      ALL |   | regexps && taken
+             v                          |   |
+        NotParsed    head()    get()   /   /
+        NotReadHead --------> ------->+---'
+         \          \         \
+          \ other()  \ other() \regexps && !taken
+           \          \         \
+            \          \         \    load    Mail::Box::
+             `----->----+---------+---------> MH::Parsed
+
+     ,---------------.
+             |                |
+             v                |
+        NotParsed     head()  |
+        MIME::Head -------->--'
+        \                           Mail::Box::
+         `------------------------> MH::Parsed
+
+     load_head   NotParsed
+                                ,----------> MIME::Head
+                               /
+        NotParsed    head()   / lazy
+        <no head>  --------->+
+                              \ !lazy
+                               \
+                                `-----------> Mail::Box::
+      load        MH::Parsed
+
+   Terms: lazy refers to the evaluation of the `lazy_extract()' option. The
+load and `load_head' are triggers to the AUTOLOAD mothods.  All terms like
+`head()' refer to method-calls.  The index is true if there is an
+index-file kept, and the message-header found in there seems still valid
+(see the `keep_index' option of new()).
+
+   Finally, ALL, REAL, DELAY (default), and `regexps' refer to values of
+the `take_headers' option of new().  Notice that `take_headers' on DELAY
+is more important than `lazy_extract'.
+
+   Hm... not that easy...  Happily, the implementation takes fewer lines
+than the documentation.
+
+AUTHOR
+======
+
+   Mark Overmeer (`Mark@Overmeer.net').  All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+VERSION
+=======
+
+   This code is beta, version 1.100
+
+
+File: pm.info,  Node: Mail/Box/Manager,  Next: Mail/Box/Mbox,  Prev: Mail/Box/MH/Message,  Up: Module List
+
+Manage a set of folders
+***********************
+
+NAME
+====
+
+   Mail::Box::Manager - Manage a set of folders
+
+SYNOPSIS
+========
+
+     use Mail::Box::Manager;
+     my $manager = new Mail::Box::Manager;
+     my $folder  = $manager->open(folder => $ENV{MAIL});
+     $manager->registerType(mbox => 'Mail::Box::Mbox');
+     $manager->close($folder);
+
+DESCRIPTION
+===========
+
+   This code is beta, which means that there are no serious applications
+written with it yet.  Please inform the author when you have, so this
+module can go to stable.  Read the STATUS file inclosed in the package for
+more details.
+
+   The Mail::Box package can be used as back-end to Mail User-Agents
+(MUA's), and has special features to help those agents to have fast access
+to folder-data.  These features may delay access to folders for other
+kinds of applications.  Maybe Mail::Procmail has more for you in such
+cases.
+
+The folder manager
+------------------
+
+   The folder manager maintains a set of folders (mail-boxes).  Those
+folders may be of different types.  Most folder-types can be detected
+automatically.  This class is the only one you create in your program: all
+other classes will come when needed.
+
+   Overview:
+
+     Mail::Box::Manager
+           |
+           | open()
+           |              message()
+           v             ,--------->  Mail::Box::Message
+        Mail::Box      /                    isa
+     (Mail::Box::Mbox)                  MIME::Entity
+      (Mail::Box::MH)                   : :
+       : : :                            : :
+       : : :                            : Mail::Box::Message::Dummy
+       : : :                            Mail::Box::Message::NotParsed
+       : : Mail::Box::Tie
+       : Mail::Box::Threads
+       Mail::Box::Locker
+
+   All classes are written to be extendible.  The most complicated work is
+done in MIME::Entity, which is written and maintained by Eryq
+(eryq@zeegee.com).
+
+METHODS
+=======
+
+new ARGS
+     (class method) Create a new folder folder-manager.  This constructor
+     may carry the following options:
+
+        * folder_types => [ NAME => CLASS [,OPTIONS] ]
+
+        * folder_types => [ [ NAME => CLASS [,OPTIONS] ], [...] ]
+
+          Add one or more folder_types to the list of known types.  The
+          order is important: when you open a file without specifying its
+          type, the manager will start trying the last added set of types,
+          with precedence for the first of that list.
+
+          You may specify folder-specific defaults as OPTIONS.  They
+          overrule the settings of the manager.
+
+        * default_folder_type => NAME|CLASS
+
+          When a new folder is created, it is of this type.  If this
+          option is not specified, the most recently registered type is
+          used (see registerType and the `folder_types'-option.
+
+        * folderdir => DIRECTORY
+
+        * folderdirs => [ DIRECTORY, ... ]
+
+          The default directory, respectively directories, where folders
+          are located.  Mail::Box::Manager can autodetect the existing
+          folder-types.  There may be different kinds of folders opened at
+          the same time, and messages can be moved between those types,
+          although that may result in a loss of information.
+
+registerType TYPE => CLASS [,OPTIONS]
+     With registerType you can register one TYPE of folders.  The CLASS is
+     compiled immediately, so you do not need to use them in your own
+     modules.  The TYPE is just an arbitrary name.
+
+     The added types are put in front of the known types, so are checked
+     first when a folder is opened in autodetect mode.
+
+     Example:
+
+          $manager->registerType(mbox => 'Mail::Box::Mbox',
+             save_on_exit => 0, folderdir => '/tmp');
+
+folderTypes
+     The folderTypes returns the list of currently defined types.
+
+     Example:
+
+          print join("\n", $manager->folderTypes), "\n";
+
+open ARGS
+     Open a folder.  The folder-type is autodetected unless the type is
+     specified.  open carries options for the manager, which are described
+     here, but may have additional options for each type of folders.  See
+     the options to the constructor (the new method) for each type of
+     mail-box, but first the new of `Mail::Box' for the general options.
+
+     The options which are most common to open():
+
+        * folder => FOLDERNAME
+
+          Which folder to open.  The default folder is $ENV{MAIL}.
+
+        * folderdir => DIRECTORY
+
+          The directory where the folders are usually stored.
+
+        * type => FOLDERTYPENAME|FOLDERTYPE
+
+          Specify that the folder is of a specific type.  When you do not
+          specify this and you open the folder for ready, it checks all
+          registered folder-types for the ability to open the folder.  If
+          you open a new folder to write, then the default will be the
+          most recently registered type (if you add more than one type at
+          once, the first of the list is taken).
+
+          Examples:
+
+               $manager->open(folder => '=jack', type => 'mbox');
+               $manager->open(type => 'Mail::Box::Mbox');
+
+        * create => BOOL
+
+          Create the folder when it does not exist.  By default, this is
+          not done.  The type-option specifies which type of folder is
+          created.
+
+addOpenFolder FOLDER
+openFolders
+     As could be expected from the name, addOpenFolder adds a new folder to
+     set of open folders.  Ignores undefined value for FOLDER.
+     openFolders returns a list of all open folders.
+
+close FOLDER
+closeAllFolders
+     close removes the specified folder from the list of open folders.
+     Indirectly it will update the files on disk if needed (depends on the
+     `save_on_exit' flag to each seperate folder).
+
+     You may also close the folder directly.  The manager will be informed
+     about this event.
+
+     Examples:
+
+          my $inbox = $mgr->open('inbox');
+          $mgr->close($inbox);
+          $inbox->close;        # alternative
+
+     closeAllFolders calls close for each folder managed by this object.
+
+appendMessage FOLDER|FOLDERNAME, MESSAGES, OPTIONS
+     Append one or more messages to a folder.  As first argument, you may
+     specify a FOLDERNAME or an opened folder.  When the name is that of
+     an opened folder, is it treated as if the folder-structure was
+     specified.
+
+     When a message is added to an opened folder, it is only added to the
+     structure internally in the program.  The data will not be written to
+     disk until a write of that folder takes place.  When the name of an
+     unopened folder is given, data message data is immediately stored on
+     disk.
+
+     A message must be an instance of an MIME::Entity.  The actual type
+     may be in conflict with the requirements for the folder-type where
+     the data is added.  However, this is not a concern of the caller: the
+     folders will try to resolve the differences with minimal loss of
+     information.
+
+     The OPTIONS is a list of key-values, which are added to (overruling)
+     the default options for the detected folder-type.
+
+     Examples:
+
+          $mgr->appendMessage('=send', $message, folderdir => '/');
+          $mgr->appendMessage('=received', $inbox->messages);
+
+delete FOLDERNAME [,OPTIONS]
+     Remove the named folder, including all its sub-folders.  The OPTIONS
+     are those of open().
+
+     To accomplish a full removal, all folders have to be opened first,
+     while Mail::Box messages may have parts of them stored in external
+     files, which must be removed too.
+
+AUTHOR
+======
+
+   Mark Overmeer (`Mark@Overmeer.net').  All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+VERSION
+=======
+
+   This code is beta, version 1.100
+
+
+File: pm.info,  Node: Mail/Box/Mbox,  Next: Mail/Box/Mbox/Message,  Prev: Mail/Box/Manager,  Up: Module List
+
+Handle folders with many messages per file.
+*******************************************
+
+NAME
+====
+
+   Mail::Box::Mbox - Handle folders with many messages per file.
+
+SYNOPSIS
+========
+
+     use Mail::Box::Mbox;
+     my $folder = new Mail::Box::Mbox folder => $ENV{MAIL}, ...;
+
+DESCRIPTION
+===========
+
+   This manual-page describes Mail::Box::Mbox and Mail::Box::Mbox::*
+packages.  Read Mail::Box::Manager and Mail::Box first.
+
+How Mbox-folders work
+---------------------
+
+   Mbox folders store many messages in one file (let's call this a
+`file-based' folder, in contrary to a `directory-based' foldertype like
+MH).
+
+   In file-based folders, each message is preceeded by a line which starts
+with the word `From '.  Lines inside a message which do accedentally start
+with From are, in the file, preceeded by `>'.  This character is stripped
+when the message is read.
+
+   The name of a folder may be an absolute or relative path.  You can also
+preceed the foldername by =, which means that it is relative to the
+folderdir as specified at new.
+
+Simulation of sub-folders
+-------------------------
+
+   File-based folders do not really have a sub-folder idea, as
+directory-based folders have, but this module tries to simulate them.  In
+this implementation a directory like
+
+     Mail/subject1/
+
+   is taken as an empty folder `Mail/subject1', with the folders in that
+directory as sub-folders for it.  You may also use
+
+     Mail/subject1
+     Mail/subject1.d/
+
+   where `Mail/subject1' is the folder, and the folders in the
+`Mail/subject1.d' directory are used as sub-folders.  If your situation is
+as in the first example and you want to put messages in that empty folder,
+the directory is automatically renamed, such that the second situation is
+reached.
+
+   Because of these simulated sub-folders, the folder-manager does not
+need to distiguish between file- and directory-based folders in this
+respect.
+
+METHODS
+=======
+
+new ARGS
+     Create a new folder.  Many options are taken from object-classes which
+     Mail::Box::Mbox is an extention of.  Read below for a detailed
+     description of Mbox specific options.
+
+          access            Mail::Box          'r'
+          create            Mail::Box          0
+          dummy_type        Mail::Box::Threads 'Mail::Box::Thread::Dummy'
+          folder            Mail::Box          $ENV{MAIL}
+          folderdir         Mail::Box          $ENV{HOME}.'/Mail'
+          lazy_extract      Mail::Box          10kb
+          lockfile          Mail::Box::Locker  foldername.lock-extention
+          lock_extention    Mail::Box::Mbox    '.lock'
+          lock_method       Mail::Box::Locker  'dotlock'
+          lock_timeout      Mail::Box::Locker  1 hour
+          lock_wait         Mail::Box::Locker  10 seconds
+          manager           Mail::Box          undef
+          message_type      Mail::Box          'Mail::Box::Mbox::Message'
+          notreadhead_type  Mail::Box          'Mail::Box::Message::NotReadHead'
+          notread_type      Mail::Box          'Mail::Box::Mbox::NotParsed'
+          realhead_type     Mail::Box          'MIME::Head'
+          remove_when_empty Mail::Box          1
+          save_on_exit      Mail::Box          1
+          subfolder_extention Mail::Box::Mbox  '.d'
+          take_headers      Mail::Box          <quite some>
+          thread_body       Mail::Box::Threads 0
+          thread_timespan   Mail::Box::Threads <not used>
+          thread_window     Mail::Box::Threads <not used>
+          <none>            Mail::Box::Tie
+
+     Mbox specific options:
+
+        * lock_extention => FILENAME|STRING
+
+          When the dotlock locking mechanism is used, the lock is created
+          by the creation of a file.  For Mail::Box::Mbox type of folders,
+          this file is by default named as the folder-file itself,
+          followed by `.lock'.
+
+          You may specify an absolute filename, a relative (to the folder's
+          directory) name, or an extention (preceeded by a dot).  So valid
+          examples are:
+
+               .lock                  # append to filename
+               my_own_lockfile.test   # full filename, same dir
+               /etc/passwd            # somewhere else
+
+        * subfolder_extention => STRING
+
+          Mail folders which store their messages in files do usually not
+          support sub-folders, as known by mail folders which store
+          messages in a directory.
+
+          However, we simulate sub-directories if the user wants us to.
+          When a subfolder of folder `xyz' is created, we create a
+          directory which is called `xyz.d' to contain them.  This
+          extention `.d' can be changed using this option.
+
+fileOpen
+fileIsOpen
+fileClose
+     Open/close the file which keeps the folder.  If the folder is already
+     open, it will not be opened again.  This method will maintain
+     exclusive locking.  Of course, fileIsOpen only checks if the file is
+     opened or not.
+
+     Example:
+
+          my $file = $folder->fileOpen or die;
+          $folder->fileClose;
+
+readMessages
+     Read all messages from the folder.  This method is called at
+     instantiation of the folder, so do not call it yourself unless you
+     have a very good reason.
+
+write
+     Write all messages to the folder-file.  Returns the folder when this
+     was successful.  If you want to write to a different file, you first
+     create a new folder, then move the messages, and then write that
+     file. As options you may specify (see `Mail::Box' for explanation)
+
+        * keep_deleted => BOOL
+
+        * save_deleted => BOOL
+
+        * remove_when_empty => BOOL
+
+addMessage MESSAGE
+     Add a message to the Mbox-folder.  If you specify a message with an
+     id which is already in the folder, the message will be ignored.
+
+appendMessages OPTIONS
+     (Class method) Append one or more messages to a folder.  The folder
+     will not be read, but messages are just appended to the folder-file.
+     This also means that double messages can exist in a folder.
+
+     If the folder does not exist, undef (or FALSE) is returned.
+
+        * folder => FOLDERNAME
+
+        * message => MESSAGE
+
+        * messages => ARRAY-OF-MESSAGES
+
+     Example:
+
+          my $message = Mail::Internet->new(...);
+          Mail::Box::Mbox->appendMessages
+            ( folder    => '=xyz'
+            , message   => $message
+            , folderdir => $ENV{FOLDERS}
+            );
+
+filename
+     Returns the filename related to this folder.
+
+     Example:
+
+          print $folder->filename;
+
+folderToFilename FOLDERNAME, FOLDERDIR, EXTENTION
+     (class method)  Translate a foldername into a filename, with use of
+     the FOLDERDIR to replace a leading =.
+
+folder management methods
+-------------------------
+
+   Read the Mail::Box manual for more details and more options on each
+method.
+
+foundIn FOLDERNAME [,OPTIONS]
+     Autodetect if there is a Mail::Box::Mbox folder specified here.  The
+     FOLDERNAME specifies the name of the folder, as is specified by the
+     application.  ARGS is a reference to a hash with extra information on
+     the request.  For this class, we use (if defined):
+
+        * folderdir => DIRECTORY
+
+        * subfolder_extention => STRING
+
+     Example:
+
+          Mail::Box::Mbox->foundIn
+             ( '=markov'
+             , folderdir => "$ENV{HOME}/Mail"
+             );
+
+create FOLDERNAME [, OPTIONS]
+     (Class method) Create a folder.  If the folder already exists, it will
+     be left untouched.  As options, you may specify:
+
+        * folderdir => DIRECTORY
+
+listFolders [OPTIONS]
+     (Class OR Instance method) List the folders in a certain directory.
+     This method can be called on the class, in which case you specify the
+     base folder where the sub-folders must be retreived from as name.
+     When used on an instance, the sub-folders of the instance are
+     returned.
+
+     Folders will not start with a dot.  When a directory without the
+     sub-folder extention is found, then an empty folder is presumed.
+
+        * folder => FOLDERNAME
+
+        * folderdir => DIRECTORY
+
+        * check => BOOL
+
+        * skip_empty => BOOL
+
+        * subfolder_extention => STRING
+
+openSubFolder NAME [,OPTIONS]
+     Open (or create, if it does not exist yet) a new subfolder to an
+     existing folder.
+
+     Example:
+
+          my $folder = Mail::Box::Mbox->new(folder => '=Inbox');
+          my $sub    = $folder->openSubFolder('read');
+          
+          =cut
+
+     sub openSubFolder($@) {   my ($self, $name) = (shift, shift);
+     $self->clone(folder => $self->name . '/' .$name, @_); }
+
+AUTHOR
+======
+
+   Mark Overmeer (`Mark@Overmeer.net').  All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+VERSION
+=======
+
+   This code is beta, version 1.100
+
+
+File: pm.info,  Node: Mail/Box/Mbox/Message,  Next: Mail/Box/Message,  Prev: Mail/Box/Mbox,  Up: Module List
+
+a message in a Mbox folder
+**************************
+
+NAME
+====
+
+   Mail::Box::Mbox::Message - a message in a Mbox folder
+
+SYNOPSIS
+========
+
+     my $folder  = new Mail::Box::Mbox folder => $ENV{MAIL}, ...;
+     my $message = $folder->message(0);
+
+DESCRIPTION
+===========
+
+   This manual-page describes the classes `Mail::Box::Mbox::Message',
+`Mail::Box::Mbox::Parsed', and `Mail::Box::Mbox::NotParsed'.  These
+objects are used to store messages which are not totally read, fully read,
+or to be written to a *Note Mail/Box/Mbox: Mail/Box/Mbox, type of folder.
+
+   During its life, a message will pass through certain stages.  These
+stages were introduced to reduce the access-time to the folder.  Changing
+from stage, the message changes from object-class (try to do this in any
+other language than Perl!).
+
+   All information which is required during the full life-span of the
+message is stored in a `Mail::Box::Mbox::Message', which is extended by the
+`Mail::Box::Mbox::NotParsed' and the `Mail::Box::Mbox::Message::Parsed'.
+The last object (`Mail::Box::Mbox::NotReadHead') maintains some
+header-lines of the message.
+
+   The bottom of this page provides more `details about the
+implementation|' in this node, but first the use.
+
+CLASS Mail::Box::Mbox::Message
+==============================
+
+   This object contains methods which are part of as well delay-loaded
+(not-parsed) as loaded messages, but not general for all folders.
+
+METHODS
+-------
+
+new ARGS
+     Messages in file-based folders use the following extra options for
+     creation:
+
+        * from LINE
+
+          The line which precedes each message in the file.  Some people
+          detest this line, but this is just how things were invented...
+
+fromLine [LINE]
+     Many people detest file-style folders because they store messages all
+     in one file, where a line starting with `From ' leads the header.  If
+     we receive a message from a file-based folder, we store that line.
+     If we write to such a file, but there is no such line stored, then we
+     try to produce one.
+
+     When you pass a LINE, that this is stored.
+
+print FILEHANDLE
+     Write one message to a file-handle.  Unmodified messages are taken
+     from the folder-file where they were stored in.  Modified messages
+     are written as in memory.  Specify a FILEHANDLE to write to (defaults
+     to STDOUT).
+
+migrate FILEHANDLE
+     Move the message from the current folder, to a new folder-file.  The
+     old location should be not used after this.
+
+CLASS Mail::Box::Mbox::Parsed
+=============================
+
+   This object extends a `Mail::Box::Message::Parsed' with extra tools and
+facts on what is special to messages in file-based folders, with respect
+to messages in other types of folders.
+
+METHODS
+-------
+
+coerce FOLDER, MESSAGE [,OPTIONS]
+     (Class method) Coerce a MESSAGE into a `Mail::Box::Mbox::Parsed'.
+     When any message is offered to be stored in a mbox FOLDER, it first
+     should have all fields which are specific for Mbox-folders.
+
+     The coerced message is returned on success, else undef.
+
+     Example:
+
+          my $inbox = Mail::Box::Mbox->new(...);
+          my $mh    = Mail::Box::MH::Message->new(...);
+          Mail::Box::Mbox::Parsed->coerce($inbox, $mh);
+          # Now, the $mh is ready to be included in $inbox.
+
+     However, you can better use
+
+          $inbox->coerce($mh);
+
+     which will call the right coerce() for sure.
+
+CLASS Mail::Box::Mbox::NotParsed
+================================
+
+   Not parsed messages stay in the file until the message is used.  Because
+this folder structure uses many messages in the same file, the
+byte-locations are remembered.
+
+METHODS
+-------
+
+load
+     This method is called by the autoloader then the data of the message
+     is required.  If you specified REAL for the `take_headers' option for
+     new(), you did have a MIME::Head in your hands, however this will be
+     destroyed when the whole message is loaded.
+
+IMPLEMENTATION
+==============
+
+   The user of a folder gets his hand on a message-object, and is not
+bothered with the actual data which is stored in the object at that
+moment.  As implementor of a mail-package, you might be.
+
+   A message is simple to use, but has a quite complex class structure.  A
+message is not a real message from the start, but only when you access the
+body of it.  Before that, a hollow placeholder is used.  Below is depicted
+how the internal structure of a message-object changes based on actions on
+the object and parameters.
+
+   The inheritance relation is like this:
+
+     read()
+     =====#
+          V              load()
+     ::Mbox::NotParsed ========> ::Mbox::Parsed
+           |       \               /    |
+           ^        \             /     ^
+           |        ::Mbox::Message     |
+           |                            |
+        ::Message::NotParsed        ::Message::Parsed
+                 \                  /   |
+                  ::Message::Message    ^
+                           |            |
+                           ^       MIME::Entity
+                           |            |
+                       ::Thread         ^
+                                        |
+                                    Mail::Internet
+
+   The `Mail::Box::Mbox::Parsed' stage, means that the whole message is in
+memory.  It then is a full decendent of a `MIME::Entity'.  But at the same
+time, it consumes a considerable amount of memory, and the program has
+spent quite some processor time on.  All the intermediate stati are
+created to avoid full loading, so to be cheap in memory and time.  Folder
+access will be much faster under normal circumstances.
+
+   For trained eyes only the status-transition diagram:
+
+     read()     !lazy
+     -------> +----------------------------------> Mail::Box::
+              |                                  Mbox::Parsed
+              |                                         ^
+              |                                         |
+              |                    NotParsed    load    |
+              |        ALL ,-----> NotReadHead ------>-'|
+              | lazy      /                             |
+              `--------->+                              |
+                          \        NotParsed    load    |
+                      REAL `-----> MIME::Head ------->-'
+
+     ,-------------------------+---.
+             |                      ALL |   | regexps && taken
+             v                          |   |
+        NotParsed    head()    get()   /   /
+        NotReadHead --------> ------->+---'
+         \          \         \
+          \ other()  \ other() \regexps && !taken
+           \          \         \
+            \          \         \    load    Mail::Box::
+             `----->----+---------+---------> MBox::Parsed
+
+     ,---------------.
+             |                |
+             v                |
+        NotParsed     head()  |
+        MIME::Head -------->--'
+        \                           Mail::Box::
+         `------------------------> MBox::Parsed
+
+   Terms: lazy refers to the evaluation of the `lazy_extract()' option. The
+load and `load_head' are triggers to the AUTOLOAD mothods.  All terms like
+`head()' refer to method-calls.  Finally, ALL, REAL, and `regexps'
+(default) refer to values of the `take_headers' option of new().
+
+   Hm... not that easy...  but relatively simple compared to MH-folder
+messages.
+
+AUTHOR
+======
+
+   Mark Overmeer (`Mark@Overmeer.net').  All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+VERSION
+=======
+
+   This code is beta, version 1.100
+
+

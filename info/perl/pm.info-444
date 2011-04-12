@@ -1,0 +1,2005 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: YAPE/Regex,  Next: YAPE/Regex/Element,  Prev: YAPE/HTML/Element,  Up: Module List
+
+Yet Another Parser/Extractor for Regular Expressions
+****************************************************
+
+NAME
+====
+
+   YAPE::Regex - Yet Another Parser/Extractor for Regular Expressions
+
+SYNOPSIS
+========
+
+     use YAPE::Regex;
+     use strict;
+     
+     my $regex = qr/reg(ular\s+)?exp?(ression)?/i;
+     my $parser = YAPE::Regex->new($regex);
+     
+     # here is the tokenizing part
+     while (my $chunk = $parser->next) {
+       # ...
+     }
+
+`YAPE' MODULES
+==============
+
+   The `YAPE' hierarchy of modules is an attempt at a unified means of
+parsing and extracting content.  It attempts to maintain a generic
+interface, to promote simplicity and reusability.  The API is powerful,
+yet simple.  The modules do tokenization (which can be intercepted) and
+build trees, so that extraction of specific nodes is doable.
+
+DESCRIPTION
+===========
+
+   This module is yet another (?) parser and tree-builder for Perl regular
+expressions.  It builds a tree out of a regex, but at the moment, the
+extent of the extraction tool for the tree is quite limited (see
+`Extracting Sections' in this node).  However, the tree can be useful to
+extension modules.
+
+USAGE
+=====
+
+   In addition to the base class, `YAPE::Regex', there is the auxiliary
+class `YAPE::Regex::Element' (common to all `YAPE' base classes) that
+holds the individual nodes' classes.  There is documentation for the node
+classes in that module's documentation.
+
+Methods for `YAPE::Regex'
+-------------------------
+
+   * `use YAPE::Regex;'
+
+   * `use YAPE::Regex qw( MyExt::Mod );'
+
+     If supplied no arguments, the module is loaded normally, and the node
+     classes are given the proper inheritence (from
+     `YAPE::Regex::Element').  If you supply a module (or list of
+     modules), import will automatically include them (if needed) and set
+     up *their* node classes with the proper inheritence - that is, it
+     will append `YAPE::Regex' to `@MyExt::Mod::ISA', and
+     `YAPE::Regex::xxx' to each node class's `@ISA' (where `xxx' is the
+     name of the specific node class).
+
+          package MyExt::Mod;
+          use YAPE::Regex 'MyExt::Mod';
+          
+          # @MyExt::Mod::ISA = 'YAPE::Regex'
+          # @MyExt::Mod::text::ISA = 'YAPE::Regex::text'
+          # ...
+
+   * `my $p = YAPE::Regex->new($REx);'
+
+     Creates a `YAPE::Regex' object, using the contents of `$REx' as a
+     regular expression.  The new method will *attempt* to convert `$REx'
+     to a compiled regex (using `qr//') if `$REx' isn't already one.  If
+     there is an error in the regex, this will fail, but the parser will
+     pretend it was ok.  It will then report the bad token when it gets to
+     it, in the course of parsing.
+
+   * `my $text = $p->chunk($len);'
+
+     Returns the next `$len' characters in the input string; `$len'
+     defaults to 30 characters.  This is useful for figuring out why a
+     parsing error occurs.
+
+   * `my $done = $p->done;'
+
+     Returns true if the parser is done with the input string, and false
+     otherwise.
+
+   * `my $errstr = $p->error;'
+
+     Returns the parser error message.
+
+   * `my $backref = $p->extract;'
+
+     Returns a code reference that returns the next back-reference in the
+     regex.  For more information on enhancements in upcoming versions of
+     this module, check `Extracting Sections' in this node.
+
+   * `my $node = $p->display(...);'
+
+     Returns a string representation of the entire content.  It calls the
+     parse method in case there is more data that has not yet been parsed.
+     This calls the `fullstring' method on the root nodes.  Check the
+     `YAPE::Regex::Element' docs on the arguments to `fullstring'.
+
+   * `my $node = $p->next;'
+
+     Returns the next token, or undef if there is no valid token.  There
+     will be an error message (accessible with the error method) if there
+     was a problem in the parsing.
+
+   * `my $node = $p->parse;'
+
+     Calls next until all the data has been parsed.
+
+   * `my $node = $p->root;'
+
+     Returns the root node of the tree structure.
+
+   * `my $state = $p->state;'
+
+     Returns the current state of the parser.  It is one of the following
+     values: alt, anchor, any, backref, `capture(N)', class, close, code,
+     comment, `cond(TYPE)', `ctrl', cut, done, error, flags, group, hex,
+     `later', `lookahead(neg|pos)', `lookbehind(neg|pos)', macro, oct,
+     `slash', and text.
+
+     For `capture(N)', N will be the number the captured pattern
+     represents.
+
+     For `cond(TYPE)', TYPE will either be a number representing the
+     back-reference that the conditional depends on, or the string assert.
+
+     For lookahead and `lookbehind', one of neg and pos will be there,
+     depending on the type of assertion.
+
+   * `my $node = $p->top;'
+
+     Synonymous to root.
+
+Extracting Sections
+-------------------
+
+   While extraction of nodes is the goal of the `YAPE' modules, the author
+is at a loss for words as to what needs to be extracted from a regex.  At
+the current time, all the extract method does is allow you access to the
+regex's set of back-references:
+
+     my $extor = $parser->extract;
+     while (my $backref = $extor->()) {
+       # ...
+     }
+
+   `japhy' is very open to suggestions as to the approach to node
+extraction (in how the API should look, in addition to what should be
+proffered).  Preliminary ideas include extraction keywords like the output
+of *-Dr* (or the re module's debug option).
+
+   The `YAPE::Regex::Wasted' extension module, which suggests that regexes
+like `/(.*?):/' be changed to `/([^:]*):/' (and their ilk), could make use
+of an extraction technique that lets the user detect a node of `.*?'
+followed by a constant string or character class.
+
+EXTENSIONS
+==========
+
+   * `YAPE::Regex::Explain' 2.00
+
+     Presents an explanation of a regular expression, node by node.
+
+   * `YAPE::Regex::Reverse' (Not released)
+
+     Reverses the nodes of a regular expression.
+
+   * `YAPE::Regex::Wasted' (Not released)
+
+     Points out wasted `/s' and `/m' modifiers, and tries to suggest
+     replacements for `.*?' nodes.
+
+TO DO
+=====
+
+   This is a listing of things to add to future versions of this module.
+
+API
+---
+
+   * Create a robust extract method
+
+     Open to suggestions.
+
+Internals
+---------
+
+   * Add Perl 5.6 character class support
+
+     The new character class syntaces, `[:posix:]' and `\p{UniCode}',
+     aren't yet supported.  These might be class objects, or have their
+     own classes (`posix_class' and `unicode_class').
+
+BUGS
+====
+
+   Following is a list of known or reported bugs.
+
+Pending
+-------
+
+   * NONE!
+
+SUPPORT
+=======
+
+   Visit `YAPE''s web site at `http://www.pobox.com/~japhy/YAPE/'.
+
+SEE ALSO
+========
+
+   The `YAPE::Regex::Element' documentation, for information on the node
+classes.  Also, `Text::Balanced', Damian Conway's excellent module, used
+for
+
+AUTHOR
+======
+
+     Jeff "japhy" Pinyan
+     CPAN ID: PINYAN
+     japhy@pobox.com
+     http://www.pobox.com/~japhy/
+
+
+File: pm.info,  Node: YAPE/Regex/Element,  Next: YAPE/Regex/Explain,  Prev: YAPE/Regex,  Up: Module List
+
+sub-classes for YAPE::Regex elements
+************************************
+
+NAME
+====
+
+   YAPE::Regex::Element - sub-classes for YAPE::Regex elements
+
+SYNOPSIS
+========
+
+     use YAPE::Regex 'MyExt::Mod';
+     # this sets up inheritence in MyExt::Mod
+     # see YAPE::Regex documentation
+
+`YAPE' MODULES
+==============
+
+   The `YAPE' hierarchy of modules is an attempt at a unified means of
+parsing and extracting content.  It attempts to maintain a generic
+interface, to promote simplicity and reusability.  The API is powerful,
+yet simple.  The modules do tokenization (which can be intercepted) and
+build trees, so that extraction of specific nodes is doable.
+
+DESCRIPTION
+===========
+
+   This module provides the classes for the `YAPE::Regex' objects.  The
+base class for these objects is `YAPE::Regex::Element'.  The objects
+classes are numerous.
+
+Methods for `YAPE::Regex::Element'
+----------------------------------
+
+   This class contains fallback methods for the other classes.
+
+   * `my $str = $obj->text;'
+
+     Returns a string representation of the content of the regex node
+     *itself*, not any nodes contained in it.  This is undef for non-text
+     nodes.
+
+   * `my $str = $obj->string;'
+
+     Returns a string representation of the regex node *itself*, not any
+     nodes contained in it.
+
+   * `my $str = $obj->fullstring;'
+
+     Returns a string representation of the regex node, including any
+     nodes contained in it.
+
+   * `my $quant = $obj->quant;'
+
+     Returns a string with the quantity, and a ? if the node is
+     non-greedy.  The quantity is one of *, +, ?, `{*M*,*N*}', or an empty
+     string.
+
+   * `my $ng = $obj->ngreed;'
+
+     Returns a ? if the node is non-greedy, and an empty string otherwise.
+
+Methods for `YAPE::Regex::anchor'
+---------------------------------
+
+   This class represents anchors.  Objects have the following methods:
+
+   * `my $anchor = YAPE::Regex::anchor->new($type,$q,$ng);'
+
+     Creates a `YAPE::Regex::anchor' object.  Takes three arguments:  the
+     anchor (^, `\A', `$', `\Z', `\z', `\B', `\b', or `\G'), the quantity,
+     and the non-greedy flag.  The quantity should be an empty string.
+
+          my $anc = YAPE::Regex::anchor->new('\A', '', '?');
+          # /\A?/
+
+   * `my $type = $anchor->type;'
+
+     Returns the string anchor.
+
+Methods for `YAPE::Regex::macro'
+--------------------------------
+
+   This class represents character-class macros.  Objects have the
+following methods:
+
+   * `my $macro = YAPE::Regex::macro->new($type,$q,$ng);'
+
+     Creates a `YAPE::Regex::macro' object.  Takes three arguments:  the
+     macro (w, W, d, D, s, or S), the quantity, and the non-greedy flag.
+
+          my $macro = YAPE::Regex::macro->new('s', '{3,5}');
+          # /\s{3,5}/
+
+   * `my $text = $macro->text;'
+
+     Returns the macro.
+
+          print $macro->text;  # '\s'
+
+   * `my $type = $macro->type;'
+
+     Returns the string macro.
+
+Methods for `YAPE::Regex::oct'
+------------------------------
+
+   This class represents octal escapes.  Objects have the following
+methods:
+
+   * `my $oct = YAPE::Regex::oct->new($type,$q,$ng);'
+
+     Creates a `YAPE::Regex::oct' object.  Takes three arguments:  the
+     octal number (as a string), the quantity, and the non-greedy flag.
+
+          my $oct = YAPE::Regex::oct->new('040');
+          # /\040/
+
+   * `my $text = $oct->text;'
+
+     Returns the octal escape.
+
+          print $oct->text;  # '\040'
+
+   * `my $type = $oct->type;'
+
+     Returns the string oct.
+
+Methods for `YAPE::Regex::hex'
+------------------------------
+
+   This class represents hexadecimal escapes.  Objects have the following
+methods:
+
+   * `my $hex = YAPE::Regex::hex->new($type,$q,$ng);'
+
+     Creates a `YAPE::Regex::hex' object.  Takes three arguments:  the
+     hexadecimal number (as a string), the quantity, and the non-greedy
+     flag.
+
+          my $hex = YAPE::Regex::hex->new('20','{2,}');
+          # /\x20{2,}/
+
+   * `my $text = $hex->text;'
+
+     Returns the hexadecimal escape.
+
+          print $hex->text;  # '\x20'
+
+   * `my $type = $hex->type;'
+
+     Returns the string hex.
+
+Methods for `YAPE::Regex::backref'
+----------------------------------
+
+   This class represents back-references.  Objects have the following
+methods:
+
+   * `my $bref = YAPE::Regex::bref->new($type,$q,$ng);'
+
+     Creates a `YAPE::Regex::bref' object.  Takes three arguments:  the
+     number of the back-reference, the quantity, and the non-greedy flag.
+
+          my $bref = YAPE::Regex::bref->new(2,'','?');
+          # /\2?/
+
+   * `my $text = $bref->text;'
+
+     Returns the backescape.
+
+          print $bref->text;  # '\2'
+
+   * `my $type = $bref->type;'
+
+     Returns the string backref.
+
+Methods for `YAPE::Regex::ctrl'
+-------------------------------
+
+   This class represents control character escapes.  Objects have the
+following methods:
+
+   * `my $ctrl = YAPE::Regex::ctrl->new($type,$q,$ng);'
+
+     Creates a `YAPE::Regex::ctrl' object.  Takes three arguments:  the
+     control character, the quantity, and the non-greedy flag.
+
+          my $ctrl = YAPE::Regex::ctrl->new('M');
+          # /\cM/
+
+   * `my $text = $ctrl->text;'
+
+     Returns the control character escape.
+
+          print $hex->text;  # '\cM'
+
+   * `my $type = $ctrl->type;'
+
+     Returns the string `ctrl'.
+
+Methods for `YAPE::Regex::slash'
+--------------------------------
+
+   This class represents any other escaped characters.  Objects have the
+following methods:
+
+   * `my $slash = YAPE::Regex::slash->new($type,$q,$ng);'
+
+     Creates a `YAPE::Regex::slash' object.  Takes three arguments:  the
+     backslashed character, the quantity, and the non-greedy flag.
+
+          my $slash = YAPE::Regex::slash->new('t','','?');
+          # /\t?/
+
+   * `my $text = $slash->text;'
+
+     Returns the escaped character.
+
+          print $slash->text;  # '\t'
+
+   * `my $type = $slash->type;'
+
+     Returns the string `slash'.
+
+Methods for `YAPE::Regex::any'
+------------------------------
+
+   This class represents the dot metacharacter.  Objects have the
+following methods:
+
+   * `my $any = YAPE::Regex::any->new($q,$ng);'
+
+     Creates a `YAPE::Regex::any' object.  Takes two arguments:  the
+     quantity, and the non-greedy flag.
+
+          my $any = YAPE::Regex::any->new('{1,3}');
+          # /.{1,3}/
+
+   * `my $type = $any->type;'
+
+     Returns the string any.
+
+Methods for `YAPE::Regex::class'
+--------------------------------
+
+   This class represents character classes.  Objects have the following
+methods:
+
+   * `my $class = YAPE::Regex::class->new($chars,$neg,$q,$ng);'
+
+     Creates a `YAPE::Regex::class' object.  Takes four arguments:  the
+     characters in the class, a ^ if the class is negated (an empty string
+     otherwise), the quantity, and the non-greedy flag.
+
+          my $class = YAPE::Regex::class->new('aeiouy','^');
+          # /[^aeiouy]/
+
+   * `my $text = $class->text;'
+
+     Returns the character class.
+
+          print $class->text;  # [^aeiouy]
+
+   * `my $type = $class->type;'
+
+     Returns the string class.
+
+Methods for `YAPE::Regex::hex'
+------------------------------
+
+   This class represents hexadecimal escapes.  Objects have the following
+methods:
+
+   * `my $text = YAPE::Regex::text->new($text,$q,$ng);'
+
+     Creates a `YAPE::Regex::text' object.  Takes three arguments:  the
+     text, the quantity, and the non-greedy flag.  The quantity and
+     non-greedy modifier should only be present for *single-character*
+     text, because of the way the parser renders the quantity and
+     non-greedy modifier.
+
+          my $text = YAPE::Regex::text->new('alphabet','');
+          # /alphabet/
+          
+          my $text = YAPE::Regex::text->new('x','?','?');
+          # /x??/
+
+   * `my $type = $text->type;'
+
+     Returns the string text.
+
+Methods for `YAPE::Regex::alt'
+------------------------------
+
+   This class represents alternation.  Objects have the following methods:
+
+   * `my $alt = YAPE::Regex::alt->new;'
+
+     Creates a `YAPE::Regex::alt' object.
+
+          my $alt = YAPE::Regex::alt->new;
+          # /|/
+
+   * `my $type = $oct->type;'
+
+     Returns the string alt.
+
+Methods for `YAPE::Regex::comment'
+----------------------------------
+
+   This class represents in-line comments.  Objects have the following
+methods:
+
+   * `my $comment = YAPE::Regex::comment->new($comment,$x);'
+
+     Creates a `YAPE::Regex::comment' object.  Takes two arguments:  the
+     text of the comment, and whether or not the `/x' regex modifier is in
+     effect for this comment.  Note that Perl's regex engine will stop a
+     `(?#...)' comment at the first ), regardless of what you do.
+
+          my $comment = YAPE::Regex::comment->new(
+            "match an optional string of digits"
+          );
+          # /(?#match an optional string of digits)/
+
+          my $comment = YAPE::Regex::comment->new(
+            "match an optional string of digits",
+            1
+          );
+          # /# match an optional string of digits/
+
+   * `my $type = $comment->type;'
+
+     Returns the string comment.
+
+   * `my $x_on = $comment->xcomm;'
+
+     Returns true or false, depending on whether the comment is under the
+     `/x' regex modifier.
+
+Methods for `YAPE::Regex::whitespace'
+-------------------------------------
+
+   This class represents whitespace under the `/x' regex modifier.
+Objects have the following methods:
+
+   * `my $ws = YAPE::Regex::whitespace->new($text);'
+
+     Creates a `YAPE::Regex::whitespace' object.  Takes one argument:  the
+     text of the whitespace.
+
+          my $ws = YAPE::Regex::whitespace->new('  ');
+          # /  /x
+
+   * `my $text = $ws->text;'
+
+     Returns the whitespace.
+
+          print $ws->text;  # '  '
+
+   * `my $type = $ws->type;'
+
+     Returns the string `whitespace'.
+
+Methods for `YAPE::Regex::flags'
+--------------------------------
+
+   This class represents `(?ismx)' flags.  Objects have the following
+methods:
+
+   * `my $flags = YAPE::Regex::flags->new($add,$sub);'
+
+     Creates a `YAPE::Regex::flags' object.  Takes two arguments:  a
+     string of the modes to have on, and a string of the modes to
+     explicitly turn off.  The flags are displayed in alphabetical order.
+
+          my $flags = YAPE::Regex::flags->new('is','m');
+          # /(?is-m)/
+
+   * `my $type = $flags->type;'
+
+     Returns the string flags.
+
+Methods for `YAPE::Regex::cut'
+------------------------------
+
+   This class represents the cut assertion.  Objects have the following
+methods:
+
+   * `my $look = YAPE::Regex::cut->new(\@nodes);'
+
+     Creates a `YAPE::Regex::cut' object.  Takes one arguments:  a
+     reference to an array of objects to be contained in the cut.
+
+          my $REx = YAPE::Regex::class->new('aeiouy','','+');
+          my $look = YAPE::Regex::cut->new(0,[$REx]);
+          # /(?>[aeiouy]+)/
+
+   * `my $type = $cut->type;'
+
+     Returns the string cut.
+
+Methods for `YAPE::Regex::lookahead'
+------------------------------------
+
+   This class represents lookaheads.  Objects have the following methods:
+
+   * `my $look = YAPE::Regex::lookahead->new($pos,\@nodes);'
+
+     Creates a `YAPE::Regex::lookahead' object.  Takes two arguments:  a
+     boolean value indicating whether or not the lookahead is positive,
+     and a reference to an array of objects to be contained in the
+     lookahead.
+
+          my $REx = YAPE::Regex::class->new('aeiouy');
+          my $look = YAPE::Regex::lookahead->new(0,[$REx]);
+          # /(?![aeiouy])/
+
+   * `my $pos = $look->pos;'
+
+     Returns true if the lookahead is positive.
+
+          print $look->pos ? 'pos' : 'neg';  # 'neg'
+
+   * `my $type = $look->type;'
+
+     Returns the string `lookahead(pos)' or `lookahead(neg)'.
+
+Methods for `YAPE::Regex::lookbehind'
+-------------------------------------
+
+   This class represents lookbehinds.  Objects have the following methods:
+
+   * `my $look = YAPE::Regex::lookbehind->new($pos,\@nodes);'
+
+     Creates a `YAPE::Regex::lookbehind' object.  Takes two arguments:  a
+     boolean value indicating whether or not the lookbehind is positive,
+     and a reference to an array of objects to be contained in the
+     lookbehind.
+
+          my $REx = YAPE::Regex::class->new('aeiouy','^');
+          my $look = YAPE::Regex::lookbehind->new(1,[$REx]);
+          # /(?<=[^aeiouy])/
+
+   * `my $pos = $look->pos;'
+
+     Returns true if the lookbehind is positive.
+
+          print $look->pos ? 'pos' : 'neg';  # 'pos'
+
+   * `my $type = $look->type;'
+
+     Returns the string `lookbehind(pos)' or `lookbehind(neg)'.
+
+Methods for `YAPE::Regex::conditional'
+--------------------------------------
+
+   This class represents conditionals.  Objects have the following methods:
+
+   * `my $cond = YAPE::Regex::conditional->new($br,$t,$f,$q,$ng);'
+
+     Creates a `YAPE::Regex::hex' object.  Takes five arguments:  the
+     number of the back-reference (that's all that's supported in the
+     current version), an array reference to the "true" pattern, an array
+     reference to the "false" pattern, and the quantity and non-greedy
+     flag.
+
+          my $cond = YAPE::Regex::conditional->new(
+            2,
+            [],
+            [ YAPE::Regex::text->new('foo') ],
+            '?',
+          );
+          # /(?(2)|foo)?/
+
+   * `my $br = $cond->backref;'
+
+     Returns the number of the back-reference the conditional depends on.
+
+          print $br->backref;  # 2
+
+   * `my $type = $cond->type;'
+
+     Returns the string `conditional(*N*)', where N is the number of the
+     back-reference.
+
+Methods for `YAPE::Regex::group'
+--------------------------------
+
+   This class represents non-capturing groups.  Objects have the following
+methods:
+
+   * `my $group = YAPE::Regex::group->new($on,$off,\@nodes,$q,$ng);'
+
+     Creates a `YAPE::Regex::group' object.  Takes five arguments:  the
+     modes turned on, the modes explicitly turned off, a reference to an
+     array of objects in the group, the quantity, and the non-greedy flag.
+     The modes are displayed in alphabetical order.
+
+          my $group = YAPE::Regex::group->new(
+            'i',
+            's',
+            [
+              YAPE::Regex::macro->new('d', '{2}'),
+              YAPE::Regex::macro->new('s'),
+              YAPE::Regex::macro->new('d', '{2}'),
+            ],
+            '?',
+          );
+          # /(?i-s:\d{2}\s\d{2})?/
+
+   * `my $type = $group->type;'
+
+     Returns the string group.
+
+Methods for `YAPE::Regex::capture'
+----------------------------------
+
+   This class represents capturing groups.  Objects have the following
+methods:
+
+   * `my $capture = YAPE::Regex::capture->new(\@nodes,$q,$ng);'
+
+     Creates a `YAPE::Regex::capture' object.  Takes three arguments:  a
+     reference to an array of objects in the group, the quantity, and the
+     non-greedy flag.
+
+          my $capture = YAPE::Regex::capture->new(
+            [
+              YAPE::Regex::macro->new('d', '{2}'),
+              YAPE::Regex::macro->new('s'),
+              YAPE::Regex::macro->new('d', '{2}'),
+            ],
+          );
+          # /(\d{2}\s\d{2})/
+
+   * `my $type = $capture->type;'
+
+     Returns the string `capture'.
+
+Methods for `YAPE::Regex::code'
+-------------------------------
+
+   This class represents code blocks.  Objects have the following methods:
+
+   * `my $code = YAPE::Regex::code->new($block);'
+
+     Creates a `YAPE::Regex::code' object.  Takes one arguments:  a string
+     holding a block of code.
+
+          my $code = YAPE::Regex::code->new(q({ push @poss, $1 }));
+          # /(?{ push @poss, $1 })/
+
+   * `my $type = $code->type;'
+
+     Returns the string code.
+
+Methods for `YAPE::Regex::later'
+--------------------------------
+
+   This class represents closed parentheses.  Objects have the following
+methods:
+
+   * `my $later = YAPE::Regex::later->new($block);'
+
+     Creates a `YAPE::Regex::later' object.  Takes one arguments:  a
+     string holding a block of code.
+
+          my $later = YAPE::Regex::later->new(q({ push @poss, $1 }));
+          # /(?{{ push @poss, $1 }})/
+
+   * `my $type = $later->type;'
+
+     Returns the string `later'.
+
+Methods for `YAPE::Regex::close'
+--------------------------------
+
+   This class represents closed parentheses.  Objects have the following
+methods:
+
+   * `my $close = YAPE::Regex::close->new($q,$ng);'
+
+     Creates a `YAPE::Regex::close' object.  Takes two arguments:  the
+     quantity, and the non-greedy flag.  This object is never needed in
+     the tree; however, they are returned in the parsing stage, so that
+     you know when they've been reached.
+
+          my $close = YAPE::Regex::close->new('?','?');
+          # /)??/
+
+   * `my $type = $close->type;'
+
+     Returns the string close.
+
+TO DO
+=====
+
+   This is a listing of things to add to future versions of this module.
+
+   * Perl 5.6 extended character classes
+
+     The POSIX and Unicode character class extensions are not yet
+     supported.
+
+BUGS
+====
+
+   Following is a list of known or reported bugs.
+
+   * This documentation might be incomplete.
+
+SUPPORT
+=======
+
+   Visit `YAPE''s web site at `http://www.pobox.com/~japhy/YAPE/'.
+
+SEE ALSO
+========
+
+   The `YAPE::Regex' documentation, for information on the main class.
+
+AUTHOR
+======
+
+     Jeff "japhy" Pinyan
+     CPAN ID: PINYAN
+     japhy@pobox.com
+     http://www.pobox.com/~japhy/
+
+
+File: pm.info,  Node: YAPE/Regex/Explain,  Next: attributes,  Prev: YAPE/Regex/Element,  Up: Module List
+
+explanation of a regular expression
+***********************************
+
+NAME
+====
+
+   YAPE::Regex::Explain - explanation of a regular expression
+
+SYNOPSIS
+========
+
+     use YAPE::Regex::Explain;
+     my $exp = YAPE::Regex::Explain->new($REx)->explain;
+
+`YAPE' MODULES
+==============
+
+   The `YAPE' hierarchy of modules is an attempt at a unified means of
+parsing and extracting content.  It attempts to maintain a generic
+interface, to promote simplicity and reusability.  The API is powerful,
+yet simple.  The modules do tokenization (which can be intercepted) and
+build trees, so that extraction of specific nodes is doable.
+
+DESCRIPTION
+===========
+
+   This module merely sub-classes `YAPE::Regex', and produces a rather
+verbose explanation of a regex, suitable for demonstration and tutorial
+purposes.
+
+Methods for `YAPE::Regex::Explain'
+----------------------------------
+
+   * `my $p = YAPE::Regex::Explain->new($regex);'
+
+     Calls `YAPE::Regex''s new method (see its docs).
+
+   * `my $p = YAPE::Regex::Explain->explain($mode);'
+
+     Returns a string explaining the regex.  If $mode is regex, it will
+     output a valid regex (instead of the normal string).  If $mode is
+     silent, no comments will be added, but the regex will be expanded
+     into a readable format.
+
+SUPPORT
+=======
+
+   Visit `YAPE''s web site at `http://www.pobox.com/~japhy/YAPE/'.
+
+SEE ALSO
+========
+
+   The `YAPE::Regex' documentation.
+
+AUTHOR
+======
+
+     Jeff "japhy" Pinyan
+     CPAN ID: PINYAN
+     japhy@pobox.com
+     http://www.pobox.com/~japhy/
+
+
+File: pm.info,  Node: attributes,  Next: attrs,  Prev: YAPE/Regex/Explain,  Up: Module List
+
+get/set subroutine or variable attributes
+*****************************************
+
+NAME
+====
+
+   attributes - get/set subroutine or variable attributes
+
+SYNOPSIS
+========
+
+     sub foo : method ;
+     my ($x,@y,%z) : Bent ;
+     my $s = sub : method { ... };
+
+     use attributes ();	# optional, to get subroutine declarations
+     my @attrlist = attributes::get(\&foo);
+
+     use attributes 'get'; # import the attributes::get subroutine
+     my @attrlist = get \&foo;
+
+DESCRIPTION
+===========
+
+   Subroutine declarations and definitions may optionally have attribute
+lists associated with them.  (Variable my declarations also may, but see
+the warning below.)  Perl handles these declarations by passing some
+information about the call site and the thing being declared along with
+the attribute list to this module.  In particular, the first example above
+is equivalent to the following:
+
+     use attributes __PACKAGE__, \&foo, 'method';
+
+   The second example in the synopsis does something equivalent to this:
+
+     use attributes __PACKAGE__, \$x, 'Bent';
+     use attributes __PACKAGE__, \@y, 'Bent';
+     use attributes __PACKAGE__, \%z, 'Bent';
+
+   Yes, that's three invocations.
+
+   WARNING: attribute declarations for variables are an *experimental*
+feature.  The semantics of such declarations could change or be removed in
+future versions.  They are present for purposes of experimentation with
+what the semantics ought to be.  Do not rely on the current implementation
+of this feature.
+
+   There are only a few attributes currently handled by Perl itself (or
+directly by this module, depending on how you look at it.)  However,
+package-specific attributes are allowed by an extension mechanism.  (See
+`"Package-specific Attribute Handling"' in this node below.)
+
+   The setting of attributes happens at compile time.  An attempt to set
+an unrecognized attribute is a fatal error.  (The error is trappable, but
+it still stops the compilation within that eval.)  Setting an attribute
+with a name that's all lowercase letters that's not a built-in attribute
+(such as "foo") will result in a warning with -w or `use warnings
+'reserved''.
+
+Built-in Attributes
+-------------------
+
+   The following are the built-in attributes for subroutines:
+
+locked
+     Setting this attribute is only meaningful when the subroutine or
+     method is to be called by multiple threads.  When set on a method
+     subroutine (i.e., one marked with the method attribute below), Perl
+     ensures that any invocation of it implicitly locks its first argument
+     before execution.  When set on a non-method subroutine, Perl ensures
+     that a lock is taken on the subroutine itself before execution.  The
+     semantics of the lock are exactly those of one explicitly taken with
+     the lock operator immediately after the subroutine is entered.
+
+method
+     Indicates that the referenced subroutine is a method.  This has a
+     meaning when taken together with the locked attribute, as described
+     there.  It also means that a subroutine so marked will not trigger
+     the "Ambiguous call resolved as CORE::%s" warning.
+
+lvalue
+     Indicates that the referenced subroutine is a valid lvalue and can be
+     assigned to. The subroutine must return a modifiable value such as a
+     scalar variable, as described in *Note Perlsub: (perl.info)perlsub,.
+
+   There are no built-in attributes for anything other than subroutines.
+
+Available Subroutines
+---------------------
+
+   The following subroutines are available for general use once this module
+has been loaded:
+
+get
+     This routine expects a single parameter-a reference to a subroutine
+     or variable.  It returns a list of attributes, which may be empty.
+     If passed invalid arguments, it uses die() (via `Carp::croak|Carp' in
+     this node) to raise a fatal exception.  If it can find an appropriate
+     package name for a class method lookup, it will include the results
+     from a `FETCH_*type*_ATTRIBUTES' call in its return list, as
+     described in `"Package-specific Attribute Handling"' in this node
+     below.  Otherwise, only `built-in attributes|"Built-in Attributes"'
+     in this node will be returned.
+
+reftype
+     This routine expects a single parameter-a reference to a subroutine or
+     variable.  It returns the built-in type of the referenced variable,
+     ignoring any package into which it might have been blessed.  This can
+     be useful for determining the type value which forms part of the
+     method names described in `"Package-specific Attribute Handling"' in
+     this node below.
+
+   Note that these routines are not exported by default.
+
+Package-specific Attribute Handling
+-----------------------------------
+
+   WARNING: the mechanisms described here are still experimental.  Do not
+rely on the current implementation.  In particular, there is no provision
+for applying package attributes to 'cloned' copies of subroutines used as
+closures.  (See `"Making References"', *Note Perlref: (perl.info)perlref,
+for information on closures.)  Package-specific attribute handling may
+change incompatibly in a future release.
+
+   When an attribute list is present in a declaration, a check is made to
+see whether an attribute 'modify' handler is present in the appropriate
+package (or its @ISA inheritance tree).  Similarly, when `attributes::get'
+is called on a valid reference, a check is made for an appropriate
+attribute 'fetch' handler.  See `"EXAMPLES"' in this node to see how the
+"appropriate package" determination works.
+
+   The handler names are based on the underlying type of the variable being
+declared or of the reference passed.  Because these attributes are
+associated with subroutine or variable declarations, this deliberately
+ignores any possibility of being blessed into some package.  Thus, a
+subroutine declaration uses "CODE" as its type, and even a blessed hash
+reference uses "HASH" as its type.
+
+   The class methods invoked for modifying and fetching are these:
+
+FETCH_type_ATTRIBUTES
+     This method receives a single argument, which is a reference to the
+     variable or subroutine for which package-defined attributes are
+     desired.  The expected return value is a list of associated
+     attributes.  This list may be empty.
+
+MODIFY_type_ATTRIBUTES
+     This method is called with two fixed arguments, followed by the list
+     of attributes from the relevant declaration.  The two fixed arguments
+     are the relevant package name and a reference to the declared
+     subroutine or variable.  The expected return value as a list of
+     attributes which were not recognized by this handler.  Note that this
+     allows for a derived class to delegate a call to its base class, and
+     then only examine the attributes which the base class didn't already
+     handle for it.
+
+     The call to this method is currently made *during* the processing of
+     the declaration.  In particular, this means that a subroutine
+     reference will probably be for an undefined subroutine, even if this
+     declaration is actually part of the definition.
+
+   Calling `attributes::get()' from within the scope of a null package
+declaration `package ;' for an unblessed variable reference will not
+provide any starting package name for the 'fetch' method lookup.  Thus,
+this circumstance will not result in a method call for package-defined
+attributes.  A named subroutine knows to which symbol table entry it
+belongs (or originally belonged), and it will use the corresponding
+package.  An anonymous subroutine knows the package name into which it was
+compiled (unless it was also compiled with a null package declaration),
+and so it will use that package name.
+
+Syntax of Attribute Lists
+-------------------------
+
+   An attribute list is a sequence of attribute specifications, separated
+by whitespace or a colon (with optional whitespace).  Each attribute
+specification is a simple name, optionally followed by a parenthesised
+parameter list.  If such a parameter list is present, it is scanned past
+as for the rules for the `q()' operator.  (See `"Quote and Quote-like
+Operators"', *Note Perlop: (perl.info)perlop,.)  The parameter list is
+passed as it was found, however, and not as per `q()'.
+
+   Some examples of syntactically valid attribute lists:
+
+     switch(10,foo(7,3))  :  expensive
+     Ugly('\(") :Bad
+     _5x5
+     locked method
+
+   Some examples of syntactically invalid attribute lists (with
+annotation):
+
+     switch(10,foo()		# ()-string not balanced
+     Ugly('(')			# ()-string not balanced
+     5x5				# "5x5" not a valid identifier
+     Y2::north			# "Y2::north" not a simple identifier
+     foo + bar			# "+" neither a colon nor whitespace
+
+EXPORTS
+=======
+
+Default exports
+---------------
+
+   None.
+
+Available exports
+-----------------
+
+   The routines get and reftype are exportable.
+
+Export tags defined
+-------------------
+
+   The :ALL tag will get all of the above exports.
+
+EXAMPLES
+========
+
+   Here are some samples of syntactically valid declarations, with
+annotation as to how they resolve internally into `use attributes'
+invocations by perl.  These examples are primarily useful to see how the
+"appropriate package" is found for the possible method lookups for
+package-defined attributes.
+
+  1. Code:
+
+          package Canine;
+          package Dog;
+          my Canine $spot : Watchful ;
+
+     Effect:
+
+          use attributes Canine => \$spot, "Watchful";
+
+  2. Code:
+
+          package Felis;
+          my $cat : Nervous;
+
+     Effect:
+
+          use attributes Felis => \$cat, "Nervous";
+
+  3. Code:
+
+          package X;
+          sub foo : locked ;
+
+     Effect:
+
+          use attributes X => \&foo, "locked";
+
+  4. Code:
+
+          package X;
+          sub Y::x : locked { 1 }
+
+     Effect:
+
+          use attributes Y => \&Y::x, "locked";
+
+  5. Code:
+
+          package X;
+          sub foo { 1 }
+
+          package Y;
+          BEGIN { *bar = \&X::foo; }
+
+          package Z;
+          sub Y::bar : locked ;
+
+     Effect:
+
+          use attributes X => \&X::foo, "locked";
+
+        This last example is purely for purposes of completeness.  You
+should not be trying to mess with the attributes of something in a package
+that's not your own.
+
+SEE ALSO
+========
+
+   `"Private Variables via my()"', *Note Perlsub: (perl.info)perlsub, and
+`"Subroutine Attributes"', *Note Perlsub: (perl.info)perlsub, for details
+on the basic declarations; `"Subroutine Attributes"', *Note Attrs: attrs,
+for the obsolescent form of subroutine attribute specification which this
+module replaces; `use', *Note Perlfunc: (perl.info)perlfunc, for details
+on the normal invocation mechanism.
+
+
+File: pm.info,  Node: attrs,  Next: autoload,  Prev: attributes,  Up: Module List
+
+set/get attributes of a subroutine (deprecated)
+***********************************************
+
+NAME
+====
+
+   attrs - set/get attributes of a subroutine (deprecated)
+
+SYNOPSIS
+========
+
+     sub foo {
+         use attrs qw(locked method);
+         ...
+     }
+
+     @a = attrs::get(\&foo);
+
+DESCRIPTION
+===========
+
+   NOTE: Use of this pragma is deprecated.  Use the syntax
+
+     sub foo : locked method { }
+
+   to declare attributes instead.  See also *Note Attributes: attributes,.
+
+   This pragma lets you set and get attributes for subroutines.  Setting
+attributes takes place at compile time; trying to set invalid attribute
+names causes a compile-time error. Calling `attrs::get' on a subroutine
+reference or name returns its list of attribute names. Notice that
+`attrs::get' is not exported.  Valid attributes are as follows.
+
+method
+     Indicates that the invoking subroutine is a method.
+
+locked
+     Setting this attribute is only meaningful when the subroutine or
+     method is to be called by multiple threads. When set on a method
+     subroutine (i.e. one marked with the method attribute above), perl
+     ensures that any invocation of it implicitly locks its first argument
+     before execution. When set on a non-method subroutine, perl ensures
+     that a lock is taken on the subroutine itself before execution. The
+     semantics of the lock are exactly those of one explicitly taken with
+     the lock operator immediately after the subroutine is entered.
+
+
+File: pm.info,  Node: autoload,  Next: autouse,  Prev: attrs,  Up: Module List
+
+only load modules when they're used
+***********************************
+
+NAME
+====
+
+   autoload - only load modules when they're used
+
+SYNOPSIS
+========
+
+   # For a better example, see CGI3::Object.pm. It uses # autoload.pm in
+quite a nice way.
+
+   package MySimpleCookie; use autoload qw(Exporter CGI3::Object::Cookie);
+
+   @ISA = qw(Exporter CGI3::Object::Cookie);  @EXPORT = qw(raw_fetch
+cookie raw_cookie);
+
+   # raw_fetch a list of cookies from the environment and # return as a
+hash.  The cookie values are not unescaped # or altered in any way.  sub
+raw_fetch {     my $raw_cookie = $ENV{HTTP_COOKIE} || $ENV{COOKIE};     my
+%results;     my(@pairs) = split("; ",$raw_cookie);     foreach (@pairs) {
+       if (/^([^=]+)=(.*)/) {             $results{$1} = $2;         }
+    else {             $results{$_} = ";         }     }     return
+wantarray ? %results : \%results; }
+
+   my $cookies; sub raw_cookie {     my $name = shift;     if (!$cookies)
+{ $cookies = raw_fetch() }     return $cookies->{$name}; }
+
+   package main; # Now, people can use you just for your raw_cookie...
+use MySimpleCookie('raw_fetch','raw_cookie'); $result = raw_cookie('blah');
+
+   # And it won't cost 'em a cent. They didn't use any # functions from
+CGI3::Object::Cookie, so the module # wasn't loaded.
+
+   # But if they do use the functions, the module will load automatically
+package main; use MySimpleCookie('raw_fetch','cookie'); $result =
+cookie('blah');
+
+   # Or, if they even did this, the module would load automatically and
+work.  package main; use MySimpleCookie; $me = new MySimpleCookie; print
+"Set-Cookie: ", $me->raw_cookie('blah'); print "Set-Cookie: ",
+$me->cookie('blah');
+
+DESCRIPTION
+===========
+
+AUTHOR
+======
+
+   David James (david@jamesgang.com)
+
+SEE ALSO
+========
+
+   CGI3::Object(1).
+
+
+File: pm.info,  Node: autouse,  Next: base,  Prev: autoload,  Up: Module List
+
+postpone load of modules until a function is used
+*************************************************
+
+NAME
+====
+
+   autouse - postpone load of modules until a function is used
+
+SYNOPSIS
+========
+
+     use autouse 'Carp' => qw(carp croak);
+     carp "this carp was predeclared and autoused ";
+
+DESCRIPTION
+===========
+
+   If the module Module is already loaded, then the declaration
+
+     use autouse 'Module' => qw(func1 func2($;$) Module::func3);
+
+   is equivalent to
+
+     use Module qw(func1 func2);
+
+   if Module defines func2() with prototype `($;$)', and func1() and
+func3() have no prototypes.  (At least if Module uses Exporter's import,
+otherwise it is a fatal error.)
+
+   If the module Module is not loaded yet, then the above declaration
+declares functions func1() and func2() in the current package, and
+declares a function Module::func3().  When these functions are called,
+they load the package Module if needed, and substitute themselves with the
+correct definitions.
+
+WARNING
+=======
+
+   Using autouse will move important steps of your program's execution
+from compile time to runtime.  This can
+
+   * Break the execution of your program if the module you autoused has
+     some initialization which it expects to be done early.
+
+   * hide bugs in your code since important checks (like correctness of
+     prototypes) is moved from compile time to runtime.  In particular, if
+     the prototype you specified on autouse line is wrong, you will not
+     find it out until the corresponding function is executed.  This will
+     be very unfortunate for functions which are not always called (note
+     that for such functions autouseing gives biggest win, for a workaround
+     see below).
+
+   To alleviate the second problem (partially) it is advised to write your
+scripts like this:
+
+     use Module;
+     use autouse Module => qw(carp($) croak(&$));
+     carp "this carp was predeclared and autoused ";
+
+   The first line ensures that the errors in your argument specification
+are found early.  When you ship your application you should comment out
+the first line, since it makes the second one useless.
+
+AUTHOR
+======
+
+   Ilya Zakharevich (ilya@math.ohio-state.edu)
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: base,  Next: bioback,  Prev: autouse,  Up: Module List
+
+Establish IS-A relationship with base class at compile time
+***********************************************************
+
+NAME
+====
+
+   base - Establish IS-A relationship with base class at compile time
+
+SYNOPSIS
+========
+
+     package Baz;
+     use base qw(Foo Bar);
+
+DESCRIPTION
+===========
+
+   Roughly similar in effect to
+
+     BEGIN {
+     	require Foo;
+     	require Bar;
+     	push @ISA, qw(Foo Bar);
+     }
+
+   Will also initialize the %FIELDS hash if one of the base classes has
+it.  Multiple inheritance of %FIELDS is not supported.  The 'base' pragma
+will croak if multiple base classes have a %FIELDS hash.  See *Note
+Fields: fields, for a description of this feature.
+
+   When strict 'vars' is in scope base also let you assign to @ISA without
+having to declare @ISA with the 'vars' pragma first.
+
+   If any of the base classes are not loaded yet, base silently requires
+them.  Whether to require a base class package is determined by the
+absence of a global $VERSION in the base package.  If $VERSION is not
+detected even after loading it, <base> will define $VERSION in the base
+package, setting it to the string `-1, defined by base.pm'.
+
+HISTORY
+=======
+
+   This module was introduced with Perl 5.004_04.
+
+SEE ALSO
+========
+
+   *Note Fields: fields,
+
+
+File: pm.info,  Node: bioback,  Next: biodesign,  Prev: base,  Up: Module List
+
+how to customise bioperl for your site
+**************************************
+
+NAME
+====
+
+   bioperl backend - how to customise bioperl for your site
+
+SYNOPSIS
+========
+
+   Not really appropiate for a synopsis. Read on
+
+DESCRIPTION
+===========
+
+   This document is designed to let you customise bioperl on your site.
+Bioperl can work with a number of database formats (at the moment, simple
+fasta flat file formats and EMBL/Swissprot .dat format), allowing users to
+retrieve sequences from these databases. In addition another layer, above
+flat file indexing is provided, allowing sites to retrieve sequences from
+GenBank via the web or via flat file indexing, or - if you have the time to
+do so, you can write your own interface to an in-house RDB. Using DBI this
+should be quite simple.
+
+   Two scripts are provided to get you started with the bioperl backend:
+
+bpfetch
+     Fetches sequences from a Database
+
+bpindex
+     Builds indexes for flat files databases which are easily accessible
+     by bpfetch
+
+   The core of the backend system is found in following modules
+
+   * generic access to databases, whether flat file, web or rdb. At the
+     moment, this provides random access retrieval, on the basis of ids or
+     accession numbers, but does not provide the ability to loop over the
+     entire database, nor does it provide any complex querying ability.
+
+     Bio::DB::BioSeqI is the abstract interface (hence the I) for the
+     databases.  Bio::DB::GenBank and Bio::DB::GenPept are concrete
+     implementations for network access to the GenBank and GenPept
+     databases held at NCBI, using http as a protocol.
+
+   * flat file indexing system, for read-only, flat file distributions.
+     These provide for specific instances generic type access, but the
+     underlying machinery can be customised for any number of different
+     flat file systems.
+
+     The Index modules EMBL and Fasta, as they are designed as Sequence
+     databases conform to the Bio::DB::BioSeqI interface, meaning they can
+     be used whereever the Bio::DB::BioSeqI is expected.
+
+   * conversion systems for Bio::Seq objects, either to or from sequence
+     streams. The move of things into SeqIO prevents the Bio::Seq object
+     bloating up with format code, and the SeqIO system has the benefit of
+     being very easy to extend to new formats.
+
+SETTING UP BIOPERL INDICES
+==========================
+
+   If you want to use the bioperl indexing of fasta and embl/swissprot
+.dat files then the bpfetch and bpindex scripts are great ways to start
+off (and also reading the scripts shows you how to use the bioperl
+indexing stuff). bpfetch and bpindex coordinate by the use of two
+environment variables
+
+     BIOPERL_INDEX - directory where the indices are kept
+
+     BIOPERL_INDEX_TYPE - type of DBM file to use for the index
+
+   The basic way of indexing a database, once BIOPERL_INDEX has been set
+up, is to go
+
+     bpindex <index-name> <filenames as full path>
+
+   eg, for Fasta files
+
+     bpindex est /nfs/somewhere/fastafiles/est*.fa
+
+   Or, for embl/swissprot files
+
+   bpindex -fmt=EMBL swiss /nfs/somewhere/swiss/swissprot.dat
+
+   To retrieve sequences from the index go
+
+     bpfetch <index-name>:<id>
+
+   eg,
+
+     bpfetch est:AA01234
+
+   or
+
+     bpfetch swiss:VAV_HUMAN
+
+   bpfetch has other options to connect to genbank across the network.
+
+CHECKLIST
+=========
+
+     make a directory called /nfs/datadisk/bioperlindex/
+
+     setenv BIOPERL_INDEX (or export in Bash) in the system login
+     script to /nfs/datadisk/bioperlindex/
+
+     go bpindex swissprot /nfs/datadisk/swiss/swissprot.dat
+     etc
+
+     You are ready to use bpfetch
+
+
+File: pm.info,  Node: biodesign,  Next: biostart,  Prev: bioback,  Up: Module List
+
+Design Documentation
+********************
+
+NAME
+====
+
+   Bioperl - Design Documentation
+
+SYNOPSIS
+========
+
+   Not appropiate. Read on...
+
+DESCRIPTION
+===========
+
+   Bioperl is a coordinated project which has a number of design features
+to allow bioperl to be well used, extended and collaborate with other
+packages. This design can be focused in a number of areas.
+
+     bioperl ettiquette and learning about it
+     bioperl root object - exception throwing, exceptions etc.
+     bioperl interface design
+     bioperl sequence object design notes
+
+AUTHOR
+======
+
+   This was written by Ewan Birney in a variety of airports across the US.
+
+Reusing code and working in collaborative projects
+==================================================
+
+   The biggest problem often in reusing a code base like bioperl is that
+it requires both the people using it and the people contributing to it to
+change their attitude towards code. Generally people in bioinformatics are
+more likely to be self-taught, single programmers, who put together most
+of their scripts/programs as individuals. Bioperl is a truely collaborative
+project (the core code is the product of about 15 individuals) and anyone
+will be only contributing some part of it in the future.
+
+   Here are some notes about how my coding style has changed to work in
+collaborative projects.
+
+Learn to read documentation
+---------------------------
+
+   Reading documentation is sometimes as tough as writing the
+documentation. Try to read documentation before you ask a question - not
+only might it answer your question, but more importantly it will give you
+idea why the person who wrote the module wrote it - and this will be the
+frame work in which you can understand his or her answer.
+
+Respect people's code (in particular if it works)
+-------------------------------------------------
+
+   If the code does what you want, the fact that it is not written the way
+you would write should not be a big issue. Of course, if there is some
+glaring error then that is worth pointing out to someone. Dismissing a
+module on the basis of its coding style is a tremendously wrong thing to
+do.
+
+Learn how to provide good feedback
+----------------------------------
+
+   This ranges from giving very accurate bug reports (this script -> makes
+this error, giving all data), through to pointing out design issues in a
+constructive manner (not - this *sucks*). If you find a problem, then
+providing a patch using diff or work around is a great thing to do - the
+author/maintainer of the module will love you for it.
+
+   Providing "I used XXX and it did just what I wanted it to do" feedback
+is also really great. Developers generally only hear about their mistakes.
+To hear about successes gives everyone a warm glow.
+
+   One trick I have learnt is that when I download a new project/code or
+use a new module I open up a fresh buffer in emacs and keep a mini diary
+of everything that I did or think when I started to use the package. After
+I used it I could go back, edit the buffer and then send it to the author
+either with "it was great - it did just what I wanted, but I found that
+the documentation here was misleading" to "to get it to install I had to
+incant the following things..."
+
+Taking on a project
+-------------------
+
+   When you want to get involved, hopefully it will be because you want to
+extend something or provide better facillities to something. The important
+thing here is not to work in a vacuum. By providing the main list with a
+good proposal before you start about what you are going to do (and listen
+to the responses) is a must. I have been pulled up so many times by other
+people looking at my design that I can't imagine coding stuff now without
+feedback.
+
+Designing good tests
+--------------------
+
+   Sadly, you might think that you have written good code, but you don't
+know that until you manage to test it! The CPAN style perl modules have a
+wonderful test suite system (delve around into the t/ directories) and I
+have extended the makefile system so that the test script which you write
+to test the module can be part of the t/ system from the start. Once a
+test is in the t/ system it will be run millions of times worldwide when
+bioperl is downloaded, providing incredible and continual regression
+testing of your module (for free!).
+
+Having fun
+----------
+
+   The coding process should be enjoyable, and I get very proud of people
+who tell me that they picked up bioperl and it worked for them, even if
+they don't use a single module that I wrote. There is a brilliant sense of
+community in bioperl about providing useful, stable code and it should be
+a pleasure to contribute to it.
+
+   So - I am always looking forward to people posting on the guts list
+with their feedback/questions/proposals. As well as the long standing fun
+we have making new releases.
+
+Bioperl Root Object
+===================
+
+   All objects in bioperl (but for interfaces - see the next section)
+inheriet from the Root Object. The bioperl root object allows a number of
+very useful concepts to be provided. In particular.
+
+exceptions
+          Bioperl root object allow exceptions to be throw on the object with very
+          nice debugging output
+
+context
+          Bioperl root object have a context which allows, in particular, exceptions
+          that are thrown to say which object as throwing the exception.
+
+rearrange
+          Bioperl root object have some helper methods, in particular rearrange to
+          help functions which take hash inputs.
+
+Using the root object.
+----------------------
+
+   To use the root object, the object has to inheriet from it. This means
+the @ISA array should have (Bio::Roo::Object) in it and that the module
+goes "use Bio::Root::Object". The root object provides the ->new function.
+This new function builds a hash, sets some root object management issues
+and then calls the _initialize function. It is this function which your
+object needs to implement.  The full code is given below.
+
+     # convention is that if you are using the Bio::Root object you should put it
+     # inside the Bio namespace
+
+     package Bio::MyNewObject;
+     use vars qw(@ISA);
+     use strict;
+
+     use Bio::Root::Object;
+     @ISA = qw(Bio::Root::Object);
+
+     # new() is inherited from Bio::Root::Object
+     # _initialize is where the heavy stuff will happen when new is called
+
+     sub _initialize {
+        my($self,@args) = @_;
+        # call superclasses initialize
+
+     my $make = $self->SUPER::_initialize(@args);
+
+     # do your own argument processing here
+     # set default attributes etc...
+
+     return $make; # success - we hope!
+       }
+
+Throwing Exceptions
+-------------------
+
+     Exceptions are die functions, in which the $@ variable (a scalar) is
+     used to indicate how it died. The exceptions can be caught using the
+     eval {} system. The bioperl root object has a method called "-Greater_Than_Special_Sequencethrow"
+     which calls die but also provides a full stack trace of where this
+     throw happened on (and also which object the exception was thrown -
+     see the context section). So an exception like
+
+     $obj->throw("I am throwing an exception");
+
+   Provides the following output on STDERR if is not caught.
+
+     -------------------- EXCEPTION --------------------
+     MSG: I am throwing an exception
+     CONTEXT: Error in object Bio::Root::Object "anonymous Bio::Root::Object"
+     SCRIPT: myscript.pl
+     STACK:
+     main::my_subroutine(7)
+     main::(3)
+     ---------------------------------------------------
+
+   indicating that this exception was thrown at line 7 of subroutine
+my_subroutine, in myscript.pl
+
+   Exceptions can be caught using an eval block, such as
+
+     my $obj = Bio::SomeObject->new();
+     my $obj2
+     eval {
+       $obj2 = $obj->method1();
+       $obj2->method2(10);
+     }
+
+     if( $@ ) {
+       # exception was thrown
+       &tell_user("Exception was thrown, preventing whatever I wanted to do. Actual exception $@");
+       exit(0);
+     }
+
+     # else - use $obj2
+
+   notice that the eval block can have multiple statements in it, and also
+that if you want to use variables outside of the eval block, they must be
+declared with my outside of the eval block (you are planning to use strict
+in your scripts, aren't you!).
+
+object context
+--------------
+
+   Each bioperl object has a context, which is given by the name attribute
+(name is a method defined in the Bio::Root::Object package). This context
+is displayed when the exception is made, so that the following script:
+
+     use Bio::Root::Object;
+     $obj = Bio::Root::Object->new;
+
+     $obj->name("Context-A");
+     &my_subroutine($obj);
+
+     sub my_subroutine {
+           $self = shift;
+           $self->throw("I am throwing an exception");
+     }
+
+   Produces the following exception
+
+     -------------------- EXCEPTION --------------------
+     MSG: I am throwing an exception
+     CONTEXT: Error in object Bio::Root::Object "Context-A"
+     SCRIPT: test2.pl
+     STACK:
+     main::my_subroutine(10)
+     main::test2.pl(6)
+     ---------------------------------------------------
+
+   Notice that the Object nows says that it is Context-A.
+
+   This context is particularly useful when objects are produced from a
+database. This is because some exceptions are really due to problems with
+the data in an object rather than the code. These sort of exceptions are
+better tracked down when you know where the object came from, not where in
+the code the exception is thrown.
+
+   One of the drawbacks to this scheme is that the attribute ->name is
+"special" from bioperl's perspective. I believe it is best to stay away
+from using $obj->name() to mean anything from the object's perspective
+(for example ->id() ), leaving it free to be used as a context for
+debugging purposes. You might prefer to overload the name attribute to be
+"useful" for the object.
+
+Bioperl Interface design
+========================
+
+   Bioperl has been moving to a split between interface and implementation
+definitions.  An interface is solely the definition of what methods one
+can call on an object, without any knowledge of how it is implemented. An
+implementation is an actual, working implementation of an object. In
+languages like Java, interface definition is part of the language. In
+Perl, like many aspects of Perl you have to roll your own.
+
+   In bioperl, the interface names are called Bio::MyObjectI, with the
+trailing I indicating it is an interface definition of an object. The
+interface files (sometimes nicknamed the 'I files') provide mainly
+documentation on what the interface is, and how to use (and implement it).
+All the functions which the implementation is expected to provide are
+defined as subroutines, and then die with an informative warning. The
+exception to this rule are the implementation independent functions (see
+later).
+
+   Objects which want to implement this interface should inheriet the
+Bio::MyObjectI file in their @ISA array. This means that if the
+implementation does not provide a method which the interface defines,
+rather than the user getting a "method not found error" it gets a
+"mymethod was not defined in MyObjectI, but should have been" which makes
+it clearer that whoever provided the implementation was to blame, and not
+the caller/script writer.
+
+   When people want to check they have valid objects being passed to their
+functions they should test the presence of the interface, not the
+implementation. for example
+
+     sub my_sequence_routine {
+       my($seq,$other_argument) = @_;
+
+     $seq->isa('Bio::SeqI') || die "[$seq] is not a sequence. Cannot process";
+
+     # do stuff
+
+     }
+
+   This is in contrast to
+
+     sub my_incorrect_sequence_routine {
+       my($seq,$other_argument) = @_;
+
+     # this line is INCORRECT
+     $seq->isa('Bio::Seq') || die "[$seq] is not a sequence. Cannot process";
+
+     # do stuff
+
+     }
+
+Rationale of interface design
+-----------------------------
+
+   Some people might justifiably argue "why do this?". The main reason is
+to support external objects from bioperl, and allow them to masquarade as
+real bioperl objects. For example you might have your own quite intricate
+sequence object which you want to use in bioperl functions, but don't want
+to lose your own neat coding. One option would be to have a function which
+built a bioperl sequence object from your object, but then you would be
+endlessly building temporary objects and destroying them, in particular if
+the script yo-yoed between your code and bioperl code.
+
+   A better solution would be to implement the Bio::SeqI interface. You
+would read the Bio::SeqI documentation, and then provide the methods which
+it required, and put Bio::SeqI in your @ISA array. Then you could pass in
+your object into bioperl routines and eh voila - you *are* a bioperl
+sequence object.
+
+   (A problem might arise if your object has the same methods as the
+Bio::SeqI methods but use them differently - your $obj->id() might mean
+provide the raw memory location of the object, whereas the documentation
+for Bio::SeqI $obj->id() says it should return the human-readable name. If
+so you need to look into providing an 'Adaptor' class, as suggested in the
+Gang-of-four).
+
+   Interface classes really come into their own when we start leaving Perl
+and enter extensions wrapped over C or over databases, or through systems
+like CORBA to other languages, like Java/Python etc. Here the "object" is
+often a very thin wrapper over the a DBI interface, or an XS interface,
+and how it stores the object is really different. By providing a very
+clear, implementation free interface with good documentation there is a
+very clear target to hit.
+
+   Some people might complain that we are doing something very
+"un-perl-like" by providing these separate interface files. They are 90%
+documentation, and could be provided anywhere, in many ways they could be
+merged with the actual implementation classes and just made clear that if
+someone wants to mimic a class they should override the following methods.
+However, we (and in particular myself - Ewan) prefers a clear separation
+of the interface. It gives us a much clearer way of defining what is going
+on.  It is in many ways just "design sugar" (as opposed to syntactic sugar)
+to help us, but it really helps, so thats good enough justification to me.
+
+Implementation functions in Interface files
+-------------------------------------------
+
+   One of the issues we discovered early on in using Interface files was
+that there were methods that we would like to provide for classes which
+were independent of their implementation. A good example is a "Range"
+interface, which might define the following methods
+
+     $obj->start()
+     $obj->end()
+
+   Now a client to the object might want to use a $obj->length() method.
+because it is much easier than retrieving the two attributes and
+substracting them. However, the ->length() method is just a pain for
+someone providing the implementation to provide - once start() and end()
+is defined, length is. There seems to be a catch-22 here: to make an
+object definition good for a client one needs to have additional, helper
+methods "on top of" the interface, however to make life easier for the
+*object implementation* one wants to have the bare minimum of functions
+defined which the implementer has to provide.
+
+   In the Range interface this became more than annoyance, as alot of the
+"smarts" of the Range system was that we wanted to have the ability to say
+
+     if( $range->intersection($someother_range) )
+
+   We wanted a generic RangeI interface that we could apply to many
+objects, with definitions required only for ->start, ->end and ->strand.
+However we wanted the ->intersection, and ->union methods to be on all
+ranges, without us having to reimplement this every time.
+
+   Our (Matt Pocock and Ewan Birney's) solution was to allow
+implementation into the RangeI interface file, but only when these
+implementations sat "on top" of the interface definition and therefore
+provided helper client operations. In a language like Java, we would
+clearly have two classes, with a composition/delegation method:
+
+     MyPublicSomethingClass has-a MyInternalSomethingInterface, with
+
+     ADifferentImplemtation implements MyInternalSomethingInterface
+
+   However this is really heavy handed in Perl (and people were
+complaining about having different implementation/interface classes). We
+were quite happy about merging the implementation independent functions
+with the interface definition, and I (Ewan) used this in other interfaces
+since then. The documentation has to be clear about what is going on, but
+I think in general it is.
+
+IDL (Interface Definition Language)
+-----------------------------------
+
+   There is an idl definition of bioperl in bioperl.idl. This is the start
+of a new era of interoperability in this field, so please read it and see
+if you can comment on it.
+
+

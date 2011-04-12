@@ -1,0 +1,1602 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Imager/Expr,  Next: Imager/Regops,  Prev: Imager,  Up: Module List
+
+implements expression parsing and compilation for the  expression evaluation engine used by Imager::transform2()
+****************************************************************************************************************
+
+NAME
+====
+
+   Imager::Expr - implements expression parsing and compilation for the
+expression evaluation engine used by Imager::transform2()
+
+SYNOPSIS
+========
+
+   my $code = Imager::Expr->new({rpnexpr=>$someexpr})   or die "Cannot
+compile $someexpr: ",Imager::Expr::error();
+
+DESCRIPTION
+===========
+
+   This module is used internally by the Imager::transform2() function.
+You shouldn't have much need to use it directly, but you may want to
+extend it.
+
+   To create a new Imager::Expr object, call:
+
+     my %options;
+     my $expr = Imager::Expr->new(\%options)
+       or die Imager::Expr::error();
+
+   You will need to set an expression value and you may set any of the
+following:
+
+constants
+     A hashref defining extra constants for expression parsing.  The names
+     of the constants must be valid identifiers (/[^\W\d]\w*/) and the
+     values must be valid numeric constants (that Perl recognizes in
+     scalars).
+
+     Imager::Expr may define it's own constants (currently just pi.)
+
+variables
+     A reference to an array of variable names.  These are allocated
+     numeric registers starting from register zero.
+
+   By default you can define a 'rpnexpr' key (which emulates RPN) or
+'expr' (an infix expression).  It's also possible to write other
+expression parsers that will use other keys.  Only one expression key
+should be defined.
+
+Instance methods
+----------------
+
+   The Imager::Expr::error() method is used to retrieve the error if the
+expression object cannot be created.
+
+Methods
+-------
+
+   Imager::Expr provides only a few simple methods meant for external use:
+
+$expr->code()
+     Returns the compiled code.
+
+$expr->nregs()
+     Returns a reference to the array of numeric registers.
+
+$expr->cregs()
+     Returns a reference to the array of colour registers.
+
+$expr->dumpops()
+     Returns a string with the generated VM "machine code".
+
+$expr->dumpcode()
+     Returns a string with the unassembled VM "machine code".
+
+Creating a new parser
+---------------------
+
+   I'll write this one day.
+
+   Methods used by parsers:
+
+@vars = $self->_variables()
+     A list (not a reference) of the input variables.  This should be used
+     to allocate as many registers as there are variable as input
+     registers.
+
+$self->error($message)
+     Set the return value of Imager::Expr::error()
+
+@ops = $self->stack_to_reg(@stack_ops)
+     Converts marginally parsed RPN to register code.
+
+Future compatibility
+--------------------
+
+   Try to avoid doing your own optimization beyond literal folding - if we
+add some sort of jump, the existing optimizer will need to be rewritten,
+and any optimization you perform may well be broken too (well, your code
+generation will probably be broken anyway <sigh>).
+
+
+File: pm.info,  Node: Imager/Regops,  Next: Imager/regmach,  Prev: Imager/Expr,  Up: Module List
+
+generated information about the register based VM
+*************************************************
+
+NAME
+====
+
+   Imager::Regops - generated information about the register based VM
+
+SYNOPSIS
+========
+
+     use Imager::Regops;
+     $Imager::Regops::Attr{$opname}->{opcode} # opcode for given operator
+     $Imager::Regops::Attr{$opname}->{parms} # number of parameters
+     $Imager::Regops::Attr{$opname}->{types} # types of parameters
+     $Imager::Regops::Attr{$opname}->{func} # operator is a function
+     $Imager::Regops::Attr{$opname}->{result} # r for numeric, p for pixel result
+     $Imager::Regops::MaxOperands; # maximum number of operands
+
+DESCRIPTION
+===========
+
+   This module is generated automatically from regmach.h so we don't need
+to maintain the same information in at least one extra place.
+
+   At least that's the idea.
+
+AUTHOR
+======
+
+   Tony Cook, tony@develop-help.com
+
+SEE ALSO
+========
+
+   perl(1), Imager(3), http://www.eecs.umich.edu/~addi/perl/Imager/
+
+
+File: pm.info,  Node: Imager/regmach,  Next: InfoBrief,  Prev: Imager/Regops,  Up: Module List
+
+documents the register virtual machine used by Imager::transform2().
+********************************************************************
+
+NAME
+====
+
+   Imager::regmach - documents the register virtual machine used by
+Imager::transform2().
+
+SYNOPSIS
+========
+
+   The register machine is a complete rewrite of the stack machine
+orginally used by Imager::transform(), written for use by
+Imager::transform2().
+
+DESCRIPTION
+===========
+
+   (This document might be a little incoherent.)
+
+   The register machine is a fast implementation of a small instruction
+set designed for evaluating an arithmetic expression to produce a colour
+for an image.
+
+   The machine takes as input:
+
+instructions
+     An array of instructions
+
+numeric registers
+     An array of numeric registers.  Some registers are initialized as
+     literals.
+
+colour registers
+     An array of colour registers.  Currently these registers aren't
+     initialized.
+
+input images
+     An array of Imager i_img pointers.  The getpn operators read pixels
+     from these images.
+
+   The instructions supplied each take up to 4 input numeric or colour
+registers with a single output numeric or colour register.  The machine
+attempts to execute instructions as safely as possible, assuming that
+correct instructions have been provided, eg. the machine protects against
+divide by zero, but doesn't check register numbers for validity.
+
+   The final instruction must be a 'ret' instruction, which returns the
+result ;)
+
+Adding new instructions
+-----------------------
+
+   To add a new instruction:
+
+  1. Add a new opcode to the enumeration in regmach.h - make sure to add
+     comment after the enum name giving the input registers (rX for
+     numeric, pX for colour) that the instruction takes.  These must be in
+     the order that the instruction expects to take the.  Put a letter (r
+     or p) after -> to indicate the result type.
+
+  2. Add a case to regmach.c that executes the instruction.
+
+  3. make
+
+        The makefile should rebuild the Regops.pm file, and your new
+instruction will be added as a function.
+
+   If you want to add a single alternative instruction that might take
+different argument types (it must take the same number of parameters),
+create another instruction with that name followed by a p.  The current
+expression parsers explicitly look for such instruction names.
+
+Future directions
+-----------------
+
+   Conditional and non-conditional jumps to implement iteration.  This
+will break the current optimizer in *Note Imager/Expr: Imager/Expr, (and
+the compilers for both expression compilers, for that matter.)
+
+   Complex arithmetic (Addi suggested this one).  This would most likely
+be a separate machine.  Otherwise we'll have a very significant
+performance loss.
+
+WARNINGS
+========
+
+   If you feed bad 'machine code' to the register machine, you have a good
+chance of a SIGSEGV.
+
+
+File: pm.info,  Node: InfoBrief,  Next: Inline,  Prev: Imager/regmach,  Up: Module List
+
+Perl extension for printing envelopes for Infobrief mailings according to the standards of the Deutsche Bundespost
+******************************************************************************************************************
+
+NAME
+====
+
+   InfoBrief - Perl extension for printing envelopes for Infobrief
+mailings according to the standards of the Deutsche Bundespost
+
+SYNOPSIS
+========
+
+     use InfoBrief;
+     $x = new InfoBrief %OPTIONS;
+     print $x->preamble;
+     print $x->page(@address);
+     print $x->trailer;
+
+DESCRIPTION
+===========
+
+   This modules is probably not very useful outside of Germany. It is a
+tool dedicated for printing envelopes for Infobrief mailings according to
+the standards of the Deutsche Bundespost. You may customize it for other
+standards though.
+
+   The output generated is Postscript level 2 and conforms to EPSF 1.2.
+Since `copypage' ist used, the single pages contain only the new address
+and running number and the size of the postscript file is modest.
+
+OPTIONS
+=======
+
+   The Constructor new take a few options to customize the output:
+
+a4
+
+a5
+     Generate A4 rsp. A5 output. Default is C5.
+
+width number
+height number
+     Custom output size. Units are Postscript dots (72 dpi).
+
+border number
+     Set custom border size. Default is 20.
+
+amt string
+     Set the Postamt for the "Entgelt bezahlt" stamp. Default is `'44227
+     Dortmund 52''.
+
+stempel
+     Add/Omit the "Entgelt bezahlt" stamp. Default is `true'.
+
+infobrief
+     Add/Omit the "Infobrief" banner. Default is false since the banner is
+     not required.
+
+numbering
+     Add/Omit a running number on each envelope. Default is `true'.
+
+AUTHOR
+======
+
+   Ulrich Pfeifer <`pfeifer@ls6.informatik.uni-dortmund.de'>
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: Inline,  Next: Inline-API,  Prev: InfoBrief,  Up: Module List
+
+Write Perl subroutines in other programming languages.
+******************************************************
+
+NAME
+====
+
+   Inline - Write Perl subroutines in other programming languages.
+
+SYNOPSIS
+========
+
+     print "9 + 16 = ", add(9, 16), "\n";
+     print "9 - 16 = ", subtract(9, 16), "\n";
+     
+     use Inline C => <<'END_OF_C_CODE';
+     
+     int add(int x, int y) {
+       return x + y;
+     }
+     
+     int subtract(int x, int y) {
+       return x - y;
+     }
+     
+     END_OF_C_CODE
+
+DESCRIPTION
+===========
+
+   The Inline module allows you to put source code from other programming
+languages directly "inline" in a Perl script or module. The code is
+automatically compiled as needed, and then loaded for immediate access
+from Perl.
+
+   Inline saves you from the hassle of having to write and compile your
+own glue code using facilities like XS or SWIG. Simply type the code where
+you want it and run your Perl as normal. All the hairy details are handled
+for you. The compilation and installation of your code chunks all happen
+transparently; all you will notice is the delay of compilation.
+
+   The Inline code only gets compiled the first time you run it (or
+whenever it is modified) so you only take the performance hit once. Code
+that is Inlined into distributed modules (like on the CPAN) will get
+compiled when the module is installed, so the end user will never notice
+the compilation time.
+
+   Best of all, it works the same on both Unix and Microsoft Windows. See
+*Note Inline-Support: Inline-Support, for support information.
+
+Why Inline?
+-----------
+
+   Do you want to know "Why would I use other languages in Perl?" or "Why
+should I use Inline to do it?"? I'll try to answer both.
+
+Why would I use other languages in Perl?
+     The most obvious reason is performance. For an interpreted language,
+     Perl is very fast. Many people will say "Anything Perl can do, C can
+     do faster". (They never mention the development time :-) Anyway, you
+     may be able to remove a bottleneck in your Perl code by using another
+     language, without having to write the entire program in that
+     language. This keeps your overall development time down, because
+     you're using Perl for all of the non-critical code.
+
+     Another reason is to access functionality from existing API-s that
+     use the language. Some of this code may only be available in binary
+     form. But by creating small subroutines in the native language, you
+     can "glue" existing libraries to your Perl. As a user of the CPAN,
+     you know that code reuse is a good thing. So why throw away those
+     Fortran libraries just yet?
+
+     If you are using Inline with the C language, then you can access the
+     full internals of Perl itself. This opens up the floodgates to both
+     extreme power and peril.
+
+     Maybe the best reason is "Because you want to!". Diversity keeps the
+     world interesting. TMTOWTDI!
+
+Why should I use Inline to do it?
+     There are already two major facilities for extending Perl with C.
+     They are XS and SWIG. Both are similar in their capabilities, at
+     least as far as Perl is concerned. And both of them are quite
+     difficult to learn compared to Inline.
+
+     There is a big fat learning curve involved with setting up and using
+     the XS environment. You need to get quite intimate with the following
+     docs:
+
+          * perlxs
+          * perlxstut
+          * perlapi
+          * perlguts
+          * perlmod
+          * h2xs
+          * xsubpp
+          * ExtUtils::MakeMaker
+
+     With Inline you can be up and running in minutes. There is a C
+     Cookbook with lots of short but complete programs that you can extend
+     to your real-life problems. No need to learn about the complicated
+     build process going on in the background. You don't even need to
+     compile the code yourself. Inline takes care of every last detail
+     except writing the C code.
+
+     Perl programmers cannot be bothered with silly things like compiling.
+     "Tweak, Run, Tweak, Run" is our way of life. Inline does all the
+     dirty work for you.
+
+     Another advantage of Inline is that you can use directly it in a
+     script. You can even use it in a Perl one-liner. With XS and SWIG,
+     you always set up an entirely separate module. Even if you only have
+     one or two functions. Inline makes easy things easy, and hard things
+     possible. Just like Perl.
+
+     Finally, Inline supports several programming languages (not just C
+     and C++). As of this writing, Inline has support for C, C++, Python,
+     and CPR. There are plans to add many more. See `"SUPPORTED
+     LANGUAGES"' in this node below.
+
+Using the Inline.pm Module
+==========================
+
+   Inline is a little bit different than most of the Perl modules that you
+are used to. It doesn't import any functions into your namespace and it
+doesn't have any object oriented methods. Its entire interface (with one
+exception) is specified through the `'use Inline ...'' command.
+
+   This section will explain all of the different ways to `use Inline'. If
+you want to begin using Inline immediately, see *Note Inline/C-Cookbook:
+Inline/C-Cookbook,.
+
+The Basics
+----------
+
+   The most basic form for using Inline is:
+
+     use Inline X => "X source code";
+
+   where 'X' is one of the supported Inline programming languages. The
+second parameter specifies the source code that you want to bind to Perl.
+The source code can be specified in many ways, but most commonly it's a
+quoted string. A handy way to write the string is to use Perl's "here
+document" style of quoting. Like this:
+
+     use Inline X => <<'END_OF_X';
+     
+        X source code goes here.
+     
+     END_OF_X
+
+   The source code can also be specified as a filename, a reference to a
+subroutine that returns source code, or a reference to an array that
+contains lines of source code.
+
+   If you want to specify the source code in a Perl variable, remember
+that `'use'' is a compile time directive, so you'll need to set that
+variable in a BEGIN block, before the use.
+
+     BEGIN {
+         $X = "X source code";
+     }
+     use Inline X => $X;
+
+   An alternative to doing this is to specify the source code at run time
+using the 'Inline->bind()' method. (This is the one interface exception
+mentioned above) The bind() method takes the same arguments as `'use
+Inline ...''.
+
+     use Inline;
+     $X = "X source code";
+     bind Inline X => $X;  # or Inline->bind(X => $X);
+
+Alternate Syntaxes
+------------------
+
+   Instead of specifying the source code as a here-document string, you
+may want to put it at the end of your script, after the `__END__'
+statement. Then you can tell Inline to read it in from the DATA
+filehandle, like this:
+
+     use Inline C => 'DATA';
+     
+     print "9 + 16 = ", add(9, 16), "\n";
+     print "9 - 16 = ", subtract(9, 16), "\n";
+     
+     __END__
+     
+     __C__
+     
+     int add(int x, int y) {
+       return x + y;
+     }
+     
+     int subtract(int x, int y) {
+       return x - y;
+     }
+
+   This syntax makes use of the source-file keyword, `'DATA'', and a
+special marker: `__C__'. 'C' is the programming language you are binding
+to. Inline will read through the DATA filehandle and look for the special
+marker. It will use everything up until the next marker, a POD command, or
+the end of the file.
+
+   NOTE: The 'DATA' keyword can be ommitted if there are no extra
+parameters following it.
+
+   This allows you to specify multiple Inline sections, possibly in
+different programming languages, and POD documentation all in the same
+place. If you want to specify AutoLoader subroutines as well, put them
+before the first Inline marker. Here is another example:
+
+     # The module Foo.pm
+     package Foo;
+     use AutoLoader;
+     
+     use Inline C;
+     use Inline C;
+     use Inline Python;
+     
+     1;
+     
+     __DATA__
+     
+     sub marine {
+         # This is an autoloaded subroutine
+     }
+     
+     __C__
+     /* First C section */
+     
+     __C__
+     /* Second C section */
+     
+     =head1
+     
+     Some POD doc.
+     
+     =cut
+     
+     __Python__
+     """A Python Section"""
+
+   With a module you need to use `__DATA__' instead of `__END__'. An
+important thing to remember is that you need to have one "use Inline Foo
+=> 'DATA'" for each "__Foo__" marker, and they must be in the same order.
+This allows you to apply different configuration options to each section.
+
+   NOTE: Versions of Inline prior to 0.30 suggested a syntax of:
+
+     use Inline;
+     Inline->import(C => <DATA>);
+
+   to read source code from the DATA filehandle. This syntax has been
+deprecated. It will still work, but you will get a warning if $^W is true.
+It will eventually be removed from the syntax. Use the new syntax for
+getting source code from the DATA filehandle. If you really need to access
+Inline at run time, use the bind() method instead. This (supported) code
+would do the same thing as the deprecated syntax:
+
+     use Inline;
+     Inline->bind(C => [<DATA>]);
+
+   But the preferred practice is:
+
+     use Inline C => 'DATA';
+
+   or just:
+
+     use Inline C;
+
+Configuration Options
+---------------------
+
+   Inline trys to do the right thing as often as possible. But sometimes
+you may need to override the default actions. This is easy to do. Simply
+list the Inline configuration options after the regular Inline parameters.
+All congiguration options are specified as (key, value) pairs.
+
+     use Inline (C => 'DATA',
+                 DIRECTORY => './inline_dir',
+                 LIBS => '-lfoo',
+                 INC => '-I/foo/include',
+                 PREFIX => 'XXX_',
+                 NOWARN => 1,
+                );
+
+   You can also specify the configuration options on a separate Inline
+call like this:
+
+     use Inline (C => Config =>
+                 DIRECTORY => './inline_dir',
+                 LIBS => '-lfoo',
+                 INC => '-I/foo/include',
+                 PREFIX => 'XXX_',
+                 NOWARN => 1,
+                );
+     use Inline C => <<'END_OF_C_CODE';
+
+   The special keyword `'Config'' tells Inline that this is a
+configuration-only call. No source code will be compiled or bound to Perl.
+
+   If you want to specify global configuration options that don't apply to
+a particular language, just leave the language out of the call. Like this:
+
+     use Inline Config => DIRECTORY => './inline_dir';
+
+   The Config options are inherited and additive. You can use as many
+Config calls as you want. And you can apply different options to different
+code sections. When a source code section is passed in , Inline will apply
+whichever options have been specified up to that point. Here is a complex
+configuration example:
+
+     use Inline (Config =>
+                 DIRECTORY => './inline_dir',
+                );
+     use Inline (C => Config =>
+                 LIBS => '-lglobal',
+                );
+     use Inline (C => 'DATA',         # First C Section
+                 LIBS => ['-llocal1', '-llocal2'],
+                );
+     use Inline (Config =>
+                 NOWARN => 1,
+                );
+     use Inline (Python => 'DATA',    # First Python Section
+                 LIBS => '-lmypython1',
+                );
+     use Inline (C => 'DATA',         # Second C Section
+                 LIBS => [undef, '-llocal3'],
+                );
+
+   The first Config applies to all subsequent calls. The second Config
+applies to all subsequent C sections (but not `Python' sections). In the
+first C section, the external libraries global, `local1' and `local2' are
+used. (Most options allow either string or array ref forms, and do the
+right thing.) The `Python' section does not use the global library, but
+does use the same DIRECTORY, and has warnings turned off. The second C
+section only uses the `local3' library. That's because a value of undef
+resets the additive behaviour.
+
+   The DIRECTORY and NOWARN options are generic Inline options. All other
+options are language specific. To find out what the C options do, see
+`Inline::C'.
+
+   NOTE - Versions of Inline prior to 0.30, used a module called
+`Inline::Config' to configure Inline. This module is no longer supported
+and will no longer work with Inline. If you have it installed, remove it
+from your system to avoid occasional warnings. Everything that you could
+do with `Inline::Config' is still possible through the new configuration
+syntax.
+
+Playing 'with' Others
+---------------------
+
+   Inline has a special configuration syntax that tells it to get more
+configuration options from other Perl modules. Here is an example:
+
+     use Inline with => 'Event';
+
+   This tells Inline to load the module `Event.pm' and ask it for
+configuration information. Since Event has a C API of its own, it can pass
+Inline all of the information it needs to be able to use Event C callbacks
+seamlessly.
+
+   That means that you don't need to specify the typemaps, shared
+libraries, include files and other information required to get this to
+work.
+
+   You can specify a single module or a list of them. Like:
+
+     use Inline with => qw(Event Foo Bar);
+
+   Currently, Event is the only module that works with Inline.
+
+Inline Shortcuts
+----------------
+
+   Inline lets you set many configuration options from the command line.
+These options are called 'shortcuts'. They can be very handy, especially
+when you only want to set the options temporarily, for say, debugging.
+
+   For instance, to get some general information about your Inline code in
+the script `Foo.pl', use the command:
+
+     perl -MInline=INFO Foo.pl
+
+   If you want to force your code to compile, even if its already done,
+use:
+
+     perl -MInline=FORCE Foo.pl
+
+   If you want to do both, use:
+
+     perl -MInline=INFO -MInline=FORCE Foo.pl
+
+   or better yet:
+
+     perl -MInline=INFO,FORCE Foo.pl
+
+The Inline DIRECTORY
+--------------------
+
+   Inline needs a place to build your code and to install the results of
+the build. It uses a single directory named `'.Inline/'' under normal
+circumstances. If you create this directory in your home directory, the
+current directory or in the directory where your program resides, Inline
+will find and use it. You can also specify it in the environment variable
+`PERL_INLINE_DIRECTORY' or directly in your program, by using the
+DIRECTORY keyword option. If Inline cannot find the directory in any of
+these places it will create a `'_Inline/'' directory in either your
+current directory or the directory where your script resides.
+
+   One of the key factors to using Inline successfully, is understanding
+this directory. When developing code it is usually best to create this
+directory (or let Inline do it) in your current directory. Remember that
+there is nothing sacred about this directory except that it holds your
+compiled code. Feel free to delete it at any time. Inline will simply
+start from scratch and recompile your code on the next run. If you have
+several programs that you want to force to recompile, just delete your
+`'.Inline/'' directory.
+
+   It is probably best to have a separate `'.Inline/'' directory for each
+project that you are working on. You may want to keep stable code in the
+<.Inline/> in your home directory. On multi-user systems, each user should
+have their own `'.Inline/'' directories. It could be a security risk to
+put the directory in a shared place like `/tmp/'.
+
+Debugging Inline Errors
+-----------------------
+
+   All programmers make mistakes. When you make a mistake with Inline,
+like writing bad C code, you'll get a big error report on your screen.
+This report tells you where to look to do the debugging.
+
+   When Inline needs to compile something it creates a subdirectory under
+your `DIRECTORY/build/' directory. This is where it writes all the
+components it needs to build your extension. Things like XS files,
+Makefiles and output log files.
+
+   If everything goes OK, Inline will delete this subdirectory. If there
+is an error, Inline will leave the directory intact and print its
+location. The idea is that you are supposed to go into that directory and
+figure out what happened.
+
+   As a convenience, Inline copies your latest error directory to
+`DIRECTORY/errors' and strips all of the MD5 hash codes out of the names.
+More debugging improvements are coming in future releases.
+
+   Read the doc for your particular Inline language module for more
+information.
+
+The 'config' Registry File
+--------------------------
+
+   Inline keeps a cached file of all of the Inline Language Support
+Module's meta data in a file called config. This file can be found in your
+DIRECTORY directory. If the file does not exist, Inline creates a new one.
+It will search your system for any module beginning with `Inline::'. It
+will then call that module's register() method to get useful information
+for future invocations.
+
+   Whenever you add a new ILSM, you should delete this file so that Inline
+will auto-discover your newly installed language module.
+
+Configuration Options
+=====================
+
+   This section lists all of the generic Inline configuration options. For
+language specific configuration, see the doc for that language.
+
+DIRECTORY
+---------
+
+   The DIRECTORY config option is the directory that Inline uses to both
+build and install an extension.
+
+   Normally Inline will search in a bunch of known places for a directory
+called `'.Inline/''. Failing that, it will create a directory called
+`'_Inline/''
+
+   If you want to specify your own directory, use this configuration
+option.
+
+   Note that you must create the DIRECTORY directory yourself. Inline will
+not do it for you.
+
+WITH
+----
+
+   WITH can also be used as a configuration option instead of using the
+special 'with' syntax. Do this if you want to use different sections of
+Inline code with different modules. (Probably a very rare usage)
+
+     use Event;
+     use Inline C => DATA => WITH => 'Event';
+
+   Modules specified using the config form of WITH will not be
+automatically required. You must use them yourself.
+
+GLOBAL_LOAD
+-----------
+
+   This option is for compiled languages only. It tells Inline to tell
+DynaLoader to load an object file in such a way that its symbols can be
+dynamically resolved by other object files. May not work on all platforms.
+
+UNTAINT
+-------
+
+   You must use this option  whenever you use Perl's -T switch, for taint
+checking. This option tells Inline to blindly untaint all tainted
+variables. It also turns on SAFEMODE by default.
+
+SAFEMODE
+--------
+
+   Perform extra safety checking, in an attempt to thwart malicious code.
+This option cannot guarantee security, but it does turn on all the
+currently implemented checks.
+
+   There is a slight startup penalty by using SAFEMODE. Also, using
+UNTAINT automatically turns this option on. If you need your code to start
+faster under -T (taint) checking, you'll need to turn this option off
+manually. Only do this if you are not worried about security risks.
+
+NOWARN
+------
+
+     use Inline C => DATA => NOWARN => 1;
+
+   This option tells Inline to turn off any warnings.
+
+   It is *NOT* yet implemented.
+
+Inline Configuration Shortcuts
+------------------------------
+
+   This is a list of all the shorcut configuration options  currently
+available for Inline. Specify them from the command line when running
+Inline scripts.
+
+     perl -MInline=NOCLEAN inline_script.pl
+
+   or
+
+     perl -MInline=Info,force,NoClean inline_script.pl
+
+   You can specify multiple shortcuts separated by commas. They are not
+case sensitive.
+
+CLEAN
+     Tells Inline to remove any build directories that may be lying around
+     in your build area. Normally these directories get removed
+     immediately after a successful build. Exceptions are when the build
+     fails, or when you use the NOCLEAN or REPORTBUG options.
+
+FORCE
+     Forces the code to be recompiled, even if everything is up to date.
+
+GLOBAL
+     Turns on the GLOBAL_LOAD option.
+
+INFO
+     This is a very useful option when you want to know what's going on
+     under the hood. It tells Inline to print helpful information to
+     `STDERR'. Among the things that get printed is a list of which Inline
+     functions were successfully bound to Perl.
+
+NOCLEAN
+     Tells Inline to leave the build files after compiling.
+
+REPORTBUG
+     Puts Inline into 'REPORTBUG' mode, which does special processing when
+     you want to report a bug. REPORTBUG also automatically forces a
+     build, and doesn't clean up afterwards. This is so that you can tar
+     and mail the build directory to me. REPORTBUG will print exact
+     instructions on what to do. Please read and follow them carefully.
+
+     NOTE: REPORTBUG informs you to use the tar command. If your system
+     does not have tar, please use the equivalent zip command.
+
+SAFE
+     Turns SAFEMODE on. UNTAINT will turn this on automatically. While
+     this mode performs extra security checking, it does not guarantee
+     safety.
+
+SITE_INSTALL
+     Says that compiled code should be installed in the Perl
+     installation's "`site_perl'" directory. Use this to permanently
+     install an Inlined module.
+
+     This is the one shortcut that is not normally used from the command
+     line. You put a line like this at the top of a `'test.pl'':
+
+          use Inline SITE_INSTALL;
+
+     This causes 'make test' to put the compiled results in the right
+     place.
+
+UNSAFE
+     Turns SAFEMODE off. Use this in combination with UNTAINT for slightly
+     faster startup time under -T. Only use this if you are sure the
+     environment is safe.
+
+UNTAINT
+     Turn the UNTAINT option on. Used with -T switch.
+
+VERSION
+     Tells Inline to report it's release version. Program will exit
+     immediately after version is printed.
+
+Writing Modules with Inline
+===========================
+
+   Writing CPAN modules that use other programming languages is easy with
+Inline. Let's say that you wanted to write a module called `Math::Simple'.
+Start by using the following command:
+
+     h2xs -AXn Math::Simple
+
+   This will generate a bunch of files that form a skeleton of what you
+need for a distributable module. Next, modify the `Simple.pm' file to look
+like this:
+
+     package Math::Simple;
+     
+     use strict;
+     use vars qw($VERSION @ISA @EXPORT_OK);
+     require Exporter;
+     @ISA = qw(Exporter);
+     @EXPORT_OK = qw(add subtract);
+     BEGIN {
+         $VERSION = '0.01';
+     }
+     
+     use Inline C => 'DATA';
+     
+     1;
+     
+     __DATA__
+     
+     =pod
+     
+     =cut
+     
+     __C__
+     int add(int x, int y) {
+       return x + y;
+     }
+     
+     int subtract(int x, int y) {
+       return x - y;
+     }
+
+   Finally, you need to add the following line to the top of your test.pl
+file:
+
+     use Inline SITE_INSTALL;
+
+   When the person installing `Math::Simple' does a "make test", the
+Inline module will compile the Inlined code and place the executable code
+into the `./blib' directory. Then when a "make install" is done, the
+module will be copied into Perl's `$Config{installsitearch}' directory
+(which is where an installed module should go).
+
+   Now all you need to do is:
+
+     perl Makefile.PL
+     make dist
+
+   That will generate the file `Math-Simple-0.01.tar.gz' which is a
+distributable package.
+
+How Inline Works
+================
+
+   In reality, Inline just automates everything you would need to do if
+you were going to do it by hand (using XS, etc).
+
+   Inline performs the following steps:
+
+  1. Receive the Source Code Inline gets the source code from your script
+     or module with a statements like the following:
+
+          use Inline C => "Source-Code";
+
+     or
+
+          use Inline;
+          bind Inline C => "Source-Code";
+
+     where C is the programming language of the source code, and
+     `Source-Code' is a string (most easily represented by using the "Here
+     Document" quoting style; see `"SYNOPSIS"' in this node above), a file
+     name, an array reference, or a reference to a subroutine.
+
+     Since Inline is coded in a "use" statement, everything is done during
+     Perl's compile time. If anything needs to be done that will affect
+     the `Source-Code' string, it needs to be done in a BEGIN block that
+     is before the "`use Inline ...'" statement. If you really need to
+     specify code to Inline at runtime, you can use the bind() method.
+
+     Source code that is stowed in the 'DATA' section of your code, is
+     read in by an `INIT' subroutine in Inline. That's because the DATA
+     filehandle is not available at compile time.
+
+  2. Check if the Source Code has been Compiled Inline only needs to
+     compile the source code if it has not yet been compiled. It
+     accomplishes this seemingly magical task in an extremely simple and
+     straightforward manner. It runs the source text through the
+     Digest::MD5 module to produce a 128-bit "fingerprint" which is
+     virtually unique. The fingerprint (in hex) is *mangled* with the
+     current package name (and the script name, if the package is "main")
+     along with the name of the programming language, to form a unique
+     name for the executable module. For instance, the C code from
+     `examples/example001.pl' (see `"Examples In C"' in this node) would
+     mangle into:
+
+          main_C_example001_pl_3a9a7ba88a8fb10714be625de5e701f1.so
+
+     If an executable with that name already exists, then proceed to step
+     8. (No compilation is necessary)
+
+  3. Find a Place to Build and Install At this point Inline knows it needs
+     to compile the source code. The first thing to figure out is where to
+     create the great big mess associated with compilation, and where to
+     put the object when it's done.
+
+     By default Inline will try to build and install under the first place
+     that meets one of the following conditions:
+
+          A) The DIRECTORY= config option; if specified
+          B) The PERL_INLINE_DIRECTORY environment variable; if set
+          C) .Inline/ (in current directory); if exists and $PWD != $HOME
+          D) bin/.Inline/ (in directory of your script); if exists
+          E) ~/.Inline/; if exists
+          F) ./_Inline/; if exists
+          G) bin/_Inline; if exists
+          H) Create ./_Inline/; if possible
+          I) Create bin/_Inline/; if possible
+
+     Failing that, Inline will croak. This is rare and easily remedied by
+     just making a directory that Inline will use;
+
+     If the SITE_INSTALL option is in effect, then Inline will only use
+     `./_Inline/' to build in, and the `$Config{installsitearch}'
+     directory to install the executable in. This option is intended to be
+     used in modules that are to be distributed on the CPAN, so that they
+     get installed in the proper place.
+
+  4. Parse the Source for Semantic Cues Inline uses the module
+     Parse::RecDescent to parse through your chunks of source code and
+     look for things that it can create run-time bindings to. For
+     instance, in C it looks for all of the function definitions and
+     breaks them down into names and data types. These elements are used
+     to correctly bind the C function to a Perl subroutine.
+
+  5. Create the Build Environment Now Inline can take all of the gathered
+     information and create an environment to build your source code into
+     an executable. Without going into all the details, it just creates
+     the appropriate directories, creates the appropriate source files
+     including an XS file and a Makefile.PL.
+
+  6. Compile the Code and Install the Executable The planets are in
+     alignment. Now for the easy part. Inline just does what you would do
+     to install a module. "`perl Makefile.PL && make && make test && make
+     install'". If something goes awry, Inline will croak with a message
+     indicating where to look for more info.
+
+  7. Tidy Up By default, Inline will remove all of the mess created by the
+     build process, assuming that everything worked. If the compile fails,
+     Inline will leave everything intact, so that you can debug your
+     errors. Setting the NOCLEAN shortcut option will also stop Inline
+     from cleaning up.
+
+  8. DynaLoad the Executable Inline uses the `DynaLoader::bootstrap'
+     method to pull your external module into Perl space. Now you can call
+     all of your external functions like Perl subroutines.
+
+
+SUPPORTED LANGUAGES
+===================
+
+   This section has been moved to *Note Inline-Support: Inline-Support,.
+
+SUPPORTED PLATFORMS
+===================
+
+   This section has been moved to *Note Inline-Support: Inline-Support,.
+
+SEE ALSO
+========
+
+   For information about using Inline with C see *Note Inline/C: Inline/C,.
+
+   For sample programs using Inline with C see *Note Inline/C-Cookbook:
+Inline/C-Cookbook,.
+
+   For information on supported languages and platforms see *Note
+Inline-Support: Inline-Support,.
+
+   For information on writing your own Inline Language Support Module, see
+*Note Inline-API: Inline-API,.
+
+   Inline's mailing list is inline@perl.org
+
+   To subscribe, send email to inline-subscribe@perl.org
+
+BUGS AND DEFICIENCIES
+=====================
+
+   When reporting a bug, please do the following:
+
+     - Put "use Inline REPORTBUG;" at the top of your code, or
+       use the command line option "perl -MInline=REPORTBUG ...".
+     - Run your code.
+     - Follow the printed directions.
+
+   Here are some things to watch out for:
+
+  1. While Inline does attempt to clean up after itself, there is
+     currently no functionality to remove a shared object when a new
+     version is compiled. This shouldn't be hard to do, but I want to
+     think about it a little more.
+
+  2. If you use function names that happen to be used internally by Perl,
+     you will get a load error at run time. There is currently no
+     functionality to prevent this or to warn you. For now, a list of
+     Perl's internal symbols is packaged in the Inline module distribution
+     under the filename `'symbols.perl''. Avoid using these in your code.
+
+
+AUTHOR
+======
+
+   Brian Ingerson <INGY@cpan.org>
+
+   Neil Watkiss <NEILW@cpan.org> is the author of `Inline::CPP' and
+`Inline::Python'. He also provided assistance for the major reworking in
+version 0.30. It is largely because of Neil, that Inline is evolving at a
+rapid pace.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000 - 2001, Brian Ingerson.
+
+   All Rights Reserved.  This module is free software. It may be used,
+redistributed and/or modified under the terms of the Perl Artistic License.
+
+   See http://www.perl.com/perl/misc/Artistic.html
+
+
+File: pm.info,  Node: Inline-API,  Next: Inline-Support,  Prev: Inline,  Up: Module List
+
+API - How to bind a programming language to Perl using Inline.pm
+****************************************************************
+
+NAME
+====
+
+   Inline-API - How to bind a programming language to Perl using Inline.pm
+
+SYNOPSIS
+========
+
+     #!/usr/bin/perl
+     
+     say_it('foo');  # Use Foo++ to print "Hello, Foo"
+     
+     use Inline Foo => <<'EOFOO';
+     
+       /FOO  This is a function written in Foo++  OOF/
+     
+       deefoon foonkshun say_it
+         < fooprint "Hello,", arrrg(0) >
+     
+     EOFOO
+
+DESCRIPTION
+===========
+
+   So you think Inline C is pretty cool, but what you really need is for
+Perl to work with the brand new programming language "Foo++". Well you're
+in luck. `Inline.pm' has support for adding your own Inline Language
+Support Module (*ILSM*), like `Inline::Foo'.
+
+   Inline has always been intended to work with lots of different
+programming languages. Many of the details can be shared between
+implementations, so that `Inline::Java' has a similar interface to
+`Inline::Fortran'. All of the common code is in `Inline.pm'.
+
+   Language specific modules like `Inline::Python' are subclasses of
+`Inline.pm'. They can inherit as much of the common behaviour as they
+want, and provide specific behaviour of their own. This usually comes in
+the form of Configuration Options and language specific compilation.
+
+   The Inline C support is probably the best boilerplate to copy from.
+Since version 0.30 all C support was isolated into the module `Inline::C'
+and the parsing grammar is further broken out into `Inline::C::grammar'.
+All of these components come with the Inline distribution.
+
+   This POD gives you all the details you need for implementing an ILSM.
+For further assistance, contact inline@perl.org See `"SEE ALSO"' in this
+node below.
+
+A Skeleton
+==========
+
+   For the remainder of this tutorial, let's assume we're writing an ILSM
+for the ficticious language `Foo++'. We'll call it `Inline::Foo'. Here is
+the skeleton Perl code you'll need to implement it.
+
+     package Inline::Foo;
+     
+     use strict;
+     require Inline;
+     require Inline::Foo::grammar;
+     use Parse::RecDescent;
+     use Config;
+     use Carp;
+     
+     $Inline::Foo::VERSION = '0.05';
+     @Inline::Foo::ISA = qw(Inline);
+     
+     #===========================================================
+     # Register Foo++ as an Inline Language Support Module (ILSM)
+     #===========================================================
+     sub register {
+         return {
+                 language => 'Foo',
+                 aliases => ['Foo++', 'F++'],
+                 type => 'compiled',
+                 suffix => $Config{so},
+                };
+     }
+     
+     #==================================
+     # Validate the Foo++ Config Options
+     #==================================
+     sub validate {
+         my $o = shift; # This is the Inline object
+     
+         $o->{Foo} = {};
+         while (@_) {
+         my ($key, $value) = (shift, shift);
+         if ($key eq 'BAR') {
+             $o->{Foo}{BAR} = $value;  # Store config value in object
+             next;
+         }
+         if ($key eq 'BAZ') {
+             $o->{Foo}{BAZ} = $value;
+             next;
+         }
+         croak "'$key' is not a valid config option for Inline::Foo\n";
+         }
+     }
+     
+     #=============================
+     # Parse and compile Foo++ code
+     #=============================
+     sub build {
+         my $o = shift;
+         $o->parse;
+         $o->compile;
+     }
+     
+     #======================================
+     # Only needed for interpreted languages
+     #======================================
+     sub load {
+         my $o = shift;
+     }
+     
+     #============================================
+     # Return a small report about the Foo++ code.
+     #============================================
+     sub info {
+         my $o = shift;
+         my $text = <<'END';
+     This is a small report about the Foo++ code. Perhaps it contains
+     information about the functions the parser found which will be
+     bound to Perl. It will get included in the text produced by the
+     Inline 'INFO' command.
+     END
+         return $text;
+     }
+
+   Except for load(), the subroutines in this code are mandatory for an
+ILSM. What they do is described below. A few things to note:
+
+  1. `Inline::Foo' must be a subclass of Inline. This is accomplished with:
+
+          @Inline::Foo::ISA = qw(Inline);
+
+  2. The line '`require Inline;'' is not necessary. But it is there to
+     remind you not to say '`use Inline;''. This will not work.
+
+  3. Remember, it is not valid for a user to say:
+
+          use Inline::Foo;
+
+     `Inline.pm' will detect such usage for you in its import method,
+     which is automatically inherited since `Inline::Foo' is a subclass.
+
+  4. It is not necessary to implement your parsing with Parse::RecDescent.
+     But I recommend it. :-)
+
+
+The Inline API
+==============
+
+   This section is a more formal specification of what functionality
+you'll need to provide to implement an ILSM.
+
+   When Inline determines that some `Foo++' code needs to be compiled it
+will automatically load your module. It will then call various subroutines
+which you need to supply. We'll call these subroutines "callbacks".
+
+   You will need to provide the following 5 callback subroutines.
+
+The register() Callback
+-----------------------
+
+   This subroutine receives no arguments. It returns a reference to a hash
+of ILSM meta-data. Inline calls this routine only when it is trying to
+detect new ILSM-s that have been installed on a given system. Here is an
+example of the has ref you would return for Foo++:
+
+     {
+      language => 'Foo',
+      aliases => ['Foo++', 'F++'],
+      type => 'compiled',
+     };
+
+   The meta-data items have the following meanings:
+
+language
+     This is the proper name of the language. It is usually implemented as
+     `Inline::X' for a given language 'X'.
+
+aliases
+     This is a reference to an array of language name aliases. The proper
+     name of a language can only contain word characters. [A-Za-z0-9_] An
+     alias can contain any characters except whitespace and quotes. This
+     is useful for names like 'C++' and 'C#'.
+
+type
+     Must be set to 'compiled' or 'interpreted'. Indicates the category of
+     the language.
+
+suffix
+     This is the file extension for the cached object that will be
+     created. For 'compiled' languages, it will probably be 'so' or 'dll'.
+     The appropriate value is in Config.pm.
+
+     For interpreted languages, this value can be whatever you want.
+     Python uses `pydat'.
+
+The validate() Callback
+-----------------------
+
+   This routine gets passed all configuration options that were not
+already handled by the base Inline module. The options are passed as
+key/value pairs. It is up to you to validate each option and store its
+value in the Inline object (which is also passed in). If a particular
+option is invalid, you should croak with an appropriate error message.
+
+The build() Callback
+--------------------
+
+   This subroutine is responsible for doing the parsing and compilation of
+the Foo++ source code. The Inline is passed as the only argument. All
+pertinent information will be stored in this object. `build()' is required
+to create a shared object of a specific name, or to croak with an
+appropriate error message.
+
+   This is the meat of your ILSM. Since it will most likely be quite
+complicated, it is probably best that you study an existing ILSM like
+`Inline::C'.
+
+The load() Callback
+-------------------
+
+   This method only needs to be provided for interpreted languages. It's
+responsibility is to start the interpreter.
+
+   For compiled languages, the load routine from `Inline.pm' is called
+which uses DynaLoader to load the shared object or DLL.
+
+The info() Callback
+-------------------
+
+   This method is called when the user makes use of the INFO shortcut. You
+should return a string containing a small report about the Inlined code.
+
+The Inline Object
+=================
+
+   `Inline.pm' creates a hash based Perl object for each section of
+Inlined source code it receives. This object contains lots of information
+about the code, the environment, and the configuration options used. You
+are free to store any additional information in the object.
+
+   To prevent naming clashes with future version of Inline you use a
+subhash under the key 'Foo' (The name of your language). This is the
+convention.
+
+   This section will describe all of the Inline object attributes.
+
+The code Attribute
+------------------
+
+   This the actual source code passed in by the user. It is stored as one
+long string.
+
+The language Attribute
+----------------------
+
+   The proper name of the language being used.
+
+The language_id Attribute
+-------------------------
+
+   The language name specified by the user. Could be 'Foo++' instead of
+'Foo'.
+
+The module Attribute
+--------------------
+
+   This is the shared object's file name.
+
+The modfname Attribute
+----------------------
+
+   This is the shared object's file name.
+
+The modpname Attribute
+----------------------
+
+   This is the shared object's installation path extension.
+
+The version Attribute
+---------------------
+
+   The version of `Inline.pm' being used.
+
+The pkg Attribute
+-----------------
+
+   The Perl package from which this invocation pf Inline was called.
+
+The parser Attribute
+--------------------
+
+   This is the place where the Parse::RecDescent parser object is normally
+stored.
+
+The install_lib Attribute
+-------------------------
+
+   This is the directory to write the shared object into.
+
+The build_dir Attribute
+-----------------------
+
+   This is the directory under which you should write all of your build
+related files.
+
+The script Attribute
+--------------------
+
+   This is the name of the script that invoked Inline.
+
+The location Attribute
+----------------------
+
+   This is the full path name of the executable object in question.
+
+The suffix Attribute
+--------------------
+
+   This is the shared library extension name. (Usually 'so' or 'dll').
+
+The mod_exists Attribute
+------------------------
+
+   This is a flag indicating whether or not this module has already been
+compiled. (1 for true and 0 for false)
+
+The config Attribute
+--------------------
+
+   This is where all of the non-language specific configuration options
+are stored.
+
+FORCE_BUILD
+     Flag indicating whether or not Inline should call the
+     `Inline::Foo::build()' method even if the code has already been
+     compiled. (0 or 1)
+
+PRINT_VERSION
+     Flag indicating whether or not Inline should print a version message.
+     (0 or 1)
+
+CLEAN_AFTER_BUILD
+     Flag indicating whether or not Inline should delete the contents of
+     the build directory after a successful compilation (0 or 1)
+
+PRINT_INFO
+     Flag indicating whether or not Inline should print an informational
+     report about the code being compiled. (0 or 1)
+
+DIRECTORY
+     The name of the base directory for building and installing Inline
+     executables.
+
+REPORTBUG
+     Flag indicating whether or not Inline is in REPORTBUG mode. (0 or 1)
+
+CLEAN_BUILD_AREA
+     Flag indicating whether or not Inline should perform a special
+     cleanup function on the BLIB directory. (0 or 1)
+
+SITE_INSTALL
+     Flag indicating whether or not the Inline code is meant to be part of
+     a permanent module installation. (0 or 1)
+
+WITH
+     A reference to an array of module names that Inline should poll for
+     configuration hints.
+
+The Inline Namespace
+====================
+
+   `Inline.pm' has been set up so that anyone can write their own language
+support modules. It further allows anyone to write a different
+implementation of an existing Inline language, like C for instance. You
+can distribute that module on the CPAN.
+
+   If you have plans to implement and distribute an Inline module, I would
+ask that you please work with the Inline community. We can be reached at
+the Inline mailing list: inline@perl.org (Send mail to
+inline-subscribe@perl.org to subscribe). Here you should find the advice
+and assistance needed to make your module a success.
+
+   The Inline community will decide if your implementation of COBOL will
+be distributed as the official `Inline::COBOL' or should use an alternate
+namespace. In matters of dispute, I (Brian Ingerson) retain final
+authority. (and I hope not to need use of it :-) Actually modules@perl.org
+retains the *final* authority.
+
+   But even if you want to work alone, you are free and welcome to write
+and distribute Inline language support modules on CPAN. You'll just need
+to distribute them under a different package name.
+
+SEE ALSO
+========
+
+   For generic information about Inline, see *Note Inline: Inline,.
+
+   For information about using Inline with C see *Note Inline/C: Inline/C,.
+
+   For information on supported languages and platforms see *Note
+Inline-Support: Inline-Support,.
+
+   Inline's mailing list is inline@perl.org
+
+   To subscribe, send email to inline-subscribe@perl.org
+
+AUTHOR
+======
+
+   Brian Ingerson <INGY@cpan.org>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2001, Brian Ingerson. All Rights Reserved.  This module
+is free software. It may be used, redistributed and/or modified under the
+terms of the Perl Artistic License.
+
+   See http://www.perl.com/perl/misc/Artistic.html
+
+

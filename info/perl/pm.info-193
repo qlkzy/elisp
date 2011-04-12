@@ -1,0 +1,1739 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Image/Base,  Next: Image/DS9,  Prev: Ima/DBI,  Up: Module List
+
+base class for loading, manipulating and saving images.
+*******************************************************
+
+NAME
+====
+
+   Image::Base - base class for loading, manipulating and saving images.
+
+SYNOPSIS
+========
+
+   This class should not be used directly. Known inheritors are Image::Xbm
+and Image::Xpm.
+
+     use Image::Xpm ;
+
+     my $i = Image::Xpm->new( -file => 'test.xpm' ) ;
+     $i->line( 1, 1, 3, 7, 'red' ) ;
+     $i->ellipse( 3, 3, 6, 7, '#ff00cc' ) ;
+     $i->rectangle( 4, 2, 9, 8, 'blue' ) ;
+
+   If you want to create your own algorithms to manipulate images in terms
+of (x,y,colour) then you could extend this class (without changing the
+file), like this:
+
+     # Filename: mylibrary.pl
+     package Image::Base ; # Switch to this class to build on it.
+     
+     sub mytransform {
+         my $self  = shift ;
+         my $class = ref( $self ) || $self ;
+
+     # Perform your transformation here; might be drawing a line or filling
+     # a rectangle or whatever... getting/setting pixels using $self->xy().
+         }
+
+     package main ; # Switch back to the default package.
+
+   Now if you require mylibrary.pl after you've used Image::Xpm or any
+other Image::Base inheriting classes then all these classes will inherit
+your `mytransform()' method.
+
+DESCRIPTION
+===========
+
+new_from_image()
+----------------
+
+     my $bitmap = Image::Xbm->new( -file => 'bitmap.xbm' ) ;
+     my $pixmap = $bitmap->new_from_image( 'Image::Xpm', -cpp => 1 ) ;
+     $pixmap->save( 'pixmap.xpm' ) ;
+
+   Note that the above will only work if you've installed Image::Xbm and
+Image::Xpm, but will work correctly for any image object that inherits from
+Image::Base and respects its API.
+
+   You can use this method to transform an image to another image of the
+same type but with some different characteristics, e.g.
+
+     my $p = Image::Xpm->new( -file => 'test1.xpm' ) ;
+     my $q = $p->new_from_image( ref $p, -cpp => 2, -file => 'test2.xpm' ) ;
+     $q->save ;
+
+line()
+------
+
+     $i->line( $x0, $y0, $x1, $y1, $colour ) ;
+
+   Draw a line from point ($x0,$y0) to point ($x1,$y1) in colour $colour.
+
+ellipse()
+---------
+
+     $i->ellipse( $x0, $y0, $x1, $y1, $colour ) ;
+
+   Draw an oval enclosed by the rectangle whose top left is ($x0,$y0) and
+bottom right is ($x1,$y1) using a line colour of $colour.
+
+rectangle()
+-----------
+
+     $i->rectangle( $x0, $y0, $x1, $y1, $colour, $fill ) ;
+
+   Draw a rectangle whose top left is ($x0,$y0) and bottom right is
+($x1,$y1) using a line colour of $colour. If `$fill' is true then the
+rectangle will be filled.
+
+new()
+-----
+
+   Virtual - must be overridden.
+
+   Recommend that it at least supports `-file' (filename), `-width' and
+`-height'.
+
+new_from_serialised()
+---------------------
+
+   Not implemented. Recommended for inheritors. Should accept a string
+serialised using serialise() and return an object (reference).
+
+serialise()
+-----------
+
+   Not implemented. Recommended for inheritors. Should return a string
+representation (ideally compressed).
+
+get()           my $width = $i->get( -width ) ;     my( $hotx, $hoty ) = $i->get( -hotx, -hoty ) ;
+--------------------------------------------------------------------------------------------------
+
+   Get any of the object's attributes. Multiple attributes may be
+requested in a single call.
+
+   See `xy' get/set colours of the image itself.
+
+set()
+-----
+
+   Virtual - must be overridden.
+
+   Set any of the object's attributes. Multiple attributes may be set in a
+single call; some attributes are read-only.
+
+   See `xy' get/set colours of the image itself.
+
+xy()
+----
+
+   Virtual - must be overridden. Expected to provide the following
+functionality:
+
+     $i->xy( 4, 11, '#123454' ) ;    # Set the colour at point 4,11
+     my $v = $i->xy( 9, 17 ) ;       # Get the colour at point 9,17
+
+   Get/set colours using x, y coordinates; coordinates start at 0.
+
+   When called to set the colour the value returned is class specific; when
+called to get the colour the value returned is the colour name, e.g.
+'blue' or '#f0f0f0', etc, e.g.
+
+     $colour = xy( $x, $y ) ;  # e.g. #123456
+     xy( $x, $y, $colour ) ;   # Return value is class specific
+
+   We don't normally pick up the return value when setting the colour.
+
+load()
+------
+
+   Virtual - must be overridden. Expected to provide the following
+functionality:
+
+     $i->load ;
+     $i->load( 'test.xpm' ) ;
+
+   Load the image whose name is given, or if none is given load the image
+whose name is in the `-file' attribute.
+
+save()
+------
+
+   Virtual - must be overridden. Expected to provide the following
+functionality:
+
+     $i->save ;
+     $i->save( 'test.xpm' ) ;
+
+   Save the image using the name given, or if none is given save the image
+using the name in the `-file' attribute. The image is saved in xpm format.
+
+CHANGES
+=======
+
+   2000/05/05
+
+   Added some basic drawing methods. Minor documentation changes.
+
+   2000/05/04
+
+   Created.
+
+AUTHOR
+======
+
+   Mark Summerfield. I can be contacted as <summer@perlpress.com> - please
+include the word 'imagebase' in the subject line.
+
+COPYRIGHT
+=========
+
+   Copyright (c) Mark Summerfield 2000. All Rights Reserved.
+
+   This module may be used/distributed/modified under the LGPL.
+
+
+File: pm.info,  Node: Image/DS9,  Next: Image/DeAnim,  Prev: Image/Base,  Up: Module List
+
+interface to the DS9 image display and analysis program
+*******************************************************
+
+NAME
+====
+
+   Image::DS9 - interface to the DS9 image display and analysis program
+
+SYNOPSIS
+========
+
+     use Image::DS9;
+     use Image::DS9 qw( :<group> );  # import constants from group <group>
+     use Image::DS9 qw( :all );	  # import all constants
+
+     $dsp = new Image::DS9;
+     $dsp = new Image::DS9( \%attrs );
+
+DESCRIPTION
+===========
+
+   This class provides access to the *DS9* image display and analysis
+program through its *XPA* access points.
+
+   *DS9* is a rather flexible and feature-rich image display program.
+Rather than extol its virtues, please consult the website in `' in this
+node.
+
+   This class is rather bare at present, providing a low level interface
+to the XPA access points.  Eventually these will be hidden by an elegant
+framework that will make life wonderful.
+
+   To use this class, first construct a *Image::DS9* object, and then
+apply it's methods.  It is possible to both address more than one *DS9*
+with a single object, as well as having multiple *Image::DS9* objects
+communicate with their own *DS9* invocations.  Eventually there will be
+documentation spelling out how to do this.
+
+METHODS
+=======
+
+Constants
+---------
+
+   Commands sent to DS9 are sent as strings.  To prevent typos (and other
+unwanted sideeffects) *Image::DS9* makes many of the commands and
+subcommands available as Perl constants - mistype these and the compiler
+will complain, not *DS9*.
+
+   Predefined constants may be imported when the *Image::DS9* package is
+loaded, by specifying one or more of the following tags: frame, `tile',
+filetype, display, scale, `mode_ops', `orient_ops', or all.
+
+   For example:
+
+     use Image::DS9 qw( :frame :tile :filetype :display );
+
+   The frame group imports `FR_active', `FR_all', `FR_center', `FR_clear',
+`FR_delete', `FR_first', `FR_hide', `FR_last', `FR_new', `FR_next',
+`FR_prev', `FR_refresh', `FR_reset', `FR_show'.
+
+   The `tile' group imports `T_Grid', `T_Column', `T_Row'.
+
+   The filetype group imports `FT_MosaicImage', `FT_MosaicImages',
+`FT_Mosaic', `FT_Array'.
+
+   The display group imports `D_blink', `D_tile', `D_single'.
+
+   The scale group imports `S_linear', `S_log', `S_squared', `S_sqrt',
+`S_minmax', `S_zscale', `S_user', `S_local', `S_global', `S_limits',
+`S_mode', `S_scope'.
+
+   The `mode_ops' group imports `MB_pointer', `MB_crosshair',
+`MB_colorbar', `MB_pan', `MB_zoom', `MB_rotate', `MB_examine'.
+
+   The `orient-ops' group imports `OR_X', `OR_Y', `OR_XY'.
+
+   The all group imports all of the above groups, as well as ON, OFF, `YES'
+`NO'.
+
+Boolean values
+--------------
+
+   Some methods take boolean values; these may be the strings `on', `off',
+`yes', no, or the integers 1 or 0.
+
+Return values
+-------------
+
+   Because a single *Image::DS9* object may communicate with multiple
+instances of *DS9*, most return values are hashes, rather than scalars.
+The hash has as keys the names of the servers, with the values being
+references to hashes with the keys name, `buf' and message.  The `buf' key
+will be present if there are no errors for that server, the message if
+there were.
+
+   For example,
+
+     use Data::Dumper;
+     %colormaps = $dsp->colormap;
+     print Dumper \@colormaps;
+
+   yields
+
+     $VAR1 = {
+              'DS9:ds9 838e2ab4:32832' =>
+               {
+                 'name' => 'DS9:ds9 838e2ab4:32832',
+                 'buf' => 'Grey'
+               }
+             };
+
+   If you know that there is only one server out there  (for example, if
+the object was created with max_servers set to 1), you can call a method
+in a scalar environment, and it will directly return the value:
+
+     $colormap = $dsp->colormap;
+
+   If there is more than one server, you'll get the results for a randomly
+chosen server.
+
+   Sending data usually doesn't result in a return:
+
+     $dsp->colormap( 'Grey' );
+
+Error Returns
+-------------
+
+   In case of error, an exception is thrown via *croak()*.  The *res()*
+method will return a hash, keyed off of the servers name.  For each server
+which had an error, the hash value will be a reference to a hash
+containing the keys name and message; the latter will contain error
+information.  For those commands which return data, and for those servers
+which did not have an error, the `buf' key will be available.
+
+Methods
+-------
+
+new
+          $dsp = new Image::DS9;
+          $dsp = new Image::DS9( \%attrs );
+
+     Construct a new object.  It returns a handle to the object.  It throws
+     an exception (catch via eval) upon error.
+
+     The optional hash attrs may contain one of the following keys:
+
+    Server
+          An alternate server to which to communicate.  It defaults to
+          `ds9'.
+
+    max_servers
+          The maximum number of servers to which to communicate.  It
+          defaults to the number of `DS9' servers running at the time the
+          constructor is called.
+
+    min_servers
+          The minimum number of servers which should respond to commands.
+          If a response is not received from at least this many servers,
+          an exception will be thrown.  It defaults to 1.
+
+     For example,
+
+          $dsp = new Image::DS9( { max_servers => 3 } );
+
+nservers
+          $nservers = $dsp->nservers;
+
+     This returns the number of servers which the object is communicating
+     with.
+
+array
+          $dsp->array( $image );
+          $dsp->array( $image, \%attrs );
+
+     This is a simple interface to the array access point, which displays
+     images.  If *$image* is a PDL object, all required information is
+     extracted from it, and it is passed to *DS9*.  Otherwise, it should
+     be binary data suitable for *DS9*, and the attrs hash should be used
+     to pass dimensional and size data to *DS9*.  attrs may contain the
+     following elements:
+
+    xdim
+          The X coordinate array extent.
+
+    ydim
+          The Y coordinate array extent.
+
+    bitpix
+          The number of bits per pixel.  Negative values indicate a
+          floating point number.
+
+colormap
+          $dsp->colormap( $colormap );
+          @colormaps = $dsp->colormap;
+
+     If an argument is specified, it should be the name of a colormap (case
+     is not important).  If no argument is specified, the current colormaps
+     for all of the *DS9* instances is returned, as a list containing
+     references to hashes with the keys name and `buf'.  The latter will
+     contain the colormap name.
+
+display
+          $dsp->display( $state );
+          %displays = $dsp->display;
+
+     If an argument is specified, this call will change how the data are
+     displayed. $state may be one of the constants `D_blink', `D_tile', or
+     `D_single' (or, equivalently, 'blink', 'tile', 'single' ).  The
+     constants are available by importing the display tag.
+
+     If no argument is specified, the current display states of the *DS9*
+     servers are returned (see `' in this node for the format).  The state
+     is will be returned as a string equivalent to the constants `D_blink',
+     `D_tile' or `D_single'.  For instance:
+
+          my $ds9 = new DS9( { max_servers => 1 } );
+
+          print "We're blinking!\n" if D_blink eq $ds9->display;
+
+file
+          $dsp->file( $file );
+          $dsp->file( $file, $type );
+          %files = $dsp->file;
+
+     Display the specified $file.  The file type is optional, and may be
+     one of the following constants: `FT_MosaicImage', `FT_MosaicImages',
+     `FT_Mosaic', `FT_Array' (or one of the strings `'mosaicimage'',
+     `'mosaicimages'', `'mosaic'', or `'array'' ). (Import the filetype
+     tag to get the constants).
+
+     If called without a value, it will return the current file name loaded
+     for the current frame.
+
+frame
+          @frames = $dsp->frame;
+
+          # perform a frame operation with no arguments
+          $dsp->frame( $frame_op );
+
+          # show the specified frame
+          $dsp->frame( show => $frame );
+
+          # delete the current frame
+          $dsp->frame( FR_delete );
+          
+          # delete the specified frame
+          $dsp->frame( delete => $frame );
+
+          # delete all of the frames
+          $dsp->frame( delete => FR_all );
+
+     Command *DS9* to do frame operations.  Frame operations are nominally
+     strings.  As *DS9* will interpret any string which isn't a frame
+     operation as the name of frame to switch to (or create, if
+     necessary), *Image::DS9* provides constants for the standard
+     operations to prevent typos.  See `' in this node.  Otherwise, use
+     the strings active, all, center, clear, delete, hide, new, refresh,
+     reset, show, first, next, prev, last.
+
+     To load a particular frame, specify the frame name as the operator.
+
+     To show a frame which has been hidden, use the second form with the
+     show operator.
+
+     For example,
+
+          $dsp->frame( FR_new );		# use the constant
+          $dsp->frame( 'new' );		# use the string literal
+          $dsp->frame( '3' );		# load frame 3
+          $dsp->frame( FR_hide );		# hide the current frame
+          $dsp->frame( show => 3 );	# show frame 3
+          $dsp->frame( FR_delete );	# delete the current frame
+
+     If frame() is called with no arguments, it returns a list of the
+     current frames for all instances of *DS9*.
+
+iconify
+          $iconify_state = $dsp->iconify;
+          %iconify_state = $dsp->iconify;
+          $dsp->iconify($bool);
+
+     With a boolean argument, specify the iconification state, else return
+     it.
+
+mode
+          $mode = $dsp->mode;
+          $dsp->mode( $state );
+
+     Change (or query) the first mouse button mode state.  Predefined
+     states are available via the `mode_ops' group; see `' in this node.
+
+orient
+          $state = $dsp->orient;
+          $dsp->orient( $state );
+
+     Change (or query) the orientation of the current frame. Predefined
+     states are available via the `orient_ops' group; see `' in this node.
+
+rotate
+          $rotate = $dsp->rotate;
+          $dsp->rotate( abs => $rotate );
+          $dsp->rotate( rel => $rotate );
+          $dsp->rotate( $rotate );
+
+     Change or query the rotation angle (in degrees) for the current frame.
+     A rotatation may be absolute or relative; this is explicitly specified
+     in the second and third forms of the method invocation.  If not
+     specified (as in the last form) it is relative.
+
+     If no argument is specified, it returns the rotatation angle for the
+     current frame.
+
+res
+          $res = $dsp->res;
+
+     In case of error, the returned results from the failing *XPA* call
+     are available via this method.  It returns a reference to an array of
+     hashes, one per instance of *DS9* addressed by the object.  See the
+     *IPC::XPA* documentation for more information on what the hashes
+     contain.
+
+scale
+          $dsp->scale( $algorithm );
+          $dsp->scale( S_limits => [ $min, $max ] );
+          $dsp->scale( S_mode => $mode );
+          $dsp->scale( S_scope => $scope );
+
+          %scale = $dsp->scale;
+          %limits = $dsp->scale( S_limits );
+          %mode = $dsp->scale( S_mode );
+          %scope = $dsp->scale( S_scope );
+
+     This specifies how the data will be scaled.  `$algorithm' may be one
+     of the constants `S_linear', `S_log', `S_squared', `S_sqrt' (or,
+     equivalently, `'linear'', `'log'', `'squared'', `'sqrt'').
+
+     $mode may be one of `S_minmax', `S_zscale', `S_user' (or,
+     equivalently, `'minmax'', `'zscale'', `'user'').
+
+     `$scope' may be on of `S_local', `S_global' (or, equivalently,
+     `'local'', `'global'' ).
+
+     The constants are available if the scale tag is imported (see `' in
+     this node).  The second set of invocations shown above illustrates
+     how to determine the current values of the scale parameters.
+
+tile_mode
+          $dsp->tile_mode( $mode );
+
+     The tiling mode may be specified by setting $mode to `T_Grid',
+     `T_Column', or `T_Row'.  These constants are available if the
+     `tile_op' tags are imported.  Otherwise, use `'grid'', c<'column'>,
+     or `'row''.  If called without a value, it will return the current
+     tiling mode.
+
+zoom
+          $zoom = $dsp->zoom;
+          $dsp->zoom( abs => $zoom );
+          $dsp->zoom( rel => $zoom );
+          $dsp->zoom( $zoom );
+
+     This changes the zoom value for the current frame.  `$zoom' is a
+     positive numerical value.  A zoom value may be absolute or relative.
+     This is explicitly specified in the second and third forms of the
+     method invocation.  If not specified (as in the last form) it is
+     absolute.  To zoom such that the image fits with in the frame,
+     specify a zoom value of 0.
+
+     If no argument is specified, it returns the zoom value for the current
+     frame.
+
+REQUIREMENTS
+============
+
+   *Image::DS9* requires *IPC::XPA* to be installed.  At present, both
+*DS9* and *xpans* (part of the *XPA* distribution) must be running prior
+to any attempts to access *DS9*.  *DS9* will automatically start *xpans*
+if it is in the user's path.
+
+   *DS9* is available at `http://hea-www.harvard.edu/RD/ds9/'.
+
+   *XPA* is available at `http://hea-www.harvard.edu/RD/xpa/'.
+
+AUTHOR
+======
+
+   Diab Jerius ( djerius@cfa.harvard.edu )
+
+SEE ALSO
+========
+
+   perl(1), IPC::XPA.
+
+
+File: pm.info,  Node: Image/DeAnim,  Next: Image/Grab,  Prev: Image/DS9,  Up: Module List
+
+create static GIF file from animated GIF
+****************************************
+
+NAME
+====
+
+   Image::DeAnim - create static GIF file from animated GIF
+
+SYNOPSIS
+========
+
+     use Image::DeAnim;
+     
+     open(G,"animated.gif") or die;
+     undef $/;
+     $gif = <G>;
+     $newgif = Image::DeAnim::gif(\$gif);
+     print $$newgif;
+
+     # Using HTTP::Response
+
+     if ($self -> content_type eq 'image/gif') {
+        my $gif = $self -> content;
+        $self -> content (${&Image::DeAnim::gif(\$gif)});
+     }
+
+DESCRIPTION
+===========
+
+   Image::DeAnim::gif takes a reference to a scalar conatining a GIF
+image, and returns a scalar reference to a filtered GIF image.  If the
+input is an animated GIF, the output will be a static GIF of the last
+frame of the animation.  If the input is already a static GIF, the output
+file should be (mostly) identical.
+
+   Image::DeAnim is intended for use with a HTTP proxy server, in order to
+de-animate GIFs before they reach the browser window.
+
+BUGS
+====
+
+   Currently only outputs last frame.  Options for first/other shouldn't
+be too difficult, though.
+
+   If the last image of the animation is not the same size as the first,
+the remaining image is blacked out (no overlay).  It doesn't bother me,
+but it may for others.
+
+   Doesn't work with cached animations, although as images work their way
+out of the cache, this shouldn't be a problem.
+
+   Not very Perl-ish; can probably use lots of fixing, and better
+documentation.  OO in place of references seems to be the next logical
+step.
+
+AUTHOR
+======
+
+   Ken MacFarlane, <ksm+cpan@universal.dca.net>
+
+COPYRIGHT
+=========
+
+   Copyright 1999.  This program may be distributed under the Perl
+Artistic License.
+
+
+File: pm.info,  Node: Image/Grab,  Next: Image/Info,  Prev: Image/DeAnim,  Up: Module List
+
+Perl extension for Grabbing images off the Internet.
+****************************************************
+
+NAME
+====
+
+   Image::Grab - Perl extension for Grabbing images off the Internet.
+
+SYNOPSIS
+========
+
+     # If you call grab without instantiating an Image::Grab, then you
+     # can pass grab args and it will instantiate one for you and return
+     # the result.
+     use Image::Grab qw(grab);
+     $image = grab(URL=>'http://www.example.com/test.gif');
+
+     use Image::Grab;
+     $pic = new Image::Grab;
+
+     # You can also pass new arguments:
+     use Image::Grab;
+     $pic = Image::Grab->new(SEARCH_URL=>'http://www.example.com/',
+                             REGEXP    =>'.*\.gif');
+
+     # The simplest OO case of a grab
+     use Image::Grab;
+     $pic->url('http://www.example.com/someimage.jpg')
+     $pic->grab;
+
+     # Now to save the image to disk
+     open(IMAGE, ">image.jpg") || die"image.jpg: $!";
+     binmode IMAGE;  # for MSDOS derivations.
+     print IMAGE $pic->image;
+     close IMAGE;
+
+     # A slightly more complicated case
+     use Image::Grab;
+     $pic->regexp('.*logo.*\.gif');
+     $pic->search_url('http://www.example.com');
+     $pic->grab;
+
+     # Get a weather forecast
+     use Image::Grab;
+     $pic->regexp('msy.*\.gif');
+     $pic->search_url('http://www.example.com/weather/msy/content.shtml');
+     $pic->grab;
+
+DESCRIPTION
+===========
+
+   Image::Grab is a simple way to get images with URLs that are either not
+predictable or are "hidden" by some method.
+
+RATIONALE
+=========
+
+   I created this module so that I would have a uniform API for grabbing
+multiple images from multiple sites that use various methods of making
+their images difficult to retrieve automatically.
+
+   I've tried to put into code all the ways that website creators will use
+to try to "protect" their images.  If you know of any methods I've missed,
+please email me.
+
+   This module was born from a script.  The script was born when a certain
+Comics Syndicate stopped having a static (or even predictable) url for
+their comics.  I generalized the code for a friend when he needed to do
+something similar.
+
+   Hopefully, others will find this module useful as well.
+
+Retrieval Methods and Properties
+================================
+
+   The following are the retrieval methods and properties available for
+any Image::Grab object.
+
+   One of the following should be set to specify the image.  If either
+`regexp' in this node or `index' in this node are used to specify the
+image, then `search_url' in this node must be set to specify the page to
+be searched for the image.
+
+   *Image::Grab* will use the data in the following order: `url' in this
+node, `regexp' in this node, `index' in this node.
+
+   `refer' in this node, `regexp' in this node, `search_url' in this node
+and `url' in this node all have POSIX time string expansion performed on
+them by the `expand_url|' in this node method when `do_posix' in this node
+is set.  Thus, if you wish to have a '%' character in your URL, you must
+put '%%'.
+
+url
+---
+
+   The fully qualified URL of the image.  This method is included simply
+for completeness and convenience.  If this is all you need, you might
+check out LWP::Simple.  (Although, the date expansion is nice...)
+
+   POSIX time string expansion is performed if `do_posix' in this node is
+set.
+
+   Example:
+
+     $url = $image->url("http://www.example.com/%Y/%m/%d.gif");
+
+search_url
+----------
+
+   If `regexp' in this node and/or `index' in this node methods are used
+to specify an image then the url in the search_url field will be used to
+find the image.  For example, if `regexp="mac.*\.gif"' and
+`search_url="http://www.example.com"', then when a grab is performed, the
+page at www.example.com is searched to see if any images on the page match
+the regular expression `"mac.*\.gif"'.
+
+   Also, when Image::Grab finally grabs the image, it uses the
+`search_url' in this node as the referer field.
+
+   POSIX time string expansion is performed if `do_posix' in this node is
+set.
+
+   Example:
+
+     $image->search_url("http://www.example.com/weather_maps.html");
+
+index
+-----
+
+   An integer indicating the image on the page to grab.  For instance, '1'
+would find the second image on the page pointed to by `search_url' in this
+node.  Used in conjunction with `regexp' in this node, it specifies which
+image to grab that the regular expression matches.
+
+   Example:
+
+     $image->search_url("http://www.example.com/index.html");
+     $image->regexp(".*\.gif");
+     $image->index(1);
+
+regexp
+------
+
+   A regular expression that will match the URL of the image.  If `index'
+in this node is not set, then the first image that matches will be used.
+If `index' in this node is set, then the nth image (base 0) that matches
+will be used.
+
+   Set `search_url' in this node to the web page that you want to search
+with this regular expression.
+
+   POSIX time string expansion is performed if `do_posix' in this node is
+set.
+
+   Example:
+
+     $image->search_url("http://www.example.com/index.html");
+     $image->regexp(".*\.gif");
+
+grab ([$tries])
+---------------
+
+   Grab the image.  Returns $image->image;
+
+   If the `url' in this node method is not used to give an absolute url,
+then `expand_url|' in this node is called before the image is fetched.
+
+   If $tries is specified, then $tries are attempted before giving up.
+$tries defaults to 10.
+
+   Example:
+
+     $image->url("http://www.example.com/comic_strip/%Y/%M/%d.gif");
+     $pic = $image->grab;
+
+grab_new ([$tries])
+-------------------
+
+   If neither `date' in this node nor `md5' in this node are set, than
+this method acts identically to `grab|' in this node.
+
+   If `md5' in this node is set, then the grab is performed only if the
+checksum of the newer image is different than the current checksum.
+
+   If `date' in this node is set than the grab is performed only if the
+image has been modified since `date' in this node.
+
+   If both `date' in this node and `md5' in this node are set then the
+conditions are ANDed.  That is, the image is returned only if it has been
+modified since `date' in this node and its checksum is different than
+`md5' in this node.
+
+Image Properties
+================
+
+   These are various properties of the image.  Generally, you don't want
+to set these after you've grabbed an image..
+
+image
+-----
+
+   Returns the actual image.
+
+date
+----
+
+   The date that the image was last updated.  The date is represented in
+the number of seconds from epoch.
+
+   If this is set when `grab_new|' in this node is called, then an image
+will only be returned if the date of the image is newer than the date set
+in this field.  (See `grab_new|' in this node for full details.)
+
+     $image->date(localtime(time));
+
+     # Grab the image if it changes in the past 30 seconds;
+     $pic = $image->grab_new;
+     $date = $image->date;
+
+md5
+---
+
+   The md5 sum for the image.
+
+   If this is set when `grab_new|' in this node is called, then an image
+will only be returned if the md5 checksums don't match. (See `grab_new|'
+in this node for full details.)
+
+   This will only be used if the MD5 module is available.  Otherwise,
+there will be no effect.
+
+type
+----
+
+   The Content-Type of information returned.  Usually it will be a MIME
+type such as "image/jpeg".
+
+Other Properties
+================
+
+   These are miscellaneous properties.  `do_posix' in this node and
+`cookiefile' in this node are the only ones you should need to use.
+
+do_posix
+--------
+
+   Tells Image::Grab to do POSIX date substitution.  This is on by default
+in recentish perls.
+
+   Perl versions 5.005 and up will have this set versions before this will
+not in order to avoid buggy behavior on long URLs.  If you have an earlier
+version of Perl and wish to use the expansion, then set this on:
+
+     $image->do_posix(1);
+
+cookiefile
+----------
+
+   Where the cookiefile is located.  Set this to the file containing the
+cookies if you wish to use the cookie file for the image.
+
+   For example, I use this to authenticate on sites that require cookie
+authentication.  To do this, first load the cookie file by visiting the
+site with Netscape and getting a cookie.  Next, set the cookie file like
+this:
+
+     $image->cookiefile($ENV{HOME} ."/.netscape/cookies")
+
+   Image::Grab will automatically send the correct cookie when the remote
+server asks for it.
+
+   The cookiefile is assumed to be in Netscape Navigator's format.
+
+cookiejar
+---------
+
+   Usually only used internally.  Contains an HTTP::Cookies::Netscape
+blessed reference.
+
+ua
+--
+
+   This contains an Image::Grab::RequestAgent blessed reference.
+Image::Grab::RequestAgent is sub-class of LWP::UserAgent and inherits all
+its methods.
+
+refer
+-----
+
+   When you do a `grab|' in this node, this url will be given as the
+referring URL.
+
+   POSIX time string expansion is performed if `do_posix' in this node is
+set.
+
+Other Methods
+=============
+
+auth($user, $password)
+----------------------
+
+   Provides a username/password pair for grabbing the image.
+
+getAllURLs ([$tries])
+---------------------
+
+   Returns a list of URLs pointing to images from the page pointed to by
+`search_url' in this node.  Of course, `search_url' in this node must be
+set for this method to be of any use.
+
+   If $tries is specified, then $tries are attempted before giving up.
+$tries defaults to 10.
+
+   Returns undef if no connection is made in $tries attempts.
+
+expand_url ([$tries])
+---------------------
+
+getRealURL ([$tries])
+---------------------
+
+   Returns the actual URL of the image specified.  Performs POSIX time
+string expansion (see strftime(3)) using the current time if do_posix is
+set.
+
+   You can use this method to get the URL for an image if that is all you
+need.
+
+   If $tries is specified, then $tries are attempted before giving up.
+$tries defaults to 10.
+
+   Returns undef if no connection is made in $tries attempts, if the
+`search_url' in this node URL is not of type text/html, or if no image that
+matches the specs is found.
+
+   If `url' in this node is given a full URL, then it is returned with
+POSIX time string expansion performed if `do_posix' in this node is set.
+
+   The *getRealURL* method is deprecated.
+
+   Example:
+
+     $image->regexp('msy.*\.gif');
+     $image->search_url('http://www.example.com/weather/msy/content.shtml');
+     $url = $image->expand_url;
+
+     # Grab the image using LWP::Simple.
+     use LWP::Simple;
+     $pic = get($url);
+
+loadCookieJar
+-------------
+
+   Usually used only internally.  Loads up the cookiejar with cookies.
+
+BUGS
+====
+
+   getAllURLs and expand_url should really be fixed so that they go out to
+the 'net only once if they need to.
+
+   POSIX date substitution screws up strings longer than 127 chars.  At
+least on Perl 5.004_04 - Perl 5.005_03 seems to behave properly.
+
+   Ummm... I am sure there are others...
+
+LICENSE
+=======
+
+   Same as Perl.
+
+AUTHOR
+======
+
+   Mark A. Hershberger (mah@everybody.org), http://everybody.org/mah/
+
+SEE ALSO
+========
+
+   *Note HTTP/Request: HTTP/Request,, *Note HTTP/Cookies: HTTP/Cookies,,
+*Note HTML/TreeBuilder: HTML/TreeBuilder,, *Note LWP/UserAgent:
+LWP/UserAgent,, *Note Digest/MD5: Digest/MD5,, *Note URI/URL: URI/URL,,
+strftime(3).
+
+
+File: pm.info,  Node: Image/Info,  Next: Image/Info/ASCII,  Prev: Image/Grab,  Up: Module List
+
+Extract meta information from image files
+*****************************************
+
+NAME
+====
+
+   Image::Info - Extract meta information from image files
+
+SYNOPSIS
+========
+
+     use Image::Info qw(image_info dim);
+
+     my $info = image_info("image.jpg");
+     if (my $error = $info->{error}) {
+         die "Can't parse image info: $error\n";
+     }
+     my $color = $info->{color_type};
+
+     my($w, $h) = dim($info);
+
+DESCRIPTION
+===========
+
+   This module provide functions to extract various kind of meta
+information from image files.  The following functions are provided by the
+`Image::Info' module:
+
+image_info( $file )
+image_info( \$imgdata )
+image_info( $file, key => value,... )
+     This function takes the name of a file or a file handle as argument
+     and will return one or more hashes (actually hash references)
+     describing the images inside the file.  If there is only one image in
+     the file only one hash is returned.  In scalar context, only the hash
+     for the first image is returned.
+
+     In case of error, and hash containing the "error" key will be
+     returned.  The corresponding value will be an appropriate error
+     message.
+
+     If a reference to a scalar is passed as argument to this function,
+     then it is assumed that this scalar contains the raw image data
+     directly.
+
+     The image_info() function also take optional key/value style arguments
+     that can influence what information is returned.
+
+dim( $info_hash )
+     Takes an hash as returned from image_info() and returns the dimensions
+     ($width, $height) of the image.  In scalar context returns the
+     dimensions as a string.
+
+html_dim( $info_hash )
+     Returns the dimensions as a string suitable for embedding directly
+     into HTML <img>-tags. E.g.:
+
+          print "<img src="..." @{[html_dim($info)]}>\n";
+
+Image descriptions
+==================
+
+   The image_info() function returns meta information about each image in
+the form of a reference to a hash.  The hash keys used are in most cases
+based on the TIFF element names.  All lower case keys are mandatory for
+all file formats and will always be there unless an error occured (in
+which case the "error" key will be present.)  Mixed case keys will only be
+present when the corresponding information element is available in the
+image.
+
+   The following key names are common for any image format:
+
+file_media_type
+     This is the MIME type that is appropriate for the given file format.
+     The corresponding value is a string like: "image/png" or "image/jpeg".
+
+file_ext
+     The is the suggested file name extention for a file of the given file
+     format.  The value is a 3 letter, lowercase string like "png", "jpg".
+
+width
+     This is the number of pixels horizontally in the image.
+
+height
+     This is the number of pixels vertically in the image.  (TIFF use the
+     name ImageLength for this field.)
+
+color_type
+     The value is a short string describing what kind of values the pixels
+     encode.  The value can be one of the following:
+
+          Gray
+          GrayA
+          RGB
+          RGBA
+          CMYK
+          YCbCr
+          CIELab
+
+     These names can also be prefixed by "Indexed-" if the image is
+     composed of indexes into a palette.  Of these, only "Indexed-RGB" is
+     likely to occur.
+
+     (It is similar to the TIFF field PhotometricInterpretation, but this
+     name was found to be too long, so we used the PNG inpired term
+     instead.)
+
+resolution
+     The value of this field normally gives the physical size of the image
+     on screen or paper. When the unit specifier is missing then this field
+     denotes the squareness of pixels in the image.
+
+     The syntax of this field is:
+
+          <res> <unit>
+          <xres> "/" <yres> <unit>
+          <xres> "/" <yres>
+
+     The <res>, <xres> and <yres> fields are numbers.  The <unit> is a
+     string like `dpi', `dpm' or `dpcm' (denoting "dots per inch/cm/meter).
+
+SamplesPerPixel
+     This says how many channels there are in the image.  For some image
+     formats this number might be higher than the number implied from the
+     color_type.
+
+BitsPerSample
+     This says how many bits are used to encode each of samples.  The value
+     is a reference to an array containing numbers. The number of elements
+     in the array should be the same as SamplesPerPixel.
+
+Comment
+     Textual comments found in the file.  The value is a reference to an
+     array if there are multiple comments found.
+
+Interlace
+     If the image is interlaced, then this tell which interlace method is
+     used.
+
+Compression
+     This tell which compression algorithm is used.
+
+Gamma
+     A number.
+
+LastModificationTime
+     A ISO date string
+
+Supported Image Formats
+=======================
+
+   The following image file formats are currently supported:
+
+ASCII
+     For more information see *Note Image/Info/ASCII: Image/Info/ASCII,.
+
+BMP
+     This module supports the Microsoft Device Independent Bitmap format
+     (BMP, DIB, RLE).
+
+     For more information see *Note Image/Info/BMP: Image/Info/BMP,.
+
+GIF
+     Both GIF87a and GIF89a are supported and the version number is found
+     as `GIF_Version' for the first image.  GIF files can contain multiple
+     images, and information for all images will be returned if
+     image_info() is called in list context.  The Netscape-2.0 extention to
+     loop animation sequences is represented by the `GIF_Loop' key for the
+     first image.  The value is either "forever" or a number indicating
+     loop count.
+
+JPEG
+     For JPEG files we extract information both from JFIF and `Exif'
+     application chunks.
+
+     `Exif' is the file format written by most digital cameras.  This
+     encode things like timestamp, camera model, focal length, exposure
+     time, aperture, flash usage, GPS position, etc.  The following web
+     page contain description of the fields that can be present:
+
+          http://www.butaman.ne.jp/~tsuruzoh/Computer/Digicams/exif-e.html
+
+PNG
+     Information from IHDR, PLTE, gAMA, pHYs, tEXt, tIME chunks are
+     extracted.  The sequence of chunks are also given by the `PNG_Chunks'
+     key.
+
+PBM/PGM/PPM
+     All information available is extracted.
+
+SVG
+     SVG also provides (for) a plethora of attributes and metadata of an
+     image.  See *Note Image/Info/SVG: Image/Info/SVG, for details.
+
+XBM
+     See *Note Image/Info/XBM: Image/Info/XBM, for details.
+
+XPM
+     See *Note Image/Info/XPM: Image/Info/XPM, for details.
+
+SEE ALSO
+========
+
+   *Note Image/Size: Image/Size,
+
+AUTHOR
+======
+
+   Copyright 1999-2000 Gisle Aas.
+
+   GIF fixes by Ralf Steines <metamonk@yahoo.com>
+
+   ASCII, BMP SVG, XPM and XBM support added by Jerrad Pierce
+<belg4mit@mit.edu>/<webmaster@pthbb.org>
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: Image/Info/ASCII,  Next: Image/Info/BMP,  Prev: Image/Info,  Up: Module List
+
+ASCII support for Image::Info
+*****************************
+
+NAME
+====
+
+   Image::Info::ASCII - ASCII support for Image::Info
+
+SYNOPSIS
+========
+
+     use Image::Info qw(image_info dim);
+
+     my $info = image_info("image.txt");
+     if (my $error = $info->{error}) {
+         die "Can't parse image info: $error\n";
+     }
+     my $color = $info->{color_type};
+
+     my($w, $h) = dim($info);
+
+DESCRIPTION
+===========
+
+   This modules supplies the standard key names except for Compression,
+Gamma, Interlace, LastModificationTime, as well as:
+
+ColorPalette
+     Reference to an array of all colors used.  This key is only present
+     if `image_info' is invoked as `image_info({ColorPalette=>1})'.
+
+ColorTableSize
+     The number of colors the image uses.
+
+L1D_Histogram
+     Reference to an array representing a one dimensioanl luminance
+     histogram. This key is only present if `image_info' is invoked as
+     `image_info($file, L1D_Histogram=>1)'. The range is from 0 to 127,
+     however auto-vivification is used so a null field is also 0, and the
+     array may not actually contain 127 fields. The index in the array
+     corresponds to the ord of the character and thusly fields
+     0-8,11,12,14-31 should always be blank.
+
+     While not immediately obvious, this could be used to accquire
+     information about a normal text file and it's language.  Though it
+     would likely have to be English, Hawaiian, Swahili, or Latin (unless
+     you can be assured that no 8th bit characters occur in the first 32
+     bytes of the source).
+
+SEE ALSO
+========
+
+   *Note Image/Info: Image/Info,, `ascii' in this node,
+`http://czyborra.com/charsets/iso646.html'
+
+NOTES
+=====
+
+   For more information about ASCII art see:
+
+     news:alt.ascii-art
+
+BUGS
+====
+
+   Other than being completely functional yet potentially useless?
+
+AUTHOR
+======
+
+   Jerrad Pierce <belg4mit@mit.edu>/<webmaster@pthbb.org>
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   MAGIC: /^[\011\012\015\040-\176]*$/ && $_ !~
+m%(^<\?xml)|(^#define\s+)|(^/\* XPM
+\*/)|(static\s+char\s+\*\w+\[\]\s*=\s*{\s*"\d+)%
+
+   For more information see *Note Image/Info/ASCII: Image/Info/ASCII,.
+
+
+File: pm.info,  Node: Image/Info/BMP,  Next: Image/Info/SVG,  Prev: Image/Info/ASCII,  Up: Module List
+
+Windows Device Indepdent Bitmap support for Image::Info
+*******************************************************
+
+NAME
+====
+
+   Image::Info:BMP - Windows Device Indepdent Bitmap support for
+Image::Info
+
+SYNOPSIS
+========
+
+     use Image::Info qw(image_info dim);
+
+     my $info = image_info("image.bmp");
+     if (my $error = $info->{error}) {
+         die "Can't parse image info: $error\n";
+     }
+     my $color = $info->{color_type};
+
+     my($w, $h) = dim($info);
+
+DESCRIPTION
+===========
+
+   This modules supplies the standard key names except for Gamma,
+Interlace, LastModificationTime, as well as:
+
+BMP_ColorsImportant
+     Specifies the number of color indexes that are required for
+     displaying the bitmap. If this value is zero, all colors are required.
+
+BMP_Origin
+     If true the bitmap is a bottom-up DIB and its origin is the
+     lower-left corner.  Otherwise, the bitmap is a top-down DIB and its
+     origin is the upper-left corner.
+
+ColorPalette
+     Reference to an array of all colors used.  This key is only present
+     if `image_info' is invoked as `image_info($file, ColorPalette=>1)'.
+
+ColorTableSize
+     The number of colors the image uses.  If 0 then this is a true color
+     image.  The number of color *available* is 2 ^ BitsPerSample.
+
+SEE ALSO
+========
+
+   *Note Image/Info: Image/Info,
+
+NOTES
+=====
+
+   For more information about BMP see:
+
+     http://msdn.microsoft.com
+
+DIAGNOSTICS
+===========
+
+Size mismatch
+     The image may be correct, the filesize does not match the internally
+     stored value.
+
+BUGS
+====
+
+   The current implementation only function on little-endian architectures.
+Consequently erroneous data concerning compression (including file_ext and
+*file_mime_type*) may be reported.
+
+AUTHOR
+======
+
+   Jerrad Pierce <belg4mit@mit.edu>/<webmaster@pthbb.org>
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   MAGIC: /^BM/
+
+   This module supports the Microsoft Device Independent Bitmap format
+(BMP, DIB, RLE).
+
+   For more information see *Note Image/Info/BMP: Image/Info/BMP,.
+
+
+File: pm.info,  Node: Image/Info/SVG,  Next: Image/Info/XBM,  Prev: Image/Info/BMP,  Up: Module List
+
+SVG support for Image::Info
+***************************
+
+NAME
+====
+
+   Image::Info::SVG - SVG support for Image::Info
+
+SYNOPSIS
+========
+
+     use Image::Info qw(image_info dim);
+
+     my $info = image_info("image.svg");
+     if (my $error = $info->{error}) {
+         die "Can't parse image info: $error\n";
+     }
+     my $color = $info->{color_type};
+
+     my($w, $h) = dim($info);
+
+DESCRIPTION
+===========
+
+   A functional yet thus far rudimentary SVG implementation.  SVG also
+provides (for) a plethora of attributes and metadata of an image.
+
+   This modules supplies the standard key names except for BitsPerSample,
+Compression, Gamma, Interlace, LastModificationTime, as well as:
+
+ImageDescription
+     The image description, corresponds to <desc>.
+
+SVG_Image
+     A scalar or reference to an array of scalars containing the URI's of
+     embedded images (JPG or PNG) that are embedded in the image.
+
+SVG_StandAlone
+     Whether or not the image is standalone.
+
+SVG_Title
+     The image title, corresponds to <title>
+
+SVG_Version
+     The URI of the DTD the image conforms to.
+
+FILES
+     This module requires *Note XML/Simple: XML/Simple,
+
+SEE ALSO
+========
+
+   *Note Image/Info: Image/Info,, *Note XML/Simple: XML/Simple,, `expat'
+in this node
+
+NOTES
+=====
+
+   SVG is not yet a standard, though much software exists which is capable
+of creating and displaying SVG images.  For more information about SVG see:
+
+     http://www.w3.org/Graphics/SVG/
+
+AUTHOR
+======
+
+   Jerrad Pierce <belg4mit@mit.edu>/<webmaster@pthbb.org>
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   MAGIC: /^<\?xml/
+
+   SVG also provides (for) a plethora of attributes and metadata of an
+image.  See *Note Image/Info/SVG: Image/Info/SVG, for details.
+
+
+File: pm.info,  Node: Image/Info/XBM,  Next: Image/Info/XPM,  Prev: Image/Info/SVG,  Up: Module List
+
+XBM support for Image::Info
+***************************
+
+NAME
+====
+
+   Image::Info::XBM - XBM support for Image::Info
+
+SYNOPSIS
+========
+
+     use Image::Info qw(image_info dim);
+
+     my $info = image_info("image.xbm");
+     if (my $error = $info->{error}) {
+         die "Can't parse image info: $error\n";
+     }
+     my $color = $info->{color_type};
+
+     my($w, $h) = dim($info);
+
+DESCRIPTION
+===========
+
+   This modules supplies the standard key names except for Compression,
+Gamma, Interlace, LastModificationTime, as well as:
+
+HotSpotX
+     The x-coord of the image's hotspot.  Set to -1 if there is no hotspot.
+
+HotSpotY
+     The y-coord of the image's hotspot.  Set to -1 if there is no hotspot.
+
+L1D_Histogram
+     Reference to an array representing a one dimensioanl luminance
+     histogram. This key is only present if `image_info' is invoked as
+     `image_info($file, L1D_Histogram=>1)'. The range is from 0 to 1.
+
+FILES
+     This module requires *Note Image/Xbm: Image/Xbm,
+
+SEE ALSO
+========
+
+   *Note Image/Info: Image/Info,, *Note Image/Xbm: Image/Xbm,
+
+NOTES
+=====
+
+   For more information about XBM see:
+
+     http://www.dcs.ed.ac.uk/home/mxr/gfx/2d/XBM.txt
+
+AUTHOR
+======
+
+   Jerrad Pierce <belg4mit@mit.edu>/<webmaster@pthbb.org>
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   MAGIC: /^#define\s+/
+
+   See *Note Image/Info/XBM: Image/Info/XBM, for details.
+
+
+File: pm.info,  Node: Image/Info/XPM,  Next: Image/Magick,  Prev: Image/Info/XBM,  Up: Module List
+
+XPM support for Image::Info
+***************************
+
+NAME
+====
+
+   Image::Info::XPM - XPM support for Image::Info
+
+SYNOPSIS
+========
+
+     use Image::Info qw(image_info dim);
+
+     my $info = image_info("image.xpm");
+     if (my $error = $info->{error}) {
+         die "Can't parse image info: $error\n";
+     }
+     my $color = $info->{color_type};
+
+     my($w, $h) = dim($info);
+
+DESCRIPTION
+===========
+
+   This modules supplies the standard key names except for Compression,
+Gamma, Interlace, LastModificationTime, as well as:
+
+ColorPalette
+     Reference to an array of all colors used.  This key is only present
+     if `image_info' is invoked as `image_info({ColorPalette>=1})'.
+
+ColorTableSize
+     The number of colors the image uses.
+
+HotSpotX
+     The x-coord of the image's hotspot.  Set to -1 if there is no hotspot.
+
+HotSpotY
+     The y-coord of the image's hotspot.  Set to -1 if there is no hotspot.
+
+L1D_Histogram
+     Reference to an array representing a one dimensioanl luminance
+     histogram. This key is only present if `image_info' is invoked as
+     `image_info($file, L1D_Histogram=>1)'. The range is from 0 to 255,
+     however auto-vivification is used so a null field is also 0, and the
+     array may not actually contain 255 fields.
+
+XPM_CharactersPerPixel
+     This is typically 1 or 2. See *Note Image/Xpm: Image/Xpm,.
+
+
+     XPM Extensions (the most common is XPMEXT) if present.
+
+FILES
+     This module requires *Note Image/Xpm: Image/Xpm,
+
+     *$Image::Info::XPM::RGBLIB* is set to `/usr/X11R6/lib/X11/rgb.txt' by
+     default, this is used to resolve textual color names to their RGB
+     counterparts.
+
+SEE ALSO
+========
+
+   *Note Image/Info: Image/Info,, *Note Image/Xpm: Image/Xpm,
+
+NOTES
+=====
+
+   For more information about XPM see:
+
+     ftp://ftp.x.org/contrib/libraries/xpm-README.html
+
+CAVEATS
+=======
+
+   While the module attempts to be as robust as possible, it may not
+recognize older XBMs (Versions 1-3), if this is the case try inserting
+/* XPM */ as the first line.
+
+AUTHOR
+======
+
+   Jerrad Pierce <belg4mit@mit.edu>/<webmaster@pthbb.org>
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   MAGIC: /(^\/\* XPM \*\/)|(static\s+char\s+\*\w+\[\]\s*=\s*{\s*"\d+)/
+
+   See *Note Image/Info/XPM: Image/Info/XPM, for details.
+
+
+File: pm.info,  Node: Image/Magick,  Next: Image/ParseGIF,  Prev: Image/Info/XPM,  Up: Module List
+
+Perl extension for calling ImageMagick's libmagick routines
+***********************************************************
+
+NAME
+====
+
+   Image::Magick - Perl extension for calling ImageMagick's libmagick
+routines
+
+SYNOPSIS
+========
+
+     use Image::Magick;
+     p = new Image::Magick;
+     p->Read("imagefile");
+     p->Set(attribute => value, ...)
+     ($a, ...) = p->Get("attribute", ...)
+     p->routine(parameter => value, ...)
+     p->Mogrify("Routine", parameter => value, ...)
+     p->Write("filename");
+
+DESCRIPTION
+===========
+
+   This Perl extension allows the reading, manipulation and writing of a
+large number of image file formats using the magick library from
+ImageMagick by John Cristy (magick@wizards.dupont.com).  It was originally
+developed to be used by CGI scripts for Web pages.
+
+   A Web page has been set up for this extension. See:
+
+     http://www.simplesystems.org/ImageMagick/www/perl.html
+
+AUTHOR
+======
+
+   Kyle Shorter	magick@wizards.dupont.com
+
+BUGS
+====
+
+   Has all the bugs of ImageMagick and much, much more!
+
+SEE ALSO
+========
+
+   perl(1).
+
+

@@ -1,0 +1,2601 @@
+This is Info file perl.info, produced by Makeinfo version 1.68 from the
+input file bigperl.texi.
+
+   settitle perl
+
+
+File: perl.info,  Node: perlhack,  Next: perlhist,  Prev: perltodo,  Up: Top
+
+How to hack at the Perl internals
+*********************************
+
+NAME
+====
+
+   perlhack - How to hack at the Perl internals
+
+DESCRIPTION
+===========
+
+   This document attempts to explain how Perl development takes place, and
+ends with some suggestions for people wanting to become bona fide porters.
+
+   The perl5-porters mailing list is where the Perl standard distribution
+is maintained and developed.  The list can get anywhere from 10 to 150
+messages a day, depending on the heatedness of the debate.  Most days
+there are two or three patches, extensions, features, or bugs being
+discussed at a time.
+
+   A searchable archive of the list is at:
+
+     http://www.xray.mpe.mpg.de/mailing-lists/perl5-porters/
+
+   The list is also archived under the usenet group name `perl.porters-gw'
+at:
+
+     http://www.deja.com/
+
+   List subscribers (the porters themselves) come in several flavours.
+Some are quiet curious lurkers, who rarely pitch in and instead watch the
+ongoing development to ensure they're forewarned of new changes or
+features in Perl.  Some are representatives of vendors, who are there to
+make sure that Perl continues to compile and work on their platforms.
+Some patch any reported bug that they know how to fix, some are actively
+patching their pet area (threads, Win32, the regexp engine), while others
+seem to do nothing but complain.  In other words, it's your usual mix of
+technical people.
+
+   Over this group of porters presides Larry Wall.  He has the final word
+in what does and does not change in the Perl language.  Various releases
+of Perl are shepherded by a "pumpking", a porter responsible for gathering
+patches, deciding on a patch-by-patch feature-by-feature basis what will
+and will not go into the release.  For instance, Gurusamy Sarathy is the
+pumpking for the 5.6 release of Perl.
+
+   In addition, various people are pumpkings for different things.  For
+instance, Andy Dougherty and Jarkko Hietaniemi share the Configure
+pumpkin, and Tom Christiansen is the documentation pumpking.
+
+   Larry sees Perl development along the lines of the US government:
+there's the Legislature (the porters), the Executive branch (the
+pumpkings), and the Supreme Court (Larry).  The legislature can discuss
+and submit patches to the executive branch all they like, but the
+executive branch is free to veto them.  Rarely, the Supreme Court will
+side with the executive branch over the legislature, or the legislature
+over the executive branch.  Mostly, however, the legislature and the
+executive branch are supposed to get along and work out their differences
+without impeachment or court cases.
+
+   You might sometimes see reference to Rule 1 and Rule 2.  Larry's power
+as Supreme Court is expressed in The Rules:
+
+  1. Larry is always by definition right about how Perl should behave.
+     This means he has final veto power on the core functionality.
+
+  2. Larry is allowed to change his mind about any matter at a later date,
+     regardless of whether he previously invoked Rule 1.
+
+        Got that?  Larry is always right, even when he was wrong.  It's
+rare to see either Rule exercised, but they are often alluded to.
+
+   New features and extensions to the language are contentious, because
+the criteria used by the pumpkings, Larry, and other porters to decide
+which features should be implemented and incorporated are not codified in
+a few small design goals as with some other languages.  Instead, the
+heuristics are flexible and often difficult to fathom.  Here is one
+person's list, roughly in decreasing order of importance, of heuristics
+that new features have to be weighed against:
+
+Does concept match the general goals of Perl?
+     These haven't been written anywhere in stone, but one approximation
+     is:
+
+          1. Keep it fast, simple, and useful.
+          2. Keep features/concepts as orthogonal as possible.
+          3. No arbitrary limits (platforms, data sizes, cultures).
+          4. Keep it open and exciting to use/patch/advocate Perl everywhere.
+          5. Either assimilate new technologies, or build bridges to them.
+
+Where is the implementation?
+     All the talk in the world is useless without an implementation.  In
+     almost every case, the person or people who argue for a new feature
+     will be expected to be the ones who implement it.  Porters capable of
+     coding new features have their own agendas, and are not available to
+     implement your (possibly good) idea.
+
+Backwards compatibility
+     It's a cardinal sin to break existing Perl programs.  New warnings are
+     contentious-some say that a program that emits warnings is not
+     broken, while others say it is.  Adding keywords has the potential to
+     break programs, changing the meaning of existing token sequences or
+     functions might break programs.
+
+Could it be a module instead?
+     Perl 5 has extension mechanisms, modules and XS, specifically to avoid
+     the need to keep changing the Perl interpreter.  You can write modules
+     that export functions, you can give those functions prototypes so they
+     can be called like built-in functions, you can even write XS code to
+     mess with the runtime data structures of the Perl interpreter if you
+     want to implement really complicated things.  If it can be done in a
+     module instead of in the core, it's highly unlikely to be added.
+
+Is the feature generic enough?
+     Is this something that only the submitter wants added to the language,
+     or would it be broadly useful?  Sometimes, instead of adding a feature
+     with a tight focus, the porters might decide to wait until someone
+     implements the more generalized feature.  For instance, instead of
+     implementing a "delayed evaluation" feature, the porters are waiting
+     for a macro system that would permit delayed evaluation and much more.
+
+Does it potentially introduce new bugs?
+     Radical rewrites of large chunks of the Perl interpreter have the
+     potential to introduce new bugs.  The smaller and more localized the
+     change, the better.
+
+Does it preclude other desirable features?
+     A patch is likely to be rejected if it closes off future avenues of
+     development.  For instance, a patch that placed a true and final
+     interpretation on prototypes is likely to be rejected because there
+     are still options for the future of prototypes that haven't been
+     addressed.
+
+Is the implementation robust?
+     Good patches (tight code, complete, correct) stand more chance of
+     going in.  Sloppy or incorrect patches might be placed on the back
+     burner until the pumpking has time to fix, or might be discarded
+     altogether without further notice.
+
+Is the implementation generic enough to be portable?
+     The worst patches make use of a system-specific features.  It's highly
+     unlikely that nonportable additions to the Perl language will be
+     accepted.
+
+Is there enough documentation?
+     Patches without documentation are probably ill-thought out or
+     incomplete.  Nothing can be added without documentation, so submitting
+     a patch for the appropriate manpages as well as the source code is
+     always a good idea.  If appropriate, patches should add to the test
+     suite as well.
+
+Is there another way to do it?
+     Larry said "Although the Perl Slogan is *There's More Than One Way to
+     Do It*, I hesitate to make 10 ways to do something".  This is a
+     tricky heuristic to navigate, though-one man's essential addition is
+     another man's pointless cruft.
+
+Does it create too much work?
+     Work for the pumpking, work for Perl programmers, work for module
+     authors, ...  Perl is supposed to be easy.
+
+Patches speak louder than words
+     Working code is always preferred to pie-in-the-sky ideas.  A patch to
+     add a feature stands a much higher chance of making it to the language
+     than does a random feature request, no matter how fervently argued the
+     request might be.  This ties into "Will it be useful?", as the fact
+     that someone took the time to make the patch demonstrates a strong
+     desire for the feature.
+
+   If you're on the list, you might hear the word "core" bandied around.
+It refers to the standard distribution.  "Hacking on the core" means
+you're changing the C source code to the Perl interpreter.  "A core
+module" is one that ships with Perl.
+
+   The source code to the Perl interpreter, in its different versions, is
+kept in a repository managed by a revision control system (which is
+currently the Perforce program, see http://perforce.com/).  The pumpkings
+and a few others have access to the repository to check in changes.
+Periodically the pumpking for the development version of Perl will release
+a new version, so the rest of the porters can see what's changed.  The
+current state of the main trunk of repository, and patches that describe
+the individual changes that have happened since the last public release
+are available at this location:
+
+     ftp://ftp.linux.activestate.com/pub/staff/gsar/APC/
+
+   Selective parts are also visible via the rsync protocol.  To get all
+the individual changes to the mainline since the last development release,
+use the following command:
+
+     rsync -avuz rsync://ftp.linux.activestate.com/perl-diffs perl-diffs
+
+   Use this to get the latest source tree in full:
+
+     rsync -avuz rsync://ftp.linux.activestate.com/perl-current perl-current
+
+   Needless to say, the source code in perl-current is usually in a
+perpetual state of evolution.  You should expect it to be very buggy.  Do
+not use it for any purpose other than testing and development.
+
+   Always submit patches to *perl5-porters@perl.org*.  This lets other
+porters review your patch, which catches a surprising number of errors in
+patches.  Either use the diff program (available in source code form from
+*ftp://ftp.gnu.org/pub/gnu/*), or use Johan Vromans' *makepatch*
+(available from *CPAN/authors/id/JV/*).  Unified diffs are preferred, but
+context diffs are accepted.  Do not send RCS-style diffs or diffs without
+context lines.  More information is given in the *Porting/patching.pod*
+file in the Perl source distribution.  Please patch against the latest
+*development* version (e.g., if you're fixing a bug in the 5.005 track,
+patch against the latest 5.005_5x version).  Only patches that survive the
+heat of the development branch get applied to maintenance versions.
+
+   Your patch should update the documentation and test suite.
+
+   To report a bug in Perl, use the program *perlbug* which comes with
+Perl (if you can't get Perl to work, send mail to the address
+*perlbug@perl.com* or *perlbug@perl.org*).  Reporting bugs through
+*perlbug* feeds into the automated bug-tracking system, access to which is
+provided through the web at *http://bugs.perl.org/*.  It often pays to
+check the archives of the perl5-porters mailing list to see whether the
+bug you're reporting has been reported before, and if so whether it was
+considered a bug.  See above for the location of the searchable archives.
+
+   The CPAN testers (*http://testers.cpan.org/*) are a group of volunteers
+who test CPAN modules on a variety of platforms.  Perl Labs
+(*http://labs.perl.org/*) automatically tests Perl source releases on
+platforms and gives feedback to the CPAN testers mailing list.  Both
+efforts welcome volunteers.
+
+   To become an active and patching Perl porter, you'll need to learn how
+Perl works on the inside.  Chip Salzenberg, a pumpking, has written
+articles on Perl internals for The Perl Journal (*http://www.tpj.com/*)
+which explain how various parts of the Perl interpreter work.  The
+`perlguts' manpage explains the internal data structures.  And, of course,
+the C source code (sometimes sparsely commented, sometimes commented well)
+is a great place to start (begin with `perl.c' and see where it goes from
+there).  A lot of the style of the Perl source is explained in the
+*Porting/pumpkin.pod* file in the source distribution.
+
+   It is essential that you be comfortable using a good debugger (e.g.
+gdb, dbx) before you can patch perl.  Stepping through perl as it executes
+a script is perhaps the best (if sometimes tedious) way to gain a precise
+understanding of the overall architecture of the language.
+
+   If you build a version of the Perl interpreter with `-DDEBUGGING',
+Perl's -D command line flag will cause copious debugging information to be
+emitted (see the `perlrun' manpage).  If you build a version of Perl with
+compiler debugging information (e.g. with the C compiler's -g option
+instead of -O) then you can step through the execution of the interpreter
+with your favourite C symbolic debugger, setting breakpoints on particular
+functions.
+
+   It's a good idea to read and lurk for a while before chipping in.  That
+way you'll get to see the dynamic of the conversations, learn the
+personalities of the players, and hopefully be better prepared to make a
+useful contribution when do you speak up.
+
+   If after all this you still think you want to join the perl5-porters
+mailing list, send mail to *perl5-porters-subscribe@perl.org*.  To
+unsubscribe, send mail to *perl5-porters-unsubscribe@perl.org*.
+
+AUTHOR
+======
+
+   This document was written by Nathan Torkington, and is maintained by
+the perl5-porters mailing list.
+
+
+File: perl.info,  Node: perlhist,  Next: perlamiga,  Prev: perlhack,  Up: Top
+
+the Perl history records
+************************
+
+NAME
+====
+
+   perlhist - the Perl history records
+
+   # # $Id: perlhist.pod,v 1.2 2000/01/24 11:44:47 jhi Exp $ #
+
+DESCRIPTION
+===========
+
+   This document aims to record the Perl source code releases.
+
+INTRODUCTION
+============
+
+   Perl history in brief, by Larry Wall:
+
+     Perl 0 introduced Perl to my officemates.
+     Perl 1 introduced Perl to the world, and changed /\(...\|...\)/ to
+         /(...|...)/.  \(Dan Faigin still hasn't forgiven me. :-\)
+     Perl 2 introduced Henry Spencer's regular expression package.
+     Perl 3 introduced the ability to handle binary data (embedded nulls).
+     Perl 4 introduced the first Camel book.  Really.  We mostly just
+         switched version numbers so the book could refer to 4.000.
+     Perl 5 introduced everything else, including the ability to
+         introduce everything else.
+
+THE KEEPERS OF THE PUMPKIN
+==========================
+
+   Larry Wall, Andy Dougherty, Tom Christiansen, Charles Bailey, Nick
+Ing-Simmons, Chip Salzenberg, Tim Bunce, Malcolm Beattie, Gurusamy
+Sarathy, Graham Barr.
+
+PUMPKIN?
+--------
+
+   [from Porting/pumpkin.pod in the Perl source code distribution]
+
+   Chip Salzenberg gets credit for that, with a nod to his cow orker,
+David Croy.  We had passed around various names (baton, token, hot potato)
+but none caught on.  Then, Chip asked:
+
+   [begin quote]
+
+     Who has the patch pumpkin?
+
+   To explain:  David Croy once told me once that at a previous job, there
+was one tape drive and multiple systems that used it for backups.  But
+instead of some high-tech exclusion software, they used a low-tech method
+to prevent multiple simultaneous backups: a stuffed pumpkin.  No one was
+allowed to make backups unless they had the "backup pumpkin".
+
+   [end quote]
+
+   The name has stuck.  The holder of the pumpkin is sometimes called the
+pumpking (keeping the source afloat?) or the pumpkineer (pulling the
+strings?).
+
+THE RECORDS
+===========
+
+     Pump-  Release         Date            Notes
+     king                                   (by no means
+                                             comprehensive,
+                                             see Changes*
+                                             for details)
+     ===========================================================================
+
+     Larry   0              Classified.     Don't ask.
+
+     Larry   1.000          1987-Dec-18
+
+     1.001..10     1988-Jan-30
+     1.011..14     1988-Feb-02
+
+     Larry   2.000          1988-Jun-05
+
+     2.001         1988-Jun-28
+
+     Larry   3.000          1989-Oct-18
+
+     3.001         1989-Oct-26
+     3.002..4      1989-Nov-11
+     3.005         1989-Nov-18
+     3.006..8      1989-Dec-22
+     3.009..13     1990-Mar-02
+     3.014         1990-Mar-13
+     3.015         1990-Mar-14
+     3.016..18     1990-Mar-28
+     3.019..27     1990-Aug-10     User subs.
+     3.028         1990-Aug-14
+     3.029..36     1990-Oct-17
+     3.037         1990-Oct-20
+     3.040         1990-Nov-10
+     3.041         1990-Nov-13
+     3.042..43     1990-Jan-??
+     3.044         1991-Jan-12
+
+     Larry   4.000          1991-Mar-21
+
+     4.001..3      1991-Apr-12
+     4.004..9      1991-Jun-07
+     4.010         1991-Jun-10
+     4.011..18     1991-Nov-05
+     4.019         1991-Nov-11     Stable.
+     4.020..33     1992-Jun-08
+     4.034         1992-Jun-11
+     4.035         1992-Jun-23
+      Larry    4.036         1993-Feb-05     Very stable.
+
+     5.000alpha1   1993-Jul-31
+     5.000alpha2   1993-Aug-16
+     5.000alpha3   1993-Oct-10
+     5.000alpha4   1993-???-??
+     5.000alpha5   1993-???-??
+     5.000alpha6   1994-Mar-18
+     5.000alpha7   1994-Mar-25
+      Andy     5.000alpha8   1994-Apr-04
+      Larry    5.000alpha9   1994-May-05     ext appears.
+     5.000alpha10  1994-Jun-11
+     5.000alpha11  1994-Jul-01
+      Andy     5.000a11a     1994-Jul-07     To fit 14.
+     5.000a11b     1994-Jul-14
+     5.000a11c     1994-Jul-19
+     5.000a11d     1994-Jul-22
+      Larry    5.000alpha12  1994-Aug-04
+      Andy     5.000a12a     1994-Aug-08
+     5.000a12b     1994-Aug-15
+     5.000a12c     1994-Aug-22
+     5.000a12d     1994-Aug-22
+     5.000a12e     1994-Aug-22
+     5.000a12f     1994-Aug-24
+     5.000a12g     1994-Aug-24
+     5.000a12h     1994-Aug-24
+      Larry    5.000beta1    1994-Aug-30
+      Andy     5.000b1a      1994-Sep-06
+      Larry    5.000beta2    1994-Sep-14     Core slushified.
+      Andy     5.000b2a      1994-Sep-14
+     5.000b2b      1994-Sep-17
+     5.000b2c      1994-Sep-17
+      Larry    5.000beta3    1994-Sep-??
+      Andy     5.000b3a      1994-Sep-18
+     5.000b3b      1994-Sep-22
+     5.000b3c      1994-Sep-23
+     5.000b3d      1994-Sep-27
+     5.000b3e      1994-Sep-28
+     5.000b3f      1994-Sep-30
+     5.000b3g      1994-Oct-04
+      Andy     5.000b3h      1994-Oct-07
+      Larry?   5.000gamma    1994-Oct-13?
+
+     Larry   5.000          1994-Oct-17
+
+     Andy     5.000a        1994-Dec-19
+              5.000b        1995-Jan-18
+              5.000c        1995-Jan-18
+              5.000d        1995-Jan-18
+              5.000e        1995-Jan-18
+              5.000f        1995-Jan-18
+              5.000g        1995-Jan-18
+              5.000h        1995-Jan-18
+              5.000i        1995-Jan-26
+              5.000j        1995-Feb-07
+              5.000k        1995-Feb-11
+              5.000l        1995-Feb-21
+              5.000m        1995-Feb-28
+              5.000n        1995-Mar-07
+              5.000o        1995-Mar-13?
+
+     Larry   5.001          1995-Mar-13
+
+     Andy     5.001a        1995-Mar-15
+              5.001b        1995-Mar-31
+              5.001c        1995-Apr-07
+              5.001d        1995-Apr-14
+              5.001e        1995-Apr-18     Stable.
+              5.001f        1995-May-31
+              5.001g        1995-May-25
+              5.001h        1995-May-25
+              5.001i        1995-May-30
+              5.001j        1995-Jun-05
+              5.001k        1995-Jun-06
+              5.001l        1995-Jun-06     Stable.
+              5.001m        1995-Jul-02     Very stable.
+              5.001n        1995-Oct-31     Very unstable.
+              5.002beta1    1995-Nov-21
+              5.002b1a      1995-Dec-04
+              5.002b1b      1995-Dec-04
+              5.002b1c      1995-Dec-04
+              5.002b1d      1995-Dec-04
+              5.002b1e      1995-Dec-08
+              5.002b1f      1995-Dec-08
+     Tom      5.002b1g      1995-Dec-21     Doc release.
+     Andy     5.002b1h      1996-Jan-05
+              5.002b2       1996-Jan-14
+     Larry    5.002b3       1996-Feb-02
+     Andy     5.002gamma    1996-Feb-11
+     Larry    5.002delta    1996-Feb-27
+
+     Larry   5.002          1996-Feb-29     Prototypes.
+
+     Charles  5.002_01      1996-Mar-25
+
+     5.003          1996-Jun-25     Security release.
+
+     5.003_01      1996-Jul-31
+      Nick     5.003_02      1996-Aug-10
+      Andy     5.003_03      1996-Aug-28
+     5.003_04      1996-Sep-02
+     5.003_05      1996-Sep-12
+     5.003_06      1996-Oct-07
+     5.003_07      1996-Oct-10
+      Chip     5.003_08      1996-Nov-19
+     5.003_09      1996-Nov-26
+     5.003_10      1996-Nov-29
+     5.003_11      1996-Dec-06
+     5.003_12      1996-Dec-19
+     5.003_13      1996-Dec-20
+     5.003_14      1996-Dec-23
+     5.003_15      1996-Dec-23
+     5.003_16      1996-Dec-24
+     5.003_17      1996-Dec-27
+     5.003_18      1996-Dec-31
+     5.003_19      1997-Jan-04
+     5.003_20      1997-Jan-07
+     5.003_21      1997-Jan-15
+     5.003_22      1997-Jan-16
+     5.003_23      1997-Jan-25
+     5.003_24      1997-Jan-29
+     5.003_25      1997-Feb-04
+     5.003_26      1997-Feb-10
+     5.003_27      1997-Feb-18
+     5.003_28      1997-Feb-21
+     5.003_90      1997-Feb-25     Ramping up to the 5.004 release.
+     5.003_91      1997-Mar-01
+     5.003_92      1997-Mar-06
+     5.003_93      1997-Mar-10
+     5.003_94      1997-Mar-22
+     5.003_95      1997-Mar-25
+     5.003_96      1997-Apr-01
+     5.003_97      1997-Apr-03     Fairly widely used.
+     5.003_97a     1997-Apr-05
+     5.003_97b     1997-Apr-08
+     5.003_97c     1997-Apr-10
+     5.003_97d     1997-Apr-13
+     5.003_97e     1997-Apr-15
+     5.003_97f     1997-Apr-17
+     5.003_97g     1997-Apr-18
+     5.003_97h     1997-Apr-24
+     5.003_97i     1997-Apr-25
+     5.003_97j     1997-Apr-28
+     5.003_98      1997-Apr-30
+     5.003_99      1997-May-01
+     5.003_99a     1997-May-09
+     p54rc1        1997-May-12     Release Candidates.
+     p54rc2        1997-May-14
+
+     Chip    5.004          1997-May-15     A major maintenance release.
+
+     Tim      5.004_01      1997-Jun-13     The 5.004 maintenance track.
+              5.004_02      1997-Aug-07
+              5.004_03      1997-Sep-05
+              5.004_04      1997-Oct-15
+              5.004m5t1     1998-Mar-04     Maintenance Trials (for 5.004_05).
+              5.004_04-m2   1997-May-01
+              5.004_04-m3   1998-May-15
+              5.004_04-m4   1998-May-19
+              5.004_04-MT5  1998-Jul-21
+              5.004_04-MT6  1998-Oct-09
+              5.004_04-MT7  1998-Nov-22
+              5.004_04-MT8  1998-Dec-03
+     Chip     5.004_04-MT9  1999-Apr-26
+              5.004_05	1999-Apr-29
+
+     Malcolm  5.004_50      1997-Sep-09     The 5.005 development track.
+              5.004_51      1997-Oct-02
+              5.004_52      1997-Oct-15
+              5.004_53      1997-Oct-16
+              5.004_54      1997-Nov-14
+              5.004_55      1997-Nov-25
+              5.004_56      1997-Dec-18
+              5.004_57      1998-Feb-03
+              5.004_58      1998-Feb-06
+              5.004_59      1998-Feb-13
+              5.004_60      1998-Feb-20
+              5.004_61      1998-Feb-27
+              5.004_62      1998-Mar-06
+              5.004_63      1998-Mar-17
+              5.004_64      1998-Apr-03
+              5.004_65      1998-May-15
+              5.004_66      1998-May-29
+     Sarathy  5.004_67      1998-Jun-15
+              5.004_68      1998-Jun-23
+              5.004_69      1998-Jun-29
+              5.004_70      1998-Jul-06
+              5.004_71      1998-Jul-09
+              5.004_72      1998-Jul-12
+              5.004_73      1998-Jul-13
+              5.004_74      1998-Jul-14     5.005 beta candidate.
+              5.004_75      1998-Jul-15     5.005 beta1.
+              5.004_76      1998-Jul-21     5.005 beta2.
+              5.005         1998-Jul-22     Oneperl.
+
+     Sarathy  5.005_01      1998-Jul-27     The 5.005 maintenance track.
+              5.005_02-T1   1998-Aug-02
+              5.005_02-T2   1998-Aug-05
+              5.005_02      1998-Aug-08
+     Graham   5.005_03-MT1  1998-Nov-30
+              5.005_03-MT2  1999-Jan-04
+              5.005_03-MT3  1999-Jan-17
+              5.005_03-MT4  1999-Jan-26
+              5.005_03-MT5  1999-Jan-28
+              5.005_03      1999-Mar-28
+     Chip     5.005_04	2000-***-**
+
+     Sarathy  5.005_50      1998-Jul-26     The 5.6 development track.
+              5.005_51      1998-Aug-10
+              5.005_52      1998-Sep-25
+              5.005_53      1998-Oct-31
+              5.005_54      1998-Nov-30
+              5.005_55      1999-Feb-16
+              5.005_56      1999-Mar-01
+              5.005_57      1999-May-25
+     	  5.005_58	1999-Jul-27
+     	  5.005_59	1999-Aug-02
+     	  5.005_60	1999-Aug-02
+     	  5.005_61	1999-Aug-20
+     	  5.005_62	1999-Oct-15
+     	  5.005_63	1999-Dec-09
+     	  5.5.640	2000-Feb-02
+     	  5.5.650	2000-Feb-08	beta1
+     	  5.5.660	2000-Feb-22	beta2
+     	  5.5.670	2000-Feb-29	beta3
+     	  5.6.0-RC1	2000-Mar-09	release candidate 1
+     	  5.6.0-RC2	2000-Mar-14	release candidate 2
+     	  5.6.0-RC3	2000-Mar-21	release candidate 3
+     	  5.6.0		2000-Mar-22
+
+SELECTED RELEASE SIZES
+----------------------
+
+   For example the notation "core: 212  29" in the release 1.000 means that
+it had in the core 212 kilobytes, in 29 files.  The "core".."doc" are
+explained below.
+
+     release        core       lib         ext        t         doc
+     ======================================================================
+
+     1.000           212  29      -   -      -   -     38  51     62   3
+     1.014           219  29      -   -      -   -     39  52     68   4
+     2.000           309  31      2   3      -   -     55  57     92   4
+     2.001           312  31      2   3      -   -     55  57     94   4
+     3.000           508  36     24  11      -   -     79  73    156   5
+     3.044           645  37     61  20      -   -     90  74    190   6
+     4.000           635  37     59  20      -   -     91  75    198   4
+     4.019           680  37     85  29      -   -     98  76    199   4
+     4.036           709  37     89  30      -   -     98  76    208   5
+     5.000alpha2     785  50    114  32      -   -    112  86    209   5
+     5.000alpha3     801  50    117  33      -   -    121  87    209   5
+     5.000alpha9    1022  56    149  43    116  29    125  90    217   6
+     5.000a12h       978  49    140  49    205  46    152  97    228   9
+     5.000b3h       1035  53    232  70    216  38    162  94    218  21
+     5.000          1038  53    250  76    216  38    154  92    536  62
+     5.001m         1071  54    388  82    240  38    159  95    544  29
+     5.002          1121  54    661 101    287  43    155  94    847  35
+     5.003          1129  54    680 102    291  43    166 100    853  35
+     5.003_07       1231  60    748 106    396  53    213 137    976  39
+     5.004          1351  60   1230 136    408  51    355 161   1587  55
+     5.004_01       1356  60   1258 138    410  51    358 161   1587  55
+     5.004_04       1375  60   1294 139    413  51    394 162   1629  55
+     5.004_05       1463  60   1435 150    394  50    445 175   1855  59
+     5.004_51       1401  61   1260 140    413  53    358 162   1594  56
+     5.004_53       1422  62   1295 141    438  70    394 162   1637  56
+     5.004_56       1501  66   1301 140    447  74    408 165   1648  57
+     5.004_59       1555  72   1317 142    448  74    424 171   1678  58
+     5.004_62       1602  77   1327 144    629  92    428 173   1674  58
+     5.004_65       1626  77   1358 146    615  92    446 179   1698  60
+     5.004_68       1856  74   1382 152    619  92    463 187   1784  60
+     5.004_70       1863  75   1456 154    675  92    494 194   1809  60
+     5.004_73       1874  76   1467 152    762 102    506 196   1883  61
+     5.004_75       1877  76   1467 152    770 103    508 196   1896  62
+     5.005          1896  76   1469 152    795 103    509 197   1945  63
+     5.005_03	1936  77   1541 153    813 104    551 201   2176  72
+     5.005_50	1969  78   1842 301    795 103    514 198   1948  63
+     5.005_53	1999  79   1885 303    806 104    602 224   2002  67
+     5.005_56       2086  79   1970 307    866 113    672 238   2221  75
+
+   The "core"..."doc" mean the following files from the Perl source code
+distribution.  The glob notation ** means recursively, (.) means regular
+files.
+
+     core   *.[hcy]
+     lib    lib/**/*.p[ml]
+     ext    ext/**/*.{[hcyt],xs,pm}
+     t      t/**/*(.)
+     doc    {README*,INSTALL,*[_.]man{,.?},pod/**/*.pod}
+
+   Here are some statistics for the other subdirectories and one file in
+the Perl source distribution for somewhat more selected releases.
+
+     ======================================================================
+       Legend:  kB   #
+
+     1.014   2.001   3.044   4.000   4.019   4.036
+
+     atarist      -  -    -  -    -  -    -  -    -  -  113 31
+     Configure   31  1   37  1   62  1   73  1   83  1   86  1
+     eg           -  -   34 28   47 39   47 39   47 39   47 39
+     emacs        -  -    -  -    -  -   67  4   67  4   67  4
+     h2pl         -  -    -  -   12 12   12 12   12 12   12 12
+     hints        -  -    -  -    -  -    -  -    5 42   11 56
+     msdos        -  -    -  -   41 13   57 15   58 15   60 15
+     os2          -  -    -  -   63 22   81 29   81 29  113 31
+     usub         -  -    -  -   21 16   25  7   43  8   43  8
+     x2p        103 17  104 17  137 17  147 18  152 19  154 19
+
+     ======================================================================
+
+     5.000a2 5.000a12h 5.000b3h 5.000  5.001m  5.002   5.003
+
+     atarist    113 31  113 31    -  -      -  -    -  -    -  -    -  -
+     bench        -  -    0  1    -  -      -  -    -  -    -  -    -  -
+     Bugs         2  5   26  1    -  -      -  -    -  -    -  -    -  -
+     dlperl      40  5    -  -    -  -      -  -    -  -    -  -    -  -
+     do         127 71    -  -    -  -      -  -    -  -    -  -    -  -
+     Configure    -  -  153  1  159  1    160  1  180  1  201  1  201  1
+     Doc          -  -   26  1   75  7     11  1   11  1    -  -    -  -
+     eg          79 58   53 44   51 43     54 44   54 44   54 44   54 44
+     emacs       67  4  104  6  104  6    104  1  104  6  108  1  108  1
+     h2pl        12 12   12 12   12 12     12 12   12 12   12 12   12 12
+     hints       11 56   12 46   18 48     18 48   44 56   73 59   77 60
+     msdos       60 15   60 15    -  -      -  -    -  -    -  -    -  -
+     os2        113 31  113 31    -  -      -  -    -  -   84 17   56 10
+     U            -  -   62  8  112 42      -  -    -  -    -  -    -  -
+     usub        43  8    -  -    -  -      -  -    -  -    -  -    -  -
+     utils        -  -    -  -    -  -      -  -    -  -   87  7   88  7
+     vms          -  -   80  7  123  9    184 15  304 20  500 24  475 26
+     x2p        171 22  171 21  162 20    162 20  279 20  280 20  280 20
+
+     ======================================================================
+
+     5.003_07 5.004   5.004_04 5.004_62 5.004_65 5.004_68
+
+     beos         -  -     -  -    -  -     -  -     1   1    1   1
+     Configure  217  1   225  1  225  1   240  1   248   1  256   1
+     cygwin32     -  -    23  5   23  5    23  5    24   5   24   5
+     djgpp        -  -     -  -    -  -    14  5    14   5   14   5
+     eg          54 44    81 62   81 62    81 62    81  62   81  62
+     emacs      143  1   194  1  204  1   212  2   212   2  212   2
+     h2pl        12 12    12 12   12 12    12 12    12  12   12  12
+     hints       90 62   129 69  132 71   144 72   151  74  155  74
+     os2        117 42   121 42  127 42   127 44   129  44  129  44
+     plan9       79 15    82 15   82 15    82 15    82  15   82  15
+     Porting     51  1    94  2  109  4   203  6   234   8  241   9
+     qnx          -  -     1  2    1  2     1  2     1   2    1   2
+     utils       97  7   112  8  118  8   124  8   156   9  159   9
+     vms        505 27   518 34  524 34   538 34   569  34  569  34
+     win32        -  -   285 33  378 36   470 39   493  39  575  41
+     x2p        280 19   281 19  281 19   281 19   282  19  281  19
+
+     ======================================================================
+
+     5.004_70 5.004_73 5.004_75  5.005  5.005_03
+
+     apollo       -   -    -   -    -   -    -   -    0   1
+     beos         1   1    1   1    1   1    1   1    1   1
+     Configure  256   1  256   1  264   1  264   1  270   1
+     cygwin32    24   5   24   5   24   5   24   5   24   5
+     djgpp       14   5   14   5   14   5   14   5	 15   5
+     eg          86  65   86  65   86  65   86  65	 86  65
+     emacs      262   2  262   2  262   2  262   2	274   2
+     h2pl        12  12   12  12   12  12   12  12	 12  12
+     hints      157  74  157  74  159  74  160  74	179  77
+     mint         -   -    -   -    -   -    -   -	  4   7
+     mpeix        -   -    -   -    5   3    5   3	  5   3
+     os2        129  44  139  44  142  44  143  44	148  44
+     plan9       82  15   82  15   82  15   82  15	 82  15
+     Porting    241   9  253   9  259  10  264  12	272  13
+     qnx          1   2    1   2    1   2    1   2	  1   2
+     utils      160   9  160   9  160   9  160   9	164   9
+     vms        570  34  572  34  573  34  575  34	583  34
+     vos          -   -    -   -    -   -    -   -	156  10
+     win32      577  41  585  41  585  41  587  41	600  42
+     x2p        281  19  281  19  281  19  281  19	281  19
+
+SELECTED PATCH SIZES
+--------------------
+
+   The "diff lines kb" means that for example the patch 5.003_08, to be
+applied on top of the 5.003_07 (or whatever was before the 5.003_08) added
+lines for 110 kilobytes, it removed lines for 19 kilobytes, and changed
+lines for 424 kilobytes.  Just the lines themselves are counted, not their
+context.  The "+ - !" become from the diff(1) context diff output format.
+
+     Pump-  Release         Date           diff lines kB
+     king                                  -------------
+                                              +   -   !
+     ===========================================================================
+
+     Chip     5.003_08      1996-Nov-19     110  19 424
+              5.003_09      1996-Nov-26      38   9 248
+              5.003_10      1996-Nov-29      29   2  27
+              5.003_11      1996-Dec-06      73  12 165
+              5.003_12      1996-Dec-19     275   6 436
+              5.003_13      1996-Dec-20      95   1  56
+              5.003_14      1996-Dec-23      23   7 333
+              5.003_15      1996-Dec-23       0   0   1
+              5.003_16      1996-Dec-24      12   3  50
+              5.003_17      1996-Dec-27      19   1  14
+              5.003_18      1996-Dec-31      21   1  32
+              5.003_19      1997-Jan-04      80   3  85
+              5.003_20      1997-Jan-07      18   1 146
+              5.003_21      1997-Jan-15      38  10 221
+              5.003_22      1997-Jan-16       4   0  18
+              5.003_23      1997-Jan-25      71  15 119
+              5.003_24      1997-Jan-29     426   1  20
+              5.003_25      1997-Feb-04      21   8 169
+              5.003_26      1997-Feb-10      16   1  15
+              5.003_27      1997-Feb-18      32  10  38
+              5.003_28      1997-Feb-21      58   4  66
+              5.003_90      1997-Feb-25      22   2  34
+              5.003_91      1997-Mar-01      37   1  39
+              5.003_92      1997-Mar-06      16   3  69
+              5.003_93      1997-Mar-10      12   3  15
+              5.003_94      1997-Mar-22     407   7 200
+              5.003_95      1997-Mar-25      41   1  37
+              5.003_96      1997-Apr-01     283   5 261
+              5.003_97      1997-Apr-03      13   2  34
+              5.003_97a     1997-Apr-05      57   1  27
+              5.003_97b     1997-Apr-08      14   1  20
+              5.003_97c     1997-Apr-10      20   1  16
+              5.003_97d     1997-Apr-13       8   0  16
+              5.003_97e     1997-Apr-15      15   4  46
+              5.003_97f     1997-Apr-17       7   1  33
+              5.003_97g     1997-Apr-18       6   1  42
+              5.003_97h     1997-Apr-24      23   3  68
+              5.003_97i     1997-Apr-25      23   1  31
+              5.003_97j     1997-Apr-28      36   1  49
+              5.003_98      1997-Apr-30     171  12 539
+              5.003_99      1997-May-01       6   0   7
+              5.003_99a     1997-May-09      36   2  61
+              p54rc1        1997-May-12       8   1  11
+              p54rc2        1997-May-14       6   0  40
+
+     5.004           1997-May-15       4   0   4
+
+     Tim      5.004_01      1997-Jun-13     222  14  57
+              5.004_02      1997-Aug-07     112  16 119
+              5.004_03      1997-Sep-05     109   0  17
+              5.004_04      1997-Oct-15      66   8 173
+
+THE KEEPERS OF THE RECORDS
+==========================
+
+   Jarkko Hietaniemi <`jhi@iki.fi'>.
+
+   Thanks to the collective memory of the Perlfolk.  In addition to the
+Keepers of the Pumpkin also Alan Champion, Andreas König, John Macdonald,
+Matthias Neeracher, Jeff Okamoto, Michael Peppler, Randal Schwartz, and
+Paul D. Smith sent corrections and additions.
+
+
+File: perl.info,  Node: perlhpux,  Next: perlmachten,  Prev: perldos,  Up: Top
+
+Perl version 5 on Hewlett-Packard Unix (HP-UX) systems
+******************************************************
+
+NAME
+====
+
+   README.hpux - Perl version 5 on Hewlett-Packard Unix (HP-UX) systems
+
+DESCRIPTION
+===========
+
+   This document describes various features of HP's Unix operating system
+(HP-UX) that will affect how Perl version 5 (hereafter just Perl) is
+compiled and/or runs.
+
+Compiling Perl 5 on HP-UX
+-------------------------
+
+   When compiling Perl, the use of an ANSI C compiler is highly
+recommended.  The C compiler that ships with all HP-UX systems is a K&R
+compiler that should only be used to build new kernels.
+
+   Perl can be compiled with either HP's ANSI C compiler or with gcc.  The
+former is recommended, as not only can it compile Perl with no difficulty,
+but also can take advantage of features listed later that require the use
+of HP compiler-specific command-line flags.
+
+   If you decide to use gcc, make sure your installation is recent and
+complete, and be sure to read the Perl README file for more gcc-specific
+details.
+
+PA-RISC
+-------
+
+   HP's current Unix systems run on its own Precision Architecture
+(PA-RISC) chip.  HP-UX used to run on the Motorola MC68000 family of
+chips, but any machine with this chip in it is quite obsolete and this
+document will not attempt to address issues for compiling Perl on the
+Motorola chipset.
+
+   The most recent version of PA-RISC at the time of this document's last
+update is 2.0.
+
+PA-RISC 1.0
+-----------
+
+   The original version of PA-RISC, HP no longer sells any system with
+this chip.
+
+   The following systems contain PA-RISC 1.0 chips:
+
+     600, 635, 645, 800, 808, 815, 822, 825, 832, 834, 835, 840,
+     842, 845, 850, 852, 855, 860, 865, 870, 890
+
+PA-RISC 1.1
+-----------
+
+   An upgrade to the PA-RISC design, it shipped for many years in many
+different system.
+
+   The following systems contain with PA-RISC 1.1 chips:
+
+     705, 710, 712, 715, 720, 722, 725, 728, 730, 735, 743, 745, 747, 750,
+     755, 770, 807S, 817S, 827S, 837S, 847S, 857S, 867S, 877S, 887S, 897S,
+     D200, D210, D220, D230, D250, D260, D310, D320, D330, D350, D360, D400,
+     E25, E35, E45, E55, F10, F20, F30, G30, G40, G50, G60, G70, H30, H40,
+     H50, H60, H70, I30, I40, I50, I60, I70, K100, K200, K210, K220, K400,
+     K410, K420, T500, T520
+
+PA-RISC 2.0
+-----------
+
+   The most recent upgrade to the PA-RISC design, it added support for
+64-bit integer data.
+
+   The following systems contain PA-RISC 2.0 chips (this is very likely to
+be out of date):
+
+     D270, D280, D370, D380, K250, K260, K370, K380, K450, K460, K570, K580,
+     T600, V2200
+
+   A complete list of models at the time the OS was built is in the file
+/opt/langtools/lib/sched.models.  The first column corresponds to the
+output of the "uname -m" command (without the leading "9000/").  The
+second column is the PA-RISC version and the third column is the exact
+chip type used.
+
+Portability Between PA-RISC Versions
+------------------------------------
+
+   An executable compiled on a PA-RISC 2.0 platform will not execute on a
+PA-RISC 1.1 platform, even if they are running the same version of HP-UX.
+If you are building Perl on a PA-RISC 2.0 platform and want that Perl to
+to also run on a PA-RISC 1.1, the compiler flags +DAportable and +DS32
+should be used.
+
+   It is no longer possible to compile PA-RISC 1.0 executables on either
+the PA-RISC 1.1 or 2.0 platforms.
+
+Building Dynamic Extensions on HP-UX
+------------------------------------
+
+   HP-UX supports dynamically loadable libraries (shared libraries).
+Shared libraries end with the suffix .sl.
+
+   Shared libraries created on a platform using a particular PA-RISC
+version are not usable on platforms using an earlier PA-RISC version by
+default.  However, this backwards compatibility may be enabled using the
+same +DAportable compiler flag (with the same PA-RISC 1.0 caveat mentioned
+above).
+
+   To create a shared library, the following steps must be performed:
+
+     1. Compile source modules with +z or +Z flag to create a .o module
+        which contains Position-Independent Code (PIC).  The linker will
+        tell you in the next step if +Z was needed.
+
+     2. Link the shared library using the -b flag.  If the code calls
+        any functions in other system libraries (e.g., libm), it must
+        be included on this line.
+
+   (Note that these steps are usually handled automatically by the
+extension's Makefile).
+
+   If these dependent libraries are not listed at shared library creation
+time, you will get fatal "Unresolved symbol" errors at run time when the
+library is loaded.
+
+   You may create a shared library that referers to another library, which
+may be either an archive library or a shared library.  If it is a shared
+library, this is called a "dependent library".  The dependent library's
+name is recorded in the main shared library, but it is not linked into the
+shared library.  Instead, it is loaded when the main shared library is
+loaded.
+
+   If the referred library is an archive library, then it is treated as a
+simple collection of .o modules (all of which must contain PIC).  These
+modules are then linked into the shared library.
+
+   Note that it is okay to create a library which contains a dependent
+library that is already linked into perl.
+
+   It is no longer possible to link PA-RISC 1.0 shared libraries.
+
+The HP ANSI C Compiler
+----------------------
+
+   When using this compiler to build Perl, you should make sure that the
+flag -Aa is added to the cpprun and cppstdin variables in the config.sh
+file.
+
+Using Large Files with Perl
+---------------------------
+
+   Beginning with HP-UX version 10.20, files larger than 2GB (2^31) may be
+created and manipulated.  Three separate methods of doing this are
+available.  Of these methods, the best method for Perl is to compile using
+the -D_FILE_OFFSET_BITS=64 compiler flag.  This causes Perl to be compiled
+using structures and functions in which these are 64 bits wide, rather
+than 32 bits wide.
+
+   There are only two drawbacks to this approach: the first is that the
+seek and tell functions (both the builtin version and the POSIX module's
+version) will not correctly function for these large files (the offset
+arguments in seek and tell are implemented as type long).  The second is
+that any extension which calls any file-manipulating C function will need
+to be recompiled using the above-mentioned -D_FILE_OFFSET_BITS=64 flag.
+The list of functions that will need to recompiled is:
+creat,		fgetpos,	fopen, freopen,	fsetpos,	fstat,
+fstatvfs,	fstatvfsdev,	ftruncate, ftw,		lockf,		lseek,
+lstat,		mmap,		nftw, open,		prealloc,	stat,
+statvfs,	statvfsdev,	tmpfile,
+truncate,	getrlimit,	setrlimit
+
+Threaded Perl
+-------------
+
+   It is impossible to compile a version of threaded Perl on any version of
+HP-UX before 10.30, and it is strongly suggested that you be running on
+HP-UX 11.00 at least.
+
+   To compile Perl with thread, add -Dusethreads to the arguments of
+Configure.  Ensure that the -D_POSIX_C_SOURCE=199506L compiler flag is
+automatically added to the list of flags.  Also make sure that -lpthread
+is listed before -lc in the list of libraries to link Perl with.
+
+   As of the date of this document, Perl threads are not fully supported
+on HP-UX.
+
+64-bit Perl
+-----------
+
+   Beginning with HP-UX 11.00, programs compiled under HP-UX can take
+advantage of the LP64 programming environment (LP64 means Longs and
+Pointers are 64 bits wide).
+
+   Work is being performed on Perl to make it 64-bit compliant on all
+versions of Unix.  Once this is complete, scalar variables will be able to
+hold numbers larger than 2^32 with complete precision.
+
+   As of the date of this document, Perl is not 64-bit compliant on HP-UX.
+
+   Should a user wish to experiment with compiling Perl in the LP64
+environment, the following steps must be taken: libraries must be searched
+only within /lib/pa20_64, the compiler flag +DD64 must be used, and the C
+library is now located at /lib/pa20_64/libc.sl.
+
+   On the brighter side, the large file problem goes away, as longs are now
+64 bits wide.
+
+GDBM and Threads
+----------------
+
+   If you attempt to compile Perl with threads on an 11.X system and also
+link in the GDBM library, then Perl will immediately core dump when it
+starts up.  The only workaround at this point is to relink the GDBM
+library under 11.X, then relink it into Perl.
+
+NFS filesystems and utime(2)
+----------------------------
+
+   If you are compiling Perl on a remotely-mounted NFS filesystem, the test
+io/fs.t may fail on test #18.  This appears to be a bug in HP-UX and no
+fix is currently available.
+
+AUTHOR
+======
+
+   Jeff Okamoto <okamoto@corp.hp.com>
+
+   With much assistance regarding shared libraries from Marc Sabatella.
+
+DATE
+====
+
+   Version 0.2: 1999/03/01
+
+
+File: perl.info,  Node: perlintern,  Next: perltodo,  Prev: perlapi,  Up: Top
+
+autogenerated documentation of purely internal  		 Perl functions
+*****************************************************************
+
+NAME
+====
+
+   perlintern - autogenerated documentation of purely internal
+Perl functions
+
+DESCRIPTION
+===========
+
+   This file is the autogenerated documentation of functions in the Perl
+intrepreter that are documented using Perl's internal documentation format
+but are not marked as part of the Perl API. In other words, *they are not
+for use in extensions*!
+
+AUTHORS
+=======
+
+   The autodocumentation system was orignally added to the Perl core by
+Benjamin Stuhl. Documentation is by whoever was kind enough to document
+their functions.
+
+SEE ALSO
+========
+
+   perlguts(1), perlapi(1)
+
+
+File: perl.info,  Node: perlipc,  Next: perlfork,  Prev: perlbot,  Up: Top
+
+Perl interprocess communication (signals, fifos, pipes, safe subprocesses, sockets, and semaphores)
+***************************************************************************************************
+
+NAME
+====
+
+   perlipc - Perl interprocess communication (signals, fifos, pipes, safe
+subprocesses, sockets, and semaphores)
+
+DESCRIPTION
+===========
+
+   The basic IPC facilities of Perl are built out of the good old Unix
+signals, named pipes, pipe opens, the Berkeley socket routines, and SysV
+IPC calls.  Each is used in slightly different situations.
+
+Signals
+=======
+
+   Perl uses a simple signal handling model: the %SIG hash contains names
+or references of user-installed signal handlers.  These handlers will be
+called with an argument which is the name of the signal that triggered it.
+A signal may be generated intentionally from a particular keyboard
+sequence like control-C or control-Z, sent to you from another process, or
+triggered automatically by the kernel when special events transpire, like
+a child process exiting, your process running out of stack space, or
+hitting file size limit.
+
+   For example, to trap an interrupt signal, set up a handler like this.
+Do as little as you possibly can in your handler; notice how all we do is
+set a global variable and then raise an exception.  That's because on most
+systems, libraries are not re-entrant; particularly, memory allocation and
+I/O routines are not.  That means that doing nearly anything in your
+handler could in theory trigger a memory fault and subsequent core dump.
+
+     sub catch_zap {
+     	my $signame = shift;
+     	$shucks++;
+     	die "Somebody sent me a SIG$signame";
+     }
+     $SIG{INT} = 'catch_zap';  # could fail in modules
+     $SIG{INT} = \&catch_zap;  # best strategy
+
+   The names of the signals are the ones listed out by `kill -l' on your
+system, or you can retrieve them from the Config module.  Set up an
+@signame list indexed by number to get the name and a %signo table indexed
+by name to get the number:
+
+     use Config;
+     defined $Config{sig_name} || die "No sigs?";
+     foreach $name (split(' ', $Config{sig_name})) {
+     	$signo{$name} = $i;
+     	$signame[$i] = $name;
+     	$i++;
+     }
+
+   So to check whether signal 17 and SIGALRM were the same, do just this:
+
+     print "signal #17 = $signame[17]\n";
+     if ($signo{ALRM}) {
+     	print "SIGALRM is $signo{ALRM}\n";
+     }
+
+   You may also choose to assign the strings `'IGNORE'' or `'DEFAULT'' as
+the handler, in which case Perl will try to discard the signal or do the
+default thing.
+
+   On most Unix platforms, the `CHLD' (sometimes also known as `CLD')
+signal has special behavior with respect to a value of `'IGNORE''.
+Setting `$SIG{CHLD}' to `'IGNORE'' on such a platform has the effect of
+not creating zombie processes when the parent process fails to wait() on
+its child processes (i.e. child processes are automatically reaped).
+Calling wait() with `$SIG{CHLD}' set to `'IGNORE'' usually returns `-1' on
+such platforms.
+
+   Some signals can be neither trapped nor ignored, such as the KILL and
+STOP (but not the TSTP) signals.  One strategy for temporarily ignoring
+signals is to use a local() statement, which will be automatically
+restored once your block is exited.  (Remember that local() values are
+"inherited" by functions called from within that block.)
+
+     sub precious {
+     	local $SIG{INT} = 'IGNORE';
+     	&more_functions;
+     }
+     sub more_functions {
+     	# interrupts still ignored, for now...
+     }
+
+   Sending a signal to a negative process ID means that you send the signal
+to the entire Unix process-group.  This code sends a hang-up signal to all
+processes in the current process group (and sets $SIG{HUP} to IGNORE so it
+doesn't kill itself):
+
+     {
+     	local $SIG{HUP} = 'IGNORE';
+     	kill HUP => -$$;
+     	# snazzy writing of: kill('HUP', -$$)
+     }
+
+   Another interesting signal to send is signal number zero.  This doesn't
+actually affect another process, but instead checks whether it's alive or
+has changed its UID.
+
+     unless (kill 0 => $kid_pid) {
+     	warn "something wicked happened to $kid_pid";
+     }
+
+   You might also want to employ anonymous functions for simple signal
+handlers:
+
+     $SIG{INT} = sub { die "\nOutta here!\n" };
+
+   But that will be problematic for the more complicated handlers that need
+to reinstall themselves.  Because Perl's signal mechanism is currently
+based on the signal(3) function from the C library, you may sometimes be so
+misfortunate as to run on systems where that function is "broken", that
+is, it behaves in the old unreliable SysV way rather than the newer, more
+reasonable BSD and POSIX fashion.  So you'll see defensive people writing
+signal handlers like this:
+
+     sub REAPER {
+     	$waitedpid = wait;
+     	# loathe sysV: it makes us not only reinstate
+     	# the handler, but place it after the wait
+     	$SIG{CHLD} = \&REAPER;
+     }
+     $SIG{CHLD} = \&REAPER;
+     # now do something that forks...
+
+   or even the more elaborate:
+
+     use POSIX ":sys_wait_h";
+     sub REAPER {
+     	my $child;
+         while (($child = waitpid(-1,WNOHANG)) > 0) {
+     	    $Kid_Status{$child} = $?;
+     	}
+     	$SIG{CHLD} = \&REAPER;  # still loathe sysV
+     }
+     $SIG{CHLD} = \&REAPER;
+     # do something that forks...
+
+   Signal handling is also used for timeouts in Unix,   While safely
+protected within an `eval{}' block, you set a signal handler to trap alarm
+signals and then schedule to have one delivered to you in some number of
+seconds.  Then try your blocking operation, clearing the alarm when it's
+done but not before you've exited your `eval{}' block.  If it goes off,
+you'll use die() to jump out of the block, much as you might using
+longjmp() or throw() in other languages.
+
+   Here's an example:
+
+     eval {
+         local $SIG{ALRM} = sub { die "alarm clock restart" };
+         alarm 10;
+         flock(FH, 2);   # blocking write lock
+         alarm 0;
+     };
+     if ($@ and $@ !~ /alarm clock restart/) { die }
+
+   If the operation being timed out is system() or qx(), this technique is
+liable to generate zombies.    If this matters to you, you'll need to do
+your own fork() and exec(), and kill the errant child process.
+
+   For more complex signal handling, you might see the standard POSIX
+module.  Lamentably, this is almost entirely undocumented, but the
+`t/lib/posix.t' file from the Perl source distribution has some examples
+in it.
+
+Named Pipes
+===========
+
+   A named pipe (often referred to as a FIFO) is an old Unix IPC mechanism
+for processes communicating on the same machine.  It works just like a
+regular, connected anonymous pipes, except that the processes rendezvous
+using a filename and don't have to be related.
+
+   To create a named pipe, use the Unix command mknod(1) or on some
+systems, mkfifo(1).  These may not be in your normal path.
+
+     # system return val is backwards, so && not ||
+     #
+     $ENV{PATH} .= ":/etc:/usr/etc";
+     if  (      system('mknod',  $path, 'p')
+     	    && system('mkfifo', $path) )
+     {
+     	die "mk{nod,fifo} $path failed";
+     }
+
+   A fifo is convenient when you want to connect a process to an unrelated
+one.  When you open a fifo, the program will block until there's something
+on the other end.
+
+   For example, let's say you'd like to have your `.signature' file be a
+named pipe that has a Perl program on the other end.  Now every time any
+program (like a mailer, news reader, finger program, etc.) tries to read
+from that file, the reading program will block and your program will
+supply the new signature.  We'll use the pipe-checking file test -p to
+find out whether anyone (or anything) has accidentally removed our fifo.
+
+     chdir; # go home
+     $FIFO = '.signature';
+     $ENV{PATH} .= ":/etc:/usr/games";
+
+     while (1) {
+     	unless (-p $FIFO) {
+     	    unlink $FIFO;
+     	    system('mknod', $FIFO, 'p')
+     		&& die "can't mknod $FIFO: $!";
+     	}
+
+     # next line blocks until there's a reader
+     open (FIFO, "> $FIFO") || die "can't write $FIFO: $!";
+     print FIFO "John Smith (smith\@host.org)\n", `fortune -s`;
+     close FIFO;
+     sleep 2;    # to avoid dup signals
+         }
+
+WARNING
+-------
+
+   By installing Perl code to deal with signals, you're exposing yourself
+to danger from two things.  First, few system library functions are
+re-entrant.  If the signal interrupts while Perl is executing one function
+(like malloc(3) or printf(3)), and your signal handler then calls the same
+function again, you could get unpredictable behavior-often, a core dump.
+Second, Perl isn't itself re-entrant at the lowest levels.  If the signal
+interrupts Perl while Perl is changing its own internal data structures,
+similarly unpredictable behaviour may result.
+
+   There are two things you can do, knowing this: be paranoid or be
+pragmatic.  The paranoid approach is to do as little as possible in your
+signal handler.  Set an existing integer variable that already has a
+value, and return.  This doesn't help you if you're in a slow system call,
+which will just restart.  That means you have to die to longjump(3) out of
+the handler.  Even this is a little cavalier for the true paranoiac, who
+avoids die in a handler because the system *is* out to get you.  The
+pragmatic approach is to say "I know the risks, but prefer the
+convenience", and to do anything you want in your signal handler, prepared
+to clean up core dumps now and again.
+
+   To forbid signal handlers altogether would bars you from many
+interesting programs, including virtually everything in this manpage,
+since you could no longer even write SIGCHLD handlers.  Their dodginess is
+expected to be addresses in the 5.005 release.
+
+Using open() for IPC
+====================
+
+   Perl's basic open() statement can also be used for unidirectional
+interprocess communication by either appending or prepending a pipe symbol
+to the second argument to open().  Here's how to start something up in a
+child process you intend to write to:
+
+     open(SPOOLER, "| cat -v | lpr -h 2>/dev/null")
+     		    || die "can't fork: $!";
+     local $SIG{PIPE} = sub { die "spooler pipe broke" };
+     print SPOOLER "stuff\n";
+     close SPOOLER || die "bad spool: $! $?";
+
+   And here's how to start up a child process you intend to read from:
+
+     open(STATUS, "netstat -an 2>&1 |")
+     		    || die "can't fork: $!";
+     while (<STATUS>) {
+     	next if /^(tcp|udp)/;
+     	print;
+     }
+     close STATUS || die "bad netstat: $! $?";
+
+   If one can be sure that a particular program is a Perl script that is
+expecting filenames in @ARGV, the clever programmer can write something
+like this:
+
+     % program f1 "cmd1|" - f2 "cmd2|" f3 < tmpfile
+
+   and irrespective of which shell it's called from, the Perl program will
+read from the file `f1', the process `cmd1', standard input (tmpfile in
+this case), the `f2' file, the `cmd2' command, and finally the `f3' file.
+Pretty nifty, eh?
+
+   You might notice that you could use backticks for much the same effect
+as opening a pipe for reading:
+
+     print grep { !/^(tcp|udp)/ } `netstat -an 2>&1`;
+     die "bad netstat" if $?;
+
+   While this is true on the surface, it's much more efficient to process
+the file one line or record at a time because then you don't have to read
+the whole thing into memory at once.  It also gives you finer control of
+the whole process, letting you to kill off the child process early if you'd
+like.
+
+   Be careful to check both the open() and the close() return values.  If
+you're *writing* to a pipe, you should also trap SIGPIPE.  Otherwise,
+think of what happens when you start up a pipe to a command that doesn't
+exist: the open() will in all likelihood succeed (it only reflects the
+fork()'s success), but then your output will fail-spectacularly.  Perl
+can't know whether the command worked because your command is actually
+running in a separate process whose exec() might have failed.  Therefore,
+while readers of bogus commands return just a quick end of file, writers
+to bogus command will trigger a signal they'd better be prepared to
+handle.  Consider:
+
+     open(FH, "|bogus")	or die "can't fork: $!";
+     print FH "bang\n"	or die "can't write: $!";
+     close FH		or die "can't close: $!";
+
+   That won't blow up until the close, and it will blow up with a SIGPIPE.
+To catch it, you could use this:
+
+     $SIG{PIPE} = 'IGNORE';
+     open(FH, "|bogus")  or die "can't fork: $!";
+     print FH "bang\n"   or die "can't write: $!";
+     close FH            or die "can't close: status=$?";
+
+Filehandles
+-----------
+
+   Both the main process and any child processes it forks share the same
+STDIN, STDOUT, and STDERR filehandles.  If both processes try to access
+them at once, strange things can happen.  You may also want to close or
+reopen the filehandles for the child.  You can get around this by opening
+your pipe with open(), but on some systems this means that the child
+process cannot outlive the parent.
+
+Background Processes
+--------------------
+
+   You can run a command in the background with:
+
+     system("cmd &");
+
+   The command's STDOUT and STDERR (and possibly STDIN, depending on your
+shell) will be the same as the parent's.  You won't need to catch SIGCHLD
+because of the double-fork taking place (see below for more details).
+
+Complete Dissociation of Child from Parent
+------------------------------------------
+
+   In some cases (starting server processes, for instance) you'll want to
+completely dissociate the child process from the parent.  This is often
+called daemonization.  A well behaved daemon will also chdir() to the root
+directory (so it doesn't prevent unmounting the filesystem containing the
+directory from which it was launched) and redirect its standard file
+descriptors from and to `/dev/null' (so that random output doesn't wind up
+on the user's terminal).
+
+     use POSIX 'setsid';
+
+     sub daemonize {
+     	chdir '/'		or die "Can't chdir to /: $!";
+     	open STDIN, '/dev/null' or die "Can't read /dev/null: $!";
+     	open STDOUT, '>/dev/null'
+     				or die "Can't write to /dev/null: $!";
+     	defined(my $pid = fork)	or die "Can't fork: $!";
+     	exit if $pid;
+     	setsid			or die "Can't start a new session: $!";
+     	open STDERR, '>&STDOUT'	or die "Can't dup stdout: $!";
+     }
+
+   The fork() has to come before the setsid() to ensure that you aren't a
+process group leader (the setsid() will fail if you are).  If your system
+doesn't have the setsid() function, open `/dev/tty' and use the
+`TIOCNOTTY' ioctl() on it instead.  See `tty(4)' in this node for details.
+
+   Non-Unix users should check their Your_OS::Process module for other
+solutions.
+
+Safe Pipe Opens
+---------------
+
+   Another interesting approach to IPC is making your single program go
+multiprocess and communicate between (or even amongst) yourselves.  The
+open() function will accept a file argument of either `"-|"' or `"|-"' to
+do a very interesting thing: it forks a child connected to the filehandle
+you've opened.  The child is running the same program as the parent.  This
+is useful for safely opening a file when running under an assumed UID or
+GID, for example.  If you open a pipe to minus, you can write to the
+filehandle you opened and your kid will find it in his STDIN.  If you open
+a pipe from minus, you can read from the filehandle you opened whatever
+your kid writes to his STDOUT.
+
+     use English;
+     my $sleep_count = 0;
+
+     do {
+     	$pid = open(KID_TO_WRITE, "|-");
+     	unless (defined $pid) {
+     	    warn "cannot fork: $!";
+     	    die "bailing out" if $sleep_count++ > 6;
+     	    sleep 10;
+     	}
+     } until defined $pid;
+
+     if ($pid) {  # parent
+     	print KID_TO_WRITE @some_data;
+     	close(KID_TO_WRITE) || warn "kid exited $?";
+     } else {     # child
+     	($EUID, $EGID) = ($UID, $GID); # suid progs only
+     	open (FILE, "> /safe/file")
+     	    || die "can't open /safe/file: $!";
+     	while (<STDIN>) {
+     	    print FILE; # child's STDIN is parent's KID
+     	}
+     	exit;  # don't forget this
+     }
+
+   Another common use for this construct is when you need to execute
+something without the shell's interference.  With system(), it's
+straightforward, but you can't use a pipe open or backticks safely.
+That's because there's no way to stop the shell from getting its hands on
+your arguments.   Instead, use lower-level control to call exec() directly.
+
+   Here's a safe backtick or pipe open for read:
+
+     # add error processing as above
+     $pid = open(KID_TO_READ, "-|");
+
+     if ($pid) {   # parent
+     	while (<KID_TO_READ>) {
+     	    # do something interesting
+     	}
+     	close(KID_TO_READ) || warn "kid exited $?";
+
+     } else {      # child
+     	($EUID, $EGID) = ($UID, $GID); # suid only
+     	exec($program, @options, @args)
+     	    || die "can't exec program: $!";
+     	# NOTREACHED
+     }
+
+   And here's a safe pipe open for writing:
+
+     # add error processing as above
+     $pid = open(KID_TO_WRITE, "|-");
+     $SIG{ALRM} = sub { die "whoops, $program pipe broke" };
+
+     if ($pid) {  # parent
+     	for (@data) {
+     	    print KID_TO_WRITE;
+     	}
+     	close(KID_TO_WRITE) || warn "kid exited $?";
+
+     } else {     # child
+     	($EUID, $EGID) = ($UID, $GID);
+     	exec($program, @options, @args)
+     	    || die "can't exec program: $!";
+     	# NOTREACHED
+     }
+
+   Note that these operations are full Unix forks, which means they may
+not be correctly implemented on alien systems.  Additionally, these are
+not true multithreading.  If you'd like to learn more about threading, see
+the modules file mentioned below in the SEE ALSO section.
+
+Bidirectional Communication with Another Process
+------------------------------------------------
+
+   While this works reasonably well for unidirectional communication, what
+about bidirectional communication?  The obvious thing you'd like to do
+doesn't actually work:
+
+     open(PROG_FOR_READING_AND_WRITING, "| some program |")
+
+   and if you forget to use the `use warnings' pragma or the -w flag, then
+you'll miss out entirely on the diagnostic message:
+
+     Can't do bidirectional pipe at -e line 1.
+
+   If you really want to, you can use the standard open2() library function
+to catch both ends.  There's also an open3() for tridirectional I/O so you
+can also catch your child's STDERR, but doing so would then require an
+awkward select() loop and wouldn't allow you to use normal Perl input
+operations.
+
+   If you look at its source, you'll see that open2() uses low-level
+primitives like Unix pipe() and exec() calls to create all the connections.
+While it might have been slightly more efficient by using socketpair(), it
+would have then been even less portable than it already is.  The open2()
+and open3() functions are  unlikely to work anywhere except on a Unix
+system or some other one purporting to be POSIX compliant.
+
+   Here's an example of using open2():
+
+     use FileHandle;
+     use IPC::Open2;
+     $pid = open2(*Reader, *Writer, "cat -u -n" );
+     print Writer "stuff\n";
+     $got = <Reader>;
+
+   The problem with this is that Unix buffering is really going to ruin
+your day.  Even though your `Writer' filehandle is auto-flushed, and the
+process on the other end will get your data in a timely manner, you can't
+usually do anything to force it to give it back to you in a similarly
+quick fashion.  In this case, we could, because we gave cat a -u flag to
+make it unbuffered.  But very few Unix commands are designed to operate
+over pipes, so this seldom works unless you yourself wrote the program on
+the other end of the double-ended pipe.
+
+   A solution to this is the nonstandard `Comm.pl' library.  It uses
+pseudo-ttys to make your program behave more reasonably:
+
+     require 'Comm.pl';
+     $ph = open_proc('cat -n');
+     for (1..10) {
+     	print $ph "a line\n";
+     	print "got back ", scalar <$ph>;
+     }
+
+   This way you don't have to have control over the source code of the
+program you're using.  The `Comm' library also has expect() and interact()
+functions.  Find the library (and we hope its successor `IPC::Chat') at
+your nearest CPAN archive as detailed in the SEE ALSO section below.
+
+   The newer Expect.pm module from CPAN also addresses this kind of thing.
+This module requires two other modules from CPAN: IO::Pty and IO::Stty.
+It sets up a pseudo-terminal to interact with programs that insist on
+using talking to the terminal device driver.  If your system is amongst
+those supported, this may be your best bet.
+
+Bidirectional Communication with Yourself
+-----------------------------------------
+
+   If you want, you may make low-level pipe() and fork() to stitch this
+together by hand.  This example only talks to itself, but you could reopen
+the appropriate handles to STDIN and STDOUT and call other processes.
+
+     #!/usr/bin/perl -w
+     # pipe1 - bidirectional communication using two pipe pairs
+     #         designed for the socketpair-challenged
+     use IO::Handle;	# thousands of lines just for autoflush :-(
+     pipe(PARENT_RDR, CHILD_WTR);		# XXX: failure?
+     pipe(CHILD_RDR,  PARENT_WTR);		# XXX: failure?
+     CHILD_WTR->autoflush(1);
+     PARENT_WTR->autoflush(1);
+
+     if ($pid = fork) {
+     	close PARENT_RDR; close PARENT_WTR;
+     	print CHILD_WTR "Parent Pid $$ is sending this\n";
+     	chomp($line = <CHILD_RDR>);
+     	print "Parent Pid $$ just read this: `$line'\n";
+     	close CHILD_RDR; close CHILD_WTR;
+     	waitpid($pid,0);
+     } else {
+     	die "cannot fork: $!" unless defined $pid;
+     	close CHILD_RDR; close CHILD_WTR;
+     	chomp($line = <PARENT_RDR>);
+     	print "Child Pid $$ just read this: `$line'\n";
+     	print PARENT_WTR "Child Pid $$ is sending this\n";
+     	close PARENT_RDR; close PARENT_WTR;
+     	exit;
+     }
+
+   But you don't actually have to make two pipe calls.  If you have the
+socketpair() system call, it will do this all for you.
+
+     #!/usr/bin/perl -w
+     # pipe2 - bidirectional communication using socketpair
+     #   "the best ones always go both ways"
+
+     use Socket;
+     use IO::Handle;	# thousands of lines just for autoflush :-(
+     # We say AF_UNIX because although *_LOCAL is the
+     # POSIX 1003.1g form of the constant, many machines
+     # still don't have it.
+     socketpair(CHILD, PARENT, AF_UNIX, SOCK_STREAM, PF_UNSPEC)
+     				or  die "socketpair: $!";
+
+     CHILD->autoflush(1);
+     PARENT->autoflush(1);
+
+     if ($pid = fork) {
+     	close PARENT;
+     	print CHILD "Parent Pid $$ is sending this\n";
+     	chomp($line = <CHILD>);
+     	print "Parent Pid $$ just read this: `$line'\n";
+     	close CHILD;
+     	waitpid($pid,0);
+     } else {
+     	die "cannot fork: $!" unless defined $pid;
+     	close CHILD;
+     	chomp($line = <PARENT>);
+     	print "Child Pid $$ just read this: `$line'\n";
+     	print PARENT "Child Pid $$ is sending this\n";
+     	close PARENT;
+     	exit;
+     }
+
+Sockets: Client/Server Communication
+====================================
+
+   While not limited to Unix-derived operating systems (e.g., WinSock on
+PCs provides socket support, as do some VMS libraries), you may not have
+sockets on your system, in which case this section probably isn't going to
+do you much good.  With sockets, you can do both virtual circuits (i.e.,
+TCP streams) and datagrams (i.e., UDP packets).  You may be able to do
+even more depending on your system.
+
+   The Perl function calls for dealing with sockets have the same names as
+the corresponding system calls in C, but their arguments tend to differ
+for two reasons: first, Perl filehandles work differently than C file
+descriptors.  Second, Perl already knows the length of its strings, so you
+don't need to pass that information.
+
+   One of the major problems with old socket code in Perl was that it used
+hard-coded values for some of the constants, which severely hurt
+portability.  If you ever see code that does anything like explicitly
+setting `$AF_INET = 2', you know you're in for big trouble:  An
+immeasurably superior approach is to use the Socket module, which more
+reliably grants access to various constants and functions you'll need.
+
+   If you're not writing a server/client for an existing protocol like
+NNTP or SMTP, you should give some thought to how your server will know
+when the client has finished talking, and vice-versa.  Most protocols are
+based on one-line messages and responses (so one party knows the other has
+finished when a "\n" is received) or multi-line messages and responses
+that end with a period on an empty line ("\n.\n" terminates a
+message/response).
+
+Internet Line Terminators
+-------------------------
+
+   The Internet line terminator is "\015\012".  Under ASCII variants of
+Unix, that could usually be written as "\r\n", but under other systems,
+"\r\n" might at times be "\015\015\012", "\012\012\015", or something
+completely different.  The standards specify writing "\015\012" to be
+conformant (be strict in what you provide), but they also recommend
+accepting a lone "\012" on input (but be lenient in what you require).  We
+haven't always been very good about that in the code in this manpage, but
+unless you're on a Mac, you'll probably be ok.
+
+Internet TCP Clients and Servers
+--------------------------------
+
+   Use Internet-domain sockets when you want to do client-server
+communication that might extend to machines outside of your own system.
+
+   Here's a sample TCP client using Internet-domain sockets:
+
+     #!/usr/bin/perl -w
+     use strict;
+     use Socket;
+     my ($remote,$port, $iaddr, $paddr, $proto, $line);
+
+     $remote  = shift || 'localhost';
+     $port    = shift || 2345;  # random port
+     if ($port =~ /\D/) { $port = getservbyname($port, 'tcp') }
+     die "No port" unless $port;
+     $iaddr   = inet_aton($remote) 		|| die "no host: $remote";
+     $paddr   = sockaddr_in($port, $iaddr);
+
+     $proto   = getprotobyname('tcp');
+     socket(SOCK, PF_INET, SOCK_STREAM, $proto)	|| die "socket: $!";
+     connect(SOCK, $paddr)    || die "connect: $!";
+     while (defined($line = <SOCK>)) {
+     	print $line;
+     }
+
+     close (SOCK)	    || die "close: $!";
+     exit;
+
+   And here's a corresponding server to go along with it.  We'll leave the
+address as INADDR_ANY so that the kernel can choose the appropriate
+interface on multihomed hosts.  If you want sit on a particular interface
+(like the external side of a gateway or firewall machine), you should fill
+this in with your real address instead.
+
+     #!/usr/bin/perl -Tw
+     use strict;
+     BEGIN { $ENV{PATH} = '/usr/ucb:/bin' }
+     use Socket;
+     use Carp;
+     $EOL = "\015\012";
+
+     sub logmsg { print "$0 $$: @_ at ", scalar localtime, "\n" }
+
+     my $port = shift || 2345;
+     my $proto = getprotobyname('tcp');
+     $port = $1 if $port =~ /(\d+)/; # untaint port number
+
+     socket(Server, PF_INET, SOCK_STREAM, $proto)	|| die "socket: $!";
+     setsockopt(Server, SOL_SOCKET, SO_REUSEADDR,
+     					pack("l", 1)) 	|| die "setsockopt: $!";
+     bind(Server, sockaddr_in($port, INADDR_ANY))	|| die "bind: $!";
+     listen(Server,SOMAXCONN) 				|| die "listen: $!";
+
+     logmsg "server started on port $port";
+
+     my $paddr;
+
+     $SIG{CHLD} = \&REAPER;
+
+     for ( ; $paddr = accept(Client,Server); close Client) {
+     	my($port,$iaddr) = sockaddr_in($paddr);
+     	my $name = gethostbyaddr($iaddr,AF_INET);
+
+     logmsg "connection from $name [",
+     	inet_ntoa($iaddr), "]
+     	at port $port";
+
+     print Client "Hello there, $name, it's now ",
+     		scalar localtime, $EOL;
+         }
+
+   And here's a multithreaded version.  It's multithreaded in that like
+most typical servers, it spawns (forks) a slave server to handle the
+client request so that the master server can quickly go back to service a
+new client.
+
+     #!/usr/bin/perl -Tw
+     use strict;
+     BEGIN { $ENV{PATH} = '/usr/ucb:/bin' }
+     use Socket;
+     use Carp;
+     $EOL = "\015\012";
+
+     sub spawn;  # forward declaration
+     sub logmsg { print "$0 $$: @_ at ", scalar localtime, "\n" }
+
+     my $port = shift || 2345;
+     my $proto = getprotobyname('tcp');
+     $port = $1 if $port =~ /(\d+)/; # untaint port number
+
+     socket(Server, PF_INET, SOCK_STREAM, $proto)	|| die "socket: $!";
+     setsockopt(Server, SOL_SOCKET, SO_REUSEADDR,
+     					pack("l", 1)) 	|| die "setsockopt: $!";
+     bind(Server, sockaddr_in($port, INADDR_ANY))	|| die "bind: $!";
+     listen(Server,SOMAXCONN) 				|| die "listen: $!";
+
+     logmsg "server started on port $port";
+
+     my $waitedpid = 0;
+     my $paddr;
+
+     sub REAPER {
+     	$waitedpid = wait;
+     	$SIG{CHLD} = \&REAPER;  # loathe sysV
+     	logmsg "reaped $waitedpid" . ($? ? " with exit $?" : '');
+     }
+
+     $SIG{CHLD} = \&REAPER;
+
+     for ( $waitedpid = 0;
+     	  ($paddr = accept(Client,Server)) || $waitedpid;
+     	  $waitedpid = 0, close Client)
+     {
+     	next if $waitedpid and not $paddr;
+     	my($port,$iaddr) = sockaddr_in($paddr);
+     	my $name = gethostbyaddr($iaddr,AF_INET);
+
+     logmsg "connection from $name [",
+     	inet_ntoa($iaddr), "]
+     	at port $port";
+
+     spawn sub {
+         print "Hello there, $name, it's now ", scalar localtime, $EOL;
+         exec '/usr/games/fortune'		# XXX: `wrong' line terminators
+     	or confess "can't exec fortune: $!";
+     };
+
+     }
+
+     sub spawn {
+     	my $coderef = shift;
+
+     unless (@_ == 0 && $coderef && ref($coderef) eq 'CODE') {
+         confess "usage: spawn CODEREF";
+     }
+
+     my $pid;
+     if (!defined($pid = fork)) {
+         logmsg "cannot fork: $!";
+         return;
+     } elsif ($pid) {
+         logmsg "begat $pid";
+         return; # I'm the parent
+     }
+     # else I'm the child -- go spawn
+
+     open(STDIN,  "<&Client")   || die "can't dup client to stdin";
+     open(STDOUT, ">&Client")   || die "can't dup client to stdout";
+     ## open(STDERR, ">&STDOUT") || die "can't dup stdout to stderr";
+     exit &$coderef();
+         }
+
+   This server takes the trouble to clone off a child version via fork()
+for each incoming request.  That way it can handle many requests at once,
+which you might not always want.  Even if you don't fork(), the listen()
+will allow that many pending connections.  Forking servers have to be
+particularly careful about cleaning up their dead children (called
+"zombies" in Unix parlance), because otherwise you'll quickly fill up your
+process table.
+
+   We suggest that you use the -T flag to use taint checking (see *Note
+Perlsec: perlsec,) even if we aren't running setuid or setgid.  This is
+always a good idea for servers and other programs run on behalf of someone
+else (like CGI scripts), because it lessens the chances that people from
+the outside will be able to compromise your system.
+
+   Let's look at another TCP client.  This one connects to the TCP "time"
+service on a number of different machines and shows how far their clocks
+differ from the system on which it's being run:
+
+     #!/usr/bin/perl  -w
+     use strict;
+     use Socket;
+
+     my $SECS_of_70_YEARS = 2208988800;
+     sub ctime { scalar localtime(shift) }
+
+     my $iaddr = gethostbyname('localhost');
+     my $proto = getprotobyname('tcp');
+     my $port = getservbyname('time', 'tcp');
+     my $paddr = sockaddr_in(0, $iaddr);
+     my($host);
+
+     $| = 1;
+     printf "%-24s %8s %s\n",  "localhost", 0, ctime(time());
+
+     foreach $host (@ARGV) {
+     	printf "%-24s ", $host;
+     	my $hisiaddr = inet_aton($host)     || die "unknown host";
+     	my $hispaddr = sockaddr_in($port, $hisiaddr);
+     	socket(SOCKET, PF_INET, SOCK_STREAM, $proto)   || die "socket: $!";
+     	connect(SOCKET, $hispaddr)          || die "bind: $!";
+     	my $rtime = '    ';
+     	read(SOCKET, $rtime, 4);
+     	close(SOCKET);
+     	my $histime = unpack("N", $rtime) - $SECS_of_70_YEARS ;
+     	printf "%8d %s\n", $histime - time, ctime($histime);
+     }
+
+Unix-Domain TCP Clients and Servers
+-----------------------------------
+
+   That's fine for Internet-domain clients and servers, but what about
+local communications?  While you can use the same setup, sometimes you
+don't want to.  Unix-domain sockets are local to the current host, and are
+often used internally to implement pipes.  Unlike Internet domain sockets,
+Unix domain sockets can show up in the file system with an ls(1) listing.
+
+     % ls -l /dev/log
+     srw-rw-rw-  1 root            0 Oct 31 07:23 /dev/log
+
+   You can test for these with Perl's -S file test:
+
+     unless ( -S '/dev/log' ) {
+     	die "something's wicked with the print system";
+     }
+
+   Here's a sample Unix-domain client:
+
+     #!/usr/bin/perl -w
+     use Socket;
+     use strict;
+     my ($rendezvous, $line);
+
+     $rendezvous = shift || '/tmp/catsock';
+     socket(SOCK, PF_UNIX, SOCK_STREAM, 0)	|| die "socket: $!";
+     connect(SOCK, sockaddr_un($rendezvous))	|| die "connect: $!";
+     while (defined($line = <SOCK>)) {
+     	print $line;
+     }
+     exit;
+
+   And here's a corresponding server.  You don't have to worry about silly
+network terminators here because Unix domain sockets are guaranteed to be
+on the localhost, and thus everything works right.
+
+     #!/usr/bin/perl -Tw
+     use strict;
+     use Socket;
+     use Carp;
+
+     BEGIN { $ENV{PATH} = '/usr/ucb:/bin' }
+     sub logmsg { print "$0 $$: @_ at ", scalar localtime, "\n" }
+
+     my $NAME = '/tmp/catsock';
+     my $uaddr = sockaddr_un($NAME);
+     my $proto = getprotobyname('tcp');
+
+     socket(Server,PF_UNIX,SOCK_STREAM,0) 	|| die "socket: $!";
+     unlink($NAME);
+     bind  (Server, $uaddr) 			|| die "bind: $!";
+     listen(Server,SOMAXCONN)			|| die "listen: $!";
+
+     logmsg "server started on $NAME";
+
+     my $waitedpid;
+
+     sub REAPER {
+     	$waitedpid = wait;
+     	$SIG{CHLD} = \&REAPER;  # loathe sysV
+     	logmsg "reaped $waitedpid" . ($? ? " with exit $?" : '');
+     }
+
+     $SIG{CHLD} = \&REAPER;
+
+     for ( $waitedpid = 0;
+     	  accept(Client,Server) || $waitedpid;
+     	  $waitedpid = 0, close Client)
+     {
+     	next if $waitedpid;
+     	logmsg "connection on $NAME";
+     	spawn sub {
+     	    print "Hello there, it's now ", scalar localtime, "\n";
+     	    exec '/usr/games/fortune' or die "can't exec fortune: $!";
+     	};
+     }
+
+   As you see, it's remarkably similar to the Internet domain TCP server,
+so much so, in fact, that we've omitted several duplicate
+functions-spawn(), logmsg(), ctime(), and REAPER()-which are exactly the
+same as in the other server.
+
+   So why would you ever want to use a Unix domain socket instead of a
+simpler named pipe?  Because a named pipe doesn't give you sessions.  You
+can't tell one process's data from another's.  With socket programming,
+you get a separate session for each client: that's why accept() takes two
+arguments.
+
+   For example, let's say that you have a long running database server
+daemon that you want folks from the World Wide Web to be able to access,
+but only if they go through a CGI interface.  You'd have a small, simple
+CGI program that does whatever checks and logging you feel like, and then
+acts as a Unix-domain client and connects to your private server.
+
+TCP Clients with IO::Socket
+===========================
+
+   For those preferring a higher-level interface to socket programming, the
+IO::Socket module provides an object-oriented approach.  IO::Socket is
+included as part of the standard Perl distribution as of the 5.004
+release.  If you're running an earlier version of Perl, just fetch
+IO::Socket from CPAN, where you'll also find find modules providing easy
+interfaces to the following systems: DNS, FTP, Ident (RFC 931), NIS and
+NISPlus, NNTP, Ping, POP3, SMTP, SNMP, SSLeay, Telnet, and Time-just to
+name a few.
+
+A Simple Client
+---------------
+
+   Here's a client that creates a TCP connection to the "daytime" service
+at port 13 of the host name "localhost" and prints out everything that the
+server there cares to provide.
+
+     #!/usr/bin/perl -w
+     use IO::Socket;
+     $remote = IO::Socket::INET->new(
+     			Proto    => "tcp",
+     			PeerAddr => "localhost",
+     			PeerPort => "daytime(13)",
+     		    )
+     		  or die "cannot connect to daytime port at localhost";
+     while ( <$remote> ) { print }
+
+   When you run this program, you should get something back that looks
+like this:
+
+     Wed May 14 08:40:46 MDT 1997
+
+   Here are what those parameters to the new constructor mean:
+
+Proto
+     This is which protocol to use.  In this case, the socket handle
+     returned will be connected to a TCP socket, because we want a
+     stream-oriented connection, that is, one that acts pretty much like a
+     plain old file.  Not all sockets are this of this type.  For example,
+     the UDP protocol can be used to make a datagram socket, used for
+     message-passing.
+
+`PeerAddr'
+     This is the name or Internet address of the remote host the server is
+     running on.  We could have specified a longer name like
+     `"www.perl.com"', or an address like `"204.148.40.9"'.  For
+     demonstration purposes, we've used the special hostname
+     `"localhost"', which should always mean the current machine you're
+     running on.  The corresponding Internet address for localhost is
+     `"127.1"', if you'd rather use that.
+
+`PeerPort'
+     This is the service name or port number we'd like to connect to.  We
+     could have gotten away with using just `"daytime"' on systems with a
+     well-configured system services file,[FOOTNOTE: The system services
+     file is in */etc/services* under Unix] but just in case, we've
+     specified the port number (13) in parentheses.  Using just the number
+     would also have worked, but constant numbers make careful programmers
+     nervous.
+
+   Notice how the return value from the new constructor is used as a
+filehandle in the while loop?  That's what's called an indirect
+filehandle, a scalar variable containing a filehandle.  You can use it the
+same way you would a normal filehandle.  For example, you can read one
+line from it this way:
+
+     $line = <$handle>;
+
+   all remaining lines from is this way:
+
+     @lines = <$handle>;
+
+   and send a line of data to it this way:
+
+     print $handle "some data\n";
+
+A Webget Client
+---------------
+
+   Here's a simple client that takes a remote host to fetch a document
+from, and then a list of documents to get from that host.  This is a more
+interesting client than the previous one because it first sends something
+to the server before fetching the server's response.
+
+     #!/usr/bin/perl -w
+     use IO::Socket;
+     unless (@ARGV > 1) { die "usage: $0 host document ..." }
+     $host = shift(@ARGV);
+     $EOL = "\015\012";
+     $BLANK = $EOL x 2;
+     foreach $document ( @ARGV ) {
+     	$remote = IO::Socket::INET->new( Proto     => "tcp",
+     					 PeerAddr  => $host,
+     					 PeerPort  => "http(80)",
+     				        );
+     	unless ($remote) { die "cannot connect to http daemon on $host" }
+     	$remote->autoflush(1);
+     	print $remote "GET $document HTTP/1.0" . $BLANK;
+     	while ( <$remote> ) { print }
+     	close $remote;
+     }
+
+   The web server handing the "http" service, which is assumed to be at
+its standard port, number 80.  If your the web server you're trying to
+connect to is at a different port (like 1080 or 8080), you should specify
+as the named-parameter pair, `< PeerPort =' 8080 >>.  The autoflush method
+is used on the socket because otherwise the system would buffer up the
+output we sent it.  (If you're on a Mac, you'll also need to change every
+`"\n"' in your code that sends data over the network to be a `"\015\012"'
+instead.)
+
+   Connecting to the server is only the first part of the process: once you
+have the connection, you have to use the server's language.  Each server
+on the network has its own little command language that it expects as
+input.  The string that we send to the server starting with "GET" is in
+HTTP syntax.  In this case, we simply request each specified document.
+Yes, we really are making a new connection for each document, even though
+it's the same host.  That's the way you always used to have to speak HTTP.
+Recent versions of web browsers may request that the remote server leave
+the connection open a little while, but the server doesn't have to honor
+such a request.
+
+   Here's an example of running that program, which we'll call *webget*:
+
+     % webget www.perl.com /guanaco.html
+     HTTP/1.1 404 File Not Found
+     Date: Thu, 08 May 1997 18:02:32 GMT
+     Server: Apache/1.2b6
+     Connection: close
+     Content-type: text/html
+
+     <HEAD><TITLE>404 File Not Found</TITLE></HEAD>
+     <BODY><H1>File Not Found</H1>
+     The requested URL /guanaco.html was not found on this server.<P>
+     </BODY>
+
+   Ok, so that's not very interesting, because it didn't find that
+particular document.  But a long response wouldn't have fit on this page.
+
+   For a more fully-featured version of this program, you should look to
+the *lwp-request* program included with the LWP modules from CPAN.
+
+Interactive Client with IO::Socket
+----------------------------------
+
+   Well, that's all fine if you want to send one command and get one
+answer, but what about setting up something fully interactive, somewhat
+like the way *telnet* works?  That way you can type a line, get the answer,
+type a line, get the answer, etc.
+
+   This client is more complicated than the two we've done so far, but if
+you're on a system that supports the powerful fork call, the solution
+isn't that rough.  Once you've made the connection to whatever service
+you'd like to chat with, call fork to clone your process.  Each of these
+two identical process has a very simple job to do: the parent copies
+everything from the socket to standard output, while the child
+simultaneously copies everything from standard input to the socket.  To
+accomplish the same thing using just one process would be *much* harder,
+because it's easier to code two processes to do one thing than it is to
+code one process to do two things.  (This keep-it-simple principle a
+cornerstones of the Unix philosophy, and good software engineering as
+well, which is probably why it's spread to other systems.)
+
+   Here's the code:
+
+     #!/usr/bin/perl -w
+     use strict;
+     use IO::Socket;
+     my ($host, $port, $kidpid, $handle, $line);
+
+     unless (@ARGV == 2) { die "usage: $0 host port" }
+     ($host, $port) = @ARGV;
+
+     # create a tcp connection to the specified host and port
+     $handle = IO::Socket::INET->new(Proto     => "tcp",
+     				    PeerAddr  => $host,
+     				    PeerPort  => $port)
+     	   or die "can't connect to port $port on $host: $!";
+
+     $handle->autoflush(1);		# so output gets there right away
+     print STDERR "[Connected to $host:$port]\n";
+
+     # split the program into two processes, identical twins
+     die "can't fork: $!" unless defined($kidpid = fork());
+
+     # the if{} block runs only in the parent process
+     if ($kidpid) {
+     	# copy the socket to standard output
+     	while (defined ($line = <$handle>)) {
+     	    print STDOUT $line;
+     	}
+     	kill("TERM", $kidpid);  		# send SIGTERM to child
+     }
+     # the else{} block runs only in the child process
+     else {
+     	# copy standard input to the socket
+     	while (defined ($line = <STDIN>)) {
+     	    print $handle $line;
+     	}
+     }
+
+   The kill function in the parent's if block is there to send a signal to
+our child process (current running in the else block) as soon as the
+remote server has closed its end of the connection.
+
+   If the remote server sends data a byte at time, and you need that data
+immediately without waiting for a newline (which might not happen), you
+may wish to replace the while loop in the parent with the following:
+
+     my $byte;
+     while (sysread($handle, $byte, 1) == 1) {
+     	print STDOUT $byte;
+     }
+
+   Making a system call for each byte you want to read is not very
+efficient (to put it mildly) but is the simplest to explain and works
+reasonably well.
+
+TCP Servers with IO::Socket
+===========================
+
+   As always, setting up a server is little bit more involved than running
+a client.  The model is that the server creates a special kind of socket
+that does nothing but listen on a particular port for incoming connections.
+It does this by calling the `< IO::Socket::INET-'new() >> method with
+slightly different arguments than the client did.
+
+Proto
+     This is which protocol to use.  Like our clients, we'll still specify
+     `"tcp"' here.
+
+LocalPort
+     We specify a local port in the LocalPort argument, which we didn't do
+     for the client.  This is service name or port number for which you
+     want to be the server. (Under Unix, ports under 1024 are restricted
+     to the superuser.)  In our sample, we'll use port 9000, but you can
+     use any port that's not currently in use on your system.  If you try
+     to use one already in used, you'll get an "Address already in use"
+     message.  Under Unix, the `netstat -a' command will show which
+     services current have servers.
+
+Listen
+     The Listen parameter is set to the maximum number of pending
+     connections we can accept until we turn away incoming clients.  Think
+     of it as a call-waiting queue for your telephone.  The low-level
+     Socket module has a special symbol for the system maximum, which is
+     SOMAXCONN.
+
+Reuse
+     The Reuse parameter is needed so that we restart our server manually
+     without waiting a few minutes to allow system buffers to clear out.
+
+   Once the generic server socket has been created using the parameters
+listed above, the server then waits for a new client to connect to it.
+The server blocks in the accept method, which eventually an bidirectional
+connection to the remote client.  (Make sure to autoflush this handle to
+circumvent buffering.)
+
+   To add to user-friendliness, our server prompts the user for commands.
+Most servers don't do this.  Because of the prompt without a newline,
+you'll have to use the sysread variant of the interactive client above.
+
+   This server accepts one of five different commands, sending output back
+to the client.  Note that unlike most network servers, this one only
+handles one incoming client at a time.  Multithreaded servers are covered
+in Chapter 6 of the Camel.
+
+   Here's the code.  We'll
+
+     #!/usr/bin/perl -w
+     use IO::Socket;
+     use Net::hostent;		# for OO version of gethostbyaddr
+
+     $PORT = 9000;			# pick something not in use
+
+     $server = IO::Socket::INET->new( Proto     => 'tcp',
+                                      LocalPort => $PORT,
+                                      Listen    => SOMAXCONN,
+                                      Reuse     => 1);
+
+     die "can't setup server" unless $server;
+     print "[Server $0 accepting clients]\n";
+
+     while ($client = $server->accept()) {
+       $client->autoflush(1);
+       print $client "Welcome to $0; type help for command list.\n";
+       $hostinfo = gethostbyaddr($client->peeraddr);
+       printf "[Connect from %s]\n", $hostinfo->name || $client->peerhost;
+       print $client "Command? ";
+       while ( <$client>) {
+         next unless /\S/;	     # blank line
+         if    (/quit|exit/i)    { last;                                     }
+         elsif (/date|time/i)    { printf $client "%s\n", scalar localtime;  }
+         elsif (/who/i )         { print  $client `who 2>&1`;                }
+         elsif (/cookie/i )      { print  $client `/usr/games/fortune 2>&1`; }
+         elsif (/motd/i )        { print  $client `cat /etc/motd 2>&1`;      }
+         else {
+           print $client "Commands: quit date who cookie motd\n";
+         }
+       } continue {
+          print $client "Command? ";
+       }
+       close $client;
+     }
+
+UDP: Message Passing
+====================
+
+   Another kind of client-server setup is one that uses not connections,
+but messages.  UDP communications involve much lower overhead but also
+provide less reliability, as there are no promises that messages will
+arrive at all, let alone in order and unmangled.  Still, UDP offers some
+advantages over TCP, including being able to "broadcast" or "multicast" to
+a whole bunch of destination hosts at once (usually on your local subnet).
+If you find yourself overly concerned about reliability and start
+building checks into your message system, then you probably should use
+just TCP to start with.
+
+   Here's a UDP program similar to the sample Internet TCP client given
+earlier.  However, instead of checking one host at a time, the UDP version
+will check many of them asynchronously by simulating a multicast and then
+using select() to do a timed-out wait for I/O.  To do something similar
+with TCP, you'd have to use a different socket handle for each host.
+
+     #!/usr/bin/perl -w
+     use strict;
+     use Socket;
+     use Sys::Hostname;
+
+     my ( $count, $hisiaddr, $hispaddr, $histime,
+     	 $host, $iaddr, $paddr, $port, $proto,
+     	 $rin, $rout, $rtime, $SECS_of_70_YEARS);
+
+     $SECS_of_70_YEARS      = 2208988800;
+
+     $iaddr = gethostbyname(hostname());
+     $proto = getprotobyname('udp');
+     $port = getservbyname('time', 'udp');
+     $paddr = sockaddr_in(0, $iaddr); # 0 means let kernel pick
+
+     socket(SOCKET, PF_INET, SOCK_DGRAM, $proto)   || die "socket: $!";
+     bind(SOCKET, $paddr)                          || die "bind: $!";
+
+     $| = 1;
+     printf "%-12s %8s %s\n",  "localhost", 0, scalar localtime time;
+     $count = 0;
+     for $host (@ARGV) {
+     	$count++;
+     	$hisiaddr = inet_aton($host) 	|| die "unknown host";
+     	$hispaddr = sockaddr_in($port, $hisiaddr);
+     	defined(send(SOCKET, 0, 0, $hispaddr))    || die "send $host: $!";
+     }
+
+     $rin = '';
+     vec($rin, fileno(SOCKET), 1) = 1;
+
+     # timeout after 10.0 seconds
+     while ($count && select($rout = $rin, undef, undef, 10.0)) {
+     	$rtime = '';
+     	($hispaddr = recv(SOCKET, $rtime, 4, 0)) 	|| die "recv: $!";
+     	($port, $hisiaddr) = sockaddr_in($hispaddr);
+     	$host = gethostbyaddr($hisiaddr, AF_INET);
+     	$histime = unpack("N", $rtime) - $SECS_of_70_YEARS ;
+     	printf "%-12s ", $host;
+     	printf "%8d %s\n", $histime - time, scalar localtime($histime);
+     	$count--;
+     }
+
+SysV IPC
+========
+
+   While System V IPC isn't so widely used as sockets, it still has some
+interesting uses.  You can't, however, effectively use SysV IPC or
+Berkeley mmap() to have shared memory so as to share a variable amongst
+several processes.  That's because Perl would reallocate your string when
+you weren't wanting it to.
+
+   Here's a small example showing shared memory usage.
+
+     use IPC::SysV qw(IPC_PRIVATE IPC_RMID S_IRWXU);
+
+     $size = 2000;
+     $id = shmget(IPC_PRIVATE, $size, S_IRWXU) || die "$!";
+     print "shm key $id\n";
+
+     $message = "Message #1";
+     shmwrite($id, $message, 0, 60) || die "$!";
+     print "wrote: '$message'\n";
+     shmread($id, $buff, 0, 60) || die "$!";
+     print "read : '$buff'\n";
+
+     # the buffer of shmread is zero-character end-padded.
+     substr($buff, index($buff, "\0")) = '';
+     print "un" unless $buff eq $message;
+     print "swell\n";
+
+     print "deleting shm $id\n";
+     shmctl($id, IPC_RMID, 0) || die "$!";
+
+   Here's an example of a semaphore:
+
+     use IPC::SysV qw(IPC_CREAT);
+
+     $IPC_KEY = 1234;
+     $id = semget($IPC_KEY, 10, 0666 | IPC_CREAT ) || die "$!";
+     print "shm key $id\n";
+
+   Put this code in a separate file to be run in more than one process.
+Call the file take:
+
+     # create a semaphore
+
+     $IPC_KEY = 1234;
+     $id = semget($IPC_KEY,  0 , 0 );
+     die if !defined($id);
+
+     $semnum = 0;
+     $semflag = 0;
+
+     # 'take' semaphore
+     # wait for semaphore to be zero
+     $semop = 0;
+     $opstring1 = pack("s!s!s!", $semnum, $semop, $semflag);
+
+     # Increment the semaphore count
+     $semop = 1;
+     $opstring2 = pack("s!s!s!", $semnum, $semop,  $semflag);
+     $opstring = $opstring1 . $opstring2;
+
+     semop($id,$opstring) || die "$!";
+
+   Put this code in a separate file to be run in more than one process.
+Call this file give:
+
+     # 'give' the semaphore
+     # run this in the original process and you will see
+     # that the second process continues
+
+     $IPC_KEY = 1234;
+     $id = semget($IPC_KEY, 0, 0);
+     die if !defined($id);
+
+     $semnum = 0;
+     $semflag = 0;
+
+     # Decrement the semaphore count
+     $semop = -1;
+     $opstring = pack("s!s!s!", $semnum, $semop, $semflag);
+
+     semop($id,$opstring) || die "$!";
+
+   The SysV IPC code above was written long ago, and it's definitely
+clunky looking.  For a more modern look, see the IPC::SysV module which is
+included with Perl starting from Perl 5.005.
+
+   A small example demonstrating SysV message queues:
+
+     use IPC::SysV qw(IPC_PRIVATE IPC_RMID IPC_CREAT S_IRWXU);
+
+     my $id = msgget(IPC_PRIVATE, IPC_CREAT | S_IRWXU);
+
+     my $sent = "message";
+     my $type = 1234;
+     my $rcvd;
+     my $type_rcvd;
+
+     if (defined $id) {
+         if (msgsnd($id, pack("l! a*", $type_sent, $sent), 0)) {
+             if (msgrcv($id, $rcvd, 60, 0, 0)) {
+                 ($type_rcvd, $rcvd) = unpack("l! a*", $rcvd);
+                 if ($rcvd eq $sent) {
+                     print "okay\n";
+                 } else {
+                     print "not okay\n";
+                 }
+             } else {
+                 die "# msgrcv failed\n";
+             }
+         } else {
+             die "# msgsnd failed\n";
+         }
+         msgctl($id, IPC_RMID, 0) || die "# msgctl failed: $!\n";
+     } else {
+         die "# msgget failed\n";
+     }
+
+NOTES
+=====
+
+   Most of these routines quietly but politely return undef when they fail
+instead of causing your program to die right then and there due to an
+uncaught exception.  (Actually, some of the new Socket conversion
+functions  croak() on bad arguments.)  It is therefore essential to check
+return values from these functions.  Always begin your socket programs
+this way for optimal success, and don't forget to add -T taint checking
+flag to the #! line for servers:
+
+     #!/usr/bin/perl -Tw
+     use strict;
+     use sigtrap;
+     use Socket;
+
+BUGS
+====
+
+   All these routines create system-specific portability problems.  As
+noted elsewhere, Perl is at the mercy of your C libraries for much of its
+system behaviour.  It's probably safest to assume broken SysV semantics for
+signals and to stick with simple TCP and UDP socket operations; e.g., don't
+try to pass open file descriptors over a local UDP datagram socket if you
+want your code to stand a chance of being portable.
+
+   As mentioned in the signals section, because few vendors provide C
+libraries that are safely re-entrant, the prudent programmer will do
+little else within a handler beyond setting a numeric variable that
+already exists; or, if locked into a slow (restarting) system call, using
+die() to raise an exception and longjmp(3) out.  In fact, even these may
+in some cases cause a core dump.  It's probably best to avoid signals
+except where they are absolutely inevitable.  This will be addressed in a
+future release of Perl.
+
+AUTHOR
+======
+
+   Tom Christiansen, with occasional vestiges of Larry Wall's original
+version and suggestions from the Perl Porters.
+
+SEE ALSO
+========
+
+   There's a lot more to networking than this, but this should get you
+started.
+
+   For intrepid programmers, the indispensable textbook is *Unix Network
+Programming* by W. Richard Stevens (published by Addison-Wesley).  Note
+that most books on networking address networking from the perspective of a
+C programmer; translation to Perl is left as an exercise for the reader.
+
+   The IO::Socket(3) manpage describes the object library, and the
+Socket(3) manpage describes the low-level interface to sockets.  Besides
+the obvious functions in *Note Perlfunc: perlfunc,, you should also check
+out the modules file at your nearest CPAN site.  (See *Note Perlmodlib:
+perlmodlib, or best yet, the `Perl FAQ' for a description of what CPAN is
+and where to get it.)
+
+   Section 5 of the modules file is devoted to "Networking, Device Control
+(modems), and Interprocess Communication", and contains numerous unbundled
+modules numerous networking modules, Chat and Expect operations, CGI
+programming, DCE, FTP, IPC, NNTP, Proxy, Ptty, RPC, SNMP, SMTP, Telnet,
+Threads, and ToolTalk-just to name a few.
+
+

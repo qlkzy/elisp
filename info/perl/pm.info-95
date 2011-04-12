@@ -1,0 +1,1915 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Class/Handler,  Next: Class/ISA,  Prev: Class/Generate,  Up: Module List
+
+Create Apache-like pseudoclass event handlers
+*********************************************
+
+NAME
+====
+
+   Class::Handler - Create Apache-like pseudoclass event handlers
+
+SYNOPSIS
+========
+
+     use Class::Handler;
+
+     handler http => 'My::Module';
+     handler http => 'My::OtherModule';
+     http->dostuff(@args);           # Tries My::Module->dostuff,
+                                     # then My::OtherModule->dostuff
+                                     # if it fails or is not found
+
+     nohandler http => 'My::Module'; # Remove My::Module from the
+                                     # list of modules to try
+
+     nohandler http;                 # Remove http handler entirely
+
+DESCRIPTION
+===========
+
+Overview
+--------
+
+   This module can be used to create and maintain pseudoclass event
+handlers, which are simply special classes which inherit from multiple
+modules but provide no methods of their own. These handlers can be used
+just like normal classes, with the added benefit that they are able to
+decline or partially handle requests, allowing multiple classes to act on
+the same data through the same interface.
+
+   This serves the dual purpose of acting as both a complete Perl 5 module
+as well as a prototype for a proposed Perl 6 feature.
+
+Adding and Using Handlers
+-------------------------
+
+   To add a handler, you simply use the handler() method which is
+automatically exported by this module. handler() takes two arguments, the
+first being the name of the handler and the second the name of a class
+which should be added to that handler:
+
+     handler signal => 'Signal::DoStuff';
+
+   This would install a new handler called signal which would have one
+class, `Signal::DoStuff', in it. You can install multiple handlers at the
+same time:
+
+     handler exception => 'My::Catch', 'Site::Failsafe';
+
+   or as multiple subsequent commands:
+
+     handler exception => 'My::Catch';
+     handler exception => 'Site::Failsafe';
+
+   The theory behind these handlers is much like the theory behind Apache
+handlers. Whatever the name of the method is that is called on the
+pseudoclass, is the name of the method that is called on the actual
+classes. For example, assuming this code:
+
+     handler http => 'My::HTTP';
+     handler http => 'LWP::UserAgent';
+     $FH = http->open("http://www.yahoo.com");
+
+   Then the following sequence of events would occur:
+
+     $FH         http->open                            undef
+      ^              |                                   ^
+      |              |                                   |
+      |  Does My::HTTP->open exist?                      |
+      |        YES/     \NO                              |
+      |          /       \                               |
+      |      Try it     Does LWP::UserAgent->open exist? |
+      |       / \        ^      YES/     \NO             |
+      |    OK/   \UNDEF /         /       ----------------
+      -------     ------       Try it                    |
+      |                         /  \                     |
+      |                      OK/    \UNDEF               |
+      -------------------------      ---------------------
+
+   Some highlights:
+
+     1. Each class's open() method is tried in turn, since
+        that is the name of the method called on the handler
+
+     2. If undef is returned, the next one in sequence is
+        tried.
+
+     3. If 'OK' (simply meaning 1 or some other true value,
+        like $FH) is returned, that is propagated out and
+        returned by the top-level handler.
+
+     4. All classes are tried until 'OK' is returned or the
+        last one is reached.
+     
+     This allows you to easily chain classes and methods together with a
+     couple key benefits over an inline C<||>:
+
+     1. Each handler can partially handle the request, but
+        still return undef, deferring to the next one in line.
+
+     2. The handlers can be reordered internally at-will
+        without the main program having to be redone.
+
+     3. Different class open() methods can use internal
+        rules, such as "only open .com URLs", without
+        you having to put checks for this all over the
+        place in the top-level program.
+
+   For more details, please see the Perl 6 RFC listed below.
+
+Removing Handlers
+-----------------
+
+   In addition to handlers being added, they need to be removed as well.
+This is where nohandler() comes in:
+
+     nohandler http => 'My::HTTP'; # remove My::HTTP from list
+     nohandler http;               # remove http handler
+
+   The first example removes `My::HTTP' from the list of classes used by
+the http handler. The second syntax removes the http handler entirely,
+meaning that this call:
+
+     $FO = http->open("http://www.yahoo.com");
+
+   will result in the familiar error:
+
+     Can't locate object method "open" via package "http"
+
+   Currently, there is no way to reorder handlers without removing and
+then re-adding them.
+
+Automatic Handler Registration and Removal
+------------------------------------------
+
+   Sometimes, you may find that you want a class to automatically register
+as a member of a given handler. To do so, you simply need to `use
+Class::Handler' in your module and then prefix the package `main::' (or
+whatever package you want to affect) to the start of the handler name:
+
+     package Custom::Module;
+
+     use Class::Handler;
+     handler 'main::stuff' => 'Custom::Module';
+
+   This will make it so that in your main script you can now do this:
+
+     use Custom::Module;
+     stuff->method(@args);
+
+   And it will call the Custom::Module->method function as expected.
+
+   However, this feature should be used with caution. It borders right on
+the edge of scary action-at-a-distance.
+
+REFERENCES
+==========
+
+   For more details on the complete Perl 6 proposal, please visit
+http://dev.perl.org/rfc/101.html. Comments are welcome.
+
+AUTHOR
+======
+
+   Copyright (c) 2000, Nathan Wiger <nate@sun.com>. All Rights Reserved.
+
+   This module is free software; you may copy this under the terms of the
+GNU General Public License, or the Artistic License, copies of which
+should have accompanied your Perl kit.
+
+
+File: pm.info,  Node: Class/ISA,  Next: Class/Iter,  Prev: Class/Handler,  Up: Module List
+
+report the search path for a class's ISA tree
+*********************************************
+
+NAME
+====
+
+   Class::ISA - report the search path for a class's ISA tree
+
+SYNOPSIS
+========
+
+     # Suppose you go: use Food::Fishstick, and that uses and
+     # inherits from other things, which in turn use and inherit
+     # from other things.  And suppose, for sake of brevity of
+     # example, that their ISA tree is the same as:
+
+     @Food::Fishstick::ISA = qw(Food::Fish  Life::Fungus  Chemicals);
+     @Food::Fish::ISA = qw(Food);
+     @Food::ISA = qw(Matter);
+     @Life::Fungus::ISA = qw(Life);
+     @Chemicals::ISA = qw(Matter);
+     @Life::ISA = qw(Matter);
+     @Matter::ISA = qw();
+
+     use Class::ISA;
+     print "Food::Fishstick path is:\n ",
+           join(", ", Class::ISA::super_path('Food::Fishstick')),
+           "\n";
+
+   That prints:
+
+     Food::Fishstick path is:
+      Food::Fish, Food, Matter, Life::Fungus, Life, Chemicals
+
+DESCRIPTION
+===========
+
+   Suppose you have a class (like Food::Fish::Fishstick) that is derived,
+via its @ISA, from one or more superclasses (as Food::Fish::Fishstick is
+from Food::Fish, Life::Fungus, and Chemicals), and some of those
+superclasses may themselves each be derived, via its @ISA, from one or
+more superclasses (as above).
+
+   When, then, you call a method in that class ($fishstick->calories),
+Perl first searches there for that method, but if it's not there, it goes
+searching in its superclasses, and so on, in a depth-first (or maybe
+"height-first" is the word) search.  In the above example, it'd first look
+in Food::Fish, then Food, then Matter, then Life::Fungus, then Life, then
+Chemicals.
+
+   This library, Class::ISA, provides functions that return that list -
+the list (in order) of names of classes Perl would search to find a
+method, with no duplicates.
+
+FUNCTIONS
+=========
+
+the function Class::ISA::super_path($CLASS)
+     This returns the ordered list of names of classes that Perl would
+     search thru in order to find a method, with no duplicates in the list.
+     $CLASS is not included in the list.  UNIVERSAL is not included - if
+     you need to consider it, add it to the end.
+
+the function Class::ISA::self_and_super_path($CLASS)
+     Just like `super_path', except that $CLASS is included as the first
+     element.
+
+the function Class::ISA::self_and_super_versions($CLASS)
+     This returns a hash whose keys are $CLASS and its
+     (super-)superclasses, and whose values are the contents of each
+     class's $VERSION (or undef, for classes with no $VERSION).
+
+     The code for self_and_super_versions is meant to serve as an example
+     for precisely the kind of tasks I anticipate that self_and_super_path
+     and super_path will be used for.  You are strongly advised to read the
+     source for self_and_super_versions, and the comments there.
+
+CAUTIONARY NOTES
+================
+
+   * Class::ISA doesn't export anything.  You have to address the
+functions with a "Class::ISA::" on the front.
+
+   * Contrary to its name, Class::ISA isn't a class; it's just a package.
+Strange, isn't it?
+
+   * Say you have a loop in the ISA tree of the class you're calling one
+of the Class::ISA functions on: say that Food inherits from Matter, but
+Matter inherits from Food (for sake of argument).  If Perl, while
+searching for a method, actually discovers this cyclicity, it will throw a
+fatal error.  The functions in Class::ISA effectively ignore this
+cyclicity; the Class::ISA algorithm is "never go down the same path
+twice", and cyclicities are just a special case of that.
+
+   * The Class::ISA functions just look at @ISAs.  But theoretically, I
+suppose, AUTOLOADs could bypass Perl's ISA-based search mechanism and do
+whatever they please.  That would be bad behavior, tho; and I try not to
+think about that.
+
+   * If Perl can't find a method anywhere in the ISA tree, it then looks
+in the magical class UNIVERSAL.  This is rarely relevant to the tasks that
+I expect Class::ISA functions to be put to, but if it matters to you, then
+instead of this:
+
+     @supers = Class::Tree::super_path($class);
+
+   do this:
+
+     @supers = (Class::Tree::super_path($class), 'UNIVERSAL');
+
+   And don't say no-one ever told ya!
+
+   * When you call them, the Class::ISA functions look at @ISAs anew -
+that is, there is no memoization, and so if ISAs change during runtime,
+you get the current ISA tree's path, not anything memoized.  However,
+changing ISAs at runtime is probably a sign that you're out of your mind!
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1999, 2000 Sean M. Burke. All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+AUTHOR
+======
+
+   Sean M. Burke `sburke@cpan.org'
+
+
+File: pm.info,  Node: Class/Iter,  Next: Class/MethodMaker,  Prev: Class/ISA,  Up: Module List
+
+Iterator superclass for Class::Visitor
+**************************************
+
+NAME
+====
+
+   Class::Iter - Iterator superclass for Class::Visitor
+
+SYNOPSIS
+========
+
+     use Class::Visitor;
+
+     visitor_class 'CLASS', 'SUPER', { TEMPLATE };
+     visitor_class 'CLASS', 'SUPER', [ TEMPLATE ];
+
+     $obj = CLASS->new ();
+     $iter = $obj->iter;
+     $iter = $obj->iter ($parent, $array, $index);
+
+     $iter->parent;
+     $iter->is_iter;
+     $iter->root;
+     $iter->rootpath;
+     $iter->next;
+     $iter->at_end;
+     $iter->delegate;
+     $iter->is_same ($obj);
+
+DESCRIPTION
+===========
+
+   `Class::Iter' defines the majority of iterator methods for iterator
+classes created by `Class::Visitor'.
+
+   parent returns the parent of this iterator, or undef if this is the
+root object.
+
+   `is_iter' returns true indicating that this object is an iterator (all
+other `is_*TYPE*' queries would be passed on to the delegate).
+
+   root returns the root parent of this iterator.
+
+   `rootpath' returns an array of all iterators between and including the
+root and this iterator.
+
+   next returns the iterator of the object after this object in the
+parent's element.  If there is no next object, next returns `$self'.
+
+   `at_end' returns true if this is the last object in the parent's
+element, i.e. it returns true if next would return `$self'.
+
+   delegate returns the object that this iterator stands-in for.
+
+   `is_same' returns true if $obj is the delegate or if $obj is an
+iterator pointing to the same object.
+
+AUTHOR
+======
+
+   Ken MacLeod, ken@bitsko.slc.ut.us
+
+SEE ALSO
+========
+
+   perl(1), Class::Visitor(3).
+
+
+File: pm.info,  Node: Class/MethodMaker,  Next: Class/Multimethods,  Prev: Class/Iter,  Up: Module List
+
+a module for creating generic methods
+*************************************
+
+NAME
+====
+
+   *Class::MethodMaker* - a module for creating generic methods
+
+SYNOPSIS
+========
+
+     use Class::MethodMaker
+       new_with_init => 'new',
+       get_set       => [ qw /foo bar baz / ];
+
+DESCRIPTION
+===========
+
+   This module solves the problem of having to write a bazillion get/set
+methods that are all the same. The argument to 'use' is a hash whose keys
+are the names of types of generic methods generated by MethodMaker and
+whose values tell method maker what methods to make. (More precisely, the
+keys are the names of MethodMaker methods (methods that write methods) and
+the values are the arguments to those methods.
+
+   To override any generated methods, it is sufficient to ensure that the
+overriding method is defined when Class::MethodMaker is called.  Note that
+the use keyword introduces a BEGIN block, so you may need to define (or at
+least declare) your overriding method in a BEGIN block.
+
+   Some new facilities may be marked as EXPERIMENTAL in the documentation.
+These facilities are being trialled, and whilst it is hoped that they will
+become mainstream code, no promises are made.  They may change or
+disappear at any time.  Caveat Emptor.  The maintainer would be delighted
+to hear any feedback particularly regarding such facilities, be it good or
+bad, so long as it is constructive.
+
+   Some old facilities may be marked as COMPATIBILITY in the documentation.
+These facilities are being maintained purely for compatibility with old
+versions of this module, but will ultimately disappear.  They are normally
+replaced by alternatives that are thought preferable for some completely
+arbitrary raisin.  Please avoid using them, and consider amending any
+existing code that does use them not to.  If you believe that their
+removal will cast an unacceptable pall over your life, please contact the
+maintainer, or get a new life: whichever is easier.
+
+AUTHOR
+======
+
+   (Original) Peter Seibel (Organic Online).
+
+   Current Maintainer: Martyn J. Pearce fluffy@engineer.com
+
+   Contributions from:
+
+     Evolution Online Systems, Inc. http://www.evolution.com
+     Matthew Persico
+     Yitzchak Scott-Thoennes
+
+SEE ALSO
+========
+
+VERSION
+=======
+
+   Class::MethodMaker v1.02
+
+SUPPORTED METHOD TYPES
+======================
+
+new
+---
+
+   Creates a basic constructor.
+
+   Takes a single string or a reference to an array of strings as its
+argument.  For each string creates a simple method that creates and
+returns an object of the appropriate class.
+
+   This method may be called as a class method, as usual, or as in instance
+method, in which case a new object of the same class as the instance will
+be created.  *Note that new_hash_init works slightly differently with
+regard to being called on an instance.*
+
+new_with_init
+-------------
+
+   Creates a basic constructor which calls a method named init after
+instantiating the object. The init method should be defined in the class
+using MethodMaker.
+
+   Takes a single string or a reference to an array of strings as its
+argument.  For each string creates a simple method that creates an object
+of the appropriate class, calls init on that object propagating all
+arguments, before returning the object.
+
+   This method may be called as a class method, as usual, or as in instance
+method, in which case a new object of the same class as the instance will
+be created.  *Note that new_hash_init works slightly differently with
+regard to being called on an instance.*
+
+new_hash_init
+-------------
+
+   Creates a basic constructor which accepts a hash of slot-name/value
+pairs with which to initialize the object.  The slot-names are interpreted
+as the names of methods that can be called on the object after it is
+created and the values are the arguments to be passed to those methods.
+
+   Takes a single string or a reference to an array of strings as its
+argument.  For each string creates a method that takes a list of arguments
+that is treated as a set of key-value pairs, with each such pair causing a
+call `$self->key ($value)'.
+
+   This method may be called as a class method, causing a new instance to
+be created, or as an instance method, which will operate on the subject
+instance.  This allows it to be combined with new_with_init (see above) to
+provide some default values.  For example, declare a new_with_init method,
+say 'new' and a new_hash_init method, for example, 'hash_init' and then in
+the init method, you can call modify or add to the %args hash and then
+call hash_init.
+
+   *Note that the operation with regard to action on an instance differs
+to that of new and new_with_init differently with regard to being called
+on an instance.*
+
+get_set
+-------
+
+   Takes a single string or a reference to an array of strings as its
+argument.  Each string specifies a slot, for which accessor methods are
+created.  The accessor methods are, by default:
+
+x
+     If an argument is provided, sets a new value for x.  This is true even
+     if the argument is undef (cf. no argument, which does not set.)
+
+     Returns (new) value.
+
+     Value defaults to undef.
+
+clear_x
+     Sets value to undef.  This is exactly equivalent to
+
+          $foo->x (undef)
+
+     No return.
+
+   This is your basic get/set method, and can be used for slots containing
+any scalar value, including references to non-scalar data. Note, however,
+that MethodMaker has meta-methods that define more useful sets of methods
+for slots containing references to lists, hashes, and objects.
+
+EXPERIMENTAL: Options
+---------------------
+
+   There are several options available for controlling the names and types
+of methods created.
+
+   The following options affect the type of methods created:
+
+-static
+     The methods will refer to a class-specific, rather than
+     instance-specific store.  I.e., these scalars are shared across all
+     instances of your object in your process.
+
+   The following options affect the methods created as detailed:
+
+-java
+     Creates getx and setx methods, which return the value, and set the
+     value (no return), respectively.
+
+-eiffel
+     Creates x and set_x methods, analogous to -java get_x and set_x
+     respectively.
+
+-compatibility
+     Creates x (as per the default), and clear_x, which resets the slot
+     value to undef.  Use this to ensure backward compatibility.
+
+-noclear
+     Creates x (as per the default) only.
+
+   Alternatively, an arrayref specifying a template for method names may be
+supplied.  Each name must contain a '*' character, which will be replaced
+by the slot name, and no two patterns may be the same.  undef may be
+supplied for methods that you do not want created.  Currently, the first 4
+members of such an arrayref may be used:
+
+  1. Creates a method that if supplied an argument, sets the slot to the
+     value of that argument; the value of the slot (after setting, if
+     relevant) is returned.
+
+  2. Creates a method that takes no arguments, sets the slot value to
+     undefined, and makes no return.
+
+  3. Creates a method that takes no arguments, and returns the value of the
+     slot.
+
+  4. Creates a method that takes one argument, and sets the value of the
+     slot to that value.  Given undef as that argument, the value is set
+     to undef.  If called with no arguments, the slot value is set to
+     undef.
+
+        See the examples.
+
+Examples
+--------
+
+   Creates methods a, b, c which can be used for both getting and setting
+the named slots:
+
+     use Class::MethodMaker
+       get_set => 'a',
+       get_set => [qw/ b c /];
+
+   Creates get_d which returns the value in slot d (takes no arguments),
+and set_d, which sets the value in slot d (no return):
+
+     use Class::MethodMaker
+       get_set => [ -java => d ];
+
+   Creates e_clear, e_get, e_set, f_clear, f_get, f_set methods:
+
+     use Class::MethodMaker
+       get_set => [[undef, '*_clear', '*_get', '*_set'] => qw/e f/ ];
+
+static_get_set
+--------------
+
+   Like `get_set|get_set' in this node, takes a single string or a
+reference to an array of strings as its argument. For each string, x
+creates two methods:
+
+x
+     If an argument is provided, sets a new value for x.  Returns (new)
+     value.  Value defaults to undef.
+
+clear_x
+     Sets value to undef.  No return.
+
+   The difference between this and  `get_set' in this node is that these
+scalars are shared across all instances of your object in your process.
+
+   This is now a wrapper around get_set (-static => @args).
+
+get_concat
+----------
+
+   Like get_set except sets do not clear out the original value, but
+instead concatenate the new value to the existing one. Thus these slots
+are only good for plain scalars. Also, like get_set, defines clear_foo
+method.
+
+   The argument taken may be a hashref, in which the keys name and join
+are recognized; name being the slot name, join being a join string t glue
+any given strings.
+
+   Example:
+
+     use Class::MethodMaker
+       get_concat => { name => 'words', join => "\t" };
+
+   Will, each time an argument is supplied to the x method, glue this
+argument onto any existing value with tab separator.  Like the join
+operator, the join field is applied *between* values, not prior to the
+first or after the last.
+
+grouped_fields
+--------------
+
+   Creates get/set methods like get_set but also defines a method which
+returns a list of the slots in the group.
+
+     grouped_fields methods
+       some_group => [ qw / field1 field2 field3 / ];
+
+   Its argument list is parsed as a hash of group-name => field-list
+pairs. Get-set methods are defined for all the fields and a method with
+the name of the group is defined which returns the list of fields in the
+group.
+
+object
+------
+
+   Creates methods for accessing a slot that contains an object of a given
+class as well as methods to automatically pass method calls onto the
+object stored in that slot.
+
+     object => [
+                'Foo' => 'phooey',
+                'Bar' => [ qw / bar1 bar2 bar3 / ],
+                'Baz' => {
+                          slot => 'foo',
+                          comp_mthds => [ qw / bar baz / ]
+                         },
+                'Fob' => [
+                          {
+                           slot => 'dog',
+                           comp_mthds => 'bark',
+                          },
+                          {
+                           slot => 'cat',
+                           comp_mthds => 'miaow',
+                          },
+                         ];
+               ];
+
+   The main argument should be a reference to an array. The array should
+contain pairs of class => sub-argument pairs.  The sub-arguments parsed
+thus:
+
+Hash Reference
+     See `Baz' above.  The hash should contain the following keys:
+
+    slot
+          The name of the instance attribute (slot).
+
+    comp_mthds
+          A string or array ref, naming the methods that will be forwarded
+          directly to the object in the slot.
+
+Array Reference
+     As for String, for each member of the array.  Also works if each
+     member is a hash reference (see `Fob' above).
+
+String
+     The name of the instance attribute (slot).
+
+   For each slot x, with forwarding methods y and z, the following methods
+are created:
+
+x
+     A get/set method.
+
+     If supplied with an object of an appropriate type, will set set the
+     slot to that value.
+
+     Else, if the slot has no value, then an object is created by calling
+     new on the appropriate class, passing in any supplied arguments.
+
+     The stored object is then returned.
+
+y
+     Forwarded onto the object in slot x, which is auto-created via new if
+     necessary.  The new, if called, is called without arguments.
+
+z
+     As for y.
+
+   So, using the example above, a method, foo, is created in the class
+that calls MethodMaker, which can get and set the value of those objects
+in slot foo, which will generally contain an object of class Baz.  Two
+additional methods are created in the class using MethodMaker, named 'bar'
+and 'baz' which result in a call to the 'bar' and 'baz' methods on the Baz
+object stored in slot foo.
+
+object_list
+-----------
+
+   Functions like list, but maintains an array of referenced objects in
+each slot. Forwarded methods return a list of the results returned by
+maping the method over each object in the array.
+
+   Arguments are like object.
+
+forward
+-------
+
+     forward => [ comp => 'method1', comp2 => 'method2' ]
+
+   Define pass-through methods for certain fields.  The above defines that
+method `method1' will be handled by component comp, whilst method
+`method2' will be handled by component `comp2'.
+
+boolean
+-------
+
+     boolean => [ qw / foo bar baz / ]
+
+   Creates methods for setting, checking and clearing flags. All flags
+created with this meta-method are stored in a single vector for space
+efficiency. The argument to boolean should be a string or a reference to
+an array of strings. For each string x it defines several methods:
+
+x
+     Returns the value of the x-flag.  If called with an argument, it first
+     sets the x-flag to the truth-value of the argument.
+
+set_x
+     Equivalent to x(1).
+
+clear_x
+     Equivalent to x(0).
+
+   Additionally, boolean defines three class methods:
+
+bits
+     Returns the vector containing all of the bit fields (remember however
+     that a vector containing all 0 bits is still true).
+
+boolean_fields
+     Returns a list of all the flags by name.
+
+bit_dump
+     Returns a hash of the flag-name/flag-value pairs.
+
+listed_attrib
+-------------
+
+     listed_attrib => [ qw / foo bar baz / ]
+
+   Like boolean, listed_attrib creates x, set_x, and clear_x methods.
+However, it also defines a class method x_objects which returns a list of
+the objects which presently have the x-flag set to true. N.B.
+listed_attrib does not use the same space efficient implementation as
+boolean, so boolean should be prefered unless the x_objects method is
+actually needed.
+
+key_attrib
+----------
+
+     key_attrib => [ qw / foo bar baz / ]
+
+   Creates get/set methods like get/set but also maintains a hash in which
+each object is stored under the value of the field when the slot is set.
+If an object has a slot set to a value which another object is already set
+to the object currently set to that value has that slot set to undef and
+the new object will be put into the hash under that value. (I.e. only one
+object can have a given key. The method find_x is defined which if called
+with any arguments returns a list of the objects stored under those values
+in the hash. Called with no arguments, it returns a reference to the hash.
+
+key_with_create
+---------------
+
+     key_with_create => [ qw / foo bar baz / ]
+
+   Just like key_attrib except the find_x method is defined to call the new
+method to create an object if there is no object already stored under any
+of the keys you give as arguments.
+
+list
+----
+
+   Creates several methods for dealing with slots containing list data.
+Takes a string or a reference to an array of strings as its argument and
+for each string, x, creates the methods:
+
+x
+     This method returns the list of values stored in the slot. In an array
+     context it returns them as an array and in a scalar context as a
+     reference to the array.
+
+x_push
+x_pop
+x_shift
+x_unshift
+x_splice
+x_clear
+x_count
+     Returns the number of elements in x.
+
+x_index
+     Takes a list of indices, returns a list of the corresponding values.
+
+x_set
+     Takes a list, treated as pairs of index => value; each given index is
+     set to the corresponding value.  No return.
+
+hash
+----
+
+   Creates a group of methods for dealing with hash data stored in a slot.
+
+   Takes a string or a reference to an array of strings and for each
+string, x, creates:
+
+x
+     Called with no arguments returns the hash stored in the slot, as a
+     hash in a list context or as a reference in a scalar context.
+
+     Called with one simple scalar argument it treats the argument as a key
+     and returns the value stored under that key.
+
+     Called with one array (list) reference argument, the array elements
+     are considered to be be keys of the hash. x returns the list of values
+     stored under those keys (also known as a *hash slice*.)
+
+     Called with one hash reference argument, the keys and values of the
+     hash are added to the hash.
+
+     Called with more than one argument, treats them as a series of
+     key/value pairs and adds them to the hash.
+
+x_keys
+     Returns the keys of the hash.
+
+x_values
+     Returns the list of values.
+
+x_tally
+     Takes a list of arguments and for each scalar in the list increments
+     the value stored in the hash and returns a list of the current (after
+     the increment) values.
+
+x_exists
+     Takes a single key, returns whether that key exists in the hash.
+
+x_delete
+     Takes a list, deletes each key from the hash.
+
+x_clear
+     Resets hash to empty.
+
+hash_of_lists
+-------------
+
+   Creates a group of methods for dealing with list data stored by key in a
+slot.
+
+   Takes a string or a reference to an array of strings and for each
+string, x, creates:
+
+x
+     Returns all the values for all the given keys, in order.  If no keys
+     are given, returns all the values (in an unspecified key order).
+
+     The result is returned as an arrayref in scalar context.  This
+     arrayref is not part of the data structure; messing with it will not
+     affect the contents directly (even if a single key was provided as
+     argument.)
+
+     If any argument is provided which is an arrayref, then the members of
+     that array are used as keys.  Thus, the trivial empty-key case may be
+     utilized with an argument of [].
+
+x_keys
+     Returns the keys of the hash.  As an arrayref in scalar context.
+
+x_exists
+     Takes a list of keys, and returns whether each key exists in the hash
+     (i.e., the and of whether the individual keys exist).
+
+x_delete
+     Takes a list, deletes each key from the hash.
+
+x_push
+     Takes a key, and some values.  Pushes the values onto the list denoted
+     by the key.  If the first argument is an arrayref, then each element
+     of that arrayref is treated as a key and the elements pushed onto each
+     appropriate list.
+
+x_pop
+     Takes a list of keys, and pops each one.  Returns the list of popped
+     elements.  undef is returned in the list for each key that is has an
+     empty list.
+
+x_last
+     Like x_pop, but does not actually change any of the lists.
+
+x_unshift
+     Like push, only the from the other end of the lists.
+
+x_shift
+     Like pop, only the from the other end of the lists.
+
+x_splice
+     Takes a key, offset, length, and a values list.  Splices the list
+     named by the key.  Anything from the offset argument (inclusive) may
+     be omitted.  See `splice', *Note Perlfunc: (perl.info)perlfunc,.
+
+x_set
+     Takes a key, and a set of index->value pairs, and sets each specified
+     index to the corresponding value for the given key.
+
+x_clear
+     Takes a list of keys.  Resets each named list to empty (but does not
+     delete the keys.)
+
+x_count
+     Takes a list of keys.  Returns the sum of the number of elements for
+     each named list.
+
+x_index
+     Takes a key, and a list of indices.  Returns a list of each item at
+     the corresponding index in the list of the given key.  Uses undef for
+     indices beyond range.
+
+x_remove
+     Takes a key, and a list of indices.  Removes each corresponding item
+     from the named list.  The indices are effectively looked up at the
+     point of call -- thus removing indices 3, 1 from list (a, b, c, d)
+     will remove (d) and (b).
+
+x_sift
+     Takes a key, and a set of named arguments, which may be a list or a
+     hash ref.  Removes list members based on a grep-like approach.
+
+    filter
+          The filter function used (as a coderef).  Is passed two
+          arguments, the value compared against, and the value in the list
+          that is potential for grepping out.  If returns true, the value
+          is removed.  Default:
+
+               sub { $_[0] == $_[1] }
+
+    keys
+          The list keys to sift through (as an arrayref).  Unknown keys are
+          ignored.  Default: all the known keys.
+
+    values
+          The values to sift out (as an arrayref).  Default: `[undef]'
+
+   Options:
+
+-static
+     Make the corresponding storage class-specific, rather than
+     instance-specific.
+
+tie_hash
+--------
+
+   Much like hash, but uses a tied hash instead.
+
+   Takes a list of pairs, where the first is the name of the component, the
+second is a hash reference.  The hash reference recognizes the following
+keys:
+
+tie
+     Required.  The name of the class to tie to.  *Make sure you have used
+     the required class*.
+
+args
+     Required.  Additional arguments for the tie, as an array ref.
+
+   The first argument can also be an arrayref, specifying multiple
+components to create.
+
+   Example:
+
+     tie_hash     => [
+                      hits        => {
+                                      tie => qw/ Tie::RefHash /,
+                                      args => [],
+                                     },
+                     ],
+
+static_hash
+-----------
+
+   Much like hash, but uses a class-based hash instead.
+
+code
+----
+
+     code => [ qw / foo bar baz / ]
+
+   Creates a slot that holds a code reference. Takes a string or a
+reference to a list of string and for each string, x, creates a method x
+which if called with one argument which is a CODE reference, it installs
+that code in the slot. Otherwise it runs the code stored in the slot with
+whatever arguments (including none) were passed in.
+
+method
+------
+
+     method => [ qw / foo bar baz / ]
+
+   Just like code, except the code is called like a method, with $self as
+its first argument. Basically, you are creating a method which can be
+different for each object. Which is sort of weird. But perhaps useful.
+
+abstract
+--------
+
+     abstract => [ qw / foo bar baz / ]
+
+   This creates a number of methods will die if called.  This is intended
+to support the use of abstract methods, that must be overidden in a useful
+subclass.
+
+counter
+-------
+
+   Create components containing simple counters that may be read,
+incremented, or reset.  For value x, the methods are:
+
+x
+     (accepts argument to set),
+
+incr_x
+     (accepts argument for increment size),
+
+reset_x.
+     The counter is implicitly initialized to zero.
+
+EXPERIMENTAL: copy
+------------------
+
+   Produce a copy of self.  The copy is a *shallow* copy; any references
+will be shared by the instance upon which the method is called and the
+returned newborn.
+
+ADDDING NEW METHOD TYPES
+========================
+
+   MethodMaker is a class that can be inherited. A subclass can define new
+method types by writing a method that generates a hash of
+method_name/code-reference pairs, and then calls the class method
+`install_methods' on them.  If the coderef is in fact a string, then that
+string will be evalled in the hope of getting a coderef to use.
+
+   For example a simple sub-class that defines a method type
+upper_case_get_set might look like this:
+
+     package Class::MethodMakerSubclass;
+
+     use strict;
+
+     use base qw( Class::MethodMaker );
+
+     sub upper_case_get_set {
+       my $class = shift;
+       my ($name) = @_;
+       my %methods;
+       $methods{$name} =
+         sub {
+           my ($self, $new) = @_;
+           defined $new and $self->{$name} = uc $new;
+           $self->{$name};
+         };
+       $class->install_methods (%methods);
+     }
+
+     1;
+
+   Alternatively, rather than a coderef, the values of the hash passed to
+install_methods may be strings, which will be evaled in the hope of
+returning a coderef to use.  If the eval fails, or anything other than a
+coderef is returned, then C::MM croaks.
+
+   Any return value from a method (above) that is used to generate methods
+will be passed to install_methods -- so in the above, the line
+
+     $class->install_methods (%methods);
+
+   could be replaced with
+
+     return %methods
+
+EXPERIMENTAL: builtin_class
+---------------------------
+
+   History: This method was in 0.92, undocumented.  Does anybody use this?
+Would anybody use this subject to some enhancement or other?  Let me know.
+
+   Purpose: This class generates a wrapper around some builtin function,
+cacheing the results in the object and providing a by-name interface.
+
+   Takes a (core) function name, and a arrayref of return position names
+(we will call it pos_list).  Creates:
+
+new
+     Calls the core func with any given arguments, stores the result in the
+     instance.
+
+x
+     For each member of pos_list, creates a method of the same name which
+     gets/sets the nth member of the returned list, where n is the position
+     of x in pos_list.
+
+fields
+     Returns pos_list, in the given order.
+
+dump
+     Returns a list item name, item value, in order.
+
+   Example Usage:
+
+     package Stat;
+
+     use Class::MethodMaker
+       builtin_class => [stat => [qw/ dev ino mode nlink /]],
+
+     package main;
+
+     my $file = "$ENV{HOME}/.profile";
+     my $s = Stat->new ($file);
+     print "File $file has ", $s->nlink, " links\n";
+
+   Note that (a) the new method does not check the return value of the
+function called (in the above example, if $file does not exist, you will
+silently get an empty object), and (b) if you really want the above
+example, see the core File::stat module.   But you get the idea, I hope.
+
+
+File: pm.info,  Node: Class/Multimethods,  Next: Class/Mutator,  Prev: Class/MethodMaker,  Up: Module List
+
+Support multimethods and function overloading in Perl
+*****************************************************
+
+NAME
+====
+
+   Class::Multimethods - Support multimethods and function overloading in
+Perl
+
+VERSION
+=======
+
+   This document describes version 1.70 of Class::Multimethods, released
+April  9, 2000.
+
+SYNOPSIS
+========
+
+     # IMPORT THE multimethod DECLARATION SUB...
+
+     use Class::Multimethods;
+
+     # DECLARE VARIOUS MULTIMETHODS CALLED find...
+
+     # 1. DO THIS IF find IS CALLED WITH A Container REF AND A Query REF...
+
+     multimethod find => (Container, Query)
+     		     => sub { $_[0]->findquery($_[1]) };
+
+     # 2. DO THIS IF find IS CALLED WITH A Container REF AND A Sample REF...
+
+     multimethod find => (Container, Sample)
+     		     => sub { $_[0]->findlike($_[1]) };
+
+     # 3. DO THIS IF find IS CALLED WITH AN Index REF AND A Word REF...
+
+     multimethod find => (Index, Word)
+     		     => sub { $_[0]->lookup_word($_[1]) };
+
+     # 4. DO THIS IF find IS CALLED WITH AN Index REF AND A qr// PATTERN
+
+     multimethod find => (Index, Regexp)
+     		     => sub { $_[0]->lookup_rx($_[1]) };
+
+     # 5. DO THIS IF find IS CALLED WITH AN Index REF AND A NUMERIC SCALAR
+
+     multimethod find => (Index, '#')
+     		     => sub { $_[0]->lookup_elem($_[1]) };
+
+     # 6. DO THIS IF find IS CALLED WITH AN Index REF AND A NON-NUMERIC SCALAR
+
+     multimethod find => (Index, '$')
+     		     => sub { $_[0]->lookup_str($_[1]) };
+
+     # 7. DO THIS IF find IS CALLED WITH AN Index REF AND AN UNBLESSED ARRAY REF
+     #    (NOTE THE RECURSIVE CALL TO THE find MULTIMETHOD)
+
+     multimethod find => (Index, ARRAY)
+     		     => sub { map { find($_[0],$_) } @{$_[1]} };
+
+     # SET UP SOME OBJECTS...
+
+     my $cntr = new Container ('./datafile');
+     my $indx = $cntr->get_index();
+
+     # ...AND SOME INHERITANCE...
+
+     @BadWord::ISA = qw( Word );
+     my $badword = new BadWord("fubar");
+
+     # ...AND EXERCISE THEM...
+
+     print find($cntr, new Query('cpan OR Perl'));		# CALLS 1.
+     print find($cntr, new Example('by a committee'));	# CALLS 2.
+
+     print find($indx, new Word('sugar'));			# CALLS 3.
+     print find($indx, $badword);				# CALLS 3.
+     print find($indx, qr/another brick in the Wall/);	# CALLS 4.
+     print find($indx, 7);					# CALLS 5.
+     print find($indx, 'But don't do that.');		# CALLS 6.
+     print find($indx, [1,"one"]);				# CALLS 7,
+     							# THEN 5 & 6.
+
+DESCRIPTION
+===========
+
+   The Class:Multimethod module exports a subroutine (&multimethod) that
+can be used to declare other subroutines that are dispatched using a
+algorithm different from the normal Perl subroutine or method dispatch
+mechanism.
+
+   Normal Perl subroutines are dispatched by finding the
+appropriately-named subroutine in the current (or specified) package and
+calling that. Normal Perl methods are dispatched by attempting to find the
+appropriately-named subroutine in the package into which the invoking
+object is blessed or, failing that, recursively searching for it in the
+packages listed in the appropriate `@ISA' arrays.
+
+   Class::Multimethods multimethods are dispatched quite differently. The
+dispatch mechanism looks at the classes or types of each argument to the
+multimethod (by calling ref on each) and determines the "closest" matching
+*variant* of the multimethod, according to the argument types specified in
+the variants' definitions (see `Finding the "nearest" multimethod' in this
+node for a definition of "closest").
+
+   The result is something akin to C++'s function overloading, but more
+intelligent, since multimethods take the inheritance relationships of each
+argument into account. Another way of thinking of the mechanism is that it
+performs polymorphic dispatch on every argument of a method, not just the
+first.
+
+Defining multimethods
+---------------------
+
+   The Class::Multimethods module exports a subroutine called
+`multimethod', which can be used to specify multimethod variants with the
+dispatch behaviour described above. The `multimethod' subroutine takes the
+name of the desired multimethod, a list of class names, and a subroutine
+reference, and generates a corresponding multimethod variant within the
+current package.
+
+   For example, the declaration:
+
+     package LargeInt;   @ISA = (LargeNumeric);
+     package LargeFloat; @ISA = (LargeNumeric);
+
+     package LargeNumeric;
+     use Class::Multimethods;
+
+     multimethod divide => (LargeInt, LargeInt) => sub
+     {
+     	LargeInt::divide($_[0],$_[1]);
+     };
+
+     multimethod divide => (LargeInt, LargeFloat) => sub
+     {
+     	LargeFloat::divide($_[0]->AsLargeFloat(),$_[1]));
+     };
+
+   creates a (single!) multimethod `&LargeNumeric::divide' with two
+variants.  If the multimethod is called with two references to `LargeInt'
+objects as arguments, the first variant (i.e. anonymous subroutine) is
+invoked. If the multimethod is called with a `LargeInt' reference and a
+`LargeFloat' reference, the second variant is called.
+
+   Note that if you're running under `use strict', the list of bareword
+class names in each variant definition will cause problems.  In that case
+you'll need to say:
+
+     multimethod divide => ('LargeInt', 'LargeInt') => sub
+     {
+     	LargeInt::divide($_[0],$_[1]);
+     };
+
+     multimethod divide => ('LargeInt', 'LargeFloat') => sub
+     {
+     	LargeFloat::divide($_[0]->AsLargeFloat(),$_[1]));
+     };
+
+   or better still:
+
+     multimethod divide => qw( LargeInt LargeInt ) => sub
+     {
+     	LargeInt::divide($_[0],$_[1]);
+     };
+
+     multimethod divide => qw( LargeInt LargeFloat ) => sub
+     {
+     	LargeFloat::divide($_[0]->AsLargeFloat(),$_[1]));
+     };
+
+   or best of all (;-):
+
+     {
+         no strict;
+     
+         multimethod divide => (LargeInt, LargeInt) => sub
+         {
+     	LargeInt::divide($_[0],$_[1]);
+         };
+
+     multimethod divide => (LargeInt, LargeFloat) => sub
+     {
+     		LargeFloat::divide($_[0]->AsLargeFloat(),$_[1]));
+     };
+     	}
+
+   Calling the multimethod with any other combination of `LargeNumeric'
+reference arguments (e.g. a reference to a `LargeFloat' and a reference to
+a `LargeInt', or two `LargeFloat' referencess) results in an exception
+being thrown, with the message:
+
+     No viable candidate for call to
+     multimethod LargeNumeric::divide at ...
+
+   To avoid this, we could provide a "catch-all" variant:
+
+     multimethod divide => (LargeNumeric, LargeNumeric) => sub
+     {
+     	LargeFloat::divide($_[0]->AsLargeFloat(),$_[1]->AsLargeFloat));
+     }
+
+   Now, calling `&LargeNumeric::divide' with either a `LargeFloat'
+reference and a `LargeInt' reference or two `LargeFloat' references
+results in this third variant being invoked. Note that, adding this third
+alternative doesn't affect calls to the other two, since
+Class::Multimethods always selects the "nearest" match (see `Finding the
+"nearest" multimethod' in this node below for details of what "nearest"
+means).
+
+   This "best fit" behaviour is extremely useful, because it means you can
+code the specific cases you want to handle, and the one or more
+"catch-all" cases to deal with any other combination of arguments.
+
+Finding the "nearest" multimethod
+---------------------------------
+
+   Of course, the usefulness of the entire system depends on how
+intelligently Class::Multimethods decides which version of a multimethod
+is "nearest" to the set of arguments you provided. This decision process
+is called "dispatch resolution", and Class::Multimethods does it like this:
+
+  1. If the types of the arguments given (as determined by ref) exactly
+     match the types specified in any variant of the multimethod, that
+     variant is the one called.
+
+  2. Otherwise, Class::Multimethods compiles a list of "viable targets". A
+     viable target is a variant of the multimethod with the correct number
+     of parameters, such that for each parameter the specified parameter
+     type is a base class of the actual type of the corresponding argument
+     in the actual call.
+
+  3. If there is only one viable target, it is immediately called. if
+     there are no viable targets, an exception is thrown indicating the
+     fact.
+
+  4. Otherwise, Class::Multimethod examines each viable target and computes
+     its "distance" to the actual set of arguments. The distance of a
+     target is the sum of the distances of each of its parameters. The
+     distance of an individual parameter is the number of inheritance
+     steps between its class and the actual class of the corresponding
+     argument.
+
+     Hence, if a specific argument is of the same class as the
+     corresponding parameter type, the distance to that parameter is zero.
+     If the argument is of a class that is an immediate child of the
+     parameter type, the distance is 1. If the argument is of a class which
+     is a "grandchild" of the parameter type, the distance is 2. Et cetera.
+
+  5. Class::Multimethod then chooses the viable target with the smallest
+     "distance" as the "final target". If there is more than one viable
+     target with an equally smallest distance, an exception is thrown
+     indicating that the call is ambiguous. If there *is* only a single
+     final target Class::Multimethod records its identity (so the distance
+     computations don't have to be repeated next time the same set of
+     argument types is used), and then calls that final target.
+
+
+Where to define multimethods
+----------------------------
+
+   Class::Multimethods doesn't care which packages the individual variants
+of a multimethod are defined in. Every variant of a multimethod is visible
+to the underlying multimethod dispatcher, no matter where it was defined.
+
+   For example, the three variants for the divide multimethod shown above
+could all be defined in the LargeNumeric package, or the LargeFloat
+package or the LargeInt package, or in main, or in a separate package of
+their own.
+
+   Of course, to make a specific multimethod visible within a given
+package you still need to tell that package about it. That can be done by
+specifying the name of the multimethod only (i.e. no argument list or
+variant code):
+
+     package Some::Other::Package::That::Wants::To::Use::divide;
+
+     use Class::Multimethods;
+     multimethod "divide";
+
+   For convenience, the declaration itself can be abbreviated to:
+
+     package Some::Other::Package::That::Wants::To::Use::divide;
+
+     use Class::Multimethods "divide";
+
+   Similarly, Class::Multimethod doesn't actually care whether
+multimethods are called as methods or as regular subroutines. This is quite
+different from the behaviour of normal Perl methods and subroutines, where
+how you call them, determines how they are dispatched.
+
+   With multimethods, since all arguments participate in the polymorphic
+resolution of a call (instead of just the first), it make no difference
+whether a multimethod is called as a subroutine:
+
+     numref3 = divide($numref1, $numref2);
+
+   or a method:
+
+     numref3 = $numref1->divide($numref2);
+
+   (so long as the multimethod has been *declared* in the appropriate
+place: the current package for subroutine-like calls, or the invoking
+object's package for method-like calls).
+
+   In other words, Class::Multimethods also provides general subroutine
+overloading. For example:
+
+     package main;
+     use IO;
+     use Class::Multimethods;
+
+     multimethod debug => (IO::File) => sub
+     {
+     	print $_[0] "This should go in a file\n";
+     }
+
+     multimethod debug => (IO::Pipe) => sub
+     {
+     	print $_[0] "This should go down a pipe\n";
+     }
+
+     multimethod debug => (IO::Socket) => sub
+     {
+     	print $_[0] "This should go out a socket\n";
+     }
+
+     # and later
+
+     debug($some_io_handle);
+
+Non-class types as parameters
+-----------------------------
+
+   Yet another thing Class::Multimethods doesn't care about is whether the
+parameter types for each multimethod variant are the names of "real"
+classes or just the identifiers returned when raw Perl data types are
+passed to the built-in ref function. That means you could also define
+multimethod variants like this:
+
+     multimethod stringify => (ARRAY) => sub
+     {
+     	my @arg = @{$_[0]};
+     	return "[" .  join(", ",@arg) . "]";
+     }
+
+     multimethod stringify => (HASH) => sub
+     {
+     	my %arg = %{$_[0]};
+     	return "{" . join(", ", map("$_=>$arg{$_}",keys %arg)) . "}";
+     }
+
+     multimethod stringify => (CODE) => sub
+     {
+     	return "sub {???}";
+     }
+
+     # and later
+
+     print stringify( [1,2,3] ), "\n";
+     print stringify( {a=>1,b=>2,c=>3} ), "\n";
+     print stringify( $array_or_hash_ref ), "\n";
+
+   Provided you remember that the parameter types ARRAY, HASH, and CODE
+really mean "reference to array", "reference to hash", and "reference to
+subroutine", the names of built-in types (i.e. those returned by ref) are
+perfectly acceptable as multimethod parameters.
+
+   That's a nice bonus, but there's a problem. Because ref returns an
+empty string when given any literal string or numeric value, the following
+code:
+
+     print stringify( 2001 ), "\n";
+     print stringify( "a multiple dispatch oddity" ), "\n";
+
+   will produce a nasty surprise:
+
+     No viable candidate for call to multimethod stringify() at line 1
+
+   That's because the dispatch resolution process first calls `ref(2001)'
+to get the class name for the first argument, and therefore thinks it's of
+class "". Since there's no stringify variant with an empty string as its
+parameter type, there are no viable targets for the multimethod call.
+Hence the exception.
+
+   To overcome this limitation, Class::Multimethods allows three special
+pseudo-type names within the parameter lists of multimethod variants.  The
+first pseudo-type - `"$"' - is the class that Class::Multimethods pretends
+that any scalar value (except a reference) belongs to. Hence, you can make
+the two recalcitrant stringifications of scalars work by defining:
+
+     multimethod stringify => ("$")
+     	=> sub { return qq{"$_[0]"} }
+
+   With that definition in place, the two calls:
+
+     print stringify( 2001 ), "\n";
+     print stringify( "a multiple dispatch oddity" ), "\n";
+
+   would produce:
+
+     "2001"
+     "a multiple dispatch oddity"
+
+   That solves the problem, but not as elegantly as it might. It would be
+better if numeric values were left unquoted. To this end,
+Class::Multimethods offers a second pseudo-type - `"#"' - which is the
+class it pretends numeric scalar values belong to (where a scalar value is
+"numeric" if it's truly a numerical value (without implicit coercions):
+
+     $var = 0	# numeric --> '$'
+     $var = 0.0	# numeric --> '$'
+     $var = "0";	# string  --> '#'
+
+   Hence you could now also define:
+
+     multimethod stringify => ("#")
+     	=> sub { return "+$_[0]" }
+     
+     the two calls to C<&stringify> now
+     produce:
+
+     +2001
+     "a multiple dispatch oddity"
+
+   The final pseudo-type - `"*"' - is a wild-card or "don't care" type
+specifier, which matches any argument type exactly. For example, we could
+provide a "catch-all" stringify variant (to handle "GLOB" or "IO"
+references, for example):
+
+     multimethod stringify => ("*")
+     	=> sub { croak "can't stringify a " . ref($_[0]) }
+
+   The `"*"' pseudo-type can also be used in multiple-argument
+multimethods.  For example:
+
+     # General case...
+
+     multimethod handle => (Window, Event, Mode)
+     		=> sub { ... }
+     
+     	# Special cases...
+
+     multimethod handle => (MovableWindow, MoveEvent, NormalMode)
+     		=> sub { ... }
+
+     multimethod handle => (ScalableWindow, ResizeEvent, NormalMode)
+     		=> sub { ... }
+
+     # Very special case
+     # (ignore any event in any window in PanicMode)
+
+     multimethod handle => ("*", "*", PanicMode)
+     		=> sub { ... }
+
+Resolving ambiguities and non-dispatchable calls
+------------------------------------------------
+
+   It's relatively easy to set up a multimethod such that particular
+combinations of argument types cannot be correctly dispatched. For
+example, consider the following variants of a multimethod called `put_peg':
+
+     multimethod put_peg => (RoundPeg,Hole) => sub
+     {
+     	print "a round peg in any old hole\n";
+     };
+
+     multimethod put_peg => (Peg,SquareHole) => sub
+     {
+     	print "any old peg in a square hole\n";
+     };
+
+     multimethod put_peg => (Peg,Hole) => sub
+     {
+     	print "any old peg in any old hole\n";
+     };
+
+   If `put_peg' is called like so:
+
+     put_peg( RoundPeg->new(), SquareHole->new() );
+
+   then Class::Multimethods can't dispatch the call, because it cannot
+decide between the `(RoundPeg,Hole)' and `(Peg,SquareHole)' variants, each
+of which is the same "distance" (i.e. 1 derivation) from the actual
+arguments.
+
+   The default behaviour is to throw an exception (i.e. die) like this:
+
+     Cannot resolve call to multimethod put_peg(RoundPeg,SquareHole).
+     The multimethods:
+     	put_peg(RoundPeg,Hole)
+     	put_peg(Peg,SquareHole)
+     are equally viable at ...
+
+   Sometimes, however, the more specialized variants are only
+optimizations, and a more general case (e.g. the `(Peg,Hole)' variant)
+would suffice as a default where such an ambiguity exists. If that is the
+case, it's possible to tell Class::Multimethods to resolve the ambiguity
+by calling that variant, using the `resolve_ambiguous' subroutine.
+`resolve_ambiguous' is automatically exported by Class::Multimethods and
+is used like this:
+
+     resolve_ambiguous put_peg => (Peg,Hole);
+
+   That is, you specify the name of the multimethod being disambiguated,
+and the signature of the variant to be used in ambiguous cases. Of course,
+the specified variant must actually exist at the time of the call. If it
+doesn't, Class::Multimethod ignores it and throws the usual exception.
+
+   Alternatively, if no variant is suitable as a default, you can register
+a reference to a subroutine that is to be called instead:
+
+     resolve_ambiguous put_peg => \&disambiguator;
+
+   Now, whenever `put_peg' can't dispatch a call because it's ambiguous,
+`disambiguator' will be called instead, with the same argument list as
+`put_peg' was given.
+
+   Of course, `resolve_ambiguous' doesn't care what subroutine it's given a
+reference to, so you can also use an anonymous subroutine:
+
+     resolve_ambiguous put_peg
+     	=> sub
+     	   {
+     		print "can't put a ", ref($_[0]),
+     		      " into a ", ref($_[1]), "\n";
+     	   };
+
+   Dispatch can also fail if there are no suitable variants available to
+handle a particular call. For example:
+
+     put_peg( JPEG->new(), Loophole->new() );
+
+   which would normally produce the exception:
+
+     No viable candidate for call to
+     multimethod put_peg(JPeg,Loophole) at ...
+
+   since classes JPEG and Loophole are't in the Peg and Hole hierarchies,
+so there's no inheritance path back to a more general variant.
+
+   To handle cases like this, you can use the <resolve_no_match>
+subroutine, which is also exported from Class::Multimethods.
+`resolve_no_match' registers a multimethod variant, or a reference to some
+other subroutine, that is then used whenever the dispatch mechanism can't
+find a suitable variant for a given multimethod call.
+
+   For example:
+
+     resolve_no_match put_peg
+     	=> sub
+     	   {
+     		put_jpeg(@_)
+     			if ref($_[0]) eq 'JPEG';
+     		shift()->hang(@_)
+     			if ref($_[0]) eq 'ClothesPeg';
+     		hammer(@_)
+     			if ref($_[0]) eq 'TentPeg';
+     		# etc.
+     
+     	   };
+
+   As with `resolve_ambiguous' the registered variant or subroutine is
+called with the same set of arguments that were passed to the original
+multimethod call.
+
+Redispatching multimethod calls
+-------------------------------
+
+   Sometimes a polymorphic method in a derived class is used to add
+functionality to an inherited method. For example, a derived class's
+`print_me' method might call it's base class's `print_me', making use of
+Perl's special `$obj-'SUPER::method()> construct:
+
+     class Base;
+
+     sub print_me
+     {
+     	my ($self) = @_;
+     	print "Base stuff\n";
+     }
+
+     class Derived; @ISA = qw( Base );
+
+     sub print_me
+     {
+     	my ($self) = @_;
+     	$self->SUPER::print_me();	# START LOOKING IN ANCESTORS
+     	print "Derived stuff\n";
+     }
+
+   If the `print_me' methods are implemented as multimethods, it's still
+possible to reinvoke an "ancestral" method, using the automatically
+exported `Class::Multimethods::superclass' subroutine:
+
+     use Class::Multimethods;
+
+     multimethod print_me => (Base) => sub
+     {
+     	my ($self) = @_;
+     	print "Base stuff\n";
+     }
+
+     multimethod print_me => (Derived) => sub
+     {
+     	my ($self) = @_;
+     	print_me( superclass($self) );	# START LOOKING IN ANCESTORS
+     	print "Derived stuff\n";
+     }
+     }
+
+   Applying superclass to the multimethod argument tells Class::Multimethod
+to start looking for parameter types amongst the ancestors of Derived.
+
+   It's also possible in regular Perl to explcitly tell the polymorphic
+dispacther where to start looking, by explicitly qualifying the method
+name:
+
+     sub Derived::print_me
+     {
+     	my ($self) = @_;
+     	$self->Base::print_me();	# START LOOKING IN Base CLASS
+     	print "Derived stuff\n";
+     }
+
+   The same is possible with multimethods. superclass takes an optional
+second argument that tells Class::Multimethods exactly where to start
+looking:
+
+     multimethod print_me => (Derived) => sub
+     {
+     	my ($self) = @_;
+     	print_me( superclass($self => Base) );	# START LOOKING IN Base
+     	print "Derived stuff\n";
+     }
+
+   Note that, unlike regular method calls, with multimethods you can apply
+the superclass subroutine to any or all of a multimethod's arguments. For
+example:
+
+     multimethod handle => (MovableWindow, MoveEvent, NormalMode) => sub
+     {
+     	my ($w, $e, $m) = @_;
+
+     # Do any special stuff,
+     # then redispatch to more general handler...
+
+     handle(superclass($w), $e, superclass($m => Mode) );
+     	}
+
+   In this case the redispatch would start looking for variants which
+matched `(*any of MovableWindow's ancestors*, MoveEvent, Mode)'.
+
+   It's also important to remember that, as with regular methods, the
+class of the actual arguments doesn't change just because we subverted the
+dispatch sequence. That means if the above redispatch called the handle
+variant that takes arguments (Window, MoveEvent, Mode), the actual
+arguments would still be of types (MovableWindow, MoveEvent, NormalMode).
+
+DIAGNOSTICS
+===========
+
+   If you call `multimethod' and forget to provide a code reference as the
+last argument, it dies with the message:
+
+     "multimethod: last arg must be a code reference at %s"
+
+   If the dispatch mechanism cannot find any multimethod with a signature
+matching the actual arguments, it dies with the message:
+
+     "No viable candidate for call to multimethod %s at %s"
+
+   If the dispatch mechanism finds two or more multimethods with signatures
+equally "close" to the actual arguments (see `"The dispatch resolution
+process"' in this node), it dies with the message:
+
+     "Cannot resolve call to multimethod %s. The multimethods:
+     	%s
+      are equally viable at %s"
+
+   If you specify two variants with the same parameter lists,
+Class::Multimethods warns:
+
+     "Multimethod %s redefined at %s"
+
+   but only if $^W is true (i.e. under the -w flag).
+
+AUTHOR
+======
+
+   Damian Conway (damian@conway.org)
+
+BUGS AND IRRITATIONS
+====================
+
+   There are undoubtedly serious bugs lurking somewhere in code this
+complex :-) Bug reports and other feedback are most welcome.
+
+   Ongoing annoyances include:
+
+   * The module uses qr// constructs to improve performance. Hence it won't
+     run under Perls earlier than 5.005.
+
+   * Multimethod dispatch is much slower than regular dispatch when the
+     resolution has to resort to the more generic cases (though it's
+     actually as very nearly as fast as doing the equivalent type
+     resolution "by hand", and certainly more reliable and maintainable)
+
+   * The cache management is far too dumb. Adding any new multimethod
+     clobbers the entire cache, when it should only expunge those entries
+     "upstream" from the the new multimethod's actual parameter types.
+
+     It's unclear, however, under what circumstances the expense of a more
+     careful cache correction algorithm would ever be recouped by the
+     savings in dispatch (well, obviously, when the installion of
+     multimethods is a rare event and multimethod dispatching is frequent,
+     but where is the breakeven point?)
+
+COPYRIGHT
+=========
+
+     Copyright (c) 1998-2000, Damian Conway. All Rights Reserved.
+           This module is free software. It may be used, redistributed
+           and/or modified under the terms of the Perl Artistic License
+        (see http://www.perl.com/perl/misc/Artistic.html)
+
+

@@ -1,0 +1,1496 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Fame,  Next: Fatal,  Prev: FakeHash,  Up: Module List
+
+Perl5 access to FAME
+********************
+
+NAME
+====
+
+   Fame - Perl5 access to FAME
+
+SYNOPSIS
+========
+
+     use Fame;
+
+     [$X =] tie %hash, Fame::DB, $dbname|$mode...
+
+     @data=@{$hash{"object:1jan80:31dec81"}}
+
+     untie %hash
+
+     &Fame::HLI::cfmddes($status,$dbkey,$desc);
+
+     print "error" if $status != &Fame::HLI::HSUCC;
+
+     $db = new Fame::DB $dbname|$mode...;
+
+     @data = $db->Read($name, $start, $end);
+
+     $db->Write($name, $start, @data);
+
+     $interp = new Fame::LANG;
+
+     $interp->command('open <access read> "db"');
+
+     @profit = $interp->exec('revenue.qtr - sales.qtr');
+
+SUMMARY
+=======
+
+  1. All but 6 C HLI 7.7 functions are fully implemented in native perl
+     code.  Not implemented: cfmlsts, cfmrdfa, cfmrrng, cfmrsts, cfmwrng,
+     cfmwsts.
+
+  2. For implementations with the FRB extensions, all hli_* functions are
+     implemented fully.  famedbpath is also implemented.
+
+  3. New perl-like functions have been added (see FAME Utilities).  These
+     provide an interface to TIE and the FAME interpreter.
+
+  4. Values of hli.h are available.
+
+
+DESCRIPTION
+===========
+
+   This is a long section.  The first part describes essential FAME hli.h
+macros.  The second part, TIE, deals with the TIEHASH mechanism for
+accessing FAME data.  The next part deals with high level functions for
+reading and writing.  Following is a short description about accessing the
+FAME interpreter. The next parts deal with more direct control of the C
+HLI.  Familiarity with the C HLI is assumed in this last part.
+
+   Three subpackages are defined by this package:
+
+Fame::HLI
+     Includes almost all the CHLI functions as well as some simple
+     utilities.
+
+Fame::DB
+     Includes a TIE interface using the Fame::HLI package, as well a
+     high-level object-oriented functions for reading and writing data.
+
+Fame::LANG
+     Provides a simple object-oriented way to run programs, commands, and
+     functions in the FAME 4GL language.  It uses the Fame::HLI package.
+
+HLI.H
+-----
+
+   Values of hli.h are accessed by adding "&Fame::HLI::" in front of the
+name.  Thus, HDAILY becomes &Fame::HLI::HDAILY.
+
+TIE
+---
+
+   You can use the Perl TIEHASH mechanism for accessing most of the FAME
+database features.  Unlike with Fame, the default open mode is read-only.
+First, open the databases with the tie command:
+
+     tie(%db, Fame::DB, "prices", "orders");
+
+   You may specify a fame open mode by using it before the databases for
+which the mode should be used:
+
+     tie(%db, Fame::DB, &Fame::HUMODE, "prices");
+
+   Instead of listing the databse names, you may also specify a reference
+to an array.  Either way, the new hash is tied to all the opened databases
+so that they are searched for objects in the order specified.
+
+   Data is read by indexing the hash (%db in our example) using the object
+name and an optional start and end date.  The index is the object name
+followed by a ":", the start date, a ",", and the end date.  However, only
+the object name is required.  When accessed this way, the hash returns a
+reference to an array so it must be indirected.  For example
+
+     @{$db{"ibm:1jun95,31jun95"}}
+
+   will return an array containing the values of "ibm" from 1jun95 to
+31jun95.  Note the use of the @{} construct which returns the values of a
+reference.  The dates must be in a format consistent with the frequency of
+the object ("ibm"), which in this case is daily.
+
+   Likewise, to write values to the database, assign the hash to an array
+reference.  For example
+
+     $db{"ibm:1jun95"} = [1,4,6];
+
+   will write out the numbers 1, 4, and 6 starting at date 1jun95.
+fameperl will write the given number of elements starting at the given
+date.  You may specify an end date, but it will be silently ignored.  This
+construct will only write data to existing data object.  To create
+objects, you must use the C HLI routines or the functions described below.
+
+   Hash functions, like "each" and "keys" will work by performing a
+wildcard lookup on the database.  The variable $Fame::DB::WILD contains a
+string with the FAME wildcard specification (default "?").
+
+   There are certain variables in the Fame::DB package which are used as
+defaults by some Fame::DB functions.  $Fame::DB::FREQ contains the default
+frequency code.  This code can be one of the valid HLI frequency codes
+such as &Fame::HLI::HDAILY.  The following data items similarly can take
+on any valid and appropriate HLI code.  $Fame::DB::TYPE contains the
+default data type.  $Fame::DB::BASIS contains the default basis attribute.
+$Fame::DB::OBSERVED contains the default observed attribute.
+$Fame::DB::CLASS is the default class.
+
+FUNCTIONS
+---------
+
+   There are several high level functions for reading, writing and
+creating data object.  These functions can be used as both normal function
+calls and object-oriented calls.  They are summarized below.  The first
+function opens a database using the same syntax as the tie command.
+
+     $ref = &Fame::DB::new($db_path|$db_mode...)
+        $db_path  database path
+        $db_mode  access mode from Fame::HLI
+
+   An alternative syntax for the Fame::DB::new syntax is
+
+     $ref = new Fame::DB $db_path|$db_mode;
+
+   There are also two other functions for adding databases to an existing
+object.
+
+     $ref->append($db_path|$db_mode...);
+
+   or
+
+     $ref->append_db($dbkey...)
+
+   The following functions take as their first parameter either a
+reference to array of databases as returned by Fame::DB::new or a single
+database key number.
+
+     @val = &Fame::DB::Read($db, $name, $start, $end)
+        @val    array of values read
+        $db     database key (or $ref)
+        $name   string object name
+        $start  start string date
+        $end    end string date
+
+   .
+
+     &Fame::DB::Write($db, $name, $start, @val)
+        $db     database key (or $ref)
+        $name   string object name
+        $start  start string date
+        @val    array of values to store
+
+   .
+
+     &Fame::DB::Create($db, $name [, $class, $freq, $type, $basis, $obs])
+        $db     database key (or $ref)
+        $name   object name
+     The following are optional:
+        $class  class code
+        $freq   frequency code
+        $type   object type
+        $basis  basis attribute
+        $obs    observed attribute
+
+   An alternative object-oriented syntax for all of the above functions
+would be:
+
+     @data = $ref->Read($name, $start, $end);
+
+   where $ref is an object of type Fame::HLI which would usually be
+initialized by
+
+     $ref = new Fame::DB $dbname;
+
+FAME 4GL
+--------
+
+   There is also a simple object-oriented interface to the FAME 4GL
+language using the HLI FAME/Server HLI functions.  There are several
+methods for doing this in Fame::LANG.
+
+$x = new Fame::LANG
+     Create a new LANG object and open the work database.
+
+$x->command($cmd)
+     Execute the command $cmd.  If the command is more than one line long,
+     all lines except the last one must be followed by "&&", the FAME
+     line-continuation string.
+
+$x->exec($fxn)
+     Execute the given function and return an array (not a scalar) of the
+     results.
+
+$x->inp($file)
+     Input the lines file named $file (this file should follow the "&&"
+     line-continuation standard) and execute the commands with command().
+     Note that you cannot use $x->command("inp file").  FAME will ignore
+     this command.
+
+$x->destroy
+     Close the work database and remove the LANG object.
+
+$x->{status}
+     The HLI status of the last command.
+
+$x->{workdb}
+     The HLI database key for the work database.
+
+C HLI
+-----
+
+   The Fame::HLI package includes almost all of the C HLI functions
+available form Fame.  The typical C HLI function is translated directly to
+perl.  For example, to call cfmddes from C HLI, you would use:
+
+     cfmddes(&status,dbkey,desc);
+
+   In fameperl, you would use:
+
+     &Fame::HLI::cfmddes($status,$dbkey,$desc);
+
+   Perl makes no distinction between pointers and values.  Thus, all
+variables (whether output or input) are specified the same way.  Perl
+takes care of modifying those values it has to modify.
+
+SPECIAL FUNCTIONS
+-----------------
+
+   There are exceptions.  Functions which use a range (or other array with
+a limited and fixed length) are called with one variable for every array
+element.  Thus, cfmsrng would be called from C as:
+
+     cfmsrng(&status,freq,&sy,&sp,&ey,&ep,range,&numobs);
+
+   From perl, each element of range must be specified.  Thus, you would
+use the following:
+
+     &Fame::HLI::cfmsrng($status,$freq,$sy,$sp,$ey,$ep,
+                         $range1,$range2,$range3,$numobs);
+
+   The functions which require this type of array expansion are: cfmrstr,
+cfmsbm, cfmsfis, cfmsnm, cfmspm, cfmwstr.
+
+   Some functions have not been implemented.  See Summary for a list.
+
+UTILITY FUNCTIONS
+-----------------
+
+   There are several functions which assist perl users in rapidly getting
+and updating FAME data.  Most of the C HLI functions that write or read
+data are not implemented.  In their place, you should use the functions
+described in this section.
+
+   When missing value translation is not specified, missing values are
+returned as string "NA", "ND", "NC" if the values are numeric; this will
+evaluate to a zero in a numeric context.  For strings, "" is returned.
+
+$dbkey = &Fame::HLI::fameopen($name);
+$dbkey = &Fame::HLI::fameopen($name,$mode);
+     Open a FAME database.  First, look at the FAME databse directory as
+     given by famedbpath.  If the database is not there, then try to open
+     it in the current directory.  Returns -1 on error.
+
+&Fame::HLI::fameclose($dbkey);
+     Close database.
+
+$type = &Fame::HLI::famegettype($dbkey,$objnam);
+     Get an object's type.
+
+$freq = &Fame::HLI::famegetfreq($dbkey,$objnam);
+     Get an object's frequency.
+
+@list = $Fame::HLI::famegetinfo($dbkey,$objnam);
+     Get info (as returned by cfmwhat) with:
+
+          ($class,$type,$freq,$basis,$observ,$fyear,$fprd,
+           $lyear,$lprd,$cyear,$cmonth,$cday,$myear,$mmonth,
+           $mday,$desc,$doc) = @list
+
+     The following table describes the order of your parameters for easy
+     reference in an array context:
+
+          Name             #
+          ------------    ---
+          class            0
+          type             1
+          freq             2
+          basis            3
+          observed         4
+          first year       5
+          first period     6
+          last year        7
+          last period      8
+          create year      9
+          create month    10
+          create day      11
+          modify year     12
+          modify month    13
+          modify day      14
+          description     15
+          documentation   16
+
+@data = &Fame::HLI::fameread($dbkey,$objnam,$syear,$sprd,$eyear,$eprd);
+     Read data for the given range of dates.  Returns undef if there's a
+     problem (the $Fame::HLI:status variable should be set with the error
+     code).
+
+@data = &Fame::HLI::famereadn($dbkey,$objnam,$numobs,@r,@m);
+          @r=($range1,$range2,$range3);
+
+          @m=($tmiss,$mistt1,$mistt2,$mistt3);
+
+     Read a given number of value starting with the values of a given
+     range.  Get the rangex values with the functions cfmsrng, cfmsfix.
+     This function will read the whole range of values, but only store
+     numobs of them.  You can get the value of numobs when setting the
+     range.  The missing value variables must contain data even if no
+     translation is being done.
+
+&Fame::HLI::famewrite($dbkey,$objnam,$year,$prd,@list);
+     Writes out all the elements of @list into the object staring with the
+     given date.  Returns error status if failed; 0 if sucessful.\n;
+
+ERRORS
+------
+
+   Errors in the utility functions are generally not reported.  However,
+an empty list or undef returned from a function call generally means there
+is an error.  You can also check the variable Fame::HLI::status which
+returns the HLI status code for the last HLI function that was executed by
+a utility function.  This value is not affected by calling HLI functions
+directly from perl (such as "&cfmini($s)").
+
+NOTES
+-----
+
+  1. The source code is written in Perl, C and CLI (a common language
+     interface).  It does not use the standard Perl 5 extension macro
+     language "xs" because the code was originally written for both Perl 4
+     and Tcl.  Because it uses CLI, a lot of the code is the same for both
+     interfaces.
+
+  2. FAME is a registered trademark of Fame Information Services.  Neither
+     this program nor its author are associated with Fame Information
+     Services, nor does the author guarantee this software in any way.
+     This software is derived from public domain work done at the Federal
+     Reserve Board, Washington, DC.
+
+  3. Everything except the Fame::HLI component is Copyright 1995-1997 by
+     Fernando Trias.  Parts of the Fame::HLI component are also Copyright
+     1995 by Fernando Trias.  These are marked as such.
+
+
+BUGS
+====
+
+   There's an object symbolic name inconsistency between the Fame C HLI
+library and the perl executable.  Both have an symbol named "Error".  You
+may have to edit the perl executable and change all occurrences of "Error"
+to something like "ErroX"; the Makefile includes a line for doing this
+automatically (make patchperl).  Alternatively, you can try to edit the
+Fame dynamic libarary file in the same way.
+
+   Fame also handles some functions as #define's in hli.h.  This is not
+the best coding practice, since it confuses the linking process. I cannot
+guarantee that further versions of Fame will not do this also and possibly
+affect this extension.
+
+AUTHOR
+======
+
+     Fernando Trias
+     trias@ix.netcom.com
+     http://www.netcom.com/~trias
+
+
+File: pm.info,  Node: Fatal,  Next: Fcntl,  Prev: Fame,  Up: Module List
+
+replace functions with equivalents which succeed or die
+*******************************************************
+
+NAME
+====
+
+   Fatal - replace functions with equivalents which succeed or die
+
+SYNOPSIS
+========
+
+     use Fatal qw(open close);
+
+     sub juggle { . . . }
+     import Fatal 'juggle';
+
+DESCRIPTION
+===========
+
+   Fatal provides a way to conveniently replace functions which normally
+return a false value when they fail with equivalents which raise exceptions
+if they are not successful.  This lets you use these functions without
+having to test their return values explicitly on each call.  Exceptions
+can be caught using `eval{}'.  See *Note Perlfunc: (perl.info)perlfunc,
+and *Note Perlvar: (perl.info)perlvar, for details.
+
+   The do-or-die equivalents are set up simply by calling Fatal's import
+routine, passing it the names of the functions to be replaced.  You may
+wrap both user-defined functions and overridable CORE operators (except
+exec, system which cannot be expressed via prototypes) in this way.
+
+   If the symbol `:void' appears in the import list, then functions named
+later in that import list raise an exception only when these are called in
+void context-that is, when their return values are ignored.  For example
+
+     use Fatal qw/:void open close/;
+
+     # properly checked, so no exception raised on error
+     if(open(FH, "< /bogotic") {
+     	warn "bogo file, dude: $!";
+     }
+
+     # not checked, so error raises an exception
+     close FH;
+
+AUTHOR
+======
+
+   Lionel.Cons@cern.ch
+
+   prototype updates by Ilya Zakharevich ilya@math.ohio-state.edu
+
+
+File: pm.info,  Node: Fcntl,  Next: Festival/Client,  Prev: Fatal,  Up: Module List
+
+load the C Fcntl.h defines
+**************************
+
+NAME
+====
+
+   Fcntl - load the C Fcntl.h defines
+
+SYNOPSIS
+========
+
+     use Fcntl;
+     use Fcntl qw(:DEFAULT :flock);
+
+DESCRIPTION
+===========
+
+   This module is just a translation of the C `fnctl.h' file.  Unlike the
+old mechanism of requiring a translated `fnctl.ph' file, this uses the
+h2xs program (see the Perl source distribution) and your native C
+compiler.  This means that it has a far more likely chance of getting the
+numbers right.
+
+NOTE
+====
+
+   Only `#define' symbols get translated; you must still correctly pack up
+your own arguments to pass as args for locking functions, etc.
+
+EXPORTED SYMBOLS
+================
+
+   By default your system's F_* and O_* constants (eg, F_DUPFD and
+O_CREAT) and the FD_CLOEXEC constant are exported into your namespace.
+
+   You can request that the flock() constants (LOCK_SH, LOCK_EX, LOCK_NB
+and LOCK_UN) be provided by using the tag `:flock'.  See *Note Exporter:
+Exporter,.
+
+   You can request that the old constants (FAPPEND, FASYNC, FCREAT,
+FDEFER, FEXCL, FNDELAY, FNONBLOCK, FSYNC, FTRUNC) be provided for
+compatibility reasons by using the tag `:Fcompat'.  For new applications
+the newer versions of these constants are suggested (O_APPEND, O_ASYNC,
+O_CREAT, O_DEFER, O_EXCL, O_NDELAY, O_NONBLOCK, O_SYNC, O_TRUNC).
+
+   For ease of use also the SEEK_* constants (for seek() and sysseek(),
+e.g. SEEK_END) and the S_I* constants (for chmod() and stat()) are
+available for import.  They can be imported either separately or using the
+tags `:seek' and `:mode'.
+
+   Please refer to your native fcntl(2), open(2), fseek(3), lseek(2)
+(equal to Perl's seek() and sysseek(), respectively), and chmod(2)
+documentation to see what constants are implemented in your system.
+
+   See *Note Perlopentut: (perl.info)perlopentut, to learn about the uses
+of the O_* constants with sysopen().
+
+   See `seek', *Note Perlfunc: (perl.info)perlfunc, and `sysseek', *Note
+Perlfunc: (perl.info)perlfunc, about the SEEK_* constants.
+
+   See `stat', *Note Perlfunc: (perl.info)perlfunc, about the S_I*
+constants.
+
+
+File: pm.info,  Node: Festival/Client,  Next: File/Archive,  Prev: Fcntl,  Up: Module List
+
+Communicate with a Festival server
+**********************************
+
+NAME
+====
+
+   Festival::Client - Communicate with a Festival server
+
+SYNOPSIS
+========
+
+     use Festival::Client;
+     
+     $Festival = Festival::Client->New("my.festival.server");
+     $Festival->say("Something to say");
+
+DESCRIPTION
+===========
+
+   `Festival' is a class implementing a simple Festival client in Perl.
+
+CONSTRUCTOR
+===========
+
+new ( [ HOST [, PORT ] ] )
+     This is the constructor for a new Festival object. `HOST' is the name
+     of the remote host to which a Festival connection is required.
+
+     `PORT' is the Festival port to connect to, it defaults to the
+     standard port 1314 if nothing else is found.
+
+     The constructor returns the open socket, or undef if an error has
+     been encountered.
+
+SAY ( TEXT )
+============
+
+   The obvious.
+
+AUTHOR
+======
+
+   Bek Oberin <gossamer@tertius.net.au>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1998 Bek Oberin.  All rights reserved.
+
+   This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: File/Archive,  Next: File/BSDGlob,  Prev: Festival/Client,  Up: Module List
+
+Figure out what is in an archive file
+*************************************
+
+NAME
+====
+
+   File::Archive - Figure out what is in an archive file
+
+SYNOPSIS
+========
+
+     use File::Archive;
+     $arch = File::Archive->new($filename);
+     $name = $arch->filename;
+     $filelist = $arch->catalog;
+     $contents = $arch->member($file);
+
+DESCRIPTION
+===========
+
+   Given an archive file of some kind, these methods will determine what
+type of archive it is, and tell you what files are contained in that
+archive. It will also give you the contents of a particular file contained
+in that archive.
+
+   This was written for the Scripts section of CPAN, so that users could
+upload tarballs, rather than just single-file scripts
+
+PREREQUISITES
+=============
+
+     Compress::Zlib
+     Archive::Tar
+
+AUTHOR
+======
+
+   Rich Bowen, <rbowen@rcbowen.com>
+
+
+File: pm.info,  Node: File/BSDGlob,  Next: File/Backup,  Prev: File/Archive,  Up: Module List
+
+Perl extension for BSD glob routine
+***********************************
+
+NAME
+====
+
+   File::BSDGlob - Perl extension for BSD glob routine
+
+SYNOPSIS
+========
+
+     use File::BSDGlob ':glob';
+     @list = glob('*.[ch]');
+     $homedir = glob('~gnat', GLOB_TILDE | GLOB_ERR);
+     if (GLOB_ERROR) {
+       # an error occurred reading $homedir
+     }
+
+     ## override the core glob (even with -T)
+     use File::BSDGlob 'globally';
+     my @sources = <*.{c,h,y}>
+
+DESCRIPTION
+===========
+
+   File::BSDGlob implements the FreeBSD glob(3) routine, which is a
+superset of the POSIX glob() (described in IEEE Std 1003.2 "POSIX.2").  The
+glob() routine takes a mandatory pattern argument, and an optional flags
+argument, and returns a list of filenames matching the pattern, with
+interpretation of the pattern modified by the flags variable.  The POSIX
+defined flags are:
+
+`GLOB_ERR'
+     Force glob() to return an error when it encounters a directory it
+     cannot open or read.  Ordinarily glob() continues to find matches.
+
+`GLOB_MARK'
+     Each pathname that is a directory that matches the pattern has a slash
+     appended.
+
+`GLOB_NOCHECK'
+     If the pattern does not match any pathname, then glob() returns a list
+     consisting of only the pattern.  If `GLOB_QUOTE' is set, its effect
+     is present in the pattern returned.
+
+`GLOB_NOSORT'
+     By default, the pathnames are sorted in ascending ASCII order; this
+     flag prevents that sorting (speeding up glob()).
+
+   The FreeBSD extensions to the POSIX standard are the following flags:
+
+`GLOB_BRACE'
+     Pre-process the string to expand C<{pat,pat,...} strings like csh(1).
+     The pattern '{}' is left unexpanded for historical reasons (and csh(1)
+     does the same thing to ease typing of find(1) patterns).
+
+`GLOB_NOMAGIC'
+     Same as `GLOB_NOCHECK' but it only returns the pattern if it does not
+     contain any of the special characters "*", "?" or "[".  `NOMAGIC' is
+     provided to simplify implementing the historic csh(1) globbing
+     behaviour and should probably not be used anywhere else.
+
+`GLOB_QUOTE'
+     Use the backslash ('\') character for quoting: every occurrence of a
+     backslash followed by a character in the pattern is replaced by that
+     character, avoiding any special interpretation of the character.
+
+`GLOB_TILDE'
+     Expand patterns that start with '~' to user name home directories.
+
+`GLOB_CSH'
+     For convenience, `GLOB_CSH' is a synonym for `GLOB_BRACE |
+     GLOB_NOMAGIC | GLOB_QUOTE | GLOB_TILDE'.
+
+   The POSIX provided `GLOB_APPEND', `GLOB_DOOFFS', and the FreeBSD
+extensions `GLOB_ALTDIRFUNC', and `GLOB_MAGCHAR' flags have not been
+implemented in the Perl version because they involve more complex
+interaction with the underlying C structures.
+
+DIAGNOSTICS
+===========
+
+   glob() returns a list of matching paths, possibly zero length.  If an
+error occurred, &File::BSDGlob::GLOB_ERROR will be non-zero and $! will be
+set.  &File::BSDGlob::GLOB_ERROR is guaranteed to be zero if no error
+occurred, or one of the following values otherwise:
+
+`GLOB_NOSPACE'
+     An attempt to allocate memory failed.
+
+`GLOB_ABEND'
+     The glob was stopped because an error was encountered.
+
+   In the case where glob() has found some matching paths, but is
+interrupted by an error, glob() will return a list of filenames and set
+&File::BSDGlob::ERROR.
+
+   Note that glob() deviates from POSIX and FreeBSD glob(3) behaviour by
+not considering `ENOENT' and `ENOTDIR' as errors - glob() will continue
+processing despite those errors, unless the `GLOB_ERR' flag is set.
+
+   Be aware that all filenames returned from File::BSDGlob are tainted.
+
+NOTES
+=====
+
+   * If you want to use multiple patterns, e.g. `glob "a* b*"', you should
+     probably throw them in a set as in `glob "{a*,b*}'.  This is because
+     the argument to glob isn't subjected to parsing by the C shell.
+     Remember that you can use a backslash to escape things.
+
+   * Win32 users should use the real slash.  If you really want to use
+     backslashes, consider using Sarathy's File::DosGlob, which comes with
+     the standard Perl distribution.
+
+AUTHOR
+======
+
+   The Perl interface was written by Nathan Torkington (gnat@frii.com),
+and is released under the artistic license.  Further modifications were
+made by Greg Bacon <gbacon@cs.uah.edu>.  The C glob code has the following
+copyright:
+
+     Copyright (c) 1989, 1993 The Regents of the University of California.
+     All rights reserved.  This code is derived from software contributed
+     to Berkeley by Guido van Rossum.
+
+   For redistribution of the C glob code, read the copyright notice in the
+file bsd_glob.c, which is part of the File::BSDGlob source distribution.
+
+
+File: pm.info,  Node: File/Backup,  Next: File/Basename,  Prev: File/BSDGlob,  Up: Module List
+
+For making rotating backups of directories
+******************************************
+
+NAME
+====
+
+   File::Backup - For making rotating backups of directories
+
+SYNOPSIS
+========
+
+     use File::Backup("backup");
+     backup(
+        from          => "/dir/to/back/up",
+        to            => "/destination/of/backup/files",
+        torootname    => root name of backup file (default is ""),
+        keep          => number of backups to keep in todir (default is 7),
+        tar           => path to archiving utility (default is "/usr/bin/tar"),
+        compress      => path to compressing utility (default is "/usr/bin/gzip"),
+        tarflags      => flags to pass to 'tar' (default is "-cf"),
+        compressflags => flags to pass to 'cmpr' (default is ""),
+        tarsuffix     => suffix to put on the tarfile (default is '.tar'),
+     );
+
+DESCRIPTION
+===========
+
+   This module implements a very simple backup scheme.  In its barest
+form, it takes as input a source directory and a destination directory,
+and puts a backup of the source directory in the destination directory.
+You may specify a maximum number of backups to keep in the directory (the
+'keep' parameter).  By setting the 'keep' parameter to n, you will keep
+the n most recent backups.  Specify -1 to keep all backups.
+
+   The backup will include a date string (of the format
+YYYY-MM-DD_hh-mm-ss) that will be used to figure out which files are the
+most recent.  You can also give a string that will be used as the
+beginning of the backup's filename (before the date string), which may be
+useful if you're keeping backups of several different things in the same
+directory.
+
+BUGS
+====
+
+   You can't make two backups of the same stuff in one second, because
+they'll try to have the same name.
+
+AUTHOR
+======
+
+   Ken Williams (ken@forum.swarthmore.edu)
+
+COPYRIGHT
+=========
+
+   Copyright 1998 Ken Williams.  All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: File/Basename,  Next: File/BasicFlock,  Prev: File/Backup,  Up: Module List
+
+split a pathname into pieces
+****************************
+
+NAME
+====
+
+   fileparse - split a pathname into pieces
+
+   basename - extract just the filename from a path
+
+   dirname - extract just the directory from a path
+
+SYNOPSIS
+========
+
+     use File::Basename;
+
+     ($name,$path,$suffix) = fileparse($fullname,@suffixlist)
+     fileparse_set_fstype($os_string);
+     $basename = basename($fullname,@suffixlist);
+     $dirname = dirname($fullname);
+
+     ($name,$path,$suffix) = fileparse("lib/File/Basename.pm","\.pm");
+     fileparse_set_fstype("VMS");
+     $basename = basename("lib/File/Basename.pm",".pm");
+     $dirname = dirname("lib/File/Basename.pm");
+
+DESCRIPTION
+===========
+
+   These routines allow you to parse file specifications into useful
+pieces using the syntax of different operating systems.
+
+fileparse_set_fstype
+     You select the syntax via the routine fileparse_set_fstype().
+
+     If the argument passed to it contains one of the substrings "VMS",
+     "MSDOS", "MacOS", "AmigaOS" or "MSWin32", the file specification
+     syntax of that operating system is used in future calls to
+     fileparse(), basename(), and dirname().  If it contains none of these
+     substrings, Unix syntax is used.  This pattern matching is
+     case-insensitive.  If you've selected VMS syntax, and the file
+     specification you pass to one of these routines contains a "/", they
+     assume you are using Unix emulation and apply the Unix syntax rules
+     instead, for that function call only.
+
+     If the argument passed to it contains one of the substrings "VMS",
+     "MSDOS", "MacOS", "AmigaOS", "os2", "MSWin32" or "RISCOS", then the
+     pattern matching for suffix removal is performed without regard for
+     case, since those systems are not case-sensitive when opening
+     existing files (though some of them preserve case on file creation).
+
+     If you haven't called fileparse_set_fstype(), the syntax is chosen by
+     examining the builtin variable $^O according to these rules.
+
+fileparse
+     The fileparse() routine divides a file specification into three
+     parts: a leading path, a file name, and a suffix.  The path contains
+     everything up to and including the last directory separator in the
+     input file specification.  The remainder of the input file
+     specification is then divided into name and suffix based on the
+     optional patterns you specify in `@suffixlist'.  Each element of this
+     list is interpreted as a regular expression, and is matched against
+     the end of name.  If this succeeds, the matching portion of name is
+     removed and prepended to suffix.  By proper use of `@suffixlist', you
+     can remove file types or versions for examination.
+
+     You are guaranteed that if you concatenate path, name, and suffix
+     together in that order, the result will denote the same file as the
+     input file specification.
+
+EXAMPLES
+========
+
+   Using Unix file syntax:
+
+     ($base,$path,$type) = fileparse('/virgil/aeneid/draft.book7',
+     				    '\.book\d+');
+
+   would yield
+
+     $base eq 'draft'
+     $path eq '/virgil/aeneid/',
+     $type eq '.book7'
+
+   Similarly, using VMS syntax:
+
+     ($name,$dir,$type) = fileparse('Doc_Root:[Help]Rhetoric.Rnh',
+     				   '\..*');
+
+   would yield
+
+     $name eq 'Rhetoric'
+     $dir  eq 'Doc_Root:[Help]'
+     $type eq '.Rnh'
+
+`basename'
+     The basename() routine returns the first element of the list produced
+     by calling fileparse() with the same arguments, except that it always
+     quotes metacharacters in the given suffixes.  It is provided for
+     programmer compatibility with the Unix shell command basename(1).
+
+`dirname'
+     The dirname() routine returns the directory portion of the input file
+     specification.  When using VMS or MacOS syntax, this is identical to
+     the second element of the list produced by calling fileparse() with
+     the same input file specification.  (Under VMS, if there is no
+     directory information in the input file specification, then the
+     current default device and directory are returned.)  When using Unix
+     or MSDOS syntax, the return value conforms to the behavior of the
+     Unix shell command dirname(1).  This is usually the same as the
+     behavior of fileparse(), but differs in some cases.  For example, for
+     the input file specification `lib/', fileparse() considers the
+     directory name to be `lib/', while dirname() considers the directory
+     name to be .).
+
+
+File: pm.info,  Node: File/BasicFlock,  Next: File/Binary,  Prev: File/Basename,  Up: Module List
+
+file locking with flock
+***********************
+
+NAME
+====
+
+     File::BasicFlock - file locking with flock
+
+SYNOPSIS
+========
+
+     use File::BasicFlock;
+
+     lock($filename);
+
+     lock($filename, 'shared');
+
+     lock($filename, undef, 'nonblocking');
+
+     lock($filename, 'shared', 'nonblocking');
+
+     unlock($filename);
+
+DESCRIPTION
+===========
+
+   Lock files using the flock() call.  The file to be locked must already
+exist.  This is a very thing interface.
+
+AUTHOR
+======
+
+   David Muir Sharnoff, <muir@idiom.com>
+
+
+File: pm.info,  Node: File/Binary,  Next: File/Cache,  Prev: File/BasicFlock,  Up: Module List
+
+Binary file reading module
+**************************
+
+NAME
+====
+
+   File::Binary - Binary file reading module
+
+SYNOPSIS
+========
+
+     use File::Binary;
+     
+     # open an SWF file as a new File::Binary object ...
+      $bin = new File::Binary('test.swf') or die "Couldn't open test.swf\n";
+     # ... and check tos ee that it's a valid SWF file
+     $bin->getBytes(3) eq 'FWS' or die $bin->getFilename()." is not a valid SWF file\n";
+     
+     # get bytes and words
+     $format = unpack("C",$bin->getBytes(1));
+     $width  = $bin->getWord;
+     
+     # get bits and signed bits
+     $hasloops = $bin->getBits(1);
+     $hasend   = $bin->getSBits(2):
+     
+     # find out where you are
+     print "File Position : " . $bin->where() . "\n";
+     
+     # seek to arbitary places in the file
+     $bin->seekTo($bin->where + 100) or die "Couldn't seek to that position\n";
+     
+     # make sure that all the bit buffers are flushed and reset
+     $bin->initBits;
+
+DESCRIPTION
+===========
+
+   *File::Binary* is a Binary file reading module. It is currently being
+used to write a suite of modules for manipulating Macromedia SWF files
+available from `http:' in this node </gratuitous plug>, and as such is
+heavily biased towards this.
+
+BUGS
+====
+
+   getSBits does not handle negative numbers well.
+
+   It used to slurp all of the file into an array which made it very
+unsuitable for large files. This was fixed in version 0.3 by Leon Brocard.
+There may be problems with the filehandle returning undef for no
+particular reason.
+
+AUTHOR
+======
+
+   Simon Wistow, <simon@twoshortplanks.com>
+
+
+File: pm.info,  Node: File/Cache,  Next: File/Cat,  Prev: File/Binary,  Up: Module List
+
+Share data between processes via filesystem
+*******************************************
+
+NAME
+====
+
+   File::Cache - Share data between processes via filesystem
+
+DESCRIPTION
+===========
+
+   *File::Cache* is a perl module that implements an object storage space
+where data is persisted across process boundaries via the filesystem.
+
+   File::Cache builds a cache in the file system using a multi-level
+directory structure that looks like this:
+
+     <CACHE_KEY>/<USERNAME>/<NAMESPACE>/[D1]/[D2]/.../<OBJECTS>
+
+   CACHE_KEY is the location of the root level of the cache. The cache key
+defaults to <TMPDIR>/File::Cache, where <TMPDIR> is the temporary
+directory on your system. USERNAME is the user identifier. This value
+defaults to the userid, if it can be determined from the system, or
+"nobody" if it can not. <NAMESPACE> defaults to "_default". D1, D2, etc.
+are subdirectories that are created to hold the cache objects.  The number
+subdirectories depends on the *cache_depth* value, which defaults to 0.
+Objects are stored in the cache using a method which depends on the
+*persistence_mechanism* value.
+
+SYNOPSIS
+========
+
+     use File::Cache;
+
+     # create a cache in the default namespace, where objects
+     # do not expire
+
+     my $cache = new File::Cache();
+
+     # create a user-private cache in the specified
+     # namespace, where objects will expire in one day, and
+     # will automatically be removed from the cache.
+
+     my $cache = new File::Cache( { namespace  => 'MyCache',
+                                    expires_in => 86400,
+                                    filemode => 0600 } );
+
+     # create a public cache in the specified namespace,
+     # where objects will expire in one day, but will not be
+     # removed from the cache automatically.
+
+     my $cache = new File::Cache( { namespace  => 'MyCache',
+                                    expires_in => 86400,
+                                    username => 'shared_user',
+                                    auto_remove_stale => 0,
+                                    filemode => 0666 } );
+
+     # create a cache readable by the user and the user's
+     # group in the specified namespace, where objects will
+     # expire in one day, but may be removed from the cache
+     # earlier if the size becomes more than a megabyte. Also,
+     # request that the cache use subdirectories to increase
+     # performance of large number of objects
+
+     my $cache = new File::Cache( { namespace  => 'MyCache',
+                                    expires_in => 86400,
+                                    max_size => 1048576,
+                                    username => 'shared_user',
+                                    filemode => 0660,
+     			        cache_depth => 3 } );
+
+     # store a value in the cache (will expire in one day)
+
+     $cache->set("key1", "value1");
+
+     # retrieve a value from the cache
+
+     $cache->get("key1");
+
+     # retrieve a stale value from the cache.
+     # (Undefined behavior if auto_remove_stale is 1)
+
+     $cache->get_stale("key1");
+
+     # store a value that expires in one hour
+
+     $cache->set("key2", "value2", 3600);
+
+     # reduce the cache size to 3600 bytes
+
+     $cache->reduce_size(3600);
+
+     # clear this cache's contents
+
+     $cache->clear();
+
+     # delete all namespaces from the filesystem
+
+     File::Cache::CLEAR();
+
+TYPICAL USAGE
+-------------
+
+   A typical scenario for this would be a mod_perl or perl CGI
+application.  In a multi-tier architecture, it is likely that a trip from
+the front-end to the database is the most expensive operation, and that
+data may not change frequently.  Using this module will help keep that
+data on the front-end.
+
+   Consider the following usage in a mod_perl application, where a
+mod_perl application serves out images that are retrieved from a database.
+Those images change infrequently, but we want to check them once an hour,
+just in case.
+
+   my $imageCache = new Cache( { namespace => 'Images',
+          expires_in => 3600 } );
+
+   my $image = $imageCache->get("the_requested_image");
+
+   if (!$image) {
+
+     # $image = [expensive database call to get the image]
+
+     $imageCache->set("the_requested_image", $image);
+
+   }
+
+   That bit of code, executed in any instance of the mod_perl/httpd
+process will first try the filesystem cache, and only perform the
+expensive database call if the image has not been fetched before, has
+timed out, or the cache has been cleared.
+
+   The current implementation of this module automatically removes expired
+items from the cache when the get() method is called and the
+auto_remove_stale setting is true.  Automatic removal does not occur when
+the set() method is called, which means that the cache can become polluted
+with expired items if many items are stored in the cache for short periods
+of time, and are rarely accessed. This is a design decision that favors
+efficiency in the common case, where items are accessed frequently. If you
+want to limit cache growth, see the max_size option, which will
+automatically shrink the cache when the set() method is called. (max_size
+is unaffected by the value of auto_remove_stale.)
+
+   Be careful that you call the purge method periodically if
+auto_remove_stale is 0 and max_size has its default value of unlimited
+size. In this configuration, the cache size will be a function of the
+number of items inserted into the cache since the last purge. (i.e. It can
+grow extremely large if you put lots of different items in the cache.)
+
+METHODS
+-------
+
+new(\%options)
+     Creates a new instance of the cache object.  The constructor takes a
+     reference to an options hash which can contain any or all of the
+     following:
+
+    $options{namespace}
+          Namespaces provide isolation between objects.  Each cache refers
+          to one and only one namespace.  Multiple caches can refer to the
+          same namespace, however.  While specifying a namespace is not
+          required, it is recommended so as not to have data collide.
+
+    $options{expires_in}
+          If the "expires_in" option is set, all objects in this cache
+          will be cleared in that number of seconds.  It can be overridden
+          on a per-object basis.  If expires_in is not set, the objects
+          will never expire unless explicitly set.
+
+    $options{cache_key}
+          The "cache_key" is used to determine the underlying filesystem
+          namespace to use.  In typical usage, leaving this unset and
+          relying on namespaces alone will be more than adequate.
+
+    $options{username}
+          The "username" is used to explicitely set the username. This is
+          useful for cases where one wishes to share a cache among
+          multiple users. If left unset, the value will be the current
+          user's username. (Also see $options{filemode}.)  Note that the
+          username is not used to set ownership of the cache files - the
+          i.e. the username does not have to be a user of the system.
+
+    $options{filemode}
+          "filemode" specifies the permissions for cache files. This is
+          useful for cases where one wishes to share a cache among
+          multiple users. If left unset, the value will be "u", indicating
+          that only the current user can read an write the cache files.
+          See the filemode() method documentation for the specification
+          syntax.
+
+    $options{max_size}
+          "max_size" specifies the maximum size of the cache, in bytes.
+          Cache objects are removed during the set() operation in order to
+          reduce the cache size before the new cache value is added. See
+          the reduce_size() documentation for the cache object removal
+          policy. The max_size will be maintained regardless of the value
+          of auto_remove_stale.
+
+    $options(auto_remove_stale}
+          "auto_remove_stale" specifies that the cache should remove
+          expired objects from the cache when they are requested.
+
+    $options(cache_depth}
+          "cache_depth" specifies the depth of the subdirectories that
+          should be created.  This is helpful when especially large
+          numbers of objects are being cached (>1000) at once.  The
+          optimal number of files per directory is dependent on the type
+          of filesystem, so some hand-tuning may be required.
+
+*set($identifier, $object, $expires_in)*
+     Adds an object to the cache.  set takes the following parameters:
+
+    $identifier
+          The key the refers to this object.
+
+    $object
+          The object to be stored.  This any Storable or Data::Dumper-able
+          scalar or (optionally blessed) ref.  Filehandles and database
+          handles can not be stored, but most other references to objects
+          can be.
+
+    $expires_in *(optional)*
+          The object will be cleared from the cache in this number of
+          seconds.  Overrides the default expires_in value for the cache.
+
+get($identifier)
+     get retrieves an object from the cache.  If the object referred to by
+     the identifier exists in the cache and has not expired then then
+     object will be returned.  If the object does not exist then get will
+     return undef.  If the object does exist but has expired then get will
+     return undef and, depending on the setting of auto_remove_stale,
+     remove the expired object from the cache.
+
+    $identifier
+          The key referring to the object to be retrieved.
+
+get_stale($identifier)
+     get_stale retrieves objects that have expired from the cache.
+     Normally, expired objects are removed automatically and can not be
+     retrieved via get_stale, but if the auto_remove_stale option is set to
+     false, then expired objects will be left in the cache.  get_stale
+     returns undef if the object does not exist at all or has not expired
+     yet.
+
+    $identifier
+          The key referring to the object to be retrieved.
+
+remove($identifier)
+     Removes an object from the cache.
+
+    $identifier
+          The key referring to the object to be removed.
+
+clear()
+     Removes all objects from this cache.
+
+purge()
+     Removes all objects that have expired
+
+size()
+     Return an estimate of the disk usage of the current namespace.
+
+reduce_size($size)
+     Reduces the size of the cache so that it is below $size. Note that the
+     cache size is approximate, and may slightly exceed the value of $size.
+
+     Cache objects are removed in order of nearest expiration time, or
+     latest access time if there are no cache objects with expiration
+     times. (If there are a mix of cache objects with expiration times and
+     without, the ones with expiration times are removed first.)
+     reduce_size takes the following parameter:
+
+    $size
+          The new target cache size.
+
+get_creation_time($identifier)
+     Gets the time at which the data associated with $identifier was stored
+     in the cache. Returns undef if $identifier is not cached.
+
+    $identifier
+          The key referring to the object to be retrieved.
+
+get_expiration_time($identifier)
+     Gets the time at which the data associated with $identifier will
+     expire from the cache. Returns undef if $identifier is not cached.
+
+    $identifier
+          The key referring to the object to be retrieved.
+
+get_global_expires_in()
+     Returns the default number of seconds before an object in the cache
+     expires.
+
+set_global_expires_in($global_expires_in)
+     Sets the default number of seconds before an object in the cache
+     expires.  set_global_expires_in takes the following parameter:
+
+    $global_expires_in
+          The default number of seconds before an object in the cache
+          expires.  It should be a number greater than zero,
+          $File::Cache::sEXPIRES_NEVER, or $File::Cache::sEXPIRES_NOW.
+
+get_auto_remove_stale()
+     Returns whether or not the cache will automatically remove objects
+     after they expire.
+
+set_auto_remove_stale($auto_remove_stale)
+     Sets whether or not the cache will automatically remove objects after
+     they expire.  set_auto_remove_stale takes the following parameter:
+
+    $auto_remove_stale
+          The new auto_remove_stale value.  If $auto_remove_stale is 1 or
+          $File::Cache::sTRUE, then the cache will automatically remove
+          items when they are being retrieved if they have expired.  If
+          $auto_remove_stale is 0 or $File::Cache::sFALSE, the cache will
+          only remove expired items when the purge() method is called, or
+          if max_size is set.  Note that the behavior of get_stale is
+          undefined if $auto_remove_stale is true.
+
+get_username()
+     Returns the username that is currently being used to define the
+     location of this cache.
+
+set_username($username)
+     Sets the username that is currently being used to define the location
+     of this cache.  set_username takes the following parameter:
+
+    $username
+          The username that is to be used to define the location of this
+          cache. It is not directly used to determine the ownership of the
+          cache files, but can be used to isolate sections of a cache for
+          different permissions.
+
+get_namespace()
+     Returns the current cache namespace.
+
+set_namespace($namespace)
+     Sets the cache namespace. set_namespace takes the following parameter:
+
+    $namespace
+          The namespace that is to be used by the cache. The namespace can
+          be used to isolate sections of a cache.
+
+get_max_size()
+     Returns the current cache maximum size. $File::Cache::sNO_MAX_SIZE
+     indicates no maximum size.
+
+set_max_size($max_size)
+     Sets the maximum cache size. The cache size is reduced as necessary.
+     set_max_size takes the following parameter:
+
+    $max_size
+          The maximum size of the cache. $File::Cache::sNO_MAX_SIZE
+          indicates no maximum size.
+
+get_cache_depth()
+     Returns the current cache depth.
+
+set_cache_depth($cache_depth)
+     Sets the cache depth. Consider calling clear() before resetting the
+     cache depth in order to prevent inaccessible cache objects from
+     occupying disk space. set_cache_depth takes the following parameter:
+
+    $cache_depth
+          The depth of subdirectories that are to be used by the cache when
+          storing cache objects.
+
+get_persistence_mechanism()
+     Returns the current cache persistence mechanism.
+
+set_persistence_mechanism($persistence_mechanism)
+     Sets the cache persistence mechanism. This method clears the cache in
+     order to ensure consistent cache objects. set_persistence_mechanism
+     takes the following parameter:
+
+    $persistence_mechanism
+          The persistence mechanism that is to be used by the cache. This
+          value can be either "Storable" or "Data::Dumper".
+
+get_filemode()
+     Returns the filemode specification for newly created cache objects.
+
+set_filemode($mode)
+     Sets the filemode specification for newly created cache objects.
+     set_filemode takes the following parameter:
+
+    $mode
+          The file mode - a numerical mode identical to that used by
+          chmod(). See the chmod() documentation for more information.
+
+File::Cache::CLEAR($cache_key)
+     Removes this cache and all the associated namespaces from the
+     filesystem.  CLEAR takes the following parameter:
+
+    $cache_key *(optional)*
+          Specifies the filesystem data to be cleared.  Needed only if a
+          cache was created with a non-standard cache key.
+
+File::Cache::PURGE($cache_key)
+     Removes all objects in all namespaces that have expired.  PURGE takes
+     the following parameter:
+
+    $cache_key *(optional)*
+          Specifies the filesystem data to be purged.  Needed only if a
+          cache was created with a non-standard cache key.
+
+File::Cache::SIZE($cache_key)
+     Roughly estimates the amount of memory in use.  SIZE takes the
+     following parameter:
+
+    $cache_key *(optional)*
+          Specifies the filesystem data to be examined.  Needed only if a
+          cache was created with a non-standard cache key.
+
+*File::Cache::REDUCE_SIZE($size, $cache_key)*
+     Reduces the size of the cache so that it is below $size. Note that the
+     cache size is approximate, and may slightly exceed the value of $size.
+
+     Cache objects are removed in order of nearest expiration time, or
+     latest access time if there are no cache objects with expiration
+     times. (If there are a mix of cache objects with expiration times and
+     without, the ones with expiration times are removed first.)
+     REDUCE_SIZE takes the following parameters:
+
+    $size
+          The new target cache size.
+
+    $cache_key *(optional)*
+          Specifies the filesystem data to be examined.  Needed only if a
+          cache was created with a non-standard cache key.
+
+BUGS
+====
+
+   * The root of the cache namespace is created with global read/write
+     permissions.
+
+SEE ALSO
+========
+
+   IPC::Cache, Storable, Data::Dumper
+
+AUTHOR
+======
+
+   DeWitt Clinton <dewitt@avacet.com>, and please see the CREDITS file
+
+

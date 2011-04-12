@@ -1,0 +1,1565 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Lingua/Stem,  Next: Lingua/Stem/AutoLoader,  Prev: Lingua/Romana/Perligata,  Up: Module List
+
+Stemming of words
+*****************
+
+NAME
+====
+
+   Lingua::Stem - Stemming of words
+
+SYNOPSIS
+========
+
+     use Lingua::Stem qw(stem);
+     my $stems   = stem(@words);
+
+     or for the OO inclined,
+
+     use Lingua::Stem;
+     my $stemmer = Lingua::Stem->new(-locale => 'EN-UK');
+     my $stems   = $stemmer->stem(@words);
+
+DESCRIPTION
+===========
+
+   This routine applies stemming algorithms to its parameters, returning
+the stemmed words as appropriate to the selected locale.
+
+   You can import some or all of the class methods.
+
+   use Lingua::Stem qw (stem clear_stem_cache stem_caching
+    add_exceptions delete_exceptions                      get_exceptions
+set_locale get_locale                      :all :locale :exceptions :stem
+:caching);
+
+     :all        - imports  stem add_exceptions delete_exceptions get_exceptions
+                   set_locale get_locale
+     :stem       - imports  stem
+     :caching    - imports  stem_caching clear_stem_cache
+     :locale     - imports  set_locale get_locale
+     :exceptions - imports  add_exceptions delete_exceptions get_exceptions
+
+CHANGES
+=======
+
+     0.50 2000.09.14 - Fixed major implementation error. Starting with
+                       version 0.30 I forgot to include rulesets 2,3 and 4
+                       for Porter's algorithm. The resulting stemming results
+                       were very poor. Thanks go to <csyap@netfision.com>
+                       for bringing the problem to my attention. Unfortunately,
+                       the fix inherently generates *different*
+                       stemming results than 0.30 and 0.40 did. If you
+                       need identically broken output - use locale 'en-broken'.
+
+     0.40 2000.08.25 - Added stem caching support as an option. This
+                       can provide a large speedup to the operation
+                       of the stemmer. Caching is default turned off
+                       to maximize compatibility with previous versions.
+
+     0.30 1999.06.24 - Replaced core of 'En' stemmers with code from
+                       Jim Richardson <jimr@maths.usyd.edu.au>
+                       Aliased 'en-us' and 'en-uk' to 'en'
+                       Fixed 'SYNOPSIS' to correct return value
+                       type for stemmed words (SYNOPIS error spotted
+                       by <Arved_37@chebucto.ns.ca>)
+
+     0.20 1999.06.15 - Changed to '.pm' module, moved into Lingua:: namespace,
+                       added OO interface, optionalized the export of routines
+                       into the caller's namespace, added named parameter
+                       initialization, stemming exceptions, autoloaded
+                       locale support and isolated case flattening to
+                       localized stemmers prevent i18n problems later.
+
+     Input and output text are assumed to be in UTF8
+     encoding (no operational impact right now, but
+     will be important when extending the module to
+     non-English).
+
+METHODS
+=======
+
+new(...);
+     Returns a new instance of a Lingua::Stem object and, optionally,
+     selection of the locale to be used for stemming.
+
+     Examples:
+
+          # By default the locale is us-en
+          $us_stemmer = Lingua::Stem->new;
+
+          # Overriding the default for a specific instance
+          $uk_stemmer = Lingua::Stem->new({ -locale => 'en-uk' });
+
+          # Overriding the default for a specific instance and changing the default
+          $uk_stemmer = Lingua::Stem->new({ -default_locale => 'en-uk' });
+
+set_locale($locale);
+     Sets the locale to one of the recognized locales. Currently, 'en',
+     'en-us' and 'en-uk' are the only recognized locales. All locale
+     identifiers are converted to lowercase.
+
+     Called as a class method, it changes the default locale for all
+     subseqently generated object instances.
+
+     Called as an instance method, it only changes the locale for that
+     particular instance.
+
+     'croaks' if passed an unknown locale.
+
+     Examples:
+
+          # Change default locale
+          Lingua::Stem::set_locale('en-uk'); # UK's spellings
+
+          # Change instance locale
+          $self->set_locale('en-us');  # US's spellings
+
+get_locale;
+     Called as a class method, returns the current default locale.
+
+     Example:
+
+          $default_locale = Lingua::Stem::get_locale;
+
+     Called as an instance method, returns the locale for the instance
+
+          $instance_locale = $stemmer->get_locale;
+
+add_exceptions($exceptions_hash_ref);
+     Exceptions allow overriding the stemming algorithm on a case by case
+     basis. It is done on an exact match and substitution basis: If a
+     passed word is identical to the exception it will be replaced by the
+     specified value. No case adjustments are performed.
+
+     Called as a class method, adds exceptions to the default exceptions
+     list used for subsequently instantations of Lingua::Stem objects.
+
+     Example:
+
+          # adding default exceptions
+          Lingua::Stem::add_exceptions({ 'emily' => 'emily',
+                                         'driven' => 'driven',
+                                     });
+
+     Called as an instance method, adds exceptions only to the specific
+     instance.
+
+          # adding instance exceptions
+          $stemmer->add_exceptions({ 'steely' => 'steely' });
+
+     The exceptions shortcut the normal stemming - if an exception matches
+     no further stemming is performed after the substitution.
+
+     Adding an exception with the same key value as an already defined
+     exception replaces the pre-existing exception with the new value.
+
+delete_exceptions(@exceptions_list);
+     The mirror of add_exceptions, this allows the _removal_ of exceptions
+     from either the defaults for the class or from the instance.
+
+          # Deletion of exceptions from class default exceptions
+          Lingua::Stem::delete_exceptions('aragorn','frodo','samwise');
+
+          # Deletion of exceptions from instance
+          $stemmer->delete_exceptions('smaug','sauron','gollum');
+
+          # Deletion of all class default exceptions
+          delete_exceptions;
+
+          # Deletion of all exceptions from instance
+          $stemmer->delete_exceptions;
+
+get_exceptions;
+     As a class method with no parameters it returns all the default
+     exceptions as an anonymous hash of 'exception' => 'replace with'
+     pairs.
+
+     Example:
+
+          # Returns all class default exceptions
+          $exceptions = Lingua::Stem::get_exceptions;
+
+     As a class method with parameters, it returns the default exceptions
+     listed in the parameters as an anonymous hash of 'exception' =>
+     'replace with' pairs.  If a parameter specifies an undefined
+     'exception', the value is set to undef.
+
+          # Returns class default exceptions for 'emily' and 'george'
+          $exceptions = Lingua::Stem::get_exceptions('emily','george');
+
+     As an instance method, with no parameters it returns the currently
+     active exceptions for the instance.
+
+          # Returns all instance exceptions
+          $exceptions = $stemmer->get_exceptions;
+
+     As an instance method with parameters, it returns the instance
+     exceptions listed in the parameters as an anonymous hash of
+     'exception' => 'replace with' pairs.  If a parameter specifies an
+     undefined 'exception', the value is set to undef.
+
+          # Returns instance exceptions for 'lisa' and 'bart'
+          $exceptions = $stemmer->get_exceptions('lisa','bart');
+
+stem(@list);
+     Called as a class method, it applies the default settings and stems
+     the list of passed words, returning an anonymous array with the
+     stemmed words in the same order as the passed list of words.
+
+     Example:
+
+          # Default settings applied
+          my $stemmed_words = Lingua::Stem::stem(@words);
+
+     Called as an instance method, it applies the instance's settings and
+     stems the list of passed words, returning an anonymous array with the
+     stemmed words in the same order as the passed list of words.
+
+          # Instance's settings applied
+          my $stemmed_words = $stemmer->stem(@words);
+
+clear_stem_cache;
+     Clears the stemming cache for the current locale. Can be called as
+     either a class method or an instance method.
+
+          $stemmer->clear_stem_cache;
+
+          clear_stem_cache;
+
+stem_caching ({ -level => 0|1|2 });
+     Sets stemming cache level for the current locale. Can be called as
+     either a class method or an instance method.
+
+          $stemmer->stem_caching({ -level => 1 });
+
+          stem_caching({ -level => 1 });
+
+     For the sake of maximum compatibility with previous versions, stem
+     caching is set to '-level => 0' initially.
+
+     '-level' definitions
+
+          '0' means 'no caching'. This is the default level.
+
+          '1' means 'cache per run'. This caches stemming results during each
+             call to 'stem'.
+
+          '2' means 'cache indefinitely'. This caches stemming results until
+             either the process exits or the 'clear_stem_cache' method is called.
+
+     stem caching is global to the locale. If you turn on stem caching for
+     one instance of a locale stemmer, all instances using the same locale
+     will have it turned on as well.
+
+NOTES
+=====
+
+   This is version 0.40.
+
+   It started with the 'Text::Stem' module which has been adapted into a
+more general framework and moved into the more language oriented 'Lingua'
+namespace and re-organized to support a OOP interface as well as switch
+core 'En' locale stemmers.
+
+   Version 0.40 added a cache for stemmed words. This can provide up to a
+4 fold performance improvement.
+
+   Organization is such that extending this module to any number of
+languages should be direct and simple.
+
+   Case flattening is a function of the language, so the 'exceptions'
+methods have to be used appropriately to the language. For 'En' family
+stemming, use lower case words, only, for exceptions.
+
+AUTHORS
+=======
+
+     Benjamin Franz <snowhare@nihongo.org>
+     Jim Richardson <imr@maths.usyd.edu.au>
+
+SEE ALSO
+========
+
+     Lingua::Stem::En Lingua:Stem::En_Us Lingua::Stem::En_Uk
+
+COPYRIGHT
+=========
+
+   Copyright 1999
+
+   FreeRun Technologies, Inc (FreeRun), Jim Richardson, University of
+Sydney <imr@maths.usyd.edu.au> and Benjamin Franz <snowhare@nihongo.org>.
+All rights reserved.
+
+   This software may be freely copied and distributed under the same terms
+and conditions as Perl.
+
+BUGS
+====
+
+   None known.
+
+TODO
+====
+
+   Add more languages. Specifically integrate Text::German for 'de' locale.
+
+
+File: pm.info,  Node: Lingua/Stem/AutoLoader,  Next: Lingua/Stem/En,  Prev: Lingua/Stem,  Up: Module List
+
+A manager for autoloading Lingua::Stem modules
+**********************************************
+
+NAME
+====
+
+   Lingua::Stem::AutoLoader - A manager for autoloading Lingua::Stem
+modules
+
+SYNOPSIS
+========
+
+   use Lingua::Stem::AutoLoader;
+
+DESCRIPTION
+===========
+
+   Sets up the autoloader to load the modules in the Lingua::Stem system
+on demand.
+
+COPYRIGHT
+=========
+
+   Copyright 1999, Benjamin Franz (<URL:http://www.nihongo.org/snowhare/>)
+and FreeRun Technologies, Inc. (<URL:http://www.freeruntech.com/>). All
+Rights Reserved.  This software may be copied or redistributed under the
+same terms as Perl itelf.
+
+AUTHOR
+======
+
+   Benjamin Franz
+
+TODO
+====
+
+   Nothing.
+
+
+File: pm.info,  Node: Lingua/Stem/En,  Next: Lingua/Stem/EnBroken,  Prev: Lingua/Stem/AutoLoader,  Up: Module List
+
+Porter's stemming algorithm for 'generic' English
+*************************************************
+
+NAME
+====
+
+   Lingua::Stem::En - Porter's stemming algorithm for 'generic' English
+
+SYNOPSIS
+========
+
+     use Lingua::Stem::En;
+     my $stems   = Lingua::Stem::En::stem({ -words => $word_list_reference,
+                                         -locale => 'en',
+                                     -exceptions => $exceptions_hash,
+                                      });
+
+DESCRIPTION
+===========
+
+   This routine applies the Porter Stemming Algorithm to its parameters,
+returning the stemmed words.
+
+   It is derived from the C program "stemmer.c" as found in freewais and
+elsewhere, which contains these notes:
+
+     Purpose:    Implementation of the Porter stemming algorithm documented
+                 in: Porter, M.F., "An Algorithm For Suffix Stripping,"
+                 Program 14 (3), July 1980, pp. 130-137.
+     Provenance: Written by B. Frakes and C. Cox, 1986.
+
+   I have re-interpreted areas that use Frakes and Cox's "WordSize"
+function. My version may misbehave on short words starting with "y", but I
+can't think of any examples.
+
+   The step numbers correspond to Frakes and Cox, and are probably in
+Porter's article (which I've not seen).  Porter's algorithm still has
+rough spots (e.g current/currency, -ings words), which I've not attempted
+to cure, although I have added support for the British -ise suffix.
+
+CHANGES
+=======
+
+     1999.06.15 - Changed to '.pm' module, moved into Lingua::Stem namespace,
+                   optionalized the export of the 'stem' routine
+                   into the caller's namespace, added named parameters
+
+     1999.06.24 - Switch core implementation of the Porter stemmer to
+                  the one written by Jim Richardson <jimr@maths.usyd.edu.au>
+
+     2000.08.25 - 2.11 Added stemming cache
+
+     2000.09.14 - 2.12 Fixed *major* :( implementation error of Porter's algorithm
+                  Error was entirely my fault - I completely forgot to include
+                  rule sets 2,3, and 4 starting with Lingua::Stem 0.30.
+                  -- Benjamin Franz
+
+METHODS
+=======
+
+stem({ -words => \@words, -locale => 'en', -exceptions => \%exceptions });
+     Stems a list of passed words using the rules of US English. Returns
+     an anonymous hash reference to the stemmed words.
+
+     Example:
+
+          my $stemmed_words = Lingua::Stem::En::stem({ -words => \@words,
+                                                      -locale => 'en',
+                                                  -exceptions => \%exceptions,
+                                  });
+
+stem_caching({ -level => 0|1|2 });
+     Sets the level of stem caching.
+
+     '0' means 'no caching'. This is the default level.
+
+     '1' means 'cache per run'. This caches stemming results during a
+     single     call to 'stem'.
+
+     '2' means 'cache indefinitely'. This caches stemming results until
+     either the process exits or the 'clear_stem_cache' method is called.
+
+clear_stem_cache;
+     Clears the cache of stemmed words
+
+NOTES
+=====
+
+   This code is almost entirely derived from the Porter 2.1 module written
+by Jim Richardson.
+
+SEE ALSO
+========
+
+     Lingua::Stem
+
+AUTHOR
+======
+
+     Jim Richardson, University of Sydney
+     jimr@maths.usyd.edu.au or http://www.maths.usyd.edu.au:8000/jimr.html
+
+     Integration in Lingua::Stem by
+     Benjamin Franz, FreeRun Technologies,
+     snowhare@nihongo.org or http://www.nihongo.org/snowhare/
+
+COPYRIGHT
+=========
+
+   Jim Richardson, University of Sydney Benjamin Franz, FreeRun
+Technologies
+
+   This code is freely available under the same terms as Perl.
+
+BUGS
+====
+
+TODO
+====
+
+
+File: pm.info,  Node: Lingua/Stem/EnBroken,  Next: Lingua/Wordnet,  Prev: Lingua/Stem/En,  Up: Module List
+
+Porter's stemming algorithm for 'generic' English
+*************************************************
+
+NAME
+====
+
+   Lingua::Stem::EnBroken - Porter's stemming algorithm for 'generic'
+English
+
+SYNOPSIS
+========
+
+     use Lingua::Stem::EnBroken;
+     my $stems   = Lingua::Stem::EnBroken::stem({ -words => $word_list_reference,
+                                         -locale => 'en',
+                                     -exceptions => $exceptions_hash,
+                                      });
+
+DESCRIPTION
+===========
+
+   This routine MIS-applies the Porter Stemming Algorithm to its
+parameters, returning the stemmed words. It is an intentionally broken
+version of Lingua::Stem::En for people needing backwards compatibility with
+Lingua::Stem 0.30 and Lingua::Stem 0.40. Do not use it if you aren't one
+of those people.
+
+   It is derived from the C program "stemmer.c" as found in freewais and
+elsewhere, which contains these notes:
+
+     Purpose:    Implementation of the Porter stemming algorithm documented
+                 in: Porter, M.F., "An Algorithm For Suffix Stripping,"
+                 Program 14 (3), July 1980, pp. 130-137.
+     Provenance: Written by B. Frakes and C. Cox, 1986.
+
+   I have re-interpreted areas that use Frakes and Cox's "WordSize"
+function. My version may misbehave on short words starting with "y", but I
+can't think of any examples.
+
+   The step numbers correspond to Frakes and Cox, and are probably in
+Porter's article (which I've not seen).  Porter's algorithm still has
+rough spots (e.g current/currency, -ings words), which I've not attempted
+to cure, although I have added support for the British -ise suffix.
+
+CHANGES
+=======
+
+     2000.09.14 -  Forked from the Lingua::Stem::En.pm module to provide
+                    a backward compatibly broken version for people needing
+                    consistent behavior with 0.30 and 0.40 more than accurate
+                    stemming.
+
+METHODS
+=======
+
+stem({ -words => \@words, -locale => 'en', -exceptions => \%exceptions });
+     Stems a list of passed words using the rules of US English. Returns
+     an anonymous hash reference to the stemmed words.
+
+     Example:
+
+          my $stemmed_words = Lingua::Stem::EnBroken::stem({ -words => \@words,
+                                                      -locale => 'en',
+                                                  -exceptions => \%exceptions,
+                                  });
+
+stem_caching({ -level => 0|1|2 });
+     Sets the level of stem caching.
+
+     '0' means 'no caching'. This is the default level.
+
+     '1' means 'cache per run'. This caches stemming results during a
+     single     call to 'stem'.
+
+     '2' means 'cache indefinitely'. This caches stemming results until
+     either the process exits or the 'clear_stem_cache' method is called.
+
+clear_stem_cache;
+     Clears the cache of stemmed words
+
+NOTES
+=====
+
+   This code is almost entirely derived from the Porter 2.1 module written
+by Jim Richardson.
+
+SEE ALSO
+========
+
+     Lingua::Stem
+
+AUTHOR
+======
+
+     Jim Richardson, University of Sydney
+     jimr@maths.usyd.edu.au or http://www.maths.usyd.edu.au:8000/jimr.html
+
+     Integration in Lingua::Stem by
+     Benjamin Franz, FreeRun Technologies,
+     snowhare@nihongo.org or http://www.nihongo.org/snowhare/
+
+COPYRIGHT
+=========
+
+   Jim Richardson, University of Sydney Benjamin Franz, FreeRun
+Technologies
+
+   This code is freely available under the same terms as Perl.
+
+BUGS
+====
+
+TODO
+====
+
+
+File: pm.info,  Node: Lingua/Wordnet,  Next: Lingua/Wordnet/Analysis,  Prev: Lingua/Stem/EnBroken,  Up: Module List
+
+Perl extension for accessing and manipulating Wordnet databases.
+****************************************************************
+
+NAME
+====
+
+   Lingua::Wordnet - Perl extension for accessing and manipulating Wordnet
+databases.
+
+SYNOPSIS
+========
+
+     use Lingua::Wordnet;
+     use Lingua::Wordnet::Analysis;
+
+     $wn->unlock();
+     $synset = $wn->lookup_synset("canary","n",4);
+     $synset2 = $wn->lookup_synset("small","a",1);
+     $synset->add_attributes($synset2);
+     $synset->write();
+     print $synset, "\n";
+     $wn->close();
+
+DESCRIPTION
+===========
+
+   Wordnet is a lexical reference system inspired by current
+psycholinguitics theories of human lexical memory. This module allows
+access to the Wordnet lexicon from Perl applications, as well as
+manipulation and extension of the lexicon. Lingua::Wordnet::Analysis
+provides numerous high-level extensions to the system.
+
+   Version 0.1 was a complete rewrite of the module in pure Perl, whereas
+the old module embedded the Wordnet C API functions. In order to use the
+module, the database files must first be converted to Berkeley DB files
+using the 'scripts/convertdb.pl' file. Why did I do that?
+
+   - The Wordnet API consists mostly of searching and text manipulation
+functions, something Perl is, um .. well suited for.
+
+   - Data retrieval is more fast with the hash lookup than with the binary
+searches
+
+   - Converting the databases allows optional manipulation of the data,
+including adding and editing synsets, as well as extension of the system
+to allow for more pointer types (including noun attributes and
+'functions').
+
+     - Developers can use the Wordnet databases without needing to compile the Wordnet API and browsers, allowing Wordnet to run on any Perl/Berkeley DB-capable platform (the database files are still needed for the conversion, of course)
+
+   - A pure Perl implementation allows easier debugging and modification
+for people who want to experiment or alter the processing.
+
+   With that said, there are actually two modules. Lingua::Wordnet
+impersonates the basic Wordnet API functions for searching and retrieving
+data, as well as adding, editing, and deleting synsets.
+Lingua::Wordnet::Analysis brings the interface up a level, allowing
+commands like "is 'yellow' an attribute of any 'birds'", and taking care
+of the recursive analysis.
+
+Lingua::Wordnet functions
+=========================
+
+$wn = new Lingua::Wordnet( [DATA_DIR] );
+     Creates and assigns a new object of class Lingua::Wordnet. DATA_DIR
+     is optional, and indicates the location of the index and data files.
+
+$wn->unlock()
+     Allows files to be written to when data is added/edited/deleted.
+
+$wn->lock()
+     Locks files to prohibit write permissions (default).
+
+$wn->grep(TEXT)
+     Returns an array of compound words matching TEXT.
+
+@synsets = $wn->lookup_synset( TEXT, POS [,NUMBER] )
+     Assigns a list of synset objects (Lingua::Wordnet::Synset) matching
+     TEXT within POS, where POS is 'n', 'v', 'a', 's' or 'r'. Without
+     NUMBER, lookup_synset() will return all matches in POS. NUMBER is the
+     sequential order of the desired synset within POS.
+
+$synset = $wn->lookup_synset_offset(SYNSET_OFFSET)
+     Assigns a synset object SYNSET_OFFSET.
+
+$synset = $wn->new_synset(WORD,POS);
+     Creates a new (empty) synset entry in the database. Both WORD and POS
+     are required. An offset will be assigned when write() is called.
+
+Lingua::Wordnet::Synset functions
+=================================
+
+@words = $synset->words([TEXT ..)]
+     Retrieves or sets the list of words for this synset. add_words()
+     should be used if you are only adding an entry, rather than setting
+     all entries. Each word is in the format: TEXT%SENSE, where TEXT is
+     the word, and SENSE is the sense number for the word. If SENSE is not
+     supplied when assigning words to a synset, Lingua::Wordnet will
+     assign the appropriate sense numbers to the words when
+     $synset->write() is called (since they must be unique). In this case,
+     the word list should consist only of the word text, without the '%'.
+     The new words will be written to the data and index files.
+
+$wn->familiarity(WORD, POS [, POLY_CNT])
+     Returns an integer of the familiarity/polysemy count for WORD in POS.
+     Given a third value POLY_CNT, sets the polysemy count for WORD in
+     POS. In Lingua::Wordnet, this is a value which must be updated by the
+     user, and is not automatically modified. This makes it useful for
+     recording familiarity or frequency counts outside of the Wordnet
+     lexicons. Note that polysemy within Lingua::Wordnet can be identified
+     for a given word by counting the synsets returned by lookup_synset().
+
+$wn->morph(WORD, POS)
+     Returns a form of WORD in POS as found in the Wordnet morph files.
+     The synset_lookup() functions performs morphological conversion
+     automatically, so a call to morph() is not required.
+
+$synset->overview()
+     Returns the terms and gloss for the synset in a format for printing.
+     This method is also used to overload a print performed on the synset.
+     Note that this is different from the "overview" parameter of the 'wn'
+     executable, since it only returns information about the current
+     synset.
+
+$synset->write()
+     Writes any changes made to $synset to the database and updates all
+     affected synset data and indexes. If $synset passes out of scope
+     before write() is called, the changes are lost.
+
+     All of following functions retrieve data in synsets. Each has two
+     corresponding functions which can be called by prepending 'add_' or
+     'delete_' before the function name. These functions accept a synset
+     object or objects as input. Unless noted otherwise in the following
+     functions, any returned data is a synset object or array of synset
+     objects. See below for examples usages.
+
+          $synset->antonyms()
+          $synset->add_antonyms($synset2[, ...])
+          $synset->delete_antonyms($synset2[, ...])
+
+     Returns, adds, or deletes antonyms for $synset. WARNING: When
+     adding/deleting synset pointers to Wordnet, it is important to add
+     pointer entries to the corresponding synset in order to maintain
+     database accuracy. Earlier versions of this module planned to
+     automate this function, however, they have been abandoned in favor of
+     having control over database writes with the 'write()' function, and
+     are now considered functionality which belongs outside of the module.
+     Thus, your program must implement the functionality to, in the above
+     examples, add an antonym entry to '$synset' for '$synset2', in
+     addition to adding an antonym entry to '$synset2' for '$synset'.
+
+$synset->hypernyms()
+     Returns hypernyms for $synset.
+
+$synset->hyponyms()
+     Returns hyponyms for $synset.
+
+$synset->entailment()
+     Returns verb entailment pointers.
+
+$synset->synonyms()
+     Returns synonyms for $synset. Note that all words within $synset are
+     synonyms.
+
+$synset->comp_meronyms()
+     Returns component-object meronyms for $synset.
+
+$synset->member_meronyms()
+     Returns member-collection meronyms for $synset.
+
+$synset->stuff_meronyms()
+     Returns stuff-object meronyms for $synset (a.k.a. substance-object).
+
+$synset->portion_meronyms()
+     Returns portion-mass meronyms for $synset.
+
+$synset->feature_meronyms()
+     Returns feature-activity meronyms for $synset.
+
+$synset->place_meronym()
+     Returns place-area meronyms for $synset.
+
+$synset->phase_meronym()
+     Sets or returns phase-process meronyms for $synset.
+
+$synset->all_meronyms()
+     Returns an array of synset objects for all meronyms types of $synset.
+
+$synset->all_holonyms()
+     Returns an array of synset objects for all holonyms of $synset.
+
+     The following seven functions mirror the above functionality for
+     holonyms, and accordingly have corresponding add_ and delete_
+     functions which update any set values to the corresponding meronym
+     pointers:
+
+$synset->comp_holonym()
+$synset->member_holonym()
+$synset->stuff_holonym()
+$synset->portion_holonym()
+$synset->feature_holonym()
+$synset->place_holonym()
+$synset->phase_holonym()
+$synset->gloss([TEXT])
+     Returns the glass for $synset. If TEXT is present, the gloss for
+     $synset will be assigned that value.
+
+$synset->attributes()
+     Returns a list of synset objects of attribute pointers for $synset.
+
+$synset->functions()
+     Returns a list of synset objects of function pointers for $synset.
+
+$synset->causes()
+     Returns the 'cause to' pointers for verbs.
+
+$synset->pertainyms()
+     Returns the 'pertains to' pointers for adj and adv.
+
+$synset->frames()
+     Returns a text array of verb frames for $synset. The add_frames() and
+     delete_frames() functions accept only integers corresponding to the
+     frames. The list of frames can be edited in Wordnet.pm directly, but
+     probably shouldn't be.
+
+$synset->lex_info([INT])
+     Returns a string containing lexicographer file information. The
+     optional INT assigns the lexicographer file information, and should
+     correspond to the file list in Wordnet.pm.
+
+$synset->offset()
+     Returns the synset offset of $synset.
+
+EXAMPLES
+========
+
+   Extensive examples can be found in the 'scripts/' directory; here I will
+summarize the basic functionality. There are also some examples in the pod
+documentation for Lingua::Wordnet::Analysis.
+
+   This will display a hypernym tree for $synset:
+
+     my $synset = $wn->lookup_synset_offset("00300911%n");
+     while ($synset = ($synset->hypernyms)[0]) {
+        $i++;
+        print " "x$i, "->", $synset->words, "\n";
+     }
+
+   Outputting the following for synset "baseball":
+
+     -> field_game%0
+      -> outdoor_game%0
+       -> athletic_game%0
+        -> sport%0athletics%0
+         -> diversion%0recreation%0
+          -> activity%0
+           -> act%0human_action%0human_activity%0
+
+   The example below will create a synset object and print a list of the
+hyponyms for that object:
+
+   use Lingua::Wordnet;  my $wn = new Lingua::Wordnet;  my $synset =
+$wn->lookup_synset("baseball","n",1);  print "The following are kinds of
+baseball games:\n";  foreach $bb_synset ($synset->hyponyms) {      my
+$words;      foreach $word ($bb_synset->words) {          $word =~
+s/\%\d+$//; $word =~ s/\_/ /g;          $words .= "$word, ";      }
+$words =~ s/\,\s*$//;      print "  $words\n";  }  $wn->close();
+
+   This will output:
+
+     The following are kinds of baseball games:
+       professional baseball
+       hardball
+       perfect game
+       no-hit game, no-hitter
+       one-hitter, 1-hitter
+       two-hitter, 2-hitter
+       three-hitter, 3-hitter
+       four-hitter, 4-hitter
+       five-hitter, 5-hitter
+       softball, softball game
+       rounders
+       stickball, stickball game
+
+   And an assignment example. This will create a new synset and add it to
+the kinds of baseball games. We unlock the Wordnet files to enable changes
+to the database:
+
+     use Lingua::Wordnet;
+     my $wn = new Lingua::Wordnet;
+     $wn->unlock();
+     my $synset = $wn->lookup_synset("baseball","n",1);
+     my $newsynset = $wn->new_synset("fooball","n");
+     $newsynset->gloss("A baseball game in which a foo is used.");
+     $synset->add_hyponym($newsynset);
+     $wn->close();
+
+   Remember, proceeded most synset functions with "add" will append the
+supplied data to the corresponding field, rather than replacing its value.
+
+   We could add an attribute 'fun' to "fooball" thus (not necessarily
+recommended pointer, but it will suffice for an example):
+
+     $fun_synset = $wn->lookup_synset("fun","adj",1);
+     $newsynset->add_attributes($fun_synset);
+
+   See the Lingua::Wordnet::Analysis documentation for examples to
+retrieving and searching entire trees and inheritance functions.
+
+BUGS/TODO
+=========
+
+   Please send bugs and suggestions/requests to dbrian@brians.org.
+Development on this module is active as of Spring 2001.
+
+   Clean up code, put references where beneficial.
+
+AUTHOR
+======
+
+   Dan Brian <dbrian@brians.org>
+
+SEE ALSO
+========
+
+   Lingua::Wordnet::Analysis.
+
+
+File: pm.info,  Node: Lingua/Wordnet/Analysis,  Next: Linux/Fuser,  Prev: Lingua/Wordnet,  Up: Module List
+
+Perl extension for high-level processing of Wordnet databases.
+**************************************************************
+
+NAME
+====
+
+   Lingua::Wordnet::Analysis - Perl extension for high-level processing of
+Wordnet databases.
+
+SYNOPSIS
+========
+
+     use Lingua::Wordnet::Analysis;
+
+     $analysis = new Lingua::Wordnet::Analysis;
+
+     # How many articles of clothing have 'tongues'?
+     $tongue = $wn->lookup_synset("tongue","n",2);
+     @articles = $analysis->search($clothes,$tongue,"all_meronyms");
+     
+     # Are there any parts, of any kinds, of any shoes, made of glass?
+     @shoe_types = $analysis->traverse("hyponyms",$shoes);
+     $count = $analysis->search(@shoe_types,$glass,"stuff_meronyms");
+
+     # Compute the intersection of two lists of synsets
+     @array1 = $shoes->all_holonyms;
+     @intersect = $analysis->intersection
+           (\@{$shoes->attributes},\@{$socks->attributes});
+
+     # Generate a list of the inherited comp_meronyms for "apple"
+     @apple_hypernyms = $analysis->traverse("hypernyms",$apple);
+     @apple_parts = $analysis->traverse("comp_meronyms",@apple_hypernyms);
+
+DESCRIPTION
+===========
+
+   Lingua::Wordnet::Analysis supplies high-level functions for analysis of
+word relationships. Most of these functions process and return potentially
+large amounts of data, so only use them if you "know what you are doing."
+
+   These functions could have been put into Lingua::Wordnet::Synset
+objects, but I wanted to keep those limited to core functionality.
+Besides, many of these functions have unproven usefulness.
+
+Lingua::Wordnet::Analysis functions
+===================================
+
+$analysis->match(SYNSET,ARRAY)
+     Finds any occurance of SYNSET in the synset list ARRAY and the list's
+     pointers. Returns a positive value if a match is found. match() does
+     not traverse.
+
+$analysis->search(SYNSET1,SYNSET2,POINTER)
+     Searches all pointers of type POINTER in SYNSET1 for SYNSET2.
+     search() is recursive, and will traverse all depths. Returns the
+     number of matches.
+
+$analysis->traverse(POINTER,SYNSET)
+     Traverses all pointer types of POINTER in SYNSET and returns a list
+     of all synsets found in the tree.
+
+$analysis->coordinates(SYNSET)
+     Returns a list of the coordinate sisters of SYNSET.
+
+$analysis->union(LIST)
+     Returns a list of synsets which is the union of synsets LIST. The
+     union consists of synsets which occur in any lists. This is useful,
+     for example, for determining all the holonyms for two or more synsets.
+
+$analysis->intersection(ref LIST)
+     Returns a list of synsets of the intersection of ARRAY1 list of
+     synsets with ARRAY2 list of synsets. The intersection consists of
+     synsets which occur in both lists. This is useful, for example, to
+     determine which meronyms are shared by two synsets:
+
+          @synsets = $analysis->intersection
+              (\@{$synset1->all_meronyms},\@{$synset2->all_meronyms});
+
+$analysis->distance(SYNSET1,SYNSET2,POINTER)
+     Returns an integer value representing the distance in pointers
+     between SYNSET1 and SYNSET2 using POINTER as the search path.
+
+EXAMPLES
+========
+
+   To print out an inherited meronym list, use traverse():
+
+     $orange = $wn->lookup_synset("orange","n",1);
+     @orange_hypernyms = $analysis->traverse("hypernyms",$orange);
+     foreach ($analysis->traverse("all_meronyms",@orange_hypernyms)) {
+         print $_->words, "\n";
+     }
+
+   Note that the inherited meronyms will not contain the direct meronyms of
+$orange.
+
+BUGS/TODO
+=========
+
+   There is tons that could go in this module ... submissions are welcome!
+
+   Lots of cleanup.
+
+   Need to add a search_path function that will return a path to a match
+as a linked list or hash of hashes.
+
+   Some might want inherited meronym/holonym trees.
+
+   Please send bugs and suggestions/requests to dbrian@brians.org.
+Development on this module is active as of Winter 2000.
+
+AUTHOR
+======
+
+   Dan Brian <dbrian@brians.org>
+
+SEE ALSO
+========
+
+   Lingua::Wordnet.
+
+
+File: pm.info,  Node: Linux/Fuser,  Next: Lip/Pod,  Prev: Lingua/Wordnet/Analysis,  Up: Module List
+
+Determine which processes have a file open
+******************************************
+
+NAME
+====
+
+   Linux::Fuser - Determine which processes have a file open
+
+SYNOPSIS
+========
+
+     use Linux::Fuser;
+
+     my $fuser = Linux::Fuser->new();
+
+     my @procs = $fuser->fuser('foo');
+
+     foreach my $proc ( @procs )
+     {
+       print $proc->pid(),"\t", $proc->user(),"\n",@{$proc->cmd()},"\n";
+     }
+
+DESCRIPTION
+===========
+
+   This module provides information similar to the Unix command 'fuser'
+about which processes have a particular file open.  The way that this
+works is highly unlikely to work on any other OS other than Linux and even
+then it may not work on other than 2.2.* kernels.
+
+   It should also be borne in mind that this may not produce entirely
+accurate results unless you are running the program as the Superuser as
+the module will require access to files in /proc that may only be readable
+by their owner.
+
+METHODS
+-------
+
+new
+     The constructor of the object. It takes no arguments and returns a
+     blessed reference suitable for calling the methods on.
+
+fuser SCALAR $file
+     Given the name of a file it will return a list of
+     Linux::Fuser::Procinfo objects, one for each process that has the
+     file open - this will be the empty list if no processes have the file
+     open or undef if the file doesnt exist.
+
+PER PROCESS METHODS
+-------------------
+
+   The fuser() method will return a list of objects of type
+Linux::Fuser::Procinfo which itself has methods to return information
+about the process.
+
+user
+     The login name of the user that started this process ( or more
+     precisely that owns the file descriptor that the file is open on ).
+
+pid
+     The process id of the process that has the file open.
+
+cmd
+     The command line of the program that opened the file.  This actually
+     returns a reference to an array containing the individual elements of
+     the command line.
+
+AUTHOR
+======
+
+   Jonathan Stowe, <jns@gellyfish.com>
+
+SEE ALSO
+========
+
+   *Note Perl: (perl.info)perl,. `proc(5)' in this node
+
+
+File: pm.info,  Node: Lip/Pod,  Next: List/Intersperse,  Prev: Linux/Fuser,  Up: Module List
+
+   Lip::Pod - Literate Perl filter
+
+   Leaves all pod code intact, and indents all non-pod code by two spaces.
+=cut directives are eaten. An =head1, =cut pair is wrapped around the
+output.  Lines consisting entirely of '#' (and at least 3 of them) are
+ignored in the non-pod zones (to allow for dividing lines in the source
+code).
+
+   Defines a subclass of Pod::Parser which implements the indentation and
+=cut skipping described in `SYNOPSIS' in this node.
+
+   Print out the Literate Perl preamble.
+
+   Pass through all commands, except =cut, which is not passed through so
+that the entire output is POD.
+
+   Print out the Literate Perl postamble.
+
+   Indents non-POD paragraphs by two spaces.
+
+   Lip::Pod - Literate Perl to POD conversion
+
+     #!/usr/bin/perl -w
+     use strict;
+     use Lip::Pod;
+     package main;
+     my $parser = new Lip::Pod;
+     $parser->parseopts( -want_nonPODs => 1, -process_cut_cmd => 1 );
+     push @ARGV, '-' unless @ARGV;
+     for (@ARGV) { $parser->parse_from_file($_); }
+     exit 0;
+
+   Donald Knuth introduced Literate Programming, which is the idea that
+computer programs should be written in an expository style, as works of
+literature.  He created a system called *web*, which implemented his ideas
+for Pascal and TeX. Later, a derivative system, *cweb* was created for the
+C programming language (with text still in TeX).
+
+   Full Literate Programming in the style of Knuth involves disconnecting
+the order of presentation to humans from the order of presentation to a
+machine.  The input files written by the author/programmer are in an order
+convenient for instructing the reader, not necessarily in the order
+required to build an executable program. Programs then process the
+combined text/code input to create human-readable output (the program is
+called *weave* in Knuth's system), or compiler-appropriate output
+(*tangle* in *web*).
+
+   This module implements a very simple Literate Programming capability for
+Perl. Just as Perl's Plain Old Documentation (POD) is intended to be just
+powerful enough to be useful, and easy for the programmer, Literate Perl
+(LIP) is intended to bring the basic benefits of Literate Programming to
+Perl without radically altering the way programmers/authors work.
+
+   When you use LIP, you put the contents of your source file in the best
+order you can for exposition that does not interfere with its function.
+This may involve, for example, alphabetizing subroutines and/or grouping
+them by some criteria. Here is a simple example:
+
+     #!/usr/bin/perl -w
+     use strict;
+
+     =begin lip
+
+     =head1 NAME
+
+     hello - LIP example
+
+     =head1 IMPLEMENTATION
+
+     Print a friendly message to standard output.
+
+     =cut
+
+     print "Hello, world!\n";
+
+     exit 0;
+
+     =end lip
+
+     =cut
+
+   Running this program will have the expected result. Running it through
+*lip2pod* will select the internal documenation and include the code itself
+as verbatim paragraphs. This results in POD output that can be formatted
+nicely by one of the *pod2** "podlators".
+
+   External documenation (like this) can be tacked on to the end of a file
+as usual. So, adding these lines to the end of the example above:
+
+     __END__
+
+     =head1 NAME
+
+     hello - LIP example
+
+     =head1 SYNOPSIS
+
+     hello
+
+     =head1 DESCRIPTION
+
+     A simple example used to demonstrate the use of B<Lip::Pod> and B<lip2pod>.
+
+     =cut
+
+   results in a single file that
+
+   * is executable; and
+
+   * contains internal documentation that can be formatted nicely (after
+     conversion via *lip2pod*; and
+
+   * contains external documentation using the same mechanism as non-LIP
+     files.
+
+   This module leverages the Pod::Parser and *Text::Tabs* modules.
+Pod::Parser is a standard module as of Perl version 5.6. For use with
+prior versions of Perl, download the latest copy from the CPAN.
+
+   * Knuth, Donald Ervin. *Literate Programming*, Center for the Study of
+     Language and Information, 1992. ISBN 0-987073-80-6 (paper).
+
+   Gregor N. Purdy <gregor@focusresearch.com>
+
+   This program is free software. You may copy or redistribute it under the
+same terms as Perl itself.
+
+
+File: pm.info,  Node: List/Intersperse,  Next: List/Permutor,  Prev: Lip/Pod,  Up: Module List
+
+Intersperse / unsort / disperse a list
+**************************************
+
+NAME
+====
+
+   List::Intersperse - Intersperse / unsort / disperse a list
+
+SYNOPSIS
+========
+
+     use List::Intersperse qw/intersperseq/;
+
+     @ispersed = intersperseq {substr($_[0],0,1)} qw/A1 A2 B1 B2 C1 C2/;
+
+     @ispersed = List::Intersperse::intersperse qw/A A B B B B B B C/;
+
+DESCRIPTION
+===========
+
+   intersperse and intersperseq evenly distribute elements of a list.
+Elements that are considered equal are spaced as far apart from each other
+as possible.
+
+FUNCTIONS
+=========
+
+intersperse LIST
+     This function returns a list of elements interspersed so that
+     equivalent items are evenly distributed throughout the list.
+
+intersperseq BLOCK LIST
+     intersperseq works like intersperse but it applies BLOCK to the
+     elements of LIST to determine the equivalance key.
+
+AUTHORS
+=======
+
+     This module was written by
+     Tim Ayers (http://search.cpan.org/search?mode=author&query=tayers) and
+     John Porter (http://search.cpan.org/search?mode=author&query=jdporter).
+
+ACKNOWLEDGEMENTS
+================
+
+   Thanks to John Porter for providing and implementing an improved
+algorithm for solving the problem.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2001 Tim Ayers and John Porter.
+
+   All rights reserved. This program is free software; you can
+redistribute it and/or modify it under the same terms as Perl itself.
+
+
+File: pm.info,  Node: List/Permutor,  Next: List/Util,  Prev: List/Intersperse,  Up: Module List
+
+Process all possible permutations of a list
+*******************************************
+
+NAME
+====
+
+   List::Permutor - Process all possible permutations of a list
+
+SYNOPSIS
+========
+
+     use List::Permutor;
+     my $perm = new List::Permutor qw/ fred barney betty /;
+     while (my @set = $perm->next) {
+         print "One order is @set.\n";
+     }
+
+DESCRIPTION
+===========
+
+   Make the object by passing a list of the objects to be permuted. Each
+time that next() is called, another permutation will be returned. When
+there are no more, it returns the empty list.
+
+METHODS
+=======
+
+new LIST
+     Returns a permutor for the given items.
+
+next
+     Returns a list of the items in the next permutation. Permutations are
+     returned "in order". That is, the permutations of (1..5) will be
+     sorted numerically: The first is (1, 2, 3, 4, 5) and the last is (5,
+     4, 3, 2, 1).
+
+peek
+     Returns the list of items which would be returned by next(), but
+     doesn't advance the sequence. Could be useful if you wished to skip
+     over just a few unwanted permutations.
+
+reset
+     Resets the iterator to the start. May be used at any time, whether the
+     entire set has been produced or not. Has no useful return value.
+
+AUTHOR
+======
+
+   Tom Phoenix <rootbeer@redcat.com>
+
+
+File: pm.info,  Node: List/Util,  Next: LiveGeez/CacheAsSERA,  Prev: List/Permutor,  Up: Module List
+
+A selection of general-utility list subroutines
+***********************************************
+
+NAME
+====
+
+   List::Util - A selection of general-utility list subroutines
+
+SYNOPSIS
+========
+
+     use List::Util qw(first sum min max minstr maxstr reduce);
+
+DESCRIPTION
+===========
+
+   `List::Util' contains a selection of subroutines that people have
+expressed would be nice to have in the perl core, but the usage would not
+really be high enough to warrant the use of a keyword, and the size so
+small such that being individual extensions would be wasteful.
+
+   By default `List::Util' does not export any subroutines. The
+subroutines defined are
+
+first BLOCK LIST
+     Similar to grep in that it evaluates BLOCK setting $_ to each element
+     of LIST in turn. first returns the first element where the result from
+     BLOCK is a true value. If BLOCK never returns true or LIST was empty
+     then undef is returned.
+
+          $foo = first { defined($_) } @list    # first defined value in @list
+          $foo = first { $_ > $value } @list    # first value in @list which
+                                                # is greater than $value
+          
+          This function could be implemented using C<reduce> like this
+
+          $foo = reduce { defined($a) ? $a : wanted($b) ? $b : undef } undef, @list
+
+     for example wanted() could be defined() which would return the first
+     defined value in @list
+
+max LIST
+     Returns the entry in the list with the highest numerical value. If the
+     list is empty then undef is returned.
+
+          $foo = max 1..10                # 10
+          $foo = max 3,9,12               # 12
+          $foo = max @bar, @baz           # whatever
+
+     This function could be implemented using reduce like this
+
+          $foo = reduce { $a > $b ? $a : $b } 1..10
+
+maxstr LIST
+     Similar to max, but treats all the entries in the list as strings and
+     returns the highest string as defined by the gt operator.  If the
+     list is empty then undef is returned.
+
+     $foo = maxstr 'A'..'Z'     	    # 'Z'     $foo = maxstr
+     "hello","world"   # "world"     $foo = maxstr @bar, @baz        #
+     whatever
+
+     This function could be implemented using reduce like this
+
+          $foo = reduce { $a gt $b ? $a : $b } 'A'..'Z'
+
+min LIST
+     Similar to max but returns the entry in the list with the lowest
+     numerical value. If the list is empty then undef is returned.
+
+          $foo = min 1..10                # 1
+          $foo = min 3,9,12               # 3
+          $foo = min @bar, @baz           # whatever
+
+     This function could be implemented using reduce like this
+
+          $foo = reduce { $a < $b ? $a : $b } 1..10
+
+minstr LIST
+     Similar to min, but treats all the entries in the list as strings and
+     returns the lowest string as defined by the lt operator.  If the list
+     is empty then undef is returned.
+
+          $foo = maxstr 'A'..'Z'     	    # 'A'
+          $foo = maxstr "hello","world"   # "hello"
+          $foo = maxstr @bar, @baz        # whatever
+
+     This function could be implemented using reduce like this
+
+          $foo = reduce { $a lt $b ? $a : $b } 'A'..'Z'
+
+reduce BLOCK LIST
+     Reduces LIST by calling BLOCK multiple times, setting `$a' and $b
+     each time. The first call will be with `$a' and $b set to the first
+     two elements of the list, subsequent calls will be done by setting
+     `$a' to the result of the previous call and $b to the next element in
+     the list.
+
+     Returns the result of the last call to BLOCK. If LIST is empty then
+     undef is returned. If LIST only contains one element then that
+     element is returned and BLOCK is not executed.
+
+          $foo = reduce { $a < $b ? $a : $b } 1..10       # min
+          $foo = reduce { $a lt $b ? $a : $b } 'aa'..'zz' # minstr
+          $foo = reduce { $a + $b } 1 .. 10               # sum
+          $foo = reduce { $a . $b } @bar                  # concat
+
+sum LIST
+     Returns the sum of all the elements in LIST.
+
+          $foo = sum 1..10                # 55
+          $foo = sum 3,9,12               # 24
+          $foo = sum @bar, @baz           # whatever
+
+     This function could be implemented using reduce like this
+
+          $foo = reduce { $a + $b } 1..10
+
+SUGGESTED ADDITIONS
+===================
+
+   The following are additions that have been requested, but I have been
+reluctant to add due to them being very simple to implement in perl
+
+     # One argument is true
+
+     sub any { $_ && return 1 for @_; 0 }
+
+     # All arguments are true
+
+     sub all { $_ || return 0 for @_; 1 }
+
+     # All arguments are false
+
+     sub none { $_ && return 0 for @_; 1 }
+
+     # One argument is false
+
+     sub notall { $_ || return 1 for @_; 0 }
+
+     # How many elements are true
+
+     sub true { scalar grep { $_ } @_ }
+
+     # How many elements are false
+
+     sub false { scalar grep { !$_ } @_ }
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997-2000 Graham Barr <gbarr@pobox.com>. All rights
+reserved.  This program is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.
+
+
+File: pm.info,  Node: LiveGeez/CacheAsSERA,  Next: LiveGeez/Cgi,  Prev: List/Util,  Up: Module List
+
+HTML Conversion for LiveGe'ez
+*****************************
+
+NAME
+====
+
+   LiveGeez::CacheAsSERA - HTML Conversion for LiveGe'ez
+
+SYNOPSIS
+========
+
+   $cacheFile = LiveGeez::CacheAsSERA::HTML($f, $sourceFile)
+
+   Where $f is a File.pm object and $sourceFile is the pre-cached file
+name.
+
+DESCRIPTION
+===========
+
+   CacheAsSERA.pm contains the routines for conversion of HTML document
+content from Ethiopic encoding systems into SERA for document caching and
+later conversion into other Ethiopic systems.
+
+AUTHOR
+======
+
+   Daniel Yacob,
+`LibEth@EthiopiaOnline.Net|mailto:LibEth@EthiopiaOnline.Net' in this node
+
+SEE ALSO
+========
+
+   perl(1).  Ethiopic(3).  `http:' in this node
+
+

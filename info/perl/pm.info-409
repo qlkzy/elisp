@@ -1,0 +1,1644 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: User/grent,  Next: User/pwent,  Prev: User/Utmp,  Up: Module List
+
+by-name interface to Perl's built-in getgr*() functions
+*******************************************************
+
+NAME
+====
+
+   User::grent - by-name interface to Perl's built-in getgr*() functions
+
+SYNOPSIS
+========
+
+     use User::grent;
+     $gr = getgrgid(0) or die "No group zero";
+     if ( $gr->name eq 'wheel' && @{$gr->members} > 1 ) {
+         print "gid zero name wheel, with other members";
+     }
+
+     use User::grent qw(:FIELDS;
+     getgrgid(0) or die "No group zero";
+     if ( $gr_name eq 'wheel' && @gr_members > 1 ) {
+         print "gid zero name wheel, with other members";
+     }
+
+     $gr = getgr($whoever);
+
+DESCRIPTION
+===========
+
+   This module's default exports override the core getgrent(), getgruid(),
+and getgrnam() functions, replacing them with versions that return
+"User::grent" objects.  This object has methods that return the similarly
+named structure field name from the C's passwd structure from `grp.h';
+namely name, passwd, gid, and members (not mem).  The first three return
+scalars, the last an array reference.
+
+   You may also import all the structure fields directly into your
+namespace as regular variables using the :FIELDS import tag.  (Note that
+this still overrides your core functions.)  Access these fields as
+variables named with a preceding `gr_'.  Thus, `$group_obj->gid()'
+corresponds to $gr_gid if you import the fields.  Array references are
+available as regular array variables, so `@{ $group_obj->members() }'
+would be simply @gr_members.
+
+   The getpw() function is a simple front-end that forwards a numeric
+argument to getpwuid() and the rest to getpwnam().
+
+   To access this functionality without the core overrides, pass the use
+an empty import list, and then access function functions with their full
+qualified names.  On the other hand, the built-ins are still available via
+the `CORE::' pseudo-package.
+
+NOTE
+====
+
+   While this class is currently implemented using the Class::Struct
+module to build a struct-like class, you shouldn't rely upon this.
+
+AUTHOR
+======
+
+   Tom Christiansen
+
+
+File: pm.info,  Node: User/pwent,  Next: VCP,  Prev: User/grent,  Up: Module List
+
+by-name interface to Perl's built-in getpw*() functions
+*******************************************************
+
+NAME
+====
+
+   User::pwent - by-name interface to Perl's built-in getpw*() functions
+
+SYNOPSIS
+========
+
+     use User::pwent;
+     $pw = getpwnam('daemon')       || die "No daemon user";
+     if ( $pw->uid == 1 && $pw->dir =~ m#^/(bin|tmp)?\z#s ) {
+         print "gid 1 on root dir";
+     }
+
+     $real_shell = $pw->shell || '/bin/sh';
+
+     for (($fullname, $office, $workphone, $homephone) =
+            split /\s*,\s*/, $pw->gecos)
+     {
+        s/&/ucfirst(lc($pw->name))/ge;
+     }
+
+     use User::pwent qw(:FIELDS);
+     getpwnam('daemon')             || die "No daemon user";
+     if ( $pw_uid == 1 && $pw_dir =~ m#^/(bin|tmp)?\z#s ) {
+         print "gid 1 on root dir";
+     }
+
+     $pw = getpw($whoever);
+
+     use User::pwent qw/:DEFAULT pw_has/;
+     if (pw_has(qw[gecos expire quota])) { .... }
+     if (pw_has("name uid gid passwd"))  { .... }
+     print "Your struct pwd has: ", scalar pw_has(), "\n";
+
+DESCRIPTION
+===========
+
+   This module's default exports override the core getpwent(), getpwuid(),
+and getpwnam() functions, replacing them with versions that return
+User::pwent objects.  This object has methods that return the similarly
+named structure field name from the C's passwd structure from `pwd.h',
+stripped of their leading "pw_" parts, namely name, `passwd', uid, gid,
+change, age, `quota', comment, class, `gecos', dir, `shell', and expire.
+The `passwd', `gecos', and `shell' fields are tainted when running in
+taint mode.
+
+   You may also import all the structure fields directly into your
+namespace as regular variables using the :FIELDS import tag.  (Note that
+this still overrides your core functions.)  Access these fields as
+variables named with a preceding `pw_' in front their method names.  Thus,
+`< $passwd_obj-'shell >> corresponds to $pw_shell if you import the fields.
+
+   The getpw() function is a simple front-end that forwards a numeric
+argument to getpwuid() and the rest to getpwnam().
+
+   To access this functionality without the core overrides, pass the use
+an empty import list, and then access function functions with their full
+qualified names.  The built-ins are always still available via the
+`CORE::' pseudo-package.
+
+System Specifics
+----------------
+
+   Perl believes that no machine ever has more than one of change, age, or
+`quota' implemented, nor more than one of either comment or class.  Some
+machines do not support expire, `gecos', or allegedly, `passwd'.  You may
+call these methods no matter what machine you're on, but they return undef
+if unimplemented.
+
+   You may ask whether one of these was implemented on the system Perl was
+built on by asking the importable `pw_has' function about them.  This
+function returns true if all parameters are supported fields on the build
+platform, false if one or more were not, and raises an exception if you
+asked about a field that Perl never knows how to provide.  Parameters may
+be in a space-separated string, or as separate arguments.  If you pass no
+parameters, the function returns the list of `struct pwd' fields supported
+by your build platform's C library, as a list in list context, or a
+space-separated string in scalar context.  Note that just because your C
+library had a field doesn't necessarily mean that it's fully implemented on
+that system.
+
+   Interpretation of the `gecos' field varies between systems, but
+traditionally holds 4 comma-separated fields containing the user's full
+name, office location, work phone number, and home phone number.  An & in
+the gecos field should be replaced by the user's properly capitalized
+login name.  The `shell' field, if blank, must be assumed to be `/bin/sh'.
+Perl does not do this for you.  The `passwd' is one-way hashed garble,
+not clear text, and may not be unhashed save by brute-force guessing.
+Secure systems use more a more secure hashing than DES.  On systems
+supporting shadow password systems, Perl automatically returns the shadow
+password entry when called by a suitably empowered user, even if your
+underlying vendor-provided C library was too short-sighted to realize it
+should do this.
+
+   See passwd(5) and getpwent(3) for details.
+
+NOTE
+====
+
+   While this class is currently implemented using the Class::Struct
+module to build a struct-like class, you shouldn't rely upon this.
+
+AUTHOR
+======
+
+   Tom Christiansen
+
+HISTORY
+=======
+
+March 18th, 2000
+     Reworked internals to support better interface to dodgey fields than
+     normal Perl function provides.  Added pw_has() field.  Improved
+     documentation.
+
+
+File: pm.info,  Node: VCP,  Next: VCP/Debug,  Prev: User/pwent,  Up: Module List
+
+Versioned Copy, copying hierarchies of versioned files
+******************************************************
+
+NAME
+====
+
+   VCP - Versioned Copy, copying hierarchies of versioned files
+
+SYNOPSIS
+========
+
+DESCRIPTION
+===========
+
+   This module copies hierarchies of versioned files between repositories,
+and between repositories and RevML (.revml) files.
+
+   Stay tuned for more documentation.
+
+EXPORTS
+=======
+
+   The following functions may be exported: `' in this node, `' in this
+node, `' in this node, along with the tags ':all' and ':debug'.  Use the
+latter to head off future namespace pollution in case :all gets expanded
+in the future..
+
+METHODS
+=======
+
+new
+          $ex = VCP->new( $source, $dest ) ;
+
+     where
+
+          $source  is an instance of VCP::Source
+          $dest    is an instance of VCP::Dest
+
+dest
+          $dest = $vcp->dest ;
+
+     Gets the dest object.  This object is set by passing it to new(), so
+     there's no need to set it.
+
+copy_all
+          $vcp->copy_all( $header, $footer ) ;
+
+     Calls $source->handle_header, $source->copy_revs, and
+     $source->handle_footer.
+
+source
+          $source = $vcp->source ;
+
+     Gets the source object.  This object is set by passing it to new(),
+     so there's no need to set it.
+
+COPYRIGHT
+=========
+
+   Copyright 2000, Perforce Software, Inc.  All Rights Reserved.
+
+   This will be licensed under a suitable license at a future date.  Until
+then, you may only use this for evaluation purposes.  Besides which, it's
+in an early alpha state, so you shouldn't depend on it anyway.
+
+AUTHOR
+======
+
+   Barrie Slaymaker <barries@slaysys.com>
+
+
+File: pm.info,  Node: VCP/Debug,  Next: VCP/Dest,  Prev: VCP,  Up: Module List
+
+debugging support for VCP
+*************************
+
+NAME
+====
+
+   VCP::Debug - debugging support for VCP
+
+SYNOPSIS
+========
+
+DESCRIPTION
+===========
+
+EXPORTS
+=======
+
+   The following functions may be exported: `' in this node, `' in this
+node, `' in this node `' in this node, along with the tags ':all' and
+':debug'.  Use the latter to head off future namespace pollution in case
+:all gets expanded in the future..
+
+   A warning will be emitted on program exit for any specs that aren't
+used, to help you make sure that you are using sensible specs.
+
+debug
+          debug $foo if debugging $self ;
+
+     Emits a line of debugging (a "\n" will be appended).  Use debug_some
+     to avoid the "\n".  Any undefined parameters will be displayed as
+     `<undef>'.
+
+debugging
+          debugging ;
+
+     Returns TRUE if the caller's module is being debugged
+
+          debugging $self ;
+          debugging $other, $self ; ## ORs the arguments together
+
+     Returns TRUE if any of the arguments are being debugged.  Plain
+     strings can be passed or blessed references.
+
+disable_debug
+     Disable all debugging.
+
+enable_debug
+          enable_debug ;
+          enable_debug( ...debug specs... ) ;
+
+     A debug spec is the name of a module (or a part of it) to be used as a
+     perl5 regular expression.
+
+COPYRIGHT
+=========
+
+   Copyright 2000, Perforce Software, Inc.  All Rights Reserved.
+
+   This will be licensed under a suitable license at a future date.  Until
+then, you may only use this for evaluation purposes.  Besides which, it's
+in an early alpha state, so you shouldn't depend on it anyway.
+
+AUTHOR
+======
+
+   Barrie Slaymaker <barries@slaysys.com>
+
+
+File: pm.info,  Node: VCP/Dest,  Next: VCP/Dest/cvs,  Prev: VCP/Debug,  Up: Module List
+
+A base class for VCP destinations
+*********************************
+
+NAME
+====
+
+   VCP::Dest - A base class for VCP destinations
+
+SYNOPSIS
+========
+
+DESCRIPTION
+===========
+
+EXTERNAL METHODS
+================
+
+new
+     Creates an instance, see subclasses for options.  The options passed
+     are usually native command-line options for the underlying
+     repository's client.  These are usually parsed and, perhaps, checked
+     for validity by calling the underlying command line.
+
+SUBCLASSING
+===========
+
+   This class uses the fields pragma, so you'll need to use base and
+possibly fields in any subclasses.
+
+SUBCLASS API
+------------
+
+   These methods are intended to support subclasses.
+
+header
+     Gets/sets the $header passed to handle_header().
+
+     Generally not overridden: all error checking is done in new(), and no
+     output should be generated until output() is called.
+
+SUBCLASS OVERLOADS
+------------------
+
+   These methods are overloaded by subclasses.
+
+backfill
+          $dest->backfill( $rev ) ;
+
+     Checks the file indicated by VCP::Rev $rev out of the target
+     repository if this destination supports backfilling.  Currently, only
+     the revml destination does not support backfilling.
+
+     The $rev->{workpath} must be set to the filename the backfill was put
+     in.
+
+     This is used when doing an incremental update, where the first
+     revision of a file in the update is encoded as a delta from the prior
+     version.  A digest of the prior version is sent along before the
+     first version delta to verify it's presence in the database.
+
+     So, the source calls backfill(), which returns TRUE on success, FALSE
+     if the destination doesn't support backfilling, and dies if there's
+     an error in procuring the right revision.
+
+     If FALSE is returned, then the revisions will be sent through with no
+     working path, but will have a delta record.
+
+     MUST BE OVERRIDDEN.
+
+handle_footer
+          $dest->handle_footer( $footer ) ;
+
+     Does any cleanup necessary.  Not required.  Don't call this from the
+     override.
+
+handle_header
+          $dest->handle_header( $header ) ;
+
+     Stows $header in $self->header.  This should only rarely be
+     overridden, since the first call to handle_rev() should output any
+     header info.
+
+rev_cmp_sub
+     Returns a subroutine reference to a sorting function.  See `' in this
+     node.
+
+     Returns -1, 0, or 1 depending on the relative order between $rev_a
+     and $rev_b.  This may be overridded.
+
+     Default ordering is by
+
+          - change_id    (compared numerically using <=>, for now)
+          - time         (commit time: simple numeric, since this is a simple number)
+          - comment      (alphabetically, case sensitive)
+          - name         (path-component-wise alphabetically case sensitive)
+
+     This ordering benefits change number oriented systems while preserving
+     commit order for non-change number oriented systems.
+
+     If change_id is undefined in either rev, it is not used.
+
+     If time is undefined in a rev, the value "-1" is used.  This causes
+     base revisions (ie digest-only) to precede real revisions.
+
+     That's not always good, though: one of commit time or change number
+     should be defined!
+
+     Change ids are compared numerically, times by date order (ie by
+     alphabetic, since ISO8601 dates are used internally).  Comment is
+     compared alphabetically, and name is compared piecewise alphabetically
+     after splitting both names on '/' ('//', '///', etc, are treated like
+     '/').
+
+     This will confess a problem if none of the above are defined, since I
+     can't think of any other rational sorting basis in the general case.
+
+sort_revs
+          $source->dest->sort_revs( $source->revs ) ;
+
+     This sorts the revisions that the source has identified in to
+     whatever order is needed by the destination.  The default ordering is
+     set by `' in this node.
+
+handle_rev
+          $dest->handle_rev( $rev ) ;
+
+     Outputs the item referred to by VCP::Rev $rev.  If this is the first
+     call, then $self->none_seen will be TRUE and any preamble should be
+     emitted.
+
+     MUST BE OVERRIDDEN.  Don't call this from the override.
+
+COPYRIGHT
+=========
+
+   Copyright 2000, Perforce Software, Inc.  All Rights Reserved.
+
+   This will be licensed under a suitable license at a future date.  Until
+then, you may only use this for evaluation purposes.  Besides which, it's
+in an early alpha state, so you shouldn't depend on it anyway.
+
+AUTHOR
+======
+
+   Barrie Slaymaker <barries@slaysys.com>
+
+
+File: pm.info,  Node: VCP/Dest/cvs,  Next: VCP/Dest/p4,  Prev: VCP/Dest,  Up: Module List
+
+cvs destination driver
+**********************
+
+NAME
+====
+
+   VCP::Dest::cvs - cvs destination driver
+
+SYNOPSIS
+========
+
+     vcp <source> cvs:module
+     vcp <source> cvs:CVSROOT:module
+
+   where module is a module or directory that already exists within CVS.
+
+   This destination driver will check out the indicated destination in a
+temporary directory and use it to add, delete, and alter files.
+
+DESCRIPTION
+===========
+
+METHODS
+=======
+
+new
+     Creates a new instance of a VCP::Dest::cvs.  Contacts the cvsd using
+     the cvs command and gets some initial information ('cvs info' and
+     'cvs labels').
+
+SUBCLASSING
+===========
+
+   This class uses the fields pragma, so you'll need to use base and
+possibly fields in any subclasses.
+
+COPYRIGHT
+=========
+
+   Copyright 2000, Perforce Software, Inc.  All Rights Reserved.
+
+   This will be licensed under a suitable license at a future date.  Until
+then, you may only use this for evaluation purposes.  Besides which, it's
+in an early alpha state, so you shouldn't depend on it anyway.
+
+AUTHOR
+======
+
+   Barrie Slaymaker <barries@slaysys.com>
+
+
+File: pm.info,  Node: VCP/Dest/p4,  Next: VCP/Dest/revml,  Prev: VCP/Dest/cvs,  Up: Module List
+
+p4 destination driver
+*********************
+
+NAME
+====
+
+   VCP::Dest::p4 - p4 destination driver
+
+SYNOPSIS
+========
+
+     vcp <source> p4[:<dest>]
+
+   where <dest> is an already created directory in the p4 repository.
+
+   This destination driver will check out the indicated destination in a
+temporary directory and use it to add, edit, and delete files.
+
+   At this time, each file being changed is submitted and gets it's own
+change number unless change numbers are assigned by the source.
+
+   Also for now, you must take care to cd to the working directory that
+the current client's view point to.
+
+DESCRIPTION
+===========
+
+METHODS
+=======
+
+new
+     Creates a new instance of a VCP::Dest::p4.  Contacts the p4d using
+     the p4 command and gets some initial information ('p4 info' and 'p4
+     labels').
+
+SUBCLASSING
+===========
+
+   This class uses the fields pragma, so you'll need to use base and
+possibly fields in any subclasses.
+
+COPYRIGHT
+=========
+
+   Copyright 2000, Perforce Software, Inc.  All Rights Reserved.
+
+   This will be licensed under a suitable license at a future date.  Until
+then, you may only use this for evaluation purposes.  Besides which, it's
+in an early alpha state, so you shouldn't depend on it anyway.
+
+AUTHOR
+======
+
+   Barrie Slaymaker <barries@slaysys.com>
+
+
+File: pm.info,  Node: VCP/Dest/revml,  Next: VCP/Plugin,  Prev: VCP/Dest/p4,  Up: Module List
+
+Outputs versioned files to a revml file
+***************************************
+
+NAME
+====
+
+   VCP::Dest::revml - Outputs versioned files to a revml file
+
+SYNOPSIS
+========
+
+   ## revml output class:
+
+     revml:[<output-file>]
+     revml:[<output-file>] -dtd <revml.dtd>
+     revml:[<output-file>] -dtd <version>
+
+DESCRIPTION
+===========
+
+EXTERNAL METHODS
+================
+
+new
+     Creates a new instance.  The only parameter is '-dtd', which overrides
+     the default DTD found by searching for modules matching
+     RevML::DTD:v*.pm.
+
+     Attempts to create the output file if one is specified.
+
+COPYRIGHT
+=========
+
+   Copyright 2000, Perforce Software, Inc.  All Rights Reserved.
+
+   This will be licensed under a suitable license at a future date.  Until
+then, you may only use this for evaluation purposes.  Besides which, it's
+in an early alpha state, so you shouldn't depend on it anyway.
+
+AUTHOR
+======
+
+   Barrie Slaymaker <barries@slaysys.com>
+
+
+File: pm.info,  Node: VCP/Plugin,  Next: VCP/Rev,  Prev: VCP/Dest/revml,  Up: Module List
+
+A base class for VCP::Source and VCP::Dest
+******************************************
+
+NAME
+====
+
+   VCP::Plugin - A base class for VCP::Source and VCP::Dest
+
+SYNOPSIS
+========
+
+DESCRIPTION
+===========
+
+   Some functionality is common to sources and destinations, such as cache
+access, Pod::Usage conversion, command-line access shortcut member, etc.
+
+EXTERNAL METHODS
+================
+
+new
+     Creates an instance, see subclasses for options.  The options passed
+     are usually native command-line options for the underlying
+     repository's client.  These are usually parsed and, perhaps, checked
+     for validity by calling the underlying command line.
+
+SUBCLASSING
+===========
+
+   This class uses the fields pragma, so you'll need to use base and
+possibly fields in any subclasses.
+
+SUBCLASS API
+------------
+
+   These methods are intended to support subclasses.
+
+seen
+          $old_rev = $self->seen( $new_rev ) ;
+          $old_r = $self->seen( $name ) ;
+
+     Called to register the fact that $new_rev has been seen, and to
+     return the last request for the same resource, which refers to the
+     previous version of the resource.  If a plain scalar is passed, simply
+     returns the last rev structure that was seen for that filename (but
+     does not mark that filename as having been seen if it hasn't).
+
+     This is one of the few accessor methods in VCP's implementation that
+     returns the previous value.
+
+none_seen
+     Returns TRUE if $dest->seen( $r ) has not yet been called.
+
+parse_repo_spec
+          my $spec = $self->split_repo_spec( $spec ) ;
+
+     This splits a repository spec in one of the following formats:
+
+          scheme:user:passwd@server:file_spec
+          scheme:user@server:file_spec
+          scheme::passwd@server:file_spec
+          scheme:server:file_spec
+          scheme:file_spec
+
+     in to a HASH reference like
+
+          $hash = {
+             SCHEME    => 'scheme',
+             USER      => 'user',
+             PASSWORD  => 'password',
+             SERVER    => 'server',
+             FILES     => 'file_spec',
+          } ;
+
+     .  The spec is parsed from the edges in in this order:
+
+          1. SCHEME (up to first ':')
+          2. FILES  (after last ':')
+          3. USER, PASSWORD (before first '@')
+          4. SERVER (everything left.
+
+     This approach allows the FILES string to contain '@', and the SERVER
+     string to contain ':' and '@'.  USER can contain ':'.  Funky, but this
+     works well, at least for cvs and p4.
+
+     If a section of the repo spec is not present, the corresponding entry
+     in $hash will not exist.
+
+     The attributes repo_user, repo_password and repo_server are set
+     automatically by this method.  It does not store the SCHEME anyware
+     since the SCHEME is usually ignored by the plugin (the plugin is
+     selected using the scheme, so it knows the scheme implicitly), and
+     the FILES setting often needs extra manipulation, so there's no point
+     in storing it.
+
+usage_and_exit
+          GetOptions( ... ) or $self->usage_and_exit ;
+
+     Used by subclasses to die if unknown options are passed in.
+
+     Requires Pod::Usage when called.
+
+work_path
+          $full_path = $self->work_path( $filename, $rev ) ;
+
+     Returns the full path to the working copy of the local filename.
+
+     Each VCP::Plugin gets thier own hierarchy to use, usually rooted at a
+     directory named /tmp/vcp$$/plugin-source-foo/ for a module
+     VCP::Plugin::Source::foo.  $$ is vcp's process ID.
+
+     This is typically $work_root/$filename/$rev, but this may change.
+     $rev is put last instead of first in order to minimize the overhead of
+     creating lots of directories.
+
+     It *must* be under $work_root in order for rm_work_path() to fully
+     clean.
+
+     All directories will be created as needed, so you should be able to
+     create the file easily after calling this.  This is only called by
+     subclasses, and is optional: a subclass could create it's own caching
+     system.
+
+     Directories are created mode 0775 (rwxrwxr-x), subject to modification
+     by umask or your local operating system.  This will be modifiable in
+     the future.
+
+mkdir
+          $self->mkdir( $filename ) ;
+          $self->mkdir( $filename, $mode ) ;
+
+     Makes a directory and any necessary parent directories.
+
+     The default mode is 770.  Does some debug logging if any directories
+     are created.
+
+mkpdir
+          $self->mkpdir( $filename ) ;
+          $self->mkpdir( $filename, $mode ) ;
+
+     Makes the parent directory of a filename and all directories down to
+     it.
+
+     The default mode is 770.  Does some debug logging if any directories
+     are created.
+
+rm_work_path
+          $self->rm_work_path( $filename, $rev ) ;
+          $self->rm_work_path( $dirname ) ;
+
+     Removes a directory or file from the work.  Also removes any and all
+     directories that become empty as a result up to the work root (/tmp
+     on Unix).
+
+work_root
+          $root = $self->work_root ;
+          $self->work_root( $new_root ) ;
+          $self->work_root( $new_root, $dir1, $dir2, .... ) ;
+
+     Gets/sets the work root.  This defaults to
+
+          File::Spec->tmpdir . "/vcp$$/" . $plugin_name
+
+     but may be altered.  If set to a relative path, the current working
+     directory is prepended.  The returned value is always absolute, and
+     will not change if you chdir().  Depending on the operating system,
+     however, it might not be located on to the current volume.  If not,
+     it's a bug, please patch away.
+
+command
+          $self->command( 'p4' ) ;
+          $self->command( 'cvs' ) ;
+
+          $path_to_command = $self->command ;
+
+     This sets the name of the primary command name that is to be used.  A
+     search of the PATH environment variable is then done if the path is
+     relative to see if the command can be found.
+
+     This method croaks if the command can not be found.
+
+     This is usually called by new().
+
+     Once this is set, the command may be executed by doing something like
+
+          $self->p4( [qw( counters )], \$out )
+             or die "Process failed".
+
+     , which runs a 'p4 counters' and pipes the output in to the \$out
+     variable.
+
+     See *Note IPC/Run: IPC/Run, for details on the additional parameters
+     after the command.
+
+command_chdir
+     Sets/gets the directory to chdir into before running the default
+     command.
+
+command_stderr_filter
+          $self->command_stderr_filter( qr/^cvs add: use 'cvs commit'.*\n/m ) ;
+          $self->command_stderr_filter( sub { my $t = shift ; $$t =~ ... } ) ;
+
+     Some commands-cough*cvs*cough-just don't seem to be able to shut up
+     on stderr.  Other times we need to watch stderr for some meaningful
+     output.
+
+     This allows you to filter out expected whinging on stderr so that the
+     command appears to run cleanly and doesn't cause $self->cmd(...) to
+     barf when it sees expected output on stderr.
+
+     This can also be used to filter out intermittent expected errors that
+     aren't errors in all contexts when they aren't actually errors.
+
+command_ok_result_codes
+          $self->command_ok_result_codes( 0, 1 ) ;
+
+     Occasionally, a non-zero result is Ok.  this method lets you set a
+     list of acceptable result codes.
+
+repo_user
+          $self->repo_user( $user_name ) ;
+          $user_name = $self->repo_user ;
+
+     Sets/gets the user name to log in to the repository with.  Some
+     plugins ignore this, like revml, while others, like p4, use it.
+
+     This is usually set automatically by `' in this node.
+
+repo_password
+          $self->repo_password( $password ) ;
+          $password = $self->repo_password ;
+
+     Sets/gets the password to log in to the repository with.  Some plugins
+     ignore this, like revml, while others, like p4, use it.
+
+     This is usually set automatically by `' in this node.
+
+repo_server
+          $self->repo_server( $server ) ;
+          $server = $self->repo_server ;
+
+     Sets/gets the repository to log in to.  Some plugins ignore this,
+     like revml, while others, like p4, use it.
+
+     This is usually set automatically by `' in this node.
+
+rev_root
+          $self->rev_root( 'depot' ) ;
+          $rr = $self->rev_root ;
+
+     The rev_root is the root of the tree being sourced. See `' in this
+     node for automated extraction.
+
+     Root values should have neither a leading or trailing directory
+     separator.
+
+     '/' and '\' are recognized as directory separators and runs of these
+     are converted to single '/' characters.  Leading and trailing '/'
+     characters are then removed.
+
+deduce_rev_root
+          $self->deduce_rev_root ;
+          print $self->rev_root ;
+
+     If the user did not specify a rev_root, passing the filespec to this
+     will do it.
+
+     '/' and '\' are recognized as directory separators, and '*', '?', and
+     '...'  as wildcard sequences.  Runs of '/' and '\' characters are
+     reduced to single '/' characters.
+
+     If no wildcards are used in the filespec, then the dirname is used.
+
+     If there is only a single name component, it is assumed to be a
+     directory name.
+
+normalize_name
+          $fn = $self->normalize_name( $fn ) ;
+
+     Normalizes the filename by converting runs of '\' and '/' to '/',
+     removing leading '/' characters, and removing a leading rev_root.
+     Dies if the name does not begin with rev_root.
+
+denormalize_name
+          $fn = $self->denormalize_name( $fn ) ;
+
+     Denormalizes the filename by prepending the rev_root.  May do more in
+     subclass overloads.  For instance, does not prepend a '//' by default
+     for instance, but p4 overloads do that.
+
+run
+          $self->run( [@cmd_and_args], \$stdout, \$stderr ) ;
+
+     A wrapper around `run', *Note IPC/Run: IPC/Run,, which integrates
+     debuggins support and disables stdin by default.
+
+COPYRIGHT
+=========
+
+   Copyright 2000, Perforce Software, Inc.  All Rights Reserved.
+
+   This will be licensed under a suitable license at a future date.  Until
+then, you may only use this for evaluation purposes.  Besides which, it's
+in an early alpha state, so you shouldn't depend on it anyway.
+
+AUTHOR
+======
+
+   Barrie Slaymaker <barries@slaysys.com>
+
+
+File: pm.info,  Node: VCP/Rev,  Next: VCP/Revs,  Prev: VCP/Plugin,  Up: Module List
+
+VCP's concept of a revision
+***************************
+
+NAME
+====
+
+   VCP::Rev - VCP's concept of a revision
+
+SYNOPSIS
+========
+
+DESCRIPTION
+===========
+
+METHODS
+=======
+
+new
+     Creates an instance, see subclasses for options.
+
+          my VCP::Rev $rev = VCP::Rev->new(
+             name => 'foo',
+             time => $commit_time,
+             ...
+          ) ;
+
+is_base_rev
+     Returns TRUE if this is a base revision.  This is the case if no
+     action is defined.  A base revision is a revision that is being
+     transferred merely to check it's contents against the destination
+     repository's contents.  It's usually a digest and the actual bosy of
+     the revision is 'backfilled' from the destination repository and
+     checked against the digest.  This cuts down on transfer size, since
+     the full body of the file never need be sent with incremental updates.
+
+     See `backfill', *Note VCP/Dest: VCP/Dest, as well.
+
+work_path, dest_work_path
+     These set/get the name of the working file for sources and
+     destinations, respectively.  These files are automatically cleaned up
+     when all VCP::Rev instances that refer to them are DESTROYED or have
+     their work_path or dest_work_path set to other files or undef.
+
+labels
+          $r->labels( @labels ) ;
+          @labels = $r->labels ;
+
+     Sets/gets labels associated with a revision.  If a label is applied
+     multiple times, it will only be returned once.  This feature means
+     that the automatic label generation code for r_... revision and
+     ch_... change labels won't add additional copies of labels that were
+     already applied to this revision in the source repository.
+
+     Returns labels in an unpredictible order, which happens to be sorted
+     for now.  This sorting is purely for logging purposes and may
+     disappear at any moment.
+
+add_label
+          $r->add_label( $label ) ;
+          $r->add_label( @labels ) ;
+
+     Marks one or more labels as being associated with this revision of a
+     file.
+
+SUBCLASSING
+===========
+
+   This class uses the fields pragma, so you'll need to use base and
+possibly fields in any subclasses.
+
+COPYRIGHT
+=========
+
+   Copyright 2000, Perforce Software, Inc.  All Rights Reserved.
+
+   This will be licensed under a suitable license at a future date.  Until
+then, you may only use this for evaluation purposes.  Besides which, it's
+in an early alpha state, so you shouldn't depend on it anyway.
+
+AUTHOR
+======
+
+   Barrie Slaymaker <barries@slaysys.com>
+
+
+File: pm.info,  Node: VCP/Revs,  Next: VCP/Source,  Prev: VCP/Rev,  Up: Module List
+
+A collection of VCP::Rev objects.
+*********************************
+
+NAME
+====
+
+   VCP::Revs - A collection of VCP::Rev objects.
+
+SYNOPSIS
+========
+
+DESCRIPTION
+===========
+
+   Right now, all revs are kept in memory, but we will enable storing them
+to disk and recovering them at some point so that we don't gobble huge
+tracts of RAM.
+
+METHODS
+=======
+
+new
+add
+          $revs->add( $rev ) ;
+          $revs->add( $rev1, $rev2, ... ) ;
+
+     Adds a revision or revisions to the collection.
+
+set
+          $revs->set( $rev ) ;
+          $revs->set( $rev1, $rev2, ... ) ;
+
+     Sets the list of revs.
+
+get
+          @revs = $revs->get ;
+
+     Gets the list of revs.
+
+sort
+          # Using a custom sort function:
+          $revs->sort( sub { my ( $rev_a, $rev_b ) = @_ ; ... } ) ;
+
+     Note: Don't use $a and $b in your sort function.  They're package
+     globals and that's not your package.  See `rev_cmp_sub', *Note
+     VCP/Dest: VCP/Dest, for more details.
+
+shift
+          while ( $r = $revs->shift ) {
+             ...
+          }
+
+     Call `' in this node before calling this :-).
+
+as_array_ref
+     Returns an ARRAY ref of all revs.
+
+SUBCLASSING
+===========
+
+   This class uses the fields pragma, so you'll need to use base and
+possibly fields in any subclasses.
+
+COPYRIGHT
+=========
+
+   Copyright 2000, Perforce Software, Inc.  All Rights Reserved.
+
+   This will be licensed under a suitable license at a future date.  Until
+then, you may only use this for evaluation purposes.  Besides which, it's
+in an early alpha state, so you shouldn't depend on it anyway.
+
+AUTHOR
+======
+
+   Barrie Slaymaker <barries@slaysys.com>
+
+
+File: pm.info,  Node: VCP/Source,  Next: VCP/Source/cvs,  Prev: VCP/Revs,  Up: Module List
+
+A base class for repository sources
+***********************************
+
+NAME
+====
+
+   VCP::Source - A base class for repository sources
+
+SYNOPSIS
+========
+
+DESCRIPTION
+===========
+
+EXTERNAL METHODS
+================
+
+new
+     Creates an instance, see subclasses for options.  The options passed
+     are usually native command-line options for the underlying
+     repository's client.  These are usually parsed and, perhaps, checked
+     for validity by calling the underlying command line.
+
+SUBCLASSING
+===========
+
+   This class uses the fields pragma, so you'll need to use base and
+possibly fields in any subclasses.  See *Note VCP/Plugin: VCP/Plugin, for
+methods often needed in subclasses.
+
+Subclass utility API
+--------------------
+
+dest
+     Sets/Gets a reference to the VCP::Dest object.  The source uses this
+     to call handle_header(), handle_rev(), and handle_end() methods.
+
+SUBCLASS OVERLOADS
+==================
+
+   These methods should be overridded in any subclasses.
+
+dest_expected
+     Returns TRUE if a destination is expected given the parameters passed
+     to new().
+
+     Some sources can have configuration options that cause side effects.
+     The only one that does this so far is the revml source, which can
+     output the RevML doctype as a .pm file.
+
+copy
+     REQUIRED OVERLOAD.
+
+          $source->copy_revs() ;
+
+     Called by `copy', *Note VCP: VCP, to do the entire export process.
+     This is passed a partially filled-in header structure.
+
+     The subclass should call
+
+          $self->dest->handle_rev( $rev_meta ) ;
+
+     The subclass needs to make sure the $rev_meta hash contains the
+     metadata for the file and a work_path that points to the work
+     location of the file:
+
+          $rev_meta = VCP::Rev->new(
+             work_path  => '/tmp/revex/4/depot/perl/perl.c',
+             name       => 'depot/perl/perl.c',
+             rev_id     => '4',
+             change_id  => '22',
+             labels     => [ 'v0_003', 'v0_004' ],
+          ) ;
+
+handle_header
+     REQUIRED OVERLOAD.
+
+     Subclasses must add all repository-specific info to the $header, at
+     least including rep_type and rep_desc.
+
+          $header->{rep_type} => 'p4',
+          $self->p4( ['info'], \$header->{rep_desc} ) ;
+
+     The subclass must call the superclass method to pass the $header on to
+     the dest:
+
+          $self->SUPER::handle_header( $header ) ;
+
+handle_footer
+     Not a required overload, as the footer carries no useful information
+     at this time.  Overriding methods must call this method to pass the
+     $footer on:
+
+          $self->SUPER::handle_footer( $footer ) ;
+
+parse_time
+          $time = $self->parse_time( $timestr ) ;
+
+     Parses "[cc]YY/MM/DD[ HH[:MM[:SS]]]".
+
+     Will add ability to use format strings in future.  HH, MM, and SS are
+     assumed to be 0 if not present.
+
+     Returns a time suitable for feeding to localtime or gmtime.
+
+     Assumes local system time, so no good for parsing times in revml, but
+     that's not a common thing to need to do, so it's in
+     VCP::Source::revml.pm.
+
+revs
+          $self->revs( VCP::Revs->new ) ;
+          $self->revs->add( $r ) ; # Many times
+          $self->dest->sort_revs( $self->revs ) ;
+          my VCP::Rev $r ;
+          while ( $r = $self->revs->pop ) {
+             ## ...checkout the source reve & set $r->work_path() to refer to it's loc.
+             $self->dest->handle_rev( $r ) ;
+          }
+
+     Sets/gets the revisions member.  This is used by most sources to
+     accumulate the set of revisions to be copied.
+
+     This member should be set by the child in copy_revs().  It should
+     then be passed to the destination
+
+bootstrap
+     Usually called from within call to GetOptions in subclass' new():
+
+          GetOptions(
+             'b|bootstrap:s'   => sub {
+          	 my ( $name, $val ) = @_ ;
+          	 $self->bootstrap( $val ) ;
+             },
+             'r|rev-root'      => \$rev_root,
+             ) or $self->usage_and_exit ;
+
+     Can be called plain:
+
+          $self->bootstrap( $bootstrap_spec ) ;
+
+     See the command line documentation for the format of $bootstrap_spec.
+
+     Returns nothing useful, but `' in this node does.
+
+COPYRIGHT
+=========
+
+   Copyright 2000, Perforce Software, Inc.  All Rights Reserved.
+
+   This will be licensed under a suitable license at a future date.  Until
+then, you may only use this for evaluation purposes.  Besides which, it's
+in an early alpha state, so you shouldn't depend on it anyway.
+
+AUTHOR
+======
+
+   Barrie Slaymaker <barries@slaysys.com>
+
+
+File: pm.info,  Node: VCP/Source/cvs,  Next: VCP/Source/p4,  Prev: VCP/Source,  Up: Module List
+
+A CVS repository source
+***********************
+
+NAME
+====
+
+   VCP::Source::cvs - A CVS repository source
+
+SYNOPSIS
+========
+
+     vcp cvs:path/... -r foo        # all files in path and below labelled foo
+     vcp cvs:path/... -r foo:       # All revs of files labelled foo and newer
+     vcp cvs:path/... -r foo: -f    # All revs of files labelled foo and newer,
+                                    # including files not tagged with foo.
+     vcp cvs:path/... -r 1.1:1.10   # revs 1.1..1.10
+     vcp cvs:path/... -r 1.1:       # revs 1.1 and up
+
+     vcp cvs:path/... -D ">=2000-11-18 5:26:30"
+                                    # All file revs newer than a date/time
+
+     ## cvs -D and -f also supported
+
+DESCRIPTION
+===========
+
+   Reads a CVS repository.  You must check out the files of interest in to
+a local working directory and run the cvs command from within that
+directory.  This is because the "cvs log" and "cvs checkout" commands need
+to have a working directory to play in.
+
+   This module in alpha.  For instance, it may be better to use a more
+cvs-like set of options to specify revision ranges.  So please don't be
+offended if the CLI changes.  Certainly labels containing '-' will throw
+us off.
+
+   Note for p4 users (and other change-number or change-set oriented
+destinations): this source does not do change-number extraction /
+aggregation.  This should be done by the destination, as it is
+destination-specific.
+
+   This module does sort the revisions it outputs so that such extraction
+can be less painful.  Revisions are sorted in increasing date order.
+
+   This doesn't deal with branches yet (at least not intentionally).  That
+will require a bit of Deep Thought.
+
+   This only deals with filespecs spelled like "/a/b/c" or "a/b/..." for
+now.
+
+   Later, we can handle other filespecs by reading the entire log output.
+
+OPTIONS
+=======
+
+-b, -bootstrap
+          -b '**'
+          --bootstrap='**'
+          -b file1[,file2[,...]]
+          --bootstrap=file1[,file2[,...]]
+
+     Forces bootstrap mode for an entire export (-b '**') or for certain
+     files.  Filenames may contain wildcards, see *Note Regexp/Shellish:
+     Regexp/Shellish, for details on what wildcards are accepted.  For
+     now, one thing to remember is to use '**' instead of p4's '...'
+     wildcard.
+
+     Controls how the first revision of a file is exported.  A bootstrap
+     export contains the entire contents of the first revision in the
+     revision range.  This should only be used when exporting for the
+     first time.
+
+     An incremental export contains a digest of the revision preceding the
+     first revision in the revision range, followed by a delta record
+     between that revision and the first revision in the range.  This
+     allows the destination import function to make sure that the
+     incremental export begins where the last export left off.
+
+     The default is decided on a per-file basis: if the first revision in
+     the range is revision #1, the full contents are exported.  Otherwise
+     an incremental export is done for that file.
+
+     This option is necessary when exporting only more recent revisions
+     from a repository.
+
+-cd
+     Used to set the CVS root directory, overriding the value of the
+     CVSROOT environment vairable.  Using this and -cd it is possible to
+     export from one CVS repository and import to another.
+
+-rev-root
+     *experimental*
+
+     Sets the root of the source tree to export.  All files to be exported
+     must be under this root directory.  The default rev-root is all of the
+     leading non-wildcard directory names.  This can be useful in the
+     unusual case of exporting a sub-tree of a larger project.  I think.
+
+-r
+          -r v_0_001:v_0_002 -f
+          -r v_0_002:-f
+
+     Passed to 'cvs log' as a '-r' revision specification.
+
+     WARNING: if this string doesn't contain a ':', you're probably doing
+     something wrong, since you're not specifying a revision range.  vcp
+     may wanr about this in the future.
+
+     This will normally only replicate files which are tagged.  This means
+     that files that have been added since, or which are missing the tag
+     for some reason, are ignored.
+
+     Use the `' in this node option to force files that don't contain the
+     tag to be exported.  This is probably what is expected.
+
+     One of -r or `' in this node must be specified.
+
+-d
+          -d "2000-11-18 5:26:30<="
+
+     Passed to 'cvs log' as a '-d' date specification.
+
+     WARNING: if this string doesn't contain a '>' or '<', you're probably
+     doing something wrong, since you're not specifying a range.  vcp may
+     warn about this in the future.
+
+     One of `' in this node or -D must be specified.
+
+-f
+     Not implemented yet.
+
+     This option causes vcp to attempt to export files that don't contain a
+     particular tag.
+
+     It is an error to specify -f without -r.
+
+     It does this by exporting all revisions of files between the oldest
+     and newest files that the -r specified.  Without -f, these would be
+     ignored.
+
+SUBCLASSING
+===========
+
+   This class uses the fields pragma, so you'll need to use base and
+possibly fields in any subclasses.
+
+COPYRIGHT
+=========
+
+   Mostly copyright 2000, Perforce Software, Inc.  All Rights Reserved,
+except for marked portions (ie the CVS log file parsing), which are
+Copyright 2000, Barrie Slaymaker, Inc.  All Rights Reserved.
+
+   This will be licensed under a suitable license at a future date.  Until
+then, you may only use this for evaluation purposes.  Besides which, it's
+in an early alpha state, so you shouldn't depend on it anyway.
+
+AUTHOR
+======
+
+   Barrie Slaymaker <barries@slaysys.com>
+
+
+File: pm.info,  Node: VCP/Source/p4,  Next: VCP/Source/revml,  Prev: VCP/Source/cvs,  Up: Module List
+
+A Perforce p4 repository source
+*******************************
+
+NAME
+====
+
+   VCP::Source::p4 - A Perforce p4 repository source
+
+SYNOPSIS
+========
+
+     vcp p4://depot/...@10          # all files after change 10 applied
+     vcp p4://depot/...@1,10        # changes 1..10
+     vcp p4://depot/...@-2,10       # changes 8..10
+     vcp p4://depot/...@1,#head     # changes 1..#head
+     vcp p4://depot/...@-2,#head    # changes 8..10
+     vcp p4:...@-2,#head            # changes 8..10, if only one depot
+
+   To specify a user name of 'user', P4PASSWD 'pass', and port 'port:1666',
+use this syntax:
+
+     vcp p4:user:client:pass@port:1666:files
+
+   Note: the password will be passed in the environment variable P4PASSWD
+so it shouldn't show up in error messages.  User, client and the server
+string will be passed as command line options to make them show up in
+error output.
+
+   You may use the P4... environment variables instead of any or all of
+the fields in the p4: repository specification.  The repository spec
+overrides the environment variables.
+
+DESCRIPTION
+===========
+
+   Reads a p4d.
+
+   Note that not all metadata is exported: labels and users are not
+exported as of yet.  This stuff will go in to the RevML at some point.
+
+   Also, the 'time' and 'mod_time' attributes will lose precision, since
+p4 doesn't report them down to the minute.  Hmmm, seems like p4 never sets
+a true mod_time.  It gets set to either the submit time or the sync time.
+From ``p4 help client'`:
+
+     modtime         Causes 'p4 sync' to force modification time
+     		    to when the file was submitted.
+
+     nomodtime *     Leaves modification time set to when the
+     		    file was fetched.
+
+OPTIONS
+=======
+
+-b, -bootstrap
+          -b '**'
+          --bootstrap='**'
+          -b file1[,file2[,...]]
+          --bootstrap=file1[,file2[,...]]
+
+     Forces bootstrap mode for an entire export (-b '**') or for certain
+     files.  Filenames may contain wildcards, see *Note Regexp/Shellish:
+     Regexp/Shellish, for details on what wildcards are accepted.  For
+     now, one thing to remember is to use '**' instead of p4's '...'
+     wildcard.
+
+     Controls how the first revision of a file is exported.  A bootstrap
+     export contains the entire contents of the first revision in the
+     revision range.  This should only be used when exporting for the
+     first time.
+
+     An incremental export contains a digest of the revision preceding the
+     first revision in the revision range, followed by a delta record
+     between that revision and the first revision in the range.  This
+     allows the destination import function to make sure that the
+     incremental export begins where the last export left off.
+
+     The default is decided on a per-file basis: if the first revision in
+     the range is revision #1, the full contents are exported.  Otherwise
+     an incremental export is done for that file.
+
+     This option is necessary when exporting only more recent revisions
+     from a repository.
+
+-r, -rev-root
+     Sets the root of the source tree to export.  All files to be exported
+     must be under this root directory.  The default rev-root is all of the
+     leading non-wildcard directory names.  This can be useful in the
+     unusual case of exporting a sub-tree of a larger project.  I think.
+
+METHODS
+=======
+
+new
+     Creates a new instance of a VCP::Source::p4.  Contacts the p4d using
+     the p4 command and gets some initial information ('p4 info' and 'p4
+     labels').
+
+SUBCLASSING
+===========
+
+   This class uses the fields pragma, so you'll need to use base and
+possibly fields in any subclasses.
+
+COPYRIGHT
+=========
+
+   Copyright 2000, Perforce Software, Inc.  All Rights Reserved.
+
+   This will be licensed under a suitable license at a future date.  Until
+then, you may only use this for evaluation purposes.  Besides which, it's
+in an early alpha state, so you shouldn't depend on it anyway.
+
+AUTHOR
+======
+
+   Barrie Slaymaker <barries@slaysys.com>
+
+
+File: pm.info,  Node: VCP/Source/revml,  Next: VCS,  Prev: VCP/Source/p4,  Up: Module List
+
+Outputs versioned files to a revml file
+***************************************
+
+NAME
+====
+
+   VCP::Source::revml - Outputs versioned files to a revml file
+
+SYNOPSIS
+========
+
+     vcp revml[:<source>]
+     vcp revml[:<source>] --dtd <dtd>
+
+   Where <source> is a filename for input; or missing or '-' for STDIN.
+
+   To compile a DTD in to a perl module:
+
+     revml: --dtd <dtd> --save-doctype
+
+DESCRIPTION
+===========
+
+   This reads a revml file and reconstitutes every revision of every file
+fond therein on the disk and then submits them to the destination.
+
+   This can require a huge amount of disk space, but it works.  Disk usage
+can be optimised later by only reconstituting the files two revisions at a
+time (the previous revision is needed to generate the current one) as the
+revs are submitted to the destination after they are sorted (by the dest).
+
+   When that happens, we need to bear in mind that the revml file will be
+in the default sort order defined by *Note VCP/Dest: VCP/Dest, and this
+may be changed by other destinations, particularly the change set oriented
+ones like p4.  As an example, imagine the following process:
+
+     cvs -> vcp -> foo.revml -> vcp -> p4
+
+   There is some chance that *Note VCP/Dest/p4: VCP/Dest/p4, will want to
+reorder the revisions in foo.revml in order to attemp change set
+aggregation.  This means that it may ask for the revs in a different order
+than they are found in the file.  Since the default sort order *should*
+put the foo.revml file in (roughly) change set order.  This is a bad
+example, I guess, but hey, just watch out when optimizing for disk space.
+
+EXTERNAL METHODS
+================
+
+new
+     Creates a new instance.  The only parameter is '-dtd', which overrides
+     the default DTD found by searching for modules matching
+     RevML::DTD:v*.pm.
+
+     Attempts to open the input file if one is specified.
+
+     If the option '-save-doctype' is passed, then no copying of resources
+     is done (queue_all returns nothing to copy) and the doctype is saved
+     as a .pm file.  See *Note RevML/Doctype: RevML/Doctype, for details.
+
+COPYRIGHT
+=========
+
+   Copyright 2000, Perforce Software, Inc.  All Rights Reserved.
+
+   This will be licensed under a suitable license at a future date.  Until
+then, you may only use this for evaluation purposes.  Besides which, it's
+in an early alpha state, so you shouldn't depend on it anyway.
+
+AUTHOR
+======
+
+   Barrie Slaymaker <barries@slaysys.com>
+
+

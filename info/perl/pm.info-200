@@ -1,0 +1,1429 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: LWP/AuthenAgent,  Next: LWP/Conn,  Prev: LWP,  Up: Module List
+
+a simple subclass of LWP::UserAgent to allow the user to type in username / password information if required for autentication.
+*******************************************************************************************************************************
+
+NAME
+====
+
+   LWP::AuthenAgent - a simple subclass of LWP::UserAgent to allow the
+user to type in username / password information if required for
+autentication.
+
+SYNOPSIS
+========
+
+     use LWP::AuthenAgent;
+
+     my $ua = new LWP::AuthenAgent;
+     my $response = $ua->request( new HTTP::Request 'GET' => $url );
+
+DESCRIPTION
+===========
+
+   LWP::AuthenAgent simple overloads the get_basic_credentials method of
+LWP::UserAgent. It prompts the user for username / passsword for a given
+realm, supressing tty echoing of the password. Authentication details are
+stored in the object for each realm, so that they can be re-used in
+subsequest requests for the same realm, if necessary.
+
+METHODS
+=======
+
+   LWP::AuthenAgent inherits all the methods available in LWP::UserAgent.
+
+SEE ALSO
+========
+
+     LWP::UserAgent
+     Term::ReadKey
+
+AUTHOR
+======
+
+   Ave Wrigley <Ave.Wrigley@itn.co.uk>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997 Canon Research Centre Europe (CRE). All rights
+reserved.  This script and any associated documentation or files cannot be
+distributed outside of CRE without express prior permission from CRE.
+
+
+File: pm.info,  Node: LWP/Conn,  Next: LWP/Conn/_Connect,  Prev: LWP/AuthenAgent,  Up: Module List
+
+event driven protocol module interface
+**************************************
+
+NAME
+====
+
+   LWP::Conn - event driven protocol module interface
+
+SYNOPSIS
+========
+
+     use LWP::Conn::XXX;
+     $conn = LWP::Conn::XXX->new(ManagedBy => $mgr,
+                                 Host      => $host,
+                                 Port      => $port,
+     	                      #...
+                                );
+
+DESCRIPTION
+===========
+
+   The *LWP::Conn* objects represent a connection to some server where one
+or more request/response exchanges can take place.  There are different
+subclasses for various types of the underlying (network) protocols.
+(Talking about 'subclasses' is kind of a lie, since the base-class does
+not really manifest itself as any real code.)
+
+   *LWP::Conn* objects conform to the following interfaces when interacting
+with their manager object (passed in as parameter during creation).  For
+the normal setup, then manager will be a *LWP::Server* object.
+
+   An *LWP::Conn* object is contructed with the new() method.  It takes
+hash-style arguments and the 'ManagedBy' parameter is the only which is
+mandatory for any LWP::Conn subclass.  It should be an reference to the
+manager object that will get method callbacks when various events happen.
+Other parameters might be mandatory depending on the specific subclass.
+
+     $conn = LWP::Conn::XXX->new(MangagedBy => $mgr,
+                                 Host => $host,
+                                 Port => $port,
+                                 ...);
+
+   The constructor will return a reference to the *LWP::Conn* object or
+undef.  If a connection object is returned, then the manager should wait
+for callbacks methods to be invoked on itself.  A return of undef will
+either indicate than we can't connect to the specified server or that all
+requests has already been processed.  A manager can know the difference
+based on whether get_request() has been invoked on it or not.
+
+   The following methods are invoked by the created *LWP::Conn* object on
+their manager.  The first two manage the request queue.  The last three
+let the manager be made aware of the state of the connection.
+
+     $mgr->get_request($conn);
+     $mgr->pushback_request($conn, @requests);
+
+     $mgr->connection_active($conn);
+     $mgr->connection_idle($conn);
+     $mgr->connection_closed($conn);
+
+   The get_request() method should return a single `LWP::Request' object
+or undef if there are no more requests to process.  It is passed a
+reference to the connection object as argument.  If the connection objects
+discover that it has been too greedy (calling get_request() too many
+times), then it might want to return unprocessed request back to the
+mangager.  It does so by calling the pushback_request() method with a
+reference to itself and one or more request objects as arguments.  The
+first request obtained by get_request() should never be pushed back.
+
+   The following two methods can be invoked (usually by the manager) on a
+living $conn object.  The activate() method can be invoked on a (usually
+'idle') connection to make it start calling get_request() again.  The
+stop() kills the connection (whatever state it is in).
+
+     $conn->activate;
+     $conn->stop;
+
+   When a connection has received a response, then it will invoke the
+following two methods on the request object (obtained using get_request()).
+
+     $req->response_data($data, $res);
+     $req->response_done($res);
+
+   The response_data() method is invoked repeatedly as the body content of
+the response is received from the network.  Invocation of this method is
+optional and depends on the kind of connection object this is.  The
+response_done() method is always invoked once for each request obtained.
+It is called when the complete response has been received.
+
+COPYRIGHT
+=========
+
+   Copyright 1998, Gisle Aas
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: LWP/Conn/_Connect,  Next: LWP/Debug,  Prev: LWP/Conn,  Up: Module List
+
+event driven connection establishment
+*************************************
+
+NAME
+====
+
+   LWP::Conn::_Connect - event driven connection establishment
+
+SYNOPSIS
+========
+
+     require LWP::Conn::_Connect;
+     $conn = LWP::Conn::_Connect->new($host, $port, $timeout, $class, $opaque);
+
+DESCRIPTION
+===========
+
+   The LWP::Conn::_Connect class encapsulate event driven Internet socket
+connection establishment.  The constructor is called with a hostname and a
+port to connect to, and will return an object derived from
+IO::Socket::INET if connection establishment has been performed or is in
+progress.  If the connection attempt fails right away then undef is
+returned and $! will be the errno that connect(2) set.
+
+   When the outcome of the connection attempt has been determined, then
+the LWP::Conn::_Connect object will be re-blessed into the given $class
+and one of the following methods will be called on it:
+
+$conn->connected($opaque)
+     Successful connection establishment.  The $conn is now connected.
+     This call can even by made before the LWP::Conn::_Connect constructor
+     returns.  The $opaque value passed to the LWP::Conn::_Connect
+     constructor is passed as argument.
+
+$conn->connect_failed($errmsg, $opaque)
+     All addresses has been tried and all of them failed.  The error from
+     the last connection attempt is passed as the first argument.  The
+     $opaque value passed to the LWP::Conn::_Connect constructor is passed
+     as the second.
+
+   The $timeout value says how many seconds to allow for each connection
+attempt.  A value of 0 indicate no timeout.  The $host argument can be a
+single scalar or an array of scalar host names.  The $port argument must
+be numeric.
+
+BUGS
+====
+
+   The gethostbyname(3) call used in the constructor is blocking.
+
+COPYRIGHT
+=========
+
+   Copyright 1998, Gisle Aas
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: LWP/Debug,  Next: LWP/EventLoop,  Prev: LWP/Conn/_Connect,  Up: Module List
+
+debug routines for the libwww-perl library
+******************************************
+
+NAME
+====
+
+   LWP::Debug - debug routines for the libwww-perl library
+
+SYNOPSIS
+========
+
+     use LWP::Debug qw(+ -conns);
+
+     # Used internally in the library
+     LWP::Debug::trace('send()');
+     LWP::Debug::debug('url ok');
+     LWP::Debug::conns("read $n bytes: $data");
+
+DESCRIPTION
+===========
+
+   LWP::Debug provides tracing facilities. The trace(), debug() and
+conns() function are called within the library and they log information at
+increasing levels of detail. Which level of detail is actually printed is
+controlled with the `level()' function.
+
+   The following functions are available:
+
+level(...)
+     The `level()' function controls the level of detail being logged.
+     Passing '+' or '-' indicates full and no logging respectively.
+     Inidividual levels can switched on and of by passing the name of the
+     level with a '+' or '-' prepended.  The levels are:
+
+          trace   : trace function calls
+          debug   : print debug messages
+          conns   : show all data transfered over the connections
+
+     The LWP::Debug module provide a special import() method that allows
+     you to pass the level() arguments with initial use statement.  If a
+     use argument start with '+' or '-' then it is passed to the level
+     function, else the name is exported as usual.  The following two
+     statements are thus equivalent (if you ignore that the second pollutes
+     your namespace):
+
+          use LWP::Debug qw(+);
+          use LWP::Debug qw(level); level('+');
+
+trace($msg)
+     The `trace()' function is used for tracing function calls. The
+     package and calling subroutine name is printed along with the passed
+     argument. This should be called at the start of every major function.
+
+debug($msg)
+     The debug() function is used for high-granularity reporting of state
+     in functions.
+
+conns($msg)
+     The `conns()' function is used to show data being transferred over
+     the connections. This may generate considerable output.
+
+
+File: pm.info,  Node: LWP/EventLoop,  Next: LWP/IO,  Prev: LWP/Debug,  Up: Module List
+
+Watch file descriptors and timers
+*********************************
+
+NAME
+====
+
+   LWP::EventLoop - Watch file descriptors and timers
+
+SYNOPSIS
+========
+
+     use LWP::EventLoop;
+     $mainloop = LWP::EventLoop->new;
+     $mainloop->readable(\*STDIN, sub {sysread(STDIN, $buf, 100)});
+     $mainloop->after(10, sub { print "10 sec later"} );
+     $mainloop->run;
+
+DESCRIPTION
+===========
+
+   The *LWP::EventLoop* class define objects that can watch file
+descriptors and timers and will invoke callback methods when events on
+these happens.  Usually you will only have a single instance of this class
+in any application.  The *LWP::MainLoop* module creates a single instance
+and provide an interface to it.  The *LWP::EventLoop* is really just a
+wrapping of the select() function.
+
+   The following methods are provided:
+
+$e = LWP::EventLoop->new
+     The constructor takes now arguments.
+
+$e->readable($io, [$callback])
+     Register the specified IO handle as being monitored for readable
+     status.  When the handle becomes readable the specified callback will
+     be invoked.  The handle can be unregistered by giving an undef
+     argument as the $callback.
+
+     Callbacks can either by an CODE reference (which is called with the
+     handle as argument) or they can be a plain scalar strings which are
+     taken to be method names that are called on the given handle object.
+     The callback can also be an array reference.  The first element of the
+     array must be a CODE reference or a method name.  The rest is taken to
+     be additional arguments passed during callback invocation.
+
+     The default callback is to invoke the $io->readable method.
+
+$e->writable($io, [$callback])
+     Like $e->readable, but watch the handle for writable status.  The
+     default callback to invoke is the $io->writable method.
+
+$e->timeout($io, $secs, [$callback])
+     Register a callback to be invoked if nothing happens on the given IO
+     handle for some number of seconds.  Callbacks take the same form as
+     for $e->readable.  The default callback is to invoke the $io->inactive
+     method.  Pass 0 as the $secs argument to disable timeout for this
+     handle.
+
+$e->activity($io, [$time]);
+     Return time of last activity on the specified handle.  This is only
+     valid if you have asked for a timeout() callback on the specified
+     handle previously.
+
+     The optional $time argument can be used to set this to some specified
+     value.  If no $time argument is provided then the current time is
+     recorded.  If the $time value is undef then the activity timestamp is
+     not changed.
+
+$e->after($secs, $timer_callback)
+     Set up a callback to be invoked after the given number of seconds.
+     The callback must be a CODE reference.  This method returns an
+     identifier that can be used to cancel this timer using the $e->forget
+     method.
+
+$e->at($time, $timer_callback)
+     Set up a callback to be invoked at the given time.  The $e->after is
+     really the same as $e->at(time + $secs, $timer_callback).
+
+$e->forget($io_timer,...)
+     Unregister all callbacks for the given IO handles and timers.  One or
+     more arguments can be given.  Each argument can either be an IO handle
+     reference or an identifier as returned by $e->after or $e->at.
+
+$e->forget_all
+     Unregister all callbacks.  The state of the LWP::EventLoop will be as
+     after construction.
+
+$e->empty
+     Return TRUE if no timer callbacks or IO handles to watch are
+     registered.
+
+$e->one_event( [$timeout] )
+     Wait for a single event to happen (but no longer than $timeout
+     seconds) and call the corresponding callback routine.  Can also return
+     without calling any callback routine.
+
+$e->run( [$timeout] )
+     Call $e->one_event until either all timer callbacks and IO handles are
+     gone or until the specified number of seconds has elapsed.
+
+$e->dump
+     Will print the state of the *LWP::EventLoop* object to the currently
+     selected file handle.  Mainly useful for debugging.  Setting the
+     $LWP::EventLoop::DEBUG variable to an TRUE value can also be useful
+     while debugging.
+
+SEE ALSO
+========
+
+   *Note LWP/MainLoop: LWP/MainLoop,
+
+COPYRIGHT
+=========
+
+   Copyright 1997-1998, Gisle Aas
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: LWP/IO,  Next: LWP/MainLoop,  Prev: LWP/EventLoop,  Up: Module List
+
+Low level I/O capability
+************************
+
+NAME
+====
+
+   LWP::IO - Low level I/O capability
+
+SYNOPSIS
+========
+
+     use LWP::IO ();
+
+DESCRIPTION
+===========
+
+   The following functions are available:
+
+LWP::IO::read($fd, $data, $size, $offset, $timeout)
+LWP::IO::write($fd, $data, $timeout)
+   These routines provide low level I/O with timeout capability for the
+LWP library.  These routines will only be installed if they are not
+already defined.  This fact can be used by programs that need to override
+these functions.  Just provide replacement functions before you require
+LWP. See also *Note LWP/TkIO: LWP/TkIO,.
+
+
+File: pm.info,  Node: LWP/MainLoop,  Next: LWP/MediaTypes,  Prev: LWP/IO,  Up: Module List
+
+Give access to an single instance of LWP::EventLoop
+***************************************************
+
+NAME
+====
+
+   LWP::MainLoop - Give access to an single instance of LWP::EventLoop
+
+SYNOPSIS
+========
+
+     use LWP::MainLoop qw(mainloop);
+     mainloop->readable(\*STDIN, sub {sysread(STDIN, $buf, 100)});
+     mainloop->after(10, sub { print "10 sec later"} );
+     mainloop->run;
+
+   or
+
+     use LWP::MainLoop qw(readable after run);
+     readable(\*STDIN, sub {sysread(STDIN, $buf, 100)});
+     after(10, sub { print "10 sec later"} );
+     run;
+
+DESCRIPTION
+===========
+
+   This module gives you access to an single instance of the
+*LWP::EventLoop* class.  All methods of *LWP::EventLoop* can be exported
+and used as a procedural interface.  The function mainloop() returns a
+reference to the single instance.
+
+   No functions are exported by default.
+
+SEE ALSO
+========
+
+   *Note LWP/EventLoop: LWP/EventLoop,
+
+COPYRIGHT
+=========
+
+   Copyright 1997-1998, Gisle Aas
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: LWP/MediaTypes,  Next: LWP/MemberMixin,  Prev: LWP/MainLoop,  Up: Module List
+
+guess media type for a file or a URL
+************************************
+
+NAME
+====
+
+   LWP::MediaTypes - guess media type for a file or a URL
+
+SYNOPSIS
+========
+
+     use LWP::MediaTypes qw(guess_media_type);
+     $type = guess_media_type("/tmp/foo.gif");
+
+DESCRIPTION
+===========
+
+   This module provides functions for handling media (also known as MIME)
+types and encodings.  The mapping from file extentions to media types is
+defined by the `media.types' file.  If the `~/.media.types' file exists it
+is used instead.  For backwards compatability we will also look for
+`~/.mime.types'.
+
+   The following functions are exported by default:
+
+guess_media_type($filename_or_url, [$header_to_modify])
+     This function tries to guess media type and encoding for a file or
+     url.  It returns the content-type, which is a string like
+     `"text/html"'.  In array context it also returns any
+     content-encodings applied (in the order used to encode the file).
+     You can pass a URI object reference, instead of the file name.
+
+     If the type can not be deduced from looking at the file name, then
+     guess_media_type() will let the -T Perl operator take a look.  If
+     this works (and -T returns a TRUE value) then we return *text/plain*
+     as the type, otherwise we return *application/octet-stream* as the
+     type.
+
+     The optional second argument should be a reference to a HTTP::Headers
+     object or any object that implements the $obj->header method in a
+     similar way.  When it is present the values of the 'Content-Type' and
+     'Content-Encoding' will be set for this header.
+
+media_suffix($type,...)
+     This function will return all suffixes that can be used to denote the
+     specified media type(s).  Wildcard types can be used.  In a scalar
+     context it will return the first suffix found.
+
+     Examples:
+
+          @suffixes = media_suffix('image/*', 'audio/basic');
+          $suffix = media_suffix('text/html');
+
+   The following functions are only exported by explict request:
+
+add_type($type, @exts)
+     Associate a list of file extensions with the given media type.
+
+     Example:
+
+          add_type("x-world/x-vrml" => qw(wrl vrml));
+
+add_encoding($type, @ext)
+     Associate a list of file extensions with an encoding type.
+
+     Example:
+
+          add_encoding("x-gzip" => "gz");
+
+read_media_types(@files)
+     Parse media types files and add the type mappings found there.
+
+     Example:
+
+          read_media_types("conf/mime.types");
+
+COPYRIGHT
+=========
+
+   Copyright 1995-1999 Gisle Aas.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: LWP/MemberMixin,  Next: LWP/Parallel,  Prev: LWP/MediaTypes,  Up: Module List
+
+Member access mixin class
+*************************
+
+NAME
+====
+
+   LWP::MemberMixin - Member access mixin class
+
+SYNOPSIS
+========
+
+     package Foo;
+     require LWP::MemberMixin;
+     @ISA=qw(LWP::MemberMixin);
+
+DESCRIPTION
+===========
+
+   A mixin class to get methods that provide easy access to member
+variables in the %$self.  Ideally there should be better Perl langauge
+support for this.
+
+   There is only one method provided:
+
+_elem($elem [, $val])
+     Internal method to get/set the value of member variable $elem. If
+     $val is defined it is used as the new value for the member variable.
+     If it is undefined the current value is not touched. In both cases
+     the previous value of the member variable is returned.
+
+
+File: pm.info,  Node: LWP/Parallel,  Next: LWP/Parallel/Protocol,  Prev: LWP/MemberMixin,  Up: Module List
+
+Extension for LWP to allow parallel HTTP and FTP access
+*******************************************************
+
+NAME
+====
+
+   LWP::Parallel - Extension for LWP to allow parallel HTTP and FTP access
+
+SYNOPSIS
+========
+
+     use LWP::Parallel;
+     print "This is LWP::Parallel_$LWP::Parallel::VERSION\n";
+
+DESCRIPTION
+===========
+
+Introduction
+------------
+
+   ParallelUserAgent is an extension to the existing libwww module. It
+allows you to take a list of URLs (currently supports only HTTP and FTP
+protocol) and connect to all of them _in parallel_, then wait for the
+results to come in.
+
+   See the Parallel::UserAgent for how to create a LWP UserAgent that will
+access multiple Web resources in parallel. The Parallel::RobotUA module
+will additionally offer proper handling of robot.txt file, the de-facto
+exclusion protocol for Web Robots.
+
+Examples
+--------
+
+   The following examples might help to get you started:
+
+     require LWP::Parallel::UserAgent;
+     use HTTP::Request;
+
+     # display tons of debugging messages. See 'perldoc LWP::Debug'
+     #use LWP::Debug qw(+);
+
+     # shortcut for demo URLs
+     my $url = "http://localhost/";
+
+     my $reqs = [
+        HTTP::Request->new('GET', $url),
+        HTTP::Request->new('GET', $url."homes/marclang/"),
+     ];
+
+     my $pua = LWP::Parallel::UserAgent->new();
+     $pua->in_order  (1);  # handle requests in order of registration
+     $pua->duplicates(0);  # ignore duplicates
+     $pua->timeout   (2);  # in seconds
+     $pua->redirect  (1);  # follow redirects
+
+     foreach my $req (@$reqs) {
+       print "Registering '".$req->url."'\n";
+       if ( my $res = $pua->register ($req) ) {
+     	print STDERR $res->error_as_HTML;
+       }
+     }
+     my $entries = $pua->wait();
+
+     foreach (keys %$entries) {
+       my $res = $entries->{$_}->response;
+
+     print "Answer for '",$res->request->url, "' was \t", $res->code,": ",
+           $res->message,"\n";
+       }
+
+   Parallel::UserAgent (as well as the Parallel::RobotUA) offer three
+default methods that will be called at certain points during the
+connection: `on_connect', `on_return' and `on_failure'.
+
+     #
+     # provide subclassed UserAgent to override on_connect, on_failure and
+     # on_return methods
+     #
+     package myUA;
+
+     use Exporter();
+     use LWP::Parallel::UserAgent qw(:CALLBACK);
+     @ISA = qw(LWP::Parallel::UserAgent Exporter);
+     @EXPORT = @LWP::Parallel::UserAgent::EXPORT_OK;
+
+     # redefine methods: on_connect gets called whenever we're about to
+     # make a a connection
+     sub on_connect {
+       my ($self, $request, $response, $entry) = @_;
+       print "Connecting to ",$request->url,"\n";
+     }
+
+     # on_failure gets called whenever a connection fails right away
+     # (either we timed out, or failed to connect to this address before,
+     # or it's a duplicate). Please note that non-connection based
+     # errors, for example requests for non-existant pages, will NOT call
+     # on_failure since the response from the server will be a well
+     # formed HTTP response!
+     sub on_failure {
+       my ($self, $request, $response, $entry) = @_;
+       print "Failed to connect to ",$request->url,"\n\t",
+             $response->code, ", ", $response->message,"\n"
+     	    if $response;
+     }
+
+     # on_return gets called whenever a connection (or its callback)
+     # returns EOF (or any other terminating status code available for
+     # callback functions). Please note that on_return gets called for
+     # any successfully terminated HTTP connection! This does not imply
+     # that the response sent from the server is a success!
+     sub on_return {
+       my ($self, $request, $response, $entry) = @_;
+       if ($response->is_success) {
+          print "\n\nWoa! Request to ",$request->url," returned code ", $response->code,
+             ": ", $response->message, "\n";
+          print $response->content;
+       } else {
+          print "\n\nBummer! Request to ",$request->url," returned code ", $response->code,
+             ": ", $response->message, "\n";
+          # print $response->error_as_HTML;
+       }
+       return;
+     }
+
+     package main;
+     use HTTP::Request;
+
+     # shortcut for demo URLs
+     my $url = "http://localhost/";
+
+     my $reqs = [
+        HTTP::Request->new('GET', $url),
+        HTTP::Request->new('GET', $url."homes/marclang/"),
+     ];
+
+     my $pua = myUA->new();
+
+     foreach my $req (@$reqs) {
+       print "Registering '".$req->url."'\n";
+       $pua->register ($req);
+     }
+     my $entries = $pua->wait(); # responses will be caught by on_return, etc
+
+   The final example will demonstrate a simple Web Robot that keeps a
+cache of the "robots.txt" permission files it has encountered so far. This
+example also uses callbacks to handle the response as it comes in.
+
+     require LWP::Parallel::UserAgent;
+     use HTTP::Request;
+
+     # persistent robot rules support. See 'perldoc WWW::RobotRules::AnyDBM_File'
+     require WWW::RobotRules::AnyDBM_File;
+
+     # shortcut for demo URLs
+     my $url = "http://www.cs.washington.edu/";
+
+     my $reqs = [
+        HTTP::Request->new('GET', $url),
+     	    # these are all redirects. depending on how you set
+               # 'redirect_ok' they either just return the status code for
+               # redirect (like 302 moved), or continue to follow redirection.
+        HTTP::Request->new('GET', $url."research/ahoy/"),
+        HTTP::Request->new('GET', $url."research/ahoy/doc/paper.html"),
+        HTTP::Request->new('GET', "http://metacrawler.cs.washington.edu:6060/"),
+     	    # these are all non-existant server. the first one should take
+               # some time, but the following ones should be rejected right
+               # away
+        HTTP::Request->new('GET', "http://www.foobar.foo/research/ahoy/"),
+        HTTP::Request->new('GET', "http://www.foobar.foo/foobar/foo/"),
+        HTTP::Request->new('GET', "http://www.foobar.foo/baz/buzz.html"),
+     	    # although server exists, file doesn't
+        HTTP::Request->new('GET', $url."foobar/bar/baz.html"),
+     	    ];
+
+     my ($req,$res);
+
+     # establish persistant robot rules cache. See WWW::RobotRules for
+     # non-permanent version. you should probably adjust the agentname
+     # and cache filename.
+     my $rules = new WWW::RobotRules::AnyDBM_File 'ParallelUA', 'cache';
+
+     # create new UserAgent (actually, a Robot)
+     my $pua = new LWP::Parallel::RobotUA ("ParallelUA",
+                                           'yourname@your.site.com', $rules);
+
+     $pua->timeout   (2);  # in seconds
+     $pua->delay    ( 5);  # in seconds
+     $pua->max_req  ( 2);  # max parallel requests per server
+     $pua->max_hosts(10);  # max parallel servers accessed
+     
+     # for our own print statements that follow below:
+     local($\) = ""; # ensure standard $OUTPUT_RECORD_SEPARATOR
+
+     # register requests
+     foreach $req (@$reqs) {
+       print "Registering '".$req->url."'\n";
+       $pua->register ($req , \&handle_answer);
+       #  Each request, even if it failed to # register properly, will
+       #  show up in the final list of # requests returned by $pua->wait,
+       #  so you can examine it # later.
+     }
+
+     # $pua->wait returns a pointer to an associative array, containing
+     # an '$entry' for each request made, sorted by its url. (as returned
+     # by $request->url->as_string)
+     my $entries = $pua->wait(); # give another timeout here, 25 seconds
+
+     # let's see what we got back (see also callback function!!)
+     foreach (keys %$entries) {
+       $res = $entries->{$_}->response;
+
+     # examine response to find cascaded requests (redirects, etc) and
+     # set current response to point to the very first response of this
+     # sequence. (not very exciting if you set '$pua->redirect(0)')
+     my $r = $res; my @redirects;
+     while ($r) {
+     	$res = $r;
+     	$r = $r->previous;
+     	push (@redirects, $res) if $r;
+     }
+     
+     # summarize response. see "perldoc HTTP::Response"
+     print "Answer for '",$res->request->url, "' was \t", $res->code,": ",
+           $res->message,"\n";
+     # print redirection history, in case we got redirected
+     foreach (@redirects) {
+     	print "\t",$_->request->url, "\t", $_->code,": ", $_->message,"\n";
+     }
+       }
+
+     # our callback function gets called whenever some data comes in
+     # (same parameter format as standard LWP::UserAgent callbacks!)
+     sub handle_answer {
+       my ($content, $response, $protocol, $entry) = @_;
+
+     print "Handling answer from '",$response->request->url,": ",
+           length($content), " bytes, Code ",
+           $response->code, ", ", $response->message,"\n";
+
+     if (length ($content) ) {
+     	# just store content if it comes in
+     	$response->add_content($content);
+     } else {
+         # Having no content doesn't mean the connection is closed!
+         # Sometimes the server might return zero bytes, so unless
+         # you already got the information you need, you should continue
+         # processing here (see below)
+     
+     	# Otherwise you can return a special exit code that will
+         # determins how ParallelUA will continue with this connection.
+
+     # Note: We have to import those constants via "qw(:CALLBACK)"!
+
+     # return C_ENDCON;  # will end only this connection
+     		    # (silly, we already have EOF)
+     # return C_LASTCON; # wait for remaining open connections,
+     		    # but don't issue any new ones!!
+     # return C_ENDALL;  # will immediately end all connections
+     		    # and return from $pua->wait
+         }
+
+     # ATTENTION!! If you want to keep reading from your connection,
+     # you should have a final 'return undef' statement here. Even if
+     # you think that all data has arrived, it does not hurt to return
+     # undef here. The Parallel UserAgent will figure out by itself
+     # when to close the connection!
+
+     return undef;	    # just keep on connecting/reading/waiting
+                             # until the server closes the connection.
+       }
+
+AUTHOR
+======
+
+   Marc Langheinrich, marclang@cs.washington.edu
+
+SEE ALSO
+========
+
+   See *Note LWP: LWP, for an overview on Web communication using Perl. See
+*Note LWP/Parallel/UserAgent: LWP/Parallel/UserAgent, and *Note
+LWP/Parallel/RobotUA: LWP/Parallel/RobotUA, for details on how to use this
+library.
+
+COPYRIGHT
+=========
+
+   Copyright 1997-2001 Marc Langheinrich.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: LWP/Parallel/Protocol,  Next: LWP/Parallel/RobotUA,  Prev: LWP/Parallel,  Up: Module List
+
+Base class for parallel LWP protocols
+*************************************
+
+NAME
+====
+
+   LWP::Parallel::Protocol - Base class for parallel LWP protocols
+
+SYNOPSIS
+========
+
+     package LWP::Parallel::Protocol::foo;
+     require LWP::Parallel::Protocol;
+     @ISA=qw(LWP::Parallel::Protocol);
+
+DESCRIPTION
+===========
+
+   This class is used a the base class for all protocol implementations
+supported by the LWP::Parallel library. It mirrors the behavior of the
+original LWP::Parallel library by subclassing from it and adding a few
+subroutines of its own.
+
+   Please see the LWP::Protocol for more information about the usage of
+this module.
+
+   In addition to the inherited methods from LWP::Protocol, The following
+methods and functions are provided:
+
+ADDITIONAL METHODS AND FUNCTIONS
+================================
+
+$prot = new HTTP::Protocol;
+     The LWP::Protocol constructor is inherited by subclasses. As this is a
+     virtual base class this method should not be called directly.
+
+$prot = LWP::Parallel::Protocol::create($url)
+     Create an object of the class implementing the protocol to handle the
+     given scheme. This is a function, not a method. It is more an object
+     factory than a constructor. This is the function user agents should
+     use to access protocols.
+
+$class = LWP::Parallel::Protocol::implementor($scheme, [$class])
+     Get and/or set implementor class for a scheme.  Returns " if the
+     specified scheme is not supported.
+
+$prot->receive ($arg, $response, $content)
+     Called to store a piece of content of a request, and process it
+     appropriately into a scalar, file, or by calling a callback.  If $arg
+     is undefined, then the content is stored within the $response.  If
+     $arg is a simple scalar, then $arg is interpreted as a file name and
+     the content is written to this file.  If $arg is a reference to a
+     routine, then content is passed to this routine.
+
+     $content must be a reference to a scalar holding the content that
+     should be processed.
+
+     The return value from receive() is the $response object reference.
+
+     Note: We will only use the file or callback argument if
+     $response->is_success().  This avoids sendig content data for
+     redirects and authentization responses to the file or the callback
+     function.
+
+$prot->receive_once($arg, $response, $content, $entry)
+     Can be called when the whole response content is available as
+     $content.  This will invoke receive() with a collector callback that
+     returns a reference to $content the first time and an empty string the
+     next.
+
+SEE ALSO
+========
+
+   Inspect the `LWP/Parallel/Protocol/http.pm' file for examples of usage.
+
+COPYRIGHT
+=========
+
+   Copyright 1997-2001 Marc Langheinrich.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: LWP/Parallel/RobotUA,  Next: LWP/Parallel/UserAgent,  Prev: LWP/Parallel/Protocol,  Up: Module List
+
+A class for Parallel Web Robots
+*******************************
+
+NAME
+====
+
+   LWP::Parallel::RobotUA - A class for Parallel Web Robots
+
+SYNOPSIS
+========
+
+     require LWP::Parallel::RobotUA;
+     $ua = new LWP::Parallel::RobotUA 'my-robot/0.1', 'me@foo.com';
+     $ua->delay(20);  # in seconds!
+     ...
+     # just use it just like a normal LWP::Parallel::UserAgent
+     $ua->register ($request, \&callback, 4096); # or
+     $ua->wait ( $timeout );
+
+DESCRIPTION
+===========
+
+   This class implements a user agent that is suitable for robot
+applications.  Robots should be nice to the servers they visit.  They
+should consult the `/robots.txt' file to ensure that they are welcomed and
+they should not make requests too frequently.
+
+   But, before you consider writing a robot take a look at
+<URL:http://info.webcrawler.com/mak/projects/robots/robots.html>.
+
+   When you use a *LWP::Parallel::RobotUA* as your user agent, then you do
+not really have to think about these things yourself.  Just send requests
+as you do when you are using a normal *LWP::Parallel::UserAgent* and this
+special agent will make sure you are nice.
+
+METHODS
+=======
+
+   The LWP::Parallel::RobotUA is a sub-class of LWP::Parallel::UserAgent
+and LWP::RobotUA and implements a mix of their methods.
+
+   In addition to LWP::Parallel::UserAgent, these methods are provided:
+
+$ua = LWP::RobotUA->new($agent_name, $from, [$rules])
+-----------------------------------------------------
+
+   Your robot's name and the mail address of the human responsible for the
+robot (i.e. you) are required by the constructor.
+
+   Optionally it allows you to specify the *WWW::RobotRules* object to
+use. (See *Note WWW/RobotRules/AnyDBM_File: WWW/RobotRules/AnyDBM_File,
+for persistent caching of robot rules in a local file)
+
+$ua->delay([$seconds])
+----------------------
+
+   Set/Get the minimum delay between requests to the same server.  The
+default is 60 seconds.
+
+   Note: The original LWP Robot uses *Minutes* instead of *Seconds* here!
+
+$ua->host_wait($netloc)
+-----------------------
+
+   Returns the number of seconds you must wait before you can make a new
+request to this server. This method keeps track of all of the robots
+connection, and enforces the delay constraint specified via the delay
+method above for each server individually.
+
+   Note: Although it says 'host', it really means 'netloc/server', i.e. it
+differentiates between individual servers running on different ports, even
+though they might be on the same machine ('host'). This function is mostly
+used internally, where RobotUA calls it to find out when to send the next
+request to a certain server.
+
+$ua->as_string
+--------------
+
+   Returns a string that describes the state of the UA.  Mainly useful for
+debugging.
+
+SEE ALSO
+========
+
+   *Note LWP/Parallel/UserAgent: LWP/Parallel/UserAgent,, *Note
+LWP/RobotUA: LWP/RobotUA,, *Note WWW/RobotRules: WWW/RobotRules,
+
+COPYRIGHT
+=========
+
+   Copyright 1997-2001 Marc Langheinrich <marclang@cs.washington.edu>
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: LWP/Parallel/UserAgent,  Next: LWP/ParallelUA,  Prev: LWP/Parallel/RobotUA,  Up: Module List
+
+A class for parallel User Agents
+********************************
+
+NAME
+====
+
+   LWP::Parallel::UserAgent - A class for parallel User Agents
+
+SYNOPSIS
+========
+
+     require LWP::Parallel::UserAgent;
+     $ua = LWP::Parallel::UserAgent->new();
+     ...
+
+     $ua->redirect (0); # prevents automatic following of redirects
+     $ua->max_hosts(5); # sets maximum number of locations accessed in parallel
+     $ua->max_req  (5); # sets maximum number of parallel requests per host
+     ...
+     $ua->register ($request); # or
+     $ua->register ($request, '/tmp/sss'); # or
+     $ua->register ($request, \&callback, 4096);
+     ...
+     $ua->wait ( $timeout );
+     ...
+     sub callback { my($data, $response, $protocol) = @_; .... }
+
+DESCRIPTION
+===========
+
+   This class implements a user agent that access web sources in parallel.
+
+   Using a *LWP::Parallel::UserAgent* as your user agent, you typically
+start by registering your requests, along with how you want the Agent to
+process the incoming results (see $ua->register).
+
+   Then you wait for the results by calling $ua->wait.  This method only
+returns, if all requests have returned an answer, or the Agent timed out.
+Also, individual callback functions might indicate that the Agent should
+stop waiting for requests and return. (see $ua->register)
+
+   See the file *Note LWP/Parallel: LWP/Parallel, for a set of simple
+examples.
+
+METHODS
+=======
+
+   The LWP::Parallel::UserAgent is a sub-class of LWP::UserAgent, but not
+all of its methods are available here. However, you can use its main
+methods, $ua->simple_request and $ua->request, in order to simulate
+singular access with this package. Of course, if a single request is all
+you need, then you should probably use LWP::UserAgent in the first place,
+since it will be faster than our emulation here.
+
+   For parallel access, you will need to use the new methods that come with
+LWP::Parallel::UserAgent, called $pua->register and $pua->wait. See below
+for more information on each method.
+
+$ua = LWP::Parallel::UserAgent->new();
+     Constructor for the parallel UserAgent.  Returns a reference to a
+     LWP::Parallel::UserAgent object.
+
+     Optionally, you can give it an existing LWP::Parallel::UserAgent (or
+     even an LWP::UserAgent) as a first argument, and it will "clone" a
+     new one from this (This just copies the behavior of LWP::UserAgent.
+     I have never actually tried this, so let me know if this does not do
+     what you want).
+
+$ua->initialize;
+     Takes no arguments and initializes the UserAgent. It is automatically
+     called in LWP::Parallel::UserAgent::new, so usually there is no need
+     to call this explicitly.
+
+     However, if you want to re-use the same UserAgent object for a number
+     of "runs", you should call $ua->initialize after you have processed
+     the results of the previous call to $ua->wait, but before registering
+     any new requests.
+
+$ua->redirect ( $ok )
+     Changes the default value for permitting Parallel::UserAgent to follow
+     redirects and authentication-requests.  The standard value is 'true'.
+
+     See `$ua-'register> for how to change the behaviour for particular
+     requests only.
+
+$ua->duplicates ( $ok )
+     Changes the default value for permitting Parallel::UserAgent to ignore
+     duplicate requests.  The standard value is 'false'.
+
+$ua->in_order ( $ok )
+     Changes the default value to restricting Parallel::UserAgent to
+     connect to the registered sites in the order they were registered. The
+     default value FALSE allows Parallel::UserAgent to make the connections
+     in an apparently random order.
+
+$ua->remember_failures ( $yes )
+     If set to one, enables ParalleUA to ignore requests or connections to
+     sites that it failed to connect to before during this "run". If set to
+     zero (the dafault) Parallel::UserAgent will try to connect to every
+     single URL you registered, even if it constantly fails to connect to a
+     particular site.
+
+$ua->max_hosts ( $max )
+     Changes the maximum number of locations accessed in parallel. The
+     default value is 7.
+
+     Note: Although it says 'host', it really means 'netloc/server'! That
+     is, multiple server on the same host (i.e. one server running on port
+     80, the other one on port 6060) will count as two 'hosts'.
+
+$ua->max_req ( $max )
+     Changes the maximum number of requests issued per host in parallel.
+     The default value is 5.
+
+$ua->register ( $request [, $arg [, $size [, $redirect_ok]]] )
+     Registers the given request with the User Agent.  In case of an error,
+     a HTTP::Request object containing the HTML-Error message is returned.
+     Otherwise (that is, in case of a success) it will return undef.
+
+     The $request should be a reference to a HTTP::Request object with
+     values defined for at least the method() and url() attributes.
+
+     $size specifies the number of bytes Parallel::UserAgent should try to
+     read each time some new data arrives.  Setting it to '0' or 'undef'
+     will make Parallel::UserAgent use the default. (8k)
+
+     Specifying `$redirect_ok' will alter the redirection behaviour for
+     this particular request only. '1' or any other true value will force
+     Parallel::UserAgent to follow redirects, even if the default is set to
+     'no_redirect'. (see `$ua-'redirect>) '0' or any other false value
+     should do the reverse.  Please note that POST requests are not being
+     followed, regardless of the $redirect_ok value!
+
+     If $arg is a scalar it is taken as a filename where the content of
+     the response is stored.
+
+     If $arg is a reference to a subroutine, then this routine is called
+     as chunks of the content is received.  An optional $size argument is
+     taken as a hint for an appropriate chunk size. The callback function
+     is called with 3 arguments: the data received this time, a reference
+     to the response object and a reference to the protocol object. The
+     callback can use the predefined constants C_ENDCON, C_LASTCON and
+     C_ENDALL as a return value in order to influence pending and active
+     connections. C_ENDCON will end this connection immediately, whereas
+     C_LASTCON will inidicate that no further connections should be made.
+     C_ENDALL will immediately end all requests and let the
+     Parallel::UserAgent return from $pua->wait().
+
+     If $arg is omitted, then the content is stored in the response object
+     itself.
+
+     If $arg is a `LPW::Parallel::UserAgent::Entry' object, then this
+     request will be registered as a follow-up request to this particular
+     entry. This will not create a new entry, but instead link the current
+     response (i.e. the reason for re-registering) as $response->previous
+     to the new response of this request.  All other fields are either
+     re-initialized ($request, $fullpath, $proxy) or left untouched ($arg,
+     $size). (This should only be use internally)
+
+     LWP::Parallel::UserAgent->request also allows the registration of
+     follow-up requests to existing requests, that required redirection or
+     authentication. In order to do this, an Parallel::UserAgent::Entry
+     object will be passed as the second argument to the call. Usually,
+     this should not be used directly, but left to the internal
+     $ua->handle_response method!
+
+$ua->on_connect ( $request, $response, $entry )
+     This method should be overridden in an (otherwise empty) subclass in
+     order to present customized messages for each connection attempted by
+     the User Agent.
+
+$ua->on_failure ( $request, $response, $entry )
+     This method should be overridden in an (otherwise empty) subclass in
+     order to present customized messages for each connection or
+     registration that failed.
+
+$ua->on_return ( $request, $response, $entry )
+     This method should be overridden in an (otherwise empty) subclass in
+     order to present customized messages for each request returned. If a
+     callback function was registered with this request, this callback
+     function is called before $pua->on_return.
+
+     Please note that while $pua->on_return is a method (which should be
+     overridden in a subclass), a callback function is NOT a method, and
+     does not have $self as its first parameter. (See more on callbacks
+     below)
+
+     The purpose of $pua->on_return is mainly to provide messages when a
+     request returns. However, you can also re-register follow-up requests
+     in case you need them.
+
+     If you need specialized follow-up requests depending on the request
+     that just returend, use a callback function instead (which can be
+     different for each request registered). Otherwise you might end up
+     writing a HUGE if..elsif..else.. branch in this global method.
+
+$us->discard_entry ( $entry )
+     Completely removes an entry from memory, in case its output is not
+     needed. Use this in callbacks such as `on_return' or <on_failure> if
+     you want to make sure an entry that you do not need does not occupy
+     valuable main memory.
+
+$ua->wait ( $timeout )
+     Waits for available sockets to write to or read from.  Will timeout
+     after $timeout seconds. Will block if $timeout = 0 specified. If
+     $timeout is omitted, it will use the Agent default timeout value.
+
+$ua->handle_response($request, $arg [, $size])
+     Analyses results, handling redirects and security.  This method may
+     actually register several different, additional requests.
+
+     This method should not be called directly. Instead, indicate for each
+     individual request registered with `$ua-'register()> whether or not
+     you want Parallel::UserAgent to handle redirects and security, or
+     specify a default value for all requests in Parallel::UserAgent by
+     using `$ua-'redirect()>.
+
+$ua->simple_request($request, [$arg [, $size]])
+     This method simulates the behavior of LWP::UserAgent->simple_request.
+     It is actually kinda overkill to use this method in
+     Parallel::UserAgent, and it is mainly here for testing backward
+     compatibility with the original LWP::UserAgent. The following
+     description is taken directly from the corresponding libwww pod:
+
+     $ua->simple_request dispatches a single WWW request on behalf of a
+     user, and returns the response received.  The $request should be a
+     reference to a HTTP::Request object with values defined for at least
+     the method() and url() attributes.
+
+     If $arg is a scalar it is taken as a filename where the content of
+     the response is stored.
+
+     If $arg is a reference to a subroutine, then this routine is called
+     as chunks of the content is received.  An optional $size argument is
+     taken as a hint for an appropriate chunk size.
+
+     If $arg is omitted, then the content is stored in the response object
+     itself.
+
+$ua->request($request, $arg [, $size])
+     Included for compatibility testing with LWP::UserAgent. Every day
+     usage is depreciated! Here is what LWP::UserAgent has to say about it:
+
+     Process a request, including redirects and security.  This method may
+     actually send several different simple reqeusts.
+
+     The arguments are the same as for `simple_request()'.
+
+     sub request {   my $self = shift;
+
+     my $ua = LWP::Parallel::UserAgent->new();   $ua->agent($self->agent);
+      $ua->from ($self->from);   $ua->redirect(1);
+     &_single_request($ua, @_); }
+
+$ua->as_string
+     Returns a text that describe the state of the UA.  Should be useful
+     for debugging, if it would print out anything important. But it does
+     not (at least not yet). Try using LWP::Debug...
+
+ADDITIONAL METHODS
+==================
+
+$ua->use_alarm([$boolean])
+     This function is not in use anymore and will display a warning when
+     called and warnings are enabled.
+
+Callback functions
+==================
+
+   You can register a callback function. See LWP::UserAgent for details.
+
+BUGS
+====
+
+   Probably lots! This was meant only as an interim release until this
+functionality is incorporated into LWPng, the next generation libwww
+module (though it has been this way for over 2 years now!)
+
+   Needs a lot more documentation on how callbacks work!
+
+SEE ALSO
+========
+
+   *Note LWP/UserAgent: LWP/UserAgent,
+
+COPYRIGHT
+=========
+
+   Copyright 1997-2001 Marc Langheinrich <marclang@cs.washington.edu>
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: LWP/ParallelUA,  Next: LWP/Protocol,  Prev: LWP/Parallel/UserAgent,  Up: Module List
+
+Parallel LWP::UserAgent
+***********************
+
+NAME
+====
+
+   LWP::ParallelUA - Parallel LWP::UserAgent
+
+SYNOPSIS
+========
+
+     require LWP::ParallelUA;
+     $ua = LWP::ParallelUA->new();
+
+     (see description of LWP::Parallel::UserAgent)
+
+DESCRIPTION
+===========
+
+   *ParallelUA* is a simple frontend to the *LWP::Parallel::UserAgent*
+module. It is here in order to maintain the compatibility with previous
+releases. However, in order to prevent the previous need for changing the
+original LWP sources, all extension files have been moved to the
+LWP::Parallel subtree.
+
+   If you start from scratch, maybe you should start using LWP::Parallel
+and its submodules directly.
+
+   See the *Note LWP/Parallel/UserAgent: LWP/Parallel/UserAgent, for the
+documentation on this module.
+
+AUTHOR
+======
+
+   Marc Langheinrich, marclang@cs.washington.edu
+
+SEE ALSO
+========
+
+   *Note LWP/Parallel/UserAgent: LWP/Parallel/UserAgent,
+
+COPYRIGHT
+=========
+
+   Copyright 1997-2001 Marc Langheinrich.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+

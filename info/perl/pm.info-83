@@ -1,0 +1,2357 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: CGI/MiniSvr,  Next: CGI/Minimal,  Prev: CGI/LogCarp,  Up: Module List
+
+Adds to CGI::Base the ability for a CGI script to become a mini http server.
+****************************************************************************
+
+NAME
+====
+
+   CGI::MiniSvr - Adds to CGI::Base the ability for a CGI script to become
+a mini http server.
+
+SYNOPSIS
+========
+
+
+     use CGI::MiniSvr;
+     
+     $cgi = new CGI::MiniSvr;
+     $cgi = new CGI::MiniSvr $port_or_path;
+     $cgi = new CGI::MiniSvr $port_or_path, $timeout_mins;
+     
+     $cgi->port;               # return MiniSvr port number with leading colon
+
+     $cgi->spawn;              # fork/detach from httpd
+     
+     $cgi->get;                # get input
+     
+     $cgi->pass_thru($host, $port);
+     $cgi->redirect($url);
+     
+     $cgi->done;               # end 'page' and close connection (high-level)
+     $cgi->close;              # just close connection (low-level)
+
+   See also the CGI::Base methods.
+
+DESCRIPTION
+===========
+
+   This file implements the CGI::MiniSvr object. This object represents an
+alternative interface between the application and an HTTP deamon.
+
+   In a typical CGI scenario the interface is just a collection of
+environment variables passed to a process which then generated some outout
+and exits. The CGI::Base class implements this standard interface.
+
+   The CGI::MiniSvr class inherits from CGI::Base and extends it to
+implement a 'mini http daemon' which can be spawned (forked) from a CGI
+script in order to maintain state information for a client 'session'.
+
+   This is very useful. It neatly side-steps many of the painful issues
+involved in writing real-world multi-screen applications using the
+standard CGI interface (namely saving and restoring state between screens).
+
+   Another use for the MiniSvr is to allow cgi scripts to produce output
+pages with dynamically generated in-line graphics (for example). To do
+this the script would spawn a MiniSvr and refer to its port number in the
+URL's for the embedded images. The MiniSvr would then sit on the port,
+with a relatively short timeout, ready to serve the requests for those
+images.  Once all the images have been served the MiniSvr would simply
+exit.
+
+   Like the CGI::Base module the CGI::MiniSvr module does not do any
+significant data parsing. Higher level query processing (forms etc) is
+performed by the CGI::Request module.
+
+   Note that the implementation of these modules means that you should
+invoke `new CGI::Base;' before `new CGI::MiniSvr;'. This is the natural
+order anyway and so should not be a problem.
+
+WARNING!
+--------
+
+   This module is not a good solution to many problems! It is only a good
+solution to some. It should only be used by those who understand why it is
+not a good solution to many problems!
+
+   For those who don't see the pitfalls of the mini server approach,
+consider just this one example:  what happens to your machine if new
+'sessions' start, on average, faster than abandoned ones timeout?
+
+   Security and short-lifespan URL's are some of the other problems.
+
+   If in doubt don't use it! If you do then don't blame me for any of the
+problems you may (will) experience. *You have been warned!*
+
+DIRECT ACCESS USAGE
+-------------------
+
+   In this mode the MiniSvr creates an internet domain socket and returns
+to the client a page with URL's which contain the MiniSvr's own port
+number.
+
+     $q = GetRequest();      # get initial request
+     $cgi = new CGI::MiniSvr;# were going to switch to CGI::MiniSvr later
+     $port = $cgi->port;     # get our port number (as ':NNNN') for use in URL's
+     $me = "http://$SERVER_NAME$port$SCRIPT_NAME"; # build my url
+     print "Hello... <A HREF="$me?INSIDE"> Step Inside ...</A>\r\n";
+     $cgi->done(1);          # flush out page, include debugging
+     $cgi->spawn and exit 0; # fork, original cgi process exits
+     CGI::Request::Interface($cgi); # default to new interface
+
+     while($q = GetQuery() or $cgi->exit){ # await request/timeout
+        ...
+     }
+
+INDIRECT ACCESS USAGE
+---------------------
+
+   In this mode the MiniSvr creates a unix domain socket and returns to the
+client a page with a hidden field containing the path to the socket.
+
+     $q = GetRequest(); # get initial request
+     $path = $q->param('_minisvr_socket_path');
+     if ($path) {
+         # just pass request on to our mini server
+         $q->cgi->pass_thru('', $path) or (...handle timeout...)
+         $q->cgi->done;
+     } else {
+         # launch new mini server
+         $path = "/tmp/cgi.$$";
+         $cgi = new CGI::MiniSvr $path; # unix domain socket
+         # code here mostly same as 'DIRECT ACCESS' above except that
+         # the returned page has an embedded field _minisvr_socket_path
+         # set to $path
+         ...
+     }
+
+SUBCLASSING THE MINISVR
+-----------------------
+
+   In some cases you may wish to have more control over the behaviour of
+the mini-server, such as handling some requests at a low level without
+disturbing the application.  Subclassing the server is generally a good
+approach. Use something like this:
+
+     #   Define a specialised subclass of the MiniSvr for this application
+     {
+       package CGI::MiniSvr::FOO;
+       use CGI::MiniSvr;
+       @ISA = qw(CGI::MiniSvr);
+
+     # Default behaviour for everything except GET requests for .(gif|html|jpg)
+     # Note that we must take great care not to: a) try to pass_thru to ourselves
+     # (it would hang), or b) pass_thru to the server a request which it will
+     # try to satisfy by starting another instance of this same script!
+
+     sub method_GET {
+         my $self = shift;
+         if ($self->{SCRIPT_NAME} =~ m/\.(gif|jpg|html)$/){
+             $self->pass_thru('', $self->{ORIG_SERVER_PORT});
+             $self->done;
+             return 'NEXT';
+         }
+         1;
+     }
+     # ... other overriding methods can be defined here ...
+       }
+
+   Once defined you can use your new customised mini server by changing:
+
+     $cgi = new CGI::MiniSvr;
+
+   into:
+
+     $cgi = new CGI::MiniSvr::FOO;
+
+   With the example code above any requests for gif, jpg or html will be
+forwarded to the server which originally invoked this script. The
+application no longer has to deal with them. Note: this is just an example
+usage for the mechanism, you would typically generate pages in which any
+embedded images had URL's which refer explicitly to the main httpd.
+
+   With a slight change in the code above you can arrange for the handling
+of the pass-thru to occur in a subprocess. This frees the main process to
+handle other requests. Since the MiniSvr typically only exists for one
+process, forking off a subprocess to handle a request is only useful for
+browsers such as Netscape which make multiple parallel requests for inline
+images.
+
+     if ($self->{SCRIPT_NAME} =~ m/\.(gif|html|jpg)$/){
+         if ($self->fork == 0) {
+             $self->pass_thru('', $self->{ORIG_SERVER_PORT});
+             $self->exit;
+         }
+         $self->done;
+         return 'NEXT';
+     }
+
+   Note that forking can be expensive. It might not be worth doing for
+small images.
+
+FEATURES
+--------
+
+   Object oriented and sub-classable.
+
+   Transparent low-level peer validation (no application involvement but
+extensible through subclassing).
+
+   Transparent low-level pass_thru/redirecting of URL's the application is
+not interested in  (no application involvement but extensible through
+subclassing).
+
+   Effective timeout mechanism with default and per-call settings.
+
+   Good emulation of standard CGI interface (for code portability).
+
+RECENT CHANGES
+--------------
+
+  1. and 2.3 Slightly improved documentation. Added a basic fork() method.
+     Fixed timeout to throw an exception so it's reliable on systems which
+     restart system calls. Socket/stdio/filehandle code improved. Cleaned
+     up done/close relationship. Added experimental support for optionally
+     handling requests by forking on a case-by-case basis. This is handy
+     for serving multiple simultaneous image requests from Netscape for
+     example.  Added notes about the MiniSvr, mainly from discussions with
+     Jack Shirazi Removed old explicit port searching code from
+     _new_inet_socket().  Improved SIGPIPE handling (see CGI::Base).
+
+  2. Fixed (worked around) a perl/stdio bug which affected POST handling.
+     Changed some uses of map to foreach. Slightly improved debugging.
+     Added support for any letter case in HTTP headers. Enhanced test code.
+
+  3. Added more documentation and examples. The max pending connections
+     parameter for listen() can now be specified as a parameter to new().
+     SIGPIPE now ignored by default. Simplified inet socket code with ideas
+     from Jack Shirazi. Improved server Status-Line header handling. Fixed
+     validate_peer() error handling and redirect().  Simplified get_vars()
+     by splitting into get_valid_connection() and read_headers(). Moved
+     example method_GET() out of MiniSvr and into the test script.
+
+     The module file can be run as a cgi script to execute a demo/test. You
+     may need to chmod +x this file and teach your httpd that it can
+     execute *.pm files.
+
+  4. Added note about possible use of MiniSvr to serve dynamically
+     generated in-line images. Added optional DoubleFork mechanism to
+     spawn which might be helpful for buggy httpd's, off by default.
+
+  5. Added support for an 'indirect, off-net, access' via a local UNIX
+     domain socket in the file system. Now uses strict. ORIG_* values now
+     stored within object and not exported as globals (Base CGI vars
+     remain unchanged).  See CGI::Base for some more details.
+
+
+FUTURE DEVELOPMENTS
+-------------------
+
+   Full pod documentation.
+
+   None of this is perfect. All suggestions welcome.
+
+   Test unix domain socket mechanism.
+
+   Issue/problem - the handling of headers. Who outputs them and when? We
+have a sequence of: headers, body, end, read, headers, body, end, read
+etc. The problem is that a random piece of code can't tell if the headers
+have been output yet. A good solution will probably have to wait till we
+have better tools for writing HTML and we get away from pages of print
+statements.
+
+   A method for setting PATH_INFO and PATH_TRANSLATED to meaningful values
+would be handy.
+
+AUTHOR, COPYRIGHT and ACKNOWLEDGEMENTS
+--------------------------------------
+
+   This code is Copyright (C) Tim Bunce 1995. All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+   This module includes ideas from Pratap Pereira
+<pereira@ee.eng.ohio-state.edu>, Jack Shirazi <js@biu.icnet.uk> and others.
+
+   IN NO EVENT SHALL THE AUTHORS BE LIABLE TO ANY PARTY FOR DIRECT,
+INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT OF THE
+USE OF THIS SOFTWARE AND ITS DOCUMENTATION (INCLUDING, BUT NOT LIMITED TO,
+LOST PROFITS) EVEN IF THE AUTHORS HAVE BEEN ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGE.
+
+SEE ALSO
+--------
+
+   CGI::Base, CGI::Request, URI::URL
+
+SUPPORT
+-------
+
+   Please use comp.infosystems.www.* and comp.lang.perl.misc for support.
+Please do _NOT_ contact the author directly. I'm sorry but I just don't
+have the time.
+
+
+File: pm.info,  Node: CGI/Minimal,  Next: CGI/MozSniff,  Prev: CGI/MiniSvr,  Up: Module List
+
+A lightweight CGI form processing pacakge
+*****************************************
+
+NAME
+====
+
+   CGI::Minimal - A lightweight CGI form processing pacakge
+
+SYNOPSIS
+========
+
+     use CGI::Minimal;
+
+     my $cgi = CGI::Minimal->new;
+     if ($cgi->truncated) {
+        &scream_about_bad_form;
+        exit;
+     }
+     my ($form_field_value) = $cgi->param('some_field_name');
+
+DESCRIPTION
+===========
+
+   Provides a micro-weight alternative to the CPAN CGI.pm module
+
+   Rather than attempt to address every possible need of a CGI programmer,
+it provides the _minimum_ functions needed for CGI such as form decoding
+(including file upload forms), URL encoding and decoding, HTTP usable date
+generation (RFC1123 compliant dates) and _basic_ escaping and unescaping
+of HTMLized text.
+
+   The form decoding interface is somewhat compatible with the CGI.pm
+module. No provision is made for generating HTTP or HTML on your behalf -
+you are expected to be conversant with how to put together any HTML or
+HTTP you need.
+
+CHANGES
+=======
+
+     1.06 10 April 2000 - 'Unfixed' use of 'quotemeta' for multipart
+                           boundaries. 'split' is doing the 'wrong thing'
+                           according to the specs...
+
+     1.05 03 April 2000 - Fixed breakage in 'param;' from 1.04 changes
+
+     1.04 03 April 2000 - Added capability to set params via the param() method
+                          like 'CGI.pm' plus general code cleanup
+     
+     1.03 02 March 2000 - 'mod_perl' compatibility added
+
+     1.02 09 June 1999  - Initial public release.
+
+METHODS
+=======
+
+new;
+     Creates a new instance of the CGI::Minimal object and decodes any
+     type of form (GET/POST). Only one 'true' object is generated - all
+     subsequent calls return an alias of the one object (a 'Singleton'
+     pattern).
+
+     Example:
+
+          use CGI::Minimal;
+
+          my $cgi = CGI::Minimal->new;
+
+param([$fieldname]);
+     Called as `$cgi->param();' it returns the list of all defined form
+     fields in the same order they appear in the data from the user agent.
+
+     Called as `$cgi->param($fieldname);' it returns the value (or array
+     of values for multiple occurances of the same field name) assigned to
+     that $fieldname. If there is more than one value, the values are
+     returned in the same order they appeared in the data from user agent.
+
+     Examples:
+
+          my (@form_fields) = $cgi->param;
+
+          my (@multi_pick_field) = $cgi->param('pick_field_name');
+
+          my ($form_field_value) = $cgi->param('some_field_name');
+
+     You can also use the param method to set param values to new values.
+     These values will be returned by any invokation of a CGI::Minimal
+     object as if they had been found in the original passed data.
+
+     Examples:
+
+          $cgi->param( 'name' => 'Joe Shmoe' );
+
+          $cgi->param({ 'name' => 'Joe Shmoe', 'birth_date' => '06/25/1966' });
+
+          $cgi->param({ 'pick_list' => ['01','05','07'] });
+
+param_mime([$fieldname]);
+     Called as `$cgi->param_mime();' it returns the list of all defined
+     form fields in the same order they appear in the data from the user
+     agent.
+
+     Called as `$cgi->param_mime($fieldname);' it returns the MIME type
+     (or array of MIME types for multiple occurances of the same field
+     name) assigned to that $fieldname. If there is more than one value,
+     the values are returned in the same order they appeared in the data
+     from user agent.
+
+     This is only meaningful when doing Form Based File Uploads and should
+     probably not be trusted even then since it depends on the _browser_
+     correctly identifying what it is sending.
+
+param_filename([$fieldname]);
+     Called as `$cgi->param_filename();' it returns the list of all
+     defined form fields in the same order they appear in the data from the
+     user agent.
+
+     Called as `$cgi->param_filename($fieldname);' it returns the file
+     name (or array of file names for multiple occurances of the same field
+     name) assigned to that $fieldname. If there is more than one value,
+     the values are returned in the same order they appeared in the data
+     from user agent.
+
+     This is only meaningful when doing Form Based File Uploads.
+
+date_rfc1123($time);
+     Takes a unix time tick value and returns a RFC1123 compliant date as
+     a formatted text string suitable for direct use in Expires,
+     Last-Modified or other HTTP headers (with the exception of
+     'Set-Cookie', which requires a different format not generated here.
+     See 'CGI::Cookie' for cookie generation).
+
+     Example:
+
+          print "Expires: ",$cgi->date_rfc1123(time + 3600),"\015\012";
+
+calling_parms_table;
+     Returns a formatted HTML table containing all the form and environment
+     variables for debugging purposes
+
+     Example:
+
+          print $cgi->calling_parms_table;
+
+url_encode($string);
+     Returns URL encoding of input string (URL unsafe codes are escaped to
+     %xx form)
+
+     Example:
+
+          my $url_encoded_string = $cgi->url_encode($string);
+
+url_decode($string);
+     Returns URL *decoding* of input string (%xx substitutions are decoded
+     to their actual values).
+
+     Example:
+
+          my $url_decoded_string = $cgi->url_decode($string);
+
+htmlize($string);
+     Returns HTML 'safe' encoding of input string. Replaces &,>,< and "
+     with their named entity codes (&amp, &gt; &lt; and &quot;)
+
+     Example:
+
+          my $html_escaped_string = $cgi->htmlize($string);
+
+dehtmlize($string);
+     Undoes basic HTML encoding of input string. Replaces &amp;, &gt;,
+     &lt; and &quot; named entity codes with their actual values.  NOT a
+     general purpose entity decoder.
+
+truncated;
+     Returns '1' if the read form was shorter than the Content-Length that
+     was specified by the submitting user agent (ie the data from a form
+     uploaded by a web browser was cut off before all the data was
+     received).
+
+     Returns '0' if the form was NOT truncated.
+
+     Example:
+
+          use CGI::Minimal;
+
+          my $cgi = CGI::Minimal->new;
+          if ($cgi->truncated) {
+            &bad_form_upload;
+          } else {
+            &good_form_upload;
+          }
+
+     'truncated' will also return '1' if the form length received would
+     have exceeded the set 'max_read_length'.
+
+CGI::Minimal::max_read_size($size);
+     Sets the maximum number of bytes/octets that the CGI decoder will
+     accept. By default, 1000000 bytes/octets.  This must be called
+     *BEFORE* calling 'new' for the first time for it to actually affect
+     form decoding.
+
+     Example:
+
+          use CGI::Minimal;
+
+          CGI::Minimal::max_read_size(1000000);
+          my $cgi = CGI::Minimal->new;
+
+BUGS
+====
+
+   None known.
+
+TODO
+====
+
+   Who knows?
+
+AUTHORS
+=======
+
+   Benjamin Franz <snowhare@nihongo.org>
+
+VERSION
+=======
+
+   Version 1.06 April 2000
+
+COPYRIGHT
+=========
+
+   Copyright (c) Benjamin Franz 1999,2000. All rights reserved.
+
+     This program is free software; you can redistribute it
+     and/or modify it under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   CGI
+
+
+File: pm.info,  Node: CGI/MozSniff,  Next: CGI/Out,  Prev: CGI/Minimal,  Up: Module List
+
+Sniff out various versions of browsers claming to be "Mozilla".
+***************************************************************
+
+NAME
+====
+
+   *MozSniff* - Sniff out various versions of browsers claming to be
+"Mozilla".
+
+SYNOPSIS
+========
+
+   I got tired of redoing this several times, or using CGI::user_agent(),
+so I wrote my own.
+
+DESCRIPTION
+===========
+
+   You should be able, I hope, to do something like:
+
+     use CGI::MozSniff;
+     my $foo = new CGI::MozSniff;
+     my $bar = $foo->sniff;
+
+   Values for $foo->sniff are:
+
+   * navigator_*$ver* - Netscape Navigator v.*$ver*
+
+   * communicator_*$ver* - Netscape Communicator v.*$ver*
+
+   * msie_*$ver* - Microsoft Internet Explorer v.*$ver*
+
+   * msie_*$ver*_AOL - Microsoft Internet Explorer v.*$ver* (AOL)
+
+   * opera_*$ver* - Opera, a pretty nice browser, as far as Windoze
+     browsers go...
+
+   * other - Some other browser
+
+
+File: pm.info,  Node: CGI/Out,  Next: CGI/PathInfo,  Prev: CGI/MozSniff,  Up: Module List
+
+buffer output when building CGI programs
+****************************************
+
+NAME
+====
+
+   CGI::Out - buffer output when building CGI programs
+
+SYNOPSIS
+========
+
+     use CGI;
+     use CGI::Out;
+
+     $query = new CGI;
+     savequery $query;		# to reconstruct input
+
+     $CGI::Out::mailto = 'fred';	# override default of $<
+
+     out $query->header();
+     out $query->start_html(
+     	-title=>'A test',
+     	-author=>'muir@idiom.com');
+
+     croak "We're outta here!";
+     confess "It was my fault: $!";
+     carp "It was your fault!";
+     warn "I'm confused";
+     die  "I'm dying.\n";
+
+     use CGI::Out qw(carpout $out);
+     carpout(\*LOG);
+     $CGI::Out::$out			# is the buffer
+
+DESCRIPTION
+===========
+
+   This is a helper routine for building CGI programs.  It buffers stdout
+until you're completed building your output.  If you should get an error
+before you are finished, then it will display a nice error message (in
+HTML), log the error, and send email about the problem.
+
+   It wraps all of the functions provided by CGI::Carp and Carp.  Do not
+"use" them directly, instead just "use CGI::Out".
+
+   Instead of print, use out.
+
+AUTHOR
+======
+
+   David Muir Sharnoff <muir@idiom.com>
+
+SEE ALSO
+========
+
+   Carp, CGI::Carp, CGI, CGI::Wrap
+
+BUGS
+====
+
+   No support for formats is provided by CGI::Out.
+
+
+File: pm.info,  Node: CGI/PathInfo,  Next: CGI/Persistent,  Prev: CGI/Out,  Up: Module List
+
+A lightweight CGI processing package for using PATH_INFO like GET method form parameters
+****************************************************************************************
+
+NAME
+====
+
+   CGI::PathInfo - A lightweight CGI processing package for using
+PATH_INFO like GET method form parameters
+
+SYNOPSIS
+========
+
+     use CGI::PathInfo;
+
+     my $path_info = CGI::PathInfo->new;
+     my ($form_field_value) = $path_info->param('some_field_name');
+
+DESCRIPTION
+===========
+
+   Provides a micro-weight equivalent to the CPAN CGI.pm module that
+permits the use of the Apache CGI environment variable 'PATH_INFO' as a
+functional equivalent to the GET method 'QUERY_STRING'.
+
+   Rather than attempt to address every possible need of a CGI programmer,
+it provides the _minimum_ functions needed for CGI such as parameter
+decoding, URL encoding and decoding.
+
+   The parameters decoding interface is somewhat compatible with the
+CGI.pm module. No provision is made for generating HTTP or HTML on your
+behalf - you are expected to be conversant with how to put together any
+HTML or HTTP you need.
+
+CHANGES
+=======
+
+     1.00 21 July 2000  - Initial public release.
+
+METHODS
+=======
+
+new;
+     Creates a new instance of the CGI::PathInfo object and decodes any
+     'PATH_INFO' parameters.
+
+     Example:
+
+          use CGI::PathInfo;
+
+          my $path_info = CGI::PathInfo->new;
+
+     The defaults are for the parameters to be seperated by '/' characters
+     with name/value pairs linked by '-' and with leading or trailing '/'
+     characters ignored.
+
+          Ex:
+
+          $ENV{'PATH_INFO'} = '/yesterday-monday/tomorrow-wednesday';
+
+          decodes to
+
+          'yesterday' -> 'monday'
+
+          'tomorrow' -> 'wednesday'
+
+     Values are read using the 'param' method.
+
+     Any of the defaults may be overridden by specifying them in the
+     invokation of 'new'.
+
+     Example:
+
+          my $path_info = CGI::PathInfo->new({  Eq => '=',
+                                              SplitOn => '&',
+                        });
+
+     It is probably a Bad Idea (tm) to set the Eq or SplitOn values to a
+     letter or a number (A-Za-z0-9) unless you are a wizard at encodings.
+
+     The defaults were chosen to maximize the likelyhood that CGI backed
+     URLs will be crawled by search engines and that MSIE won't try
+     something stupid because of a '.tla' on a URL.
+
+param([$fieldname]);
+     Called as `$path_info->param();' it returns the list of all defined
+     parameter fields in the same order they appear in the data in
+     PATH_INFO.
+
+     Called as `$path_info->param($fieldname);' it returns the value (or
+     array of values for multiple occurances of the same field name)
+     assigned to that $fieldname. If there is more than one value, the
+     values are returned in the same order they appeared in the data from
+     user agent.  If called in a scalar context when several values are
+     present for specified parameter, the *first* value will be returned.
+
+     Examples:
+
+          my (@form_fields) = $path_info->param;
+
+          my (@multi_pick_field) = $path_info->param('pick_field_name');
+
+          my ($form_field_value) = $path_info->param('some_field_name');
+
+     You can also use the param method to set param values to new values.
+     These values will be returned by this CGI::PathInfo object as if they
+     had been found in the originally processed PATH_INFO data. This will
+     not affect a seperately created instance of CGI::PathInfo.
+
+     Examples:
+
+          $path_info->param( 'name' => 'Joe Shmoe' );
+
+          $path_info->param({ 'name' => 'Joe Shmoe', 'birth_date' => '06/25/1966' });
+
+          $path_info->param({ 'pick_list' => ['01','05','07'] });
+
+calling_parms_table;
+     Returns a formatted HTML table containing all the PATH_INFO parameters
+     for debugging purposes
+
+     Example:
+
+          print $path_info->calling_parms_table;
+
+url_encode($string);
+     Returns a URL encoding of the input string.  Anything except
+     0-9a-zA-Z is escaped to %xx form.
+
+     The idea is to reserve all other characters for potential use as
+     parameter or key/value seperators.
+
+     Example:
+
+          my $url_encoded_string = $path_info->url_encode($string);
+
+url_decode($string);
+     Returns URL *decoding* of input string (%xx substitutions are decoded
+     to their actual values).
+
+     Example:
+
+          my $url_decoded_string = $path_info->url_decode($string);
+
+BUGS
+====
+
+   None known.
+
+TODO
+====
+
+   Who knows?
+
+AUTHORS
+=======
+
+   Benjamin Franz <snowhare@nihongo.org>
+
+VERSION
+=======
+
+   Version 1.00 22 July 2000
+
+COPYRIGHT
+=========
+
+   Copyright (c) Benjamin Franz and FreeRun Technologies July 2000. All
+rights reserved.
+
+     This program is free software; you can redistribute it
+     and/or modify it under the same terms as Perl itself.
+
+
+File: pm.info,  Node: CGI/Persistent,  Next: CGI/Pretty,  Prev: CGI/PathInfo,  Up: Module List
+
+Transparent state persistence for CGI applications.
+***************************************************
+
+NAME
+====
+
+   CGI::Persistent - Transparent state persistence for CGI applications.
+
+SYNOPSIS
+========
+
+     use CGI::Persistent;
+
+     my $cgi = new CGI::Persistent "/directory";
+     print $cgi->header ();
+     my $url = $cgi->state_url ();
+     print "<a href=$u>I am a persistent CGI session.</a>";
+
+SOLUTION TO THE STATELESS PROBLEM
+=================================
+
+   HTTP is a stateless protocol; a HTTP server closes connection after
+serving an object. It retains no memory of the request details and doesn't
+relate subsequent requests with what it has already served. While this
+works well for static resources like HTML pages and image elements,
+complex user interactions often require state preservation across multiple
+requests and different parts of the web resource. Statefulness on a
+stateless server is achieved either through client-side mechanisms like
+Netscape cookies (which are considered distasteful on general principles
+of privacy) or with hidden fields in forms and value-attribute pairs in
+the URLs. State preserving URLs are more desirable, because they are
+independent of the client configuration, but tend to get unwieldy with
+increase in space complexity of the application.
+
+   CGI::Persistent solves this problem by introducing persistent CGI
+sessions that store their state data on the server side. When a new
+session starts, CGI::Persistent automatically generates a unique state
+identification string and associates it with a persistent object on the
+server. The identification string is used in URLs or forms to refer to the
+particular session. Request attributes are transparently committed to the
+associated object and the object data is bound to the query.
+
+   CGI::Persistent is derived from CGI.pm. CGI.pm methods have been
+overridden as appropriate. Very few new methods have been added.
+
+METHODS
+=======
+
+new()
+     Creates a new CGI object and binds it to its associated persistent
+     state. A new state image is created if no associated state exists.
+     new() takes two optional arguments. The first argument is the
+     directory of persistence, the place where state information is
+     stored. Ideally, this should be a separate directory dedicated to
+     state files. When a directory is not specified, the current working
+     directory is assumed.
+
+     new() can also take a state id on the argument list instead of
+     getting it from the query. This might be useful if you are using this
+     module to store configuration data that you wish to retain across
+     different sessions.
+
+     Examples:
+
+          $q = new CGI::Persistent;
+          $q = new CGI::Persistent "/dope";
+          $q = new CGI::Persistent  undef, "/dope/924910985.134";
+
+state_url()
+     Returns a URL with the state identification string. This URL should
+     be used for referring to the persistent session associated with the
+     query.
+
+state_field()
+     Returns a hidden INPUT type for inclusion in HTML forms. Like
+     state_url(), this element is used in forms to refer to the associated
+     persistent session.
+
+delete()
+     delete() is an overridden method that deletes a named attribute from
+     the query.  The persistent object field associated with the attribute
+     is also deleted.
+
+     Important note: Attributes that are NOT explicitly delete()ed will
+     lurk about and come back to haunt you. Remember to clear control
+     attributes and other context dependent fields that need clearing. See
+     `delete()', *Note CGI: CGI,.
+
+delete_all()
+     Another overridden method. Deletes all attributes as well as the
+     persistent disk image of the session. This method should be used when
+     you want to irrevocably destroy a session. See `delete_all()', *Note
+     CGI: CGI,.
+
+EXAMPLES
+========
+
+   The accompanying CGI example, roach.cgi, illustrates the features of the
+module by implementing a multi-page input form.
+
+SEE ALSO
+========
+
+   CGI(3), Persistence::Object::Simple(3)
+
+AUTHOR
+======
+
+   Vipul Ved Prakash, mail@vipul.net
+
+
+File: pm.info,  Node: CGI/Pretty,  Next: CGI/PrintWrapper,  Prev: CGI/Persistent,  Up: Module List
+
+module to produce nicely formatted HTML code
+********************************************
+
+NAME
+====
+
+   CGI::Pretty - module to produce nicely formatted HTML code
+
+SYNOPSIS
+========
+
+     use CGI::Pretty qw( :html3 );
+
+     # Print a table with a single data element
+     print table( TR( td( "foo" ) ) );
+
+DESCRIPTION
+===========
+
+   CGI::Pretty is a module that derives from CGI.  It's sole function is to
+allow users of CGI to output nicely formatted HTML code.
+
+   When using the CGI module, the following code:     print table( TR( td(
+"foo" ) ) );
+
+   produces the following output:     <TABLE><TR><TD>foo</TD></TR></TABLE>
+
+   If a user were to create a table consisting of many rows and many
+columns, the resultant HTML code would be quite difficult to read since it
+has no carriage returns or indentation.
+
+   CGI::Pretty fixes this problem.  What it does is add a carriage return
+and indentation to the HTML code so that one can easily read it.
+
+     print table( TR( td( "foo" ) ) );
+
+   now produces the following output:     <TABLE>        <TR>
+<TD>              foo           </TD>        </TR>     </TABLE>
+
+Tags that won't be formatted
+----------------------------
+
+   The <A> and <PRE> tags are not formatted.  If these tags were
+formatted, the user would see the extra indentation on the web browser
+causing the page to look different than what would be expected.  If you
+wish to add more tags to the list of tags that are not to be touched, push
+them onto the `@AS_IS' array:
+
+     push @CGI::Pretty::AS_IS,qw(CODE XMP);
+
+Customizing the Indenting
+-------------------------
+
+   If you wish to have your own personal style of indenting, you can
+change the `$INDENT' variable:
+
+     $CGI::Pretty::INDENT = "\t\t";
+
+   would cause the indents to be two tabs.
+
+   Similarly, if you wish to have more space between lines, you may change
+the `$LINEBREAK' variable:
+
+     $CGI::Pretty::LINEBREAK = "\n\n";
+
+   would create two carriage returns between lines.
+
+   If you decide you want to use the regular CGI indenting, you can easily
+do the following:
+
+     $CGI::Pretty::INDENT = $CGI::Pretty::LINEBREAK = "";
+
+BUGS
+====
+
+   This section intentionally left blank.
+
+AUTHOR
+======
+
+   Brian Paulsen <Brian@ThePaulsens.com>, with minor modifications by
+Lincoln Stein <lstein@cshl.org> for incorporation into the CGI.pm
+distribution.
+
+   Copyright 1999, Brian Paulsen.  All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   Bug reports and comments to Brian@ThePaulsens.com.  You can also write
+to lstein@cshl.org, but this code looks pretty hairy to me and I'm not
+sure I understand it!
+
+SEE ALSO
+========
+
+   *Note CGI: CGI,
+
+
+File: pm.info,  Node: CGI/PrintWrapper,  Next: CGI/Push,  Prev: CGI/Pretty,  Up: Module List
+
+CGI methods output to a print handle
+************************************
+
+NAME
+====
+
+   CGI::PrintWrapper - CGI methods output to a print handle
+
+SYNOPSIS
+========
+
+     use CGI::PrintHandle;
+     use IO::Scalar; # just an example
+     use HTML::Stream; # continuing the example
+
+     # Fine, there really is no such tag as "WEAK":
+     HTML::Stream->accept_tag ('WEAK');
+
+     my $content = '';
+     my $handle = IO::Scalar->new (\$content);
+     my $cgi = CGI::PrintHandle ($handle);
+     my $html = HTML::Stream->new ($handle);
+
+     # Not a very exciting example:
+     $cgi->start_form;
+     $html->WEAK->t ('I am form: hear me submit.')->_WEAK;
+     $cgi->submit;
+     $cgi->end_form;
+
+     print "$content\n";
+     <FORM METHOD="POST"  ENCTYPE="application/x-www-form-urlencoded">
+     <WEAK>I am form: hear me submit.</WEAK><INPUT TYPE="submit" NAME=".submit"></FORM>
+
+DESCRIPTION
+===========
+
+   *CGI::PrintWrapper* arranges for CGI methods to output their results by
+printing onto an arbitrary handle.  This gets around the problem that the
+CGI's subs return strings, which may be inconvient when you wish to use
+CGI for something besides CGI script processing.
+
+   You could just call print yourself on the appropriate file handle, but
+there are many contexts in which it is cleaner to provide the extra
+abstraction (such as mixing CGI with *HTML::Stream*, the problem which
+prompted my solution, illustrated above).
+
+   *CGI::PrintWrapper* creates the necessary callbacks for printing
+dynamically, updating the symbol table as it encounters a new CGI method.
+
+CONSTRUCTOR
+===========
+
+`new ($h)'
+     Creates a new *CGI::PrintWrapper*, printing the results of CGI
+     methods onto the print handle object, $h.
+
+`new ($h, @cgi_args)'
+     Creates a new *CGI::PrintWrapper*, printing the results of CGI
+     methods onto the print handle object, $h, and using the additional
+     arguments to construct the CGI object.
+
+METHODS
+=======
+
+`cgi ( )'
+     Returns the underlying CGI object.  This is handy for invoking methods
+     on the object whose result you do not wish to print, such as param().
+
+`io ( )'
+     Returns the underlying print handle object.
+
+AUTOLOAD
+     Initially, *CGI::PrintWrapper* has no methods (except as mentioned
+     above).  As the caller invokes CGI methods, AUTOLOAD creates
+     anonymous subroutines to perform the actual CGI method call
+     indirection and print the results with the print handle object.  It
+     also updates the symbol table for *CGI::PrintWrapper* so that future
+     calls can bypass AUTOLOAD.  This makes a *CGI::PrintWrapper* object
+     transparently a CGI object, usable as a drop-in replacement.
+
+SEE ALSO
+========
+
+   *Note CGI: CGI,, *Note IO/Scalar: IO/Scalar,, *Note HTML/Stream:
+HTML/Stream,, `print', *Note Perlfunc: (perl.info)perlfunc,
+
+   CGI is the canonical package for working with fill-out forms on the
+web.  It is particularly useful for generating HTML for such forms.
+
+   *IO::Scalar* is a handy package for treating a string as an object
+supporting IO handle semantics.
+
+   *HTML::Stream* is a nice package for writing HTML markup and content
+into an IO handle with stream semantics.  It's main drawback is lack of
+support for HTML 4.0.
+
+DIAGNOSTICS
+===========
+
+   The following are the diagnostics generated by *Class::Class*.  Items
+marked "(W)" are non-fatal (invoke `Carp::carp'); those marked "(F)" are
+fatal (invoke `Carp::croak').
+
+No print handle
+     (F) The caller tried to create a new `CGI::PrintWrapper' without
+     supplying the mandatory first argument, a print handle:
+
+          $cgi = CGI::PrintWrapper->new;
+
+'%s' is not a print handle
+     (F) The caller tried to create a new `CGI::PrintWrapper' using an
+     object which does not support print as the mandatory first argument.
+
+Couldn't create CGI object because %s
+     (F) The caller tried to create a new `CGI::PrintWrapper' using bad
+     addtional arguments to the constructor for CGI.
+
+BUGS AND CAVEATS
+================
+
+   There is no way of controlling now to use CGI, for example, if you
+wished to precompile all the methods.  Instead, you should make the
+appropriate call to use yourself for CGI, in addition to that for
+*CGI::PrintWrapper*, thus:
+
+     use CGI qw(:compile);
+     use CGI::PrintWrapper;
+
+AUTHORS
+=======
+
+   B. K. Oxley (binkley) at Home <binkley@bigfoot.com>.  I am grateful to
+my employer, DataCraft, Inc., for time spent preparing this package for
+public consumption.
+
+COPYRIGHT
+=========
+
+     $Id: PrintWrapper.pm,v 1.8 1999/12/30 13:38:06 binkley Exp $
+
+     Copyright 1999, B. K. Oxley (binkley).
+
+   This library is free software; you may redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: CGI/Push,  Next: CGI/QuickForm,  Prev: CGI/PrintWrapper,  Up: Module List
+
+Simple Interface to Server Push
+*******************************
+
+NAME
+====
+
+   CGI::Push - Simple Interface to Server Push
+
+SYNOPSIS
+========
+
+     use CGI::Push qw(:standard);
+
+     do_push(-next_page=>\&next_page,
+             -last_page=>\&last_page,
+             -delay=>0.5);
+
+     sub next_page {
+         my($q,$counter) = @_;
+         return undef if $counter >= 10;
+         return start_html('Test'),
+                h1('Visible'),"\n",
+                "This page has been called ", strong($counter)," times",
+                end_html();
+     }
+
+     sub last_page {
+         my($q,$counter) = @_;
+         return start_html('Done'),
+                h1('Finished'),
+                strong($counter - 1),' iterations.',
+                end_html;
+     }
+
+DESCRIPTION
+===========
+
+   CGI::Push is a subclass of the CGI object created by CGI.pm.  It is
+specialized for server push operations, which allow you to create animated
+pages whose content changes at regular intervals.
+
+   You provide CGI::Push with a pointer to a subroutine that will draw one
+page.  Every time your subroutine is called, it generates a new page.  The
+contents of the page will be transmitted to the browser in such a way that
+it will replace what was there beforehand.  The technique will work with
+HTML pages as well as with graphics files, allowing you to create animated
+GIFs.
+
+   Only Netscape Navigator supports server push.  Internet Explorer
+browsers do not.
+
+USING CGI::Push
+===============
+
+   CGI::Push adds one new method to the standard CGI suite, do_push().
+When you call this method, you pass it a reference to a subroutine that is
+responsible for drawing each new page, an interval delay, and an optional
+subroutine for drawing the last page.  Other optional parameters include
+most of those recognized by the CGI header() method.
+
+   You may call do_push() in the object oriented manner or not, as you
+prefer:
+
+     use CGI::Push;
+     $q = new CGI::Push;
+     $q->do_push(-next_page=>\&draw_a_page);
+
+     -or-
+
+     use CGI::Push qw(:standard);
+     do_push(-next_page=>\&draw_a_page);
+
+   Parameters are as follows:
+
+-next_page
+          do_push(-next_page=>\&my_draw_routine);
+
+     This required parameter points to a reference to a subroutine
+     responsible for drawing each new page.  The subroutine should expect
+     two parameters consisting of the CGI object and a counter indicating
+     the number of times the subroutine has been called.  It should return
+     the contents of the page as an array of one or more items to print.
+     It can return a false value (or an empty array) in order to abort the
+     redrawing loop and print out the final page (if any)
+
+          sub my_draw_routine {
+              my($q,$counter) = @_;
+              return undef if $counter > 100;
+              return start_html('testing'),
+                     h1('testing'),
+                     "This page called $counter times";
+          }
+
+     You are of course free to refer to create and use global variables
+     within your draw routine in order to achieve special effects.
+
+-last_page
+     This optional parameter points to a reference to the subroutine
+     responsible for drawing the last page of the series.  It is called
+     after the -next_page routine returns a false value.  The subroutine
+     itself should have exactly the same calling conventions as the
+     -next_page routine.
+
+-type
+     This optional parameter indicates the content type of each page.  It
+     defaults to "text/html".  Normally the module assumes that each page
+     is of a homogenous MIME type.  However if you provide either of the
+     magic values "heterogeneous" or "dynamic" (the latter provided for the
+     convenience of those who hate long parameter names), you can specify
+     the MIME type - and other header fields - on a per-page basis.  See
+     "heterogeneous pages" for more details.
+
+-delay
+     This indicates the delay, in seconds, between frames.  Smaller delays
+     refresh the page faster.  Fractional values are allowed.
+
+     *If not specified, -delay will default to 1 second*
+
+-cookie, -target, -expires, -nph
+     These have the same meaning as the like-named parameters in
+     CGI::header().
+
+     If not specified, -nph will default to 1 (as needed for many servers,
+     see below).
+
+Heterogeneous Pages
+-------------------
+
+   Ordinarily all pages displayed by CGI::Push share a common MIME type.
+However by providing a value of "heterogeneous" or "dynamic" in the
+do_push() -type parameter, you can specify the MIME type of each page on a
+case-by-case basis.
+
+   If you use this option, you will be responsible for producing the HTTP
+header for each page.  Simply modify your draw routine to look like this:
+
+     sub my_draw_routine {
+         my($q,$counter) = @_;
+         return header('text/html'),   # note we're producing the header here
+                start_html('testing'),
+                h1('testing'),
+                "This page called $counter times";
+     }
+
+   You can add any header fields that you like, but some (cookies and
+status fields included) may not be interpreted by the browser.  One
+interesting effect is to display a series of pages, then, after the last
+page, to redirect the browser to a new URL.  Because redirect() does
+b<not> work, the easiest way is with a -refresh header field, as shown
+below:
+
+     sub my_draw_routine {
+         my($q,$counter) = @_;
+         return undef if $counter > 10;
+         return header('text/html'),   # note we're producing the header here
+                start_html('testing'),
+                h1('testing'),
+                "This page called $counter times";
+     }
+
+     sub my_last_page {
+         return header(-refresh=>'5; URL=http://somewhere.else/finished.html',
+                       -type=>'text/html'),
+                start_html('Moved'),
+                h1('This is the last page'),
+                'Goodbye!'
+                hr,
+                end_html;
+     }
+
+Changing the Page Delay on the Fly
+----------------------------------
+
+   If you would like to control the delay between pages on a page-by-page
+basis, call push_delay() from within your draw routine.  push_delay()
+takes a single numeric argument representing the number of seconds you
+wish to delay after the current page is displayed and before displaying
+the next one.  The delay may be fractional.  Without parameters,
+push_delay() just returns the current delay.
+
+INSTALLING CGI::Push SCRIPTS
+============================
+
+   Server push scripts must be installed as no-parsed-header (NPH) scripts
+in order to work correctly on many servers.  On Unix systems, this is most
+often accomplished by prefixing the script's name with "nph-".
+Recognition of NPH scripts happens automatically with WebSTAR and
+Microsoft IIS.  Users of other servers should see their documentation for
+help.
+
+   Apache web server from version 1.3b2 on does not need server push
+scripts installed as NPH scripts: the -nph parameter to do_push() may be
+set to a false value to disable the extra headers needed by an NPH script.
+
+AUTHOR INFORMATION
+==================
+
+   Copyright 1995-1998, Lincoln D. Stein.  All rights reserved.
+
+   This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   Address bug reports and comments to: lstein@cshl.org
+
+BUGS
+====
+
+   This section intentionally left blank.
+
+SEE ALSO
+========
+
+   *Note CGI/Carp: CGI/Carp,, *Note CGI: CGI,
+
+
+File: pm.info,  Node: CGI/QuickForm,  Next: CGI/Request,  Prev: CGI/Push,  Up: Module List
+
+Perl module to provide quick CGI forms.
+***************************************
+
+NAME
+====
+
+   CGI::QuickForm - Perl module to provide quick CGI forms.
+
+SYNOPSIS
+========
+
+     # Minimal example. (Insecure no error checking.)
+
+     #!/usr/bin/perl -w
+     use strict ;
+     use CGI qw( :standard :html3 ) ;
+     use CGI::QuickForm ;
+
+     show_form(
+         -ACCEPT => \&on_valid_form, # You must supply this subroutine.
+         -TITLE  => 'Test Form',
+         -FIELDS => [
+             { -LABEL => 'Name', },  # Default field type is textfield.
+             { -LABEL => 'Age',  },  # Stored in param( 'Age' ).
+         ],
+     ) ;
+
+     sub on_valid_form {
+         my $name = param( 'Name' ) ;
+         my $age  = param( 'Age' ) ;
+         open PEOPLE, ">>people.tab" ;
+         print PEOPLE "$name\t$age\n" ;
+         close PEOPLE ;
+         print header, start_html( 'Test Form Acceptance' ),
+             h3( 'Test Form Data Accepted' ),
+             p( "Thank you $name for your data." ), end_html ;
+     }
+
+     # All QuickForm options (aide memoir)
+
+     #!/usr/bin/perl -w
+     use strict ;
+     use CGI qw( :standard :html3 ) ;
+     use CGI::QuickForm ;
+
+     show_form(
+         -ACCEPT           => \&on_valid_form,
+         -BORDER           => 0,
+         -FOOTER           => undef,
+         -HEADER           => undef,
+         -INTRO            => undef,
+         -LANGUAGE         => 'en',
+         -USER_REQUIRED    => undef,
+         -USER_INVALID     => undef,
+         -TITLE            => 'Test Form',
+         -REQUIRED_HTML    => '<span style="font-weight:bold;color:BLUE">+</span>',
+         -INVALID_HTML     => '<span style="font-weight:bold;color:RED">*</span>',
+         -VALIDATE         => undef,       # Set this to validate the entire record
+         -SIZE             => undef,
+         -MAXLENGTH        => undef,
+         -ROWS             => undef,
+         -COLUMNS          => undef,
+         -CHECK            => 1,
+         -SPACE            => 0, # Output some newlines to assist debugging if 1
+         -MULTI_COLUMN     => 0,
+         -NAME             => undef,
+         -ONSUBMIT         => undef,
+         -JSCRIPT          => {},
+         -STYLE_FIELDNAME  => '',
+         -STYLE_FIELDVALUE => '',
+         -STYLE_BUTTONS    => '',
+         -STYLE_ROW        => '',
+         -STYLE_WHY        => '',
+         -TABLE_OPTIONS    => '',
+         -FIELDS           => [
+             {
+                 -LABEL            => 'Personal Details',
+                 -HEADLINE         => 1,
+                 -STYLE_FIELDNAME  => '',
+                 -COLSPAN          => 2,
+                 -END_ROW          => 1,
+             },
+             {
+                 -LABEL            => 'Name',
+                 -START_ROW        => 1,
+                 -END_ROW          => 1,
+                 -COLSPAN          => 1,
+                 -REQUIRED         => undef,
+                 -TYPE             => 'textfield',
+                 -VALIDATE         => undef, # Set this to validate the field
+                 -CLEAN            => undef, # Set this to clean up valid data
+                 -DESC             => undef,
+                 -STYLE_FIELDNAME  => '', # If set over-rides form-level setting
+                 -STYLE_FIELDVALUE => '', # If set over-rides form-level setting
+                 -STYLE_ROW        => '', # If set over-rides form-level setting
+                 # Lowercase options are those supplied by CGI.pm
+                 -name             => undef, # Defaults to -LABEL's value.
+                 -default          => undef,
+                 -size             => 30,
+                 -maxlength        => undef,
+             },
+             # For all others: same QuickForm options as above
+             # and all CGI.pm options (which vary with -TYPE) available
+             {
+                 -LABEL     => 'Address',
+                 -TYPE      => 'textarea',
+                 -rows      => 3,
+                 -columns   => 40,
+             },
+             {
+                 -LABEL     => 'Password',
+                 -TYPE      => 'password_field',
+             },
+             {
+                 -LABEL     => 'Hair colour',
+                 -TYPE      => 'scrolling_list',
+                 '-values'  => [ qw( Red Black Brown Grey White ) ],
+                 -size      => 1,
+                 -multiples => undef,
+             },
+             {
+                 -LABEL     => 'Worst Sport',
+                 -TYPE      => 'radio_group',
+                 -values    => [ qw( Boxing Cricket Golf ) ],
+                 -default   => 'Golf',
+             },
+             # Any other CGI.pm field can be used in the same way.
+         ],
+         -BUTTONS           => [
+             { -name => 'Add'    },
+             { -name => 'Edit'   },
+             { -name => 'List'   },
+             { -name => 'Remove' },
+             { -name => 'Clear', -DEFAULTS => 1 },
+         ],
+     ) ;
+
+DESCRIPTION
+===========
+
+   `show_form', provides a quick and simple mechanism for providing
+on-line CGI forms.
+
+   When `show_form' executes it presents the form with the fields
+requested.  As you can see from the minimal example at the beginning of
+the synopsis it will default everything it possibly can to get you up and
+running as quickly as possible.
+
+   If you have specified any validation it will validate when the user
+presses the submit button. If there is an error it will re-present the
+form with the erroneous fields marked and with all the data entered in
+tact. This is repeated as often as needed. Once the user has corrected all
+errors and the data is valid then your `&on_valid_form' subroutine will be
+called so that you can process the valid data in any way you wish.
+
+   Note that EXAMPLE #1 and EXAMPLE #2 are in this pod; `example1',
+`example2', etc. are supplied as files.
+
+QuickForm form-level (record-level) options
+-------------------------------------------
+
+`-ACCEPT'
+     Required subroutine reference. This is a reference to the subroutine
+     to execute when the form is successfully completed, i.e. once all the
+     fields and the whole record are valid (either because no validation
+     was requested or because every validation subroutine called returned
+     true). The parameters are accessible via `CGI.pm', so your
+     `&on_valid_form' may look something like this:
+
+          sub on_valid_form {
+              my $first_param  = param( 'first' ) ;
+              my $second_param = param( 'second' ) ;
+              my $third_param  = param( 'third' ) ;
+
+          # Process, e.g. send an email or write a record to a file or database.
+          # Give the user a thank you.
+              }
+
+`-BORDER'
+     Optional integer. This is the border width. Default is zero. You would
+     normally set this to 1 if you are using `-DESC' to add textual
+     descriptions to your fields.
+
+`-BUTTONS'
+     Optional array reference. This is an array of submit buttons. The
+     buttons appear at the bottom of the form, after all the fields. Each
+     button is defined as an anonymous hash, e.g.
+
+          -BUTTONS    => [
+              { -name => 'New'    },
+              { -name => 'Update' },
+              ],
+
+     although any other legitimate `CGI.pm' options may also be given, e.g.
+
+          -BUTTONS    => [
+              { -name => 'New',    -value => 'BUTTON_NEW'    },
+              { -name => 'Update', -value => 'BUTTON_UPDATE' },
+              ],
+
+     If you want a button which resets the form to its default values then
+     create an entry like this:
+
+          { -name => 'Clear', -DEFAULTS => 1 },
+
+     If no `-BUTTONS' option array reference is given it will be created
+     with `{ -name =< 'Submit' }' by default. Note that this option
+     replaces the `-BUTTONLABEL' option. If `-BUTTONLABEL' is used it will
+     be converted into the new form automatically so old scripts will not
+     be broken. However use of `-BUTTONS' is recommended for all new work.
+     To see which button has been pressed you might use code like this in
+     your on_valid_form subroutine:
+
+          if( param( 'New' ) ) {
+              # New pressed
+          }
+          elsif( param( 'Update' ) ) {
+              # Update pressed
+          }
+          # etc.
+
+`-CHECK'
+     Optional boolean, default is true. When `show_form' is called it will
+     check (i.e. do validation) providing there are parameters (i.e. the
+     user has filled in the form) and if `-CHECK' is true. This option
+     would not normally be used. However if you have links which call your
+     form with some parameters (e.g. default values), you will want the
+     form to be displayed with the defaults but *without* any validation
+     taking place in the first instance. In this situation you would set
+     `-CHECK' to false. Thus we must cope with the following scenarios:
+
+       1. Form is called with no params - must display blank form and
+          validate when the user presses a button;
+
+       2. Form is called with params (e.g. by clicking a link we've
+          provided) - must display form with any defaults and not validate
+          until the user presses a button;
+
+       3. Form is called with params (as the result of the user pressing a
+          button) - validation must take place.
+
+          To achieve the above we need to add an extra field=value pair to
+     the URL we provide and if that is present then skip validation. The
+     field's name must not be one of the form's fields! e.g.
+
+          # If it is to be called from one of our own URLs with something like
+          # www.mysite.com/cgi-bin/myscript?colour=green&size=large
+          # then we must add in the extra field=value and write the preceeding link
+          # for example as:
+          # www.mysite.com/cgi-bin/myscript?QFCHK=0&colour=green&size=large
+          # We then use query_string() to set -CHECK to 0 and show the form with the
+          # defaults without validating - we'll validate when they press a button.
+          # If its been called as something like www.mysite.com/cgi-bin/myscript
+          # then set -CHECK to 1 which gives us standard behaviour:
+          # i.e. if there are params then show_form will validate; otherwise it will
+          # show the blank form.
+          show_form(
+              -CHECK => ( query_string() =~ /QFCHK=0/o ? 0 : 1 ),
+              # etc
+              ) ;
+
+          # Or more verbosely:
+          my $Check = 1 ;
+          $Check    = 0 if query_string() =~ /QFCHK=0/o ;
+          show_form(
+              -CHECK => $Check,
+              # etc
+              ) ;
+
+     Note that QuickForm discards any query string if it reinvokes itself
+     because of invalid data. This is useful because it means you can use
+     the query string to distinguish between a 'first time' call and
+     subsequent calls as we do here with -CHECK. However if you want a
+     query string parameter to survive these calls we must extract them
+     and pass them ourselves, e.g. via a hidden field.
+
+`-FOOTER'
+     Optional string. This is used to present any text following the form
+     and if used it must include everything up to and including final
+     "</html>", e.g.:
+
+          my $footer = p( "Thank's for your efforts." ) .
+                       h6( "Copyright (c) 1999 Summer plc" ) . end_html ;
+
+          show_form(
+              -FOOTER => $footer,
+              # etc
+
+`-HEADER'
+     Optional string. This is used to present your own title and text
+     before the form proper. If you use this it must include everything
+     from "Content-type: text/html" onwards. For example:
+
+          my $header = header . start_html( "This is my Title" ) .
+                       h2( "My new Form" ) . p( "Please answer the questions!" ) ;
+
+          show_form(
+              -HEADER => $header,
+              # etc
+
+`-INTRO'
+     Optional string. If you specify `-TITLE' you may want to specify this
+     field too; it puts a paragraph of text before the form. The English
+     default is "Please enter the information.", there is a default for
+     each supported language (see `-LANGUAGE').
+
+`-INVALID_HTML'
+     Optional HTML string. Default is:
+
+          <span style="font-weight:bold;color:RED">*</span>
+
+     You can over-ride this to set your own marker to indicate an invalid
+     field.  You could use an image tag for example:
+
+          <img src="/images/invalid.jpg" alt="*" />
+
+     Note that if you use your own `-USER_REQUIRED' or `-USER_INVALID'
+     strings, this string will replace the sequence `~I~' if it occurs.
+
+     See `example1' and the companion option `-REQUIRED_HTML'.
+
+`-JSCRIPT'
+     Optional hash reference; should contain at least one element 'src'
+     which should contain some Javascript, e.g.
+
+          -JSCRIPT => { src => 'document.Address.myfield.focus()' },
+
+     This is just a wrapper for CGI.pm's `-script' option. (See `-NAME' and
+     `-ONSUBMIT'.)
+
+`-LANGUAGE'
+     Optional string. This option accepts 'en' (english), 'cy' (welsh),
+     'de' (german), 'es' (spanish) and 'fr' (french) - the French
+     translation was done by Babelfish - see CHANGES for the human
+     translators. ('english' is also supported for backward
+     compatibility.) If people provide me with translations I will add
+     other languages. This is used for the presentation of messages to the
+     user, e.g.:
+
+          Please enter the information.
+          Fields marked with + are required.
+          Fields marked with * contain errors or are empty.
+
+     If you want to create your own 'required' or 'invalid' strings using
+     the `-USER_REQUIRED' and/or `-USER_INVALID' options you must set
+     `-LANGUAGE' to 'user'.
+
+     See `example1'.
+
+`-MULTI_COLUMN'
+     Optional boolean (default false). If false QuickForm behaves as it
+     always has producing a two column table, the first column with field
+     names and the second column with field values. If true QuickForm will
+     put all field names and field values in the same row, except where
+     you force a new row to be used by marking some fields with `-END_ROW
+     =' 1,>. See the field-level options `-START_ROW', `-END_ROW' and
+     `-COLSPAN'. See `example2' and `example4' which have been updated to
+     demonstrate these options.
+
+`-NAME'
+     Optional string. If specified this string is given to the start_form()
+     function as its `-name' option; used for identifying the form for
+     Javascript.  (See `-JSCRIPT' and `-ONSUBMIT'.)
+
+`-ONSUBMIT'
+     Optional string. If specified this string is given to the start_form()
+     function as its `-onSubmit' option; used with Javascript.  (See
+     `-JSCRIPT' and `-NAME'.)
+
+`-REQUIRED_HTML'
+     Optional HTML string. Default is:
+
+          <span style="font-weight:bold;color:BLUE">+</span>
+
+     You can over-ride this to set your own marker to indicate a required
+     field.
+
+     Note that if you use your own `-USER_REQUIRED' or `-USER_INVALID'
+     strings, this string will replace the sequence `~R~' if it occurs.
+
+     See `example1' and the companion option `-INVALID_HTML'.
+
+`-TITLE'
+     Required string (unless you use `-HEADER'). This is used as the
+     form's title and as a header on the form's page - unless you use the
+     `-HEADER' option (see above) in which case this option is ignored.
+
+`-USER_INVALID'
+     Optional string. If specified you must set `-LANGUAGE' to 'user' and
+     if you are not writing English then you'll need to set
+     `-USER_REQUIRED' too.
+
+     This string is used as the error text for invalid fields. If it
+     contains the character sequence `~I~' that sequence will be replaced
+     with the HTML used to signify an invalid field (which you can
+     override by setting `-INVALID_HTML').
+
+`-USER_REQUIRED'
+     Optional string. If specified you must set `-LANGUAGE' to 'user' and
+     if you are not writing English then you'll need to set
+     `-USER_INVALID' too.
+
+     This string is used as the error text for required fields. If it
+     contains the character sequence `~R~' that sequence will be replaced
+     with the HTML used to signify a required field (which you can
+     override by setting `-REQUIRED_HTML').
+
+`-VALIDATE'
+     Optional subroutine reference. This routine is called after each
+     individual field has been validated. It is given the fields in a
+     name=>value hash. It should either return a simple true (valid) or
+     false (invalid) or a two element list, the first element being a
+     true/false value and the second value either an empty string or an
+     (html) string which gives the reason why the record is invalid.
+     Typically it may have this structure:
+
+          sub valid_record {
+              my %field = @_ ;
+              my $valid = 1 ;
+              # Do some multi-field validation, e.g.
+              if( $field{'colour'} eq 'blue' and
+                  $field{'make'} eq 'estate' ) {
+                  $valid = 0 ; # No blue estates available.
+              }
+              # etc.
+              $valid ; # Return the valid variable which may now be false.
+          }
+
+     or now (preferred style):
+
+          sub valid_record {
+              my %field = @_ ;
+              my $valid = 1 ;
+              my $why   = '' ;
+              # Do some multi-field validation, e.g.
+              if( $field{'colour'} eq 'blue' and
+                  $field{'make'} eq 'estate' ) {
+                $valid = 0 ; # No blue estates available.
+                $why   = '<b><i>No blue estates available</i></b>' ;
+              }
+              # etc.
+              ( $valid, $why ) ;
+          }
+
+     *Both syntaxes work so no existing code need be changed.* If the
+     record is invalid the `$why' element will be shown near the top of
+     the form just before the fields themselves, otherwise (i.e. if the
+     record is valid) it will be ignored.
+
+`-COLUMNS'
+     Optional integer. If set then any `-TYPE => textarea' will have a
+     `-columns' set to this value unless an explicit `-columns' is given.
+
+`-MAXLENGTH'
+     Optional integer. If set then any `-TYPE => textfield' will have a
+     `-maxlength' set to this value unless an explicit `-maxlength' is
+     given.
+
+`-ROWS'
+     Optional integer. If set then any `-TYPE => textarea' will have a
+     `-rows' set to this value unless an explicit `-rows' is given.
+
+`-SIZE'
+     Optional integer. If set then any `-TYPE => textfield' will have a
+     `-size' set to this value unless an explicit `-size' is given. For
+     example:
+
+          show_form(
+             -ACCEPT => \&on_valid_form, # You must supply this subroutine.
+             -TITLE  => 'Test Form',
+             -SIZE   => 50,
+             -FIELDS => [
+                 { -LABEL => 'Name', },
+                 { -LABEL => 'Age',  },
+             ],
+              ) ;
+              # Both the fields will be textfields because that is the default and both
+              # will have a -size of 50.
+
+          show_form(
+              -ACCEPT    => \&on_valid_form, # You must supply this subroutine.
+              -TITLE     => 'Test Form',
+              -SIZE      => 50,
+              -MAXLENGTH => 70,
+              -FIELDS => [
+                  {
+                      -LABEL => 'Name',
+                      -CLEAN => \&cleanup, # You must supply this (see later).
+                  },
+                  { -LABEL => 'Age',  },
+                  {
+                      -LABEL => 'Country',
+                                # Here we upper case the country.
+                      -CLEAN => sub { local $_ = shift ; tr/a-z/A-Z/ ; $_ },
+                      -size  => 20,
+                  },
+              ],
+          ) ;
+          # All three fields will be textfields. Name and Age will have a -size of
+          # 50 but Country will have a -size of 20. All three will have a -maxlength
+          # of 70.
+
+
+     These options apply globally and are documented under Styles later.
+
+`-SPACE'
+     Optional integer. If true then QuickForm will output some newlines to
+     help make the HTML more human readable for debugging; otherwise no
+     additional whitespace is added. Defaults to false.
+
+     =item `-FIELDS'
+
+     Required array reference. This is an array of hashes; there must be
+     at least one. The fields are displayed in the order given. The
+     options available in each field hash are covered in the next section.
+
+QuickForm field-level options
+-----------------------------
+
+`-CLEAN'
+     Optional subroutine reference. If specified this subroutines will be
+     called for the relevant field if and only if the whole record is
+     valid, i.e. just before calling your `on_valid_form' subroutine. It
+     will receive a single parameter (the value of the relevant param),
+     and must return a new value. A typical routine might clean up excess
+     whitespace, e.g.:
+
+          sub cleanup {
+              local $_ = shift ; # This is the value of param( <fieldname> )
+
+          tr/\t \n\r\f/ /s ; # Convert multiple whitespace to one space.
+          s/^\s*//o ;        # Remove leading whitespace.
+          s/\s*$//o ;        # Remove trailing whitespace.
+
+          $_ ;
+              }
+
+`-COLSPAN'
+     Optional integer. Default is 1; ignored if `-MULTI_COLUMN' is false.
+     If you choose `-MULTI_COLUMN' and want some fields to span multiple
+     rows then you can use this option to define how many rows are
+     spanned. (Note that every field is two rows wide, one for the
+     fieldname and one for the fieldvalue.)
+
+`-DESC'
+     Optional string. This is a short piece of descriptive text which
+     appears above the field and is used to give the user a little
+     guidance on what they should choose or enter. Normally if you use
+     these then you would set the form-level `-BORDER' option to 1 to help
+     visually group the field and its descriptive text.
+
+`-HEADLINE'
+     Optional boolean. Default is false. If set to true then instead of
+     inserting a field, QuickForm will insert a label. This is used to
+     separate blocks of input fields - see `example2'. If this is true
+     then you will probably want to set `-STYLE_FIELDNAME', e.g. to make
+     the text stand out; and also `-COLSPAN' to the number of columns in
+     the form if using `-MULTI_COLUMN'. The `-LABEL' is the text that will
+     be displayed. If using `-MULTI_COLUMN' any field that preceeds
+     `-HEADLINE' should normally set `-END_ROW' to true; this isn't done
+     automatically in case your form has two or more columns and you want
+     to have different headlines above each column. Thus a typical
+     headline field looks like:
+
+          {
+              -LABEL           => 'General Information',
+              -HEADLINE        => 1,
+              -COLSPAN         => 2, # Probably needs to be more for -MULTI_COLUMN
+              -END_ROW         => 1,
+              -STYLE_FIELDNAME => 'style="background-color:black;color:white;font-weight:bold"',
+
+          },
+
+`-LABEL'
+     Required string. This is the display label for the field. It is also
+     used as the field's name if no `-name' option is used.
+
+`-REQUIRED'
+     Optional boolean. Default is false. If set to true the field must
+     contain something. Should only be used with text fields. It is
+     ignored if `-VALIDATE' is given since `-VALIDATE' overrides (see
+     later).
+
+`-START_ROW' and `-END_ROW'
+     Optional booleans, default is true. These options are only relevant
+     if the form-level `-MULTI_COLUMN' option is set to true in which case
+     these options are used to identify at which fields rows start and
+     end. In practice `-START_ROW' should never be needed; simply set
+     `-END_ROW =' 1,> in each field which is to be the last field in a
+     given row. Note that because some fields may need to span several
+     columns e.g. a layout where say the first two fields are side-by-side
+     and the following field is so wide it must take the whole width; the
+     wider field's `-COLSPAN' setting may need to be set to `-COLSPAN ='
+     3,> or similar. See `example2' and `example4' which have been updated
+     to demonstrate these options.
+
+
+     Some of these options may be applied on a per-field basis; they are
+     documented under Styles later.
+
+`-TYPE'
+     Optional string. Default is `textfield'. May be any field supported by
+     `CGI.pm'.
+
+`-VALIDATE'
+     Optional subroutine reference. If specified this subroutine will be
+     called when the user presses the submit button; its argument will be
+     the value of the field. It should either return a simple true (valid)
+     or false (invalid) or a two element list, the first element being a
+     true/false value and the second value either an empty string or an
+     (html) string which gives the reason why the field is invalid. Its
+     typical structure may be:
+
+          sub valid_national_insurance {
+              my $ni = shift ;
+          
+              $ni = uc $ni ;
+              ( $ni =~ /^[A-Z]{2}\d{7}[A-Z]$/o ) ? 1 : 0 ;
+          }
+
+     or now (preferred style):
+
+          sub valid_national_insurance {
+              my $ni  = shift ;
+              my $why = '<i>Should be 2 letters followed by 7 ' .
+                        'digits then a letter</i>' ;
+          
+              $ni = uc $ni ;
+              my $valid = ( $ni =~ /^[A-Z]{2}\d{7}[A-Z]$/o ) ? 1 : 0 ;
+
+          ( $valid, $why ) ;
+              }
+
+     *Both syntaxes work so no existing code need be changed.* If the
+     field is invalid the `$why' element will be shown immediately to the
+     right of the field it refers to, otherwise (i.e. if the field is
+     valid) it will be ignored.
+
+CGI.pm field-level options
+--------------------------
+
+   All the other options passed in the hash should be the lowercase options
+supported by `CGI.pm' for the particular field type. For example for a
+`-TYPE' of `textfield' the options currently supported are `-name',
+`-default', `-size' and `-maxlength'; you may use any, all or none of them
+since `CGI.pm' always provides sensible defaults. See "All QuickForm
+options" in the SYNOPSIS above for examples of the most common field types.
+
+Styles
+------
+
+   If you wish to use a cascading style sheet with QuickForm then you need
+to set the -HEADER option to include a <link> tag which includes a
+reference to your stylesheet.
+
+   If you wish to use multiple columns see `-MULTI_COLUMN', `-START_ROW',
+`-END_ROW' and `-COLSPAN' as well as `example2' and `example4'.
+
+   Whether you use a stylesheet for classes or in-line styles you can set
+the class or style using the -STYLE_* options, e.g.
+
+     -STYLE_FIELDNAME  => qq{style="font-size:12pt;margin:2em;"},
+     -STYLE_FIELDVALUE => qq{class="valueclass"},
+     -STYLE_ROW        => qq{class="rowclass"},
+     -STYLE_DESC       => qq{style="color:darkblue"},
+
+   The above styles apply globally to all rows, but can be over-ridden, see
+later.
+
+     -STYLE_WHY        => qq{style="font-style:italic;color:red"},
+
+   Because a popular browser cannot cope with this:
+
+     -STYLE_BUTTONS    => qq{style="font-family:Helvetica;text-align:center;"},
+
+   which produces:
+
+     <span style="font-family:Helvetica;text-align:center;>
+     # buttons HTML
+     </span>
+
+   QuickForm also supports (for `-STYLE_BUTTONS' only) this:
+
+     -STYLE_BUTTONS    => 'center', # or 'centre'
+
+   which produces:
+
+   <center>     # buttons HTML     </center>
+
+   For tables you can set options (because most browsers don't seem to
+support styles in tables):
+
+     -TABLE_OPTIONS    => qq{BGCOLOR="WHITE"},
+
+   See files, `example3' (linux-help) and `example5' (bicycle) for more
+examples.
+
+   You can of course also apply your own global styles to the existing
+tags in the normal way.
+
+   When `-STYLE_DESC', `-STYLE_FIELDNAME', `-STYLE_FIELDVALUE' and
+`-STYLE_ROW' are set in `show_form' at form-level (i.e. not inside the
+`-FIELDS' section) they apply globally to every fieldname cell, fieldvalue
+cell and row respectively. If you require finer control you can set these
+styles on a per field basis by including them as field-level options, e.g.
+
+     show_form(
+         -ACCEPT           => \&on_valid_form,
+         -STYLE_FIELDNAME  => 'style="background-color:#AAAAAA"',
+         -STYLE_FIELDVALUE => 'style="background-color:#DDDDDD"',
+         -FIELDS           => [
+                 {
+                     -LABEL            => 'Forename',
+                     -STYLE_FIELDNAME  => 'style="background-color:LIGHTGREEN"',
+                     -STYLE_FIELDVALUE => 'style="background-color:YELLOW"',
+                 },
+         # etc.
+
+   If you have set a style at form-level but do not wish it to apply to a
+particular row you can over-ride either by setting a new style for the row
+as in the example above or by coding `-STYLE_ROW =' ' '> for example; we
+have to use a space because if we used the empty string or undef the
+global style would be applied.
+
+   See example 5.
+
+EXAMPLE #1: Using a form to generate email
+------------------------------------------
+
+   This program is provided as an example of QuickForm's capabilities, it
+is not a production-quality program: it has no error checking and is not
+secure.
+
+     #!/usr/bin/perl -w
+     use strict ;
+     use CGI qw( :standard :html3 ) ;
+     use CGI::QuickForm ;
+
+     show_form(
+         -TITLE  => 'Test Form',
+         -ACCEPT => \&on_valid_form,
+         -FIELDS => [
+             {
+                 -LABEL    => 'Forename',
+                 -REQUIRED => 1,
+             },
+             {
+                 -LABEL    => 'Surname',
+                 -REQUIRED => 1,
+             },
+             { -LABEL => 'Age', },
+             {
+                 -LABEL    => 'Sex',
+                 -TYPE     => 'radio_group',
+                 '-values' => [ qw( Female Male ) ],
+             },
+         ],
+     ) ;
+
+     # This subroutine will only be called if the name fields contain at
+     # least one character.
+     sub on_valid_form {
+         my $forename = param( 'Forename' ) ;
+         my $surname  = param( 'Surname' ) ;
+         my $age      = param( 'Age' ) ;
+         open MAIL, "|/usr/lib/sendmail -t" ;
+         print MAIL "From: test\@localhost\n" .
+                    "To: user\@localhost\n" .
+                    "Subject: Quick Form Email Test\n\n" .
+                    "Name: $forename $surname\n" .
+                    "Age:  $age\n" ;
+         print header, start_html( 'Test Form Data Accepted' ),
+             h3( 'Test Form Data Accepted' ),
+             p( "Thank you $forename for your data." ), end_html ;
+     }
+
+EXAMPLE #2: Appending data to a file
+------------------------------------
+
+   This program is provided as an example of QuickForm's capabilities, it
+is not a production-quality program: it has no error checking and is not
+secure.
+
+     #!/usr/bin/perl -w
+
+     use strict ;
+     use CGI qw( :standard :html3 ) ;
+     use CGI::QuickForm ;
+
+     show_form(
+         -TITLE     => 'Test Form',
+         -ACCEPT    => \&on_valid_form,
+         -VALIDATE  => \&valid_form,
+         -SIZE      => 40,
+         -MAXLENGTH => 60,
+         -FIELDS => [
+             {
+                 -LABEL     => 'Forename',
+                 -VALIDATE  => \&valid_name,
+                 -CLEAN     => \&cleanup,    # (See earlier for definition.)
+             },
+             {
+                 -LABEL     => 'Surname',
+                 -VALIDATE  => \&valid_name,
+                 -CLEAN     => \&cleanup,    # (See earlier for definition.)
+             },
+             {
+                 -LABEL     => 'Age',
+                 # &mk_valid_number generates a subroutine (a closure) and
+                 # returns a reference to that subroutine.
+                 -VALIDATE  => &mk_valid_number( 3, 130 ),
+                 -size      => 10,
+                 -maxlength => 3,
+             },
+         ],
+     ) ;
+
+     # This will only be called if all the validation routines return true.
+     sub on_valid_form {
+         my $forename = param( 'Forename' ) ;
+         my $surname  = param( 'Surname' ) ;
+         my $age      = param( 'Age' ) ;
+         open FILE, ">>namedata.tab" ;
+         print FILE "$surname\t$forename\t$age\n" ;
+         close FILE ;
+         print header, start_html( 'Test Form Data Accepted' ),
+             h3( 'Test Form Data Accepted' ),
+             p( "Thank you $forename for your data." ), end_html ;
+     }
+
+     # This is called to validate the entire form (record).
+     # Use a routine like this if there are relationships between fields that
+     # must be tested.
+     sub valid_form {
+         my %rec   = @_ ;
+         my $valid = 1 ;
+         # We don't allow (perfectly valid!) names like 'John John'.
+         my $why   = 'Not allowed to have identical forename and surname' ;
+         $valid    = 0 if lc $rec{'Surname'} eq lc $rec{'Forename'} ;
+         ( $valid, $why ) ; # $why is ignored if valid.
+     }
+
+     sub valid_name {
+         my $name  = shift ;
+         my $valid = 1 ;
+         $valid    = 0 if $name !~ /^\w{2,}$/o ;
+         ( $valid, 'Name must have at least 2 letters' ) ;
+     }
+
+     sub mk_valid_number {
+         my( $min, $max ) = @_ ;
+
+     sub {
+         my $valid = $_[0] ? ( $min <= $_[0] and $_[0] <= $max ) : 1 ;
+         ( $valid, "<i>Should be between $min and $max inclusive</i>" ) ;
+     } ;
+         }
+
+mod_perl
+--------
+
+   QuickForm appears to run fine in CGI scripts that run under
+Apache::Registry without requiring any changes.
+
+   If you want to use QuickForm under pure mod_perl, i.e. outside
+Apache::Registry they you need to do the following:
+
+  1. Add the following lines at the beginning of your script:
+
+          use Apache::Constants qw( :common ) ;
+
+  2. Ensure that any routines that return to mod_perl return OK. Normally
+     this will be `handler()' and `on_valid_form()'.
+
+  3. Convert your script into a module by wrapping the `show_form()' call
+     in a handler subroutine etc.
+
+  4. Copy the module into an Apache subdirectory in your `@INC' path.
+
+  5. Edit your Apache httpd.conf (or perl.conf) to add a Location for the
+     module.
+
+  6. If you are converting a script that uses `url()' you may need to add
+     the name of the script, e.g. `url() . path_info()'.
+
+        See `example6' for a working example that covers all the points
+above.  `example6' also has notes at the beginning to explain how to set
+things up.  `example6' is a simple conversion of `example2' so you can see
+the simple changes required. Of course you don't have to change your
+scripts at all if you run them under Apache::Registry.
+
+USING QUICKFORM WITH OBJECT MODULES
+-----------------------------------
+
+   If you want to pass QuickForm an `on_valid_form' function that is in
+fact an object's method call then instead of:
+
+     -ACCEPT => \&on_valid_form,
+
+   you need to write:
+
+     -ACCEPT => sub { $object->on_valid_form },
+
+   assuming that you have an object reference called $object and you want
+it to call its `on_valid_form' method.
+
+INTRODUCTORY ARTICLE
+--------------------
+
+   See http://www.perlpress.com/perl/quickform.html
+
+BUGS
+====
+
+   If you get messages like this under pure mod_perl:
+
+     [error] Undefined subroutine &Apache::xxxxxxx::handler called.
+
+   the problem is with your configuration not QuickForm, and I won't be
+able to help you. Please see the copious and high quality documentation at
+`http:' in this node for help with this problem.
+
+   If mod_perl prints things like "Content: text/html" at the top of your
+forms it's a mod_perl issue; check your PerlSendHeader setting (I have it
+Off).
+
+   Some browsers get awfully confused about colouring rows and cells in
+tables, so if you have problems with this please check the HTML that
+QuickForm produces (via your browsers View Source command) - in my test
+cases QuickForm always outputs correct HTML so the problem if any is with
+the browser - however if you find that the HTML is invalid please email me
+your script plus the HTML shown by View Source (in case I can't run your
+script).
+
+AUTHOR
+======
+
+   Mark Summerfield. I can be contacted as <summer@perlpress.com> - please
+include the word 'quickform' in the subject line.
+
+   Emails giving the URLs of the pages where you use QuickForm would be
+appreciated!
+
+   See CHANGES for acknowledgements.
+
+COPYRIGHT
+=========
+
+   Copyright (c) Mark Summerfield 1999-2000. All Rights Reserved.
+
+   This module may be used/distributed/modified under the LGPL.
+
+

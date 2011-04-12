@@ -1,0 +1,1744 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: RPC/Simple/AnyWhere,  Next: RPC/Simple/CallHandler,  Prev: RPC/Simple/AnyRemote,  Up: Module List
+
+extension defining a virtual SRPC client or server class
+********************************************************
+
+NAME
+====
+
+   RPC::Simple::AnyWhere - extension defining a virtual SRPC client or
+server class
+
+SYNOPSIS
+========
+
+     package MyLocal ;
+
+     use RPC::Simple::AnyLocal; # or AnyRemote BUT NOT THIS CLASS
+
+DESCRIPTION
+===========
+
+   This class is intented to be inherited only by AnyLocal or AnyRemote.
+Don't use it yourself.
+
+AUTHOR
+======
+
+   Dominique Dumont, Dominique_Dumont@grenoble.hp.com
+
+SEE ALSO
+========
+
+   perl(1), RPC::Simple::Factory(3), RPC::Simple::AnyRemote(3)
+
+
+File: pm.info,  Node: RPC/Simple/CallHandler,  Next: RPC/Simple/Factory,  Prev: RPC/Simple/AnyWhere,  Up: Module List
+
+Perl class to handle RPC calls with call-back
+*********************************************
+
+NAME
+====
+
+   RPC::Simple::CallHandler - Perl class to handle RPC calls with call-back
+
+SYNOPSIS
+========
+
+     use RPC::Simple::CallHandler;
+
+DESCRIPTION
+===========
+
+   This class is intanciated on the remote side each time a function is
+called with a call-back ref. This class will hold the relevant information
+so that the call-back will be passed to the local object which issued the
+call.
+
+   Used only for asynchronous functions calls. I.e the called function
+cannot pass a result immediately, it will have to call-back this handler.
+
+new (handler_ref, remote_object, request_id, method, argument_ref)
+==================================================================
+
+   Call the remote_object methods with a call-back parameter and the passed
+arguments, store the handler ref.
+
+   Note that the called method must be able to handle a sub ref  parameter.
+This sub must be called when the function is over.
+
+   Usually the call-back function will be a closure.
+
+methods
+=======
+
+done ($result, ...)
+-------------------
+
+   call-back method.
+
+AUTHOR
+======
+
+   Dominique_Dumont@hp.com
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: RPC/Simple/Factory,  Next: RPC/Simple/ObjectHandler,  Prev: RPC/Simple/CallHandler,  Up: Module List
+
+Perl extension for creating RPC client
+**************************************
+
+NAME
+====
+
+   RPC::Simple::Factory - Perl extension for creating RPC client
+
+SYNOPSIS
+========
+
+     use Tk;
+     use RPC::Simple::Factory;
+
+     my $mw = MainWindow-> new ;
+     my $verbose = 1 ; # up to you
+
+     # create factory
+     my $factory = new RPC::Simple::Factory($mw,\$verbose) ;
+
+DESCRIPTION
+===========
+
+   This class handles all the tricky stuff involving socket handling.
+Note that this was written to be used with Tk.
+
+Methods
+=======
+
+new($tkTop, [ $verboseRef ], [remote_host], [port] )
+----------------------------------------------------
+
+   create the factory. One factory must be created for each remote host..
+
+   tkTop is the ref of Tk's main window.
+
+   $verboseRef is the ref of a variable. When set to 1 at any time, the
+object will become verbose i.e. it will print on STDOUT a lot of messages
+related to the RPC processing. Then you may use $verboseRef as a text
+variable on a check button to control whether you want to trace RPC
+messages or not.  If not provided, the object will not be verbose.
+
+   By default, remote_host is set to 'localhost', port is set to 7810.
+
+logmsg (...)
+------------
+
+   print arguments if verbose mode.
+
+newRemoteObject( $owner_ref, [ remote_class_name ] ... )
+--------------------------------------------------------
+
+   Will create a remote (the remote_class_name) object tied to the owner.
+
+   Additional parameters will be passed as is to the remote 'new' method.
+
+getRemoteHostName
+-----------------
+
+   return the remote host name
+
+writeSockBuffer ( agent_index, remote_method, request_id, parameter, [object_name])
+-----------------------------------------------------------------------------------
+
+   Encode the method, object, parameter and send it to the remote object.
+
+   agent_index and request_id are used later for the call-back mechanism.
+
+readSock
+--------
+
+   read pending data on the socket. Do an eval on the read data to
+call-back the relevent Agents.
+
+   Note that there's no security implemented (yet).
+
+Static functions
+================
+
+spawn([port],[verbose])
+-----------------------
+
+   Will spawn a RPC::Simple server on your machine. Don't call this
+function if you need to do RPC on a remote machine.
+
+   Return the server pid or null (just like fork)
+
+ON EXIT
+=======
+
+   When the object is destroyed, the 'END' routine will be called. This
+will kill the server if it was created by spawn.
+
+AUTHOR
+======
+
+   Dominique Dumont, Dominique_Dumont@grenoble.hp.com
+
+SEE ALSO
+========
+
+   perl(1), RPC::Simple::Agent(3), RPC::Simple::AnyLocal(3).
+
+
+File: pm.info,  Node: RPC/Simple/ObjectHandler,  Next: RPC/Simple/Server,  Prev: RPC/Simple/Factory,  Up: Module List
+
+Perl class to handle a remote object
+************************************
+
+NAME
+====
+
+   RPC::Simple::ObjectHandler - Perl class to handle a remote object
+
+SYNOPSIS
+========
+
+     use RPC::Simple::ObjectHandler;
+
+DESCRIPTION
+===========
+
+   This class is instanciated by RPS::Simple::Server each time a remote
+object is created. All is handled by the server, the user need not to
+worry about it.
+
+new (server_ref, object_name, agent_id, argument_array_ref, req_id)
+===================================================================
+
+   Creates a new object controller. Also creates a new object_name which
+is remotely controlled by the agent referenced by agent_id. If object name
+has no suffix, new will 'require' object_name.pm
+
+   The new method of the slave object will be passed the argument stored
+in argument_array_ref.
+
+   req_id is used for calling back the agent once the object is created
+(either with success ot not)
+
+   The connection server is passed with server_ref
+
+METHODS
+=======
+
+remoteCall( request_id | undef , method_name, arguments )
+---------------------------------------------------------
+
+   Will call the slave object with method method_name and the arguments.
+
+   If request_id is defined, it means that a call-back is expected. In
+this case, the argument passed should contains a sub reference.
+
+close
+-----
+
+   Cancel all pending requests and delete itself.
+
+delegate(method_name, ... )
+---------------------------
+
+   Used to call the local object with passed method and arguments.
+
+callbackDone($reqId,$result)
+----------------------------
+
+   Called by the callHandler when a function performed by the remote object
+is over. $result being the result of this function.
+
+AUTHOR
+======
+
+   Dominique_Dumont@hp.com
+
+SEE ALSO
+========
+
+   perl(1)
+
+
+File: pm.info,  Node: RPC/Simple/Server,  Next: RPC/pClient,  Prev: RPC/Simple/ObjectHandler,  Up: Module List
+
+Perl class to use in the RPC server script.
+*******************************************
+
+NAME
+====
+
+   RPC::Simple::Server - Perl class to use in the RPC server script.
+
+SYNOPSIS
+========
+
+     use RPC::Simple::Server;
+
+     my $server_pid = &spawn ;
+
+DESCRIPTION
+===========
+
+   Generic server class. The mainLoop function will instantiate one server
+object for each connection request.
+
+   Server also provides functions (childDeath) to monitor children
+processes.
+
+Exported static functions
+=========================
+
+mainLoop
+--------
+
+   To be called at the end of the main program.  This function will
+perform the select loop, and call relevant server objects.
+
+goodGuy([ipaddress|host_name])
+------------------------------
+
+   Declare the IP address or the host name as a buddy. Connection from
+buddies will be accepted. localhost is always considered as a good guy.
+
+registerChild($object_ref, $pid)
+--------------------------------
+
+   Register process $pid as a process to be monitored by server.
+$object_ref is the process manager of this child.
+$object_ref::process_over will be called back when (or shortly after) the
+child dies.
+
+unregisterChild($pid)
+---------------------
+
+   unregister process $pid. Does not call-back the process manager.
+
+childDeath
+----------
+
+   Static function called when a child dies. $SIG{CHLD} must be set to
+\&childDeath by the user.
+
+CONSTRUCTOR
+===========
+
+   Called by mainloop. Construct a server. Currently only one server is
+supported.
+
+METHODS
+=======
+
+acceptSocket
+------------
+
+   called by new. By default, accepts only connection from localhost
+(127.0.0.1).
+
+writeSock(index_of_agent, method, reqId, param, [objectName ])
+--------------------------------------------------------------
+
+   Called by Object handler to send data back to Agent.
+
+   param: array_ref of parameters passed to the call-back function.
+
+readClient
+----------
+
+   Read the client's socket. Execute the code passed through the socket and
+call the relevant object handlers.
+
+   returns 0 if the socket is closed.
+
+close
+-----
+
+   Close the connection.
+
+setMask(object,method, file_number)
+-----------------------------------
+
+   Function used by any object controlling a child process. Register the
+object and the method to call back when reading from the passed file
+descriptor.
+
+   file_number is as given by fileno
+
+resetMask
+---------
+
+   To be called when the child process is dead.
+
+getFileno
+---------
+
+   Returns the fileno of the client's socket.
+
+CAVEATS
+=======
+
+   Some function are provided to handle remote processes. These functions
+are not yet tested. They may not stay in this class either.
+
+AUTHOR
+======
+
+   Dominique_Dumont@hp.com
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: RPC/pClient,  Next: RPC/pServer,  Prev: RPC/Simple/Server,  Up: Module List
+
+Perl extension for writing pRPC clients
+***************************************
+
+NAME
+====
+
+   RPC::pClient - Perl extension for writing pRPC clients
+
+SYNOPSIS
+========
+
+     use RPC::pClient;
+
+     $sock = IO::Socket::INET->new('PeerAddr' => 'joes.host.de',
+     				'PeerPort' => 2570,
+     				'Proto' => 'tcp');
+
+     $connection = new RPC::pClient('sock' => $sock,
+                                    'application' => 'My App',
+     				 'version' => '1.0',
+     				 'user' => 'joe',
+     				 'password' => 'hello!');
+
+DESCRIPTION
+===========
+
+   pRPC (Perl RPC) is a package that simplifies the writing of Perl based
+client/server applications. RPC::pServer is the package used on the server
+side, and you guess what RPC::pClient is for. See `RPC::pClient(3)' in
+this node for this part.
+
+   pRPC works by defining a set of of functions that may be executed by
+the client. For example, the server might offer a function "multiply" to
+the client. Now a function call
+
+     @result = $con->Call('multiply', $a, $b);
+
+   on the client will be mapped to a corresponding call
+
+     multiply($con, $data, $a, $b);
+
+   on the server. (See the funcTable description below for $data.) The
+function calls result will be returned to the client and stored in the
+array @result. Simple, eh? :-)
+
+Client methods
+--------------
+
+new
+     The client constructor. Returns a client object or an error string,
+     thus you typically use it like this:
+
+          $client = RPC::pClient->new ( ... );
+          if (!ref($client)) {
+              print STDERR "Error while creating client object: $client\n";
+          } else {
+              # Do real stuff
+              ...
+          }
+
+Call
+     calls a function on the server; the arguments are a function name,
+     followed by function arguments. It returns the function results, if
+     successfull. After executing Call() you should always check the error
+     attribute: An empty string indicates success. Thus the equivalent to
+
+          $c = Add($a, $b)
+          # Use $c
+          ...
+
+     is
+
+          $c = $client->Call("Add", $a, $b);
+          if ($client->error) {
+              # Do something in case of error
+              ...
+          } else {
+              # Use $c
+              ...
+          }
+
+CallInt
+     Similar to and internally used by Call. Receives the same arguments,
+     but the result is prepended by a status value: If this status value
+     is TRUE, then all went fine and the following result array is valid.
+     Otherwise an error occurred and the error message follows immediately
+     after the status code. Example:
+
+          my($status, @result) = $client->CallInt("Add", $a, $b);
+          if (!$status) {
+              #  Do something in case of error
+              my $errmsg = shift @result  ||  "Unknown error";
+              ...
+          } else {
+              ...
+          }
+
+Encrypt
+     This method can be used to get or set the cipher attribute, thus the
+     encryption mode. If the method is passed an argument, the argument
+     will be used as the new encryption mode. ('undef' for no encryption.)
+     In either case the current encryption mode will be returned. Example:
+
+          # Get the current encryption mode
+          $mode = $server->Encrypt();
+
+          # Currently disable encryption
+          $server->Encrypt(undef);
+
+          # Switch back to the old mode
+          $server->Encrypt($mode);
+
+Client attributes
+-----------------
+
+   Client attributes will typically be supplied with the new constructor.
+
+sock
+     An object of type IO::Socket, which should be connected to the server.
+
+cipher
+     This attribute can be used to add encryption quite easily. pRPC is not
+     bound to a certain encryption method, but to a block encryption API.
+     The attribute is an object supporting the methods blocksize, encrypt
+     and decrypt. For example, the modules Crypt::DES and Crypt::IDEA
+     support such an interface.
+
+     Note that you can set or remove encryption on the fly (putting undef
+     as attribute value will stop encryption), but you have to be sure,
+     that both sides change the encryption mode.
+
+     Do not modify this attribute directly, use the encrypt method
+     instead! However, it is legal to pass the attribute to the
+     constructor.
+
+     Example:
+
+          use Crypt::DES;
+          $crypt = DES->new(pack("H*", "0123456789abcdef"));
+          $client->Encrypt($crypt);
+
+          # or, to stop encryption
+          $client->Encrypt(undef);
+
+application
+version
+user
+password
+     it is part of the pRPC authorization process, that the client must
+     obeye a login procedure where he will pass an application name, a
+     protocol version and optionally a user name and password.  You do not
+     care for that (except passing the right values, of course :-), this
+     is done within the client constructor.
+
+io
+     this attribute is the Storable object created for communication with
+     the server. You may use this, for example, when you want to change
+     the encryption mode with Storable::Encrypt(). See `Storable(3)' in
+     this node.
+
+EXAMPLE
+=======
+
+     #!/usr/local/bin/perl -T
+     use 5.0004;               # Yes, this really *is* required.
+     use strict;               # Always a good choice.
+
+     use IO::Socket();
+     use RPC::pClient;
+
+     # Constants
+     my $MY_APPLICATION = "Test Application";
+     my $MY_VERSION = 1.0;
+     my $MY_USER = "foo";
+     my $MY_PASSWORD = "bar";
+
+     # Connect to the server
+     my $sock = IO::Socket::INET->new('PeerAddr' => 'joes.host.de',
+                                      'PeerPort' => 5000,
+                                      'Proto' => 'tcp');
+     if (!defined($sock)) {
+         die "Cannot connect: $!\n";
+     }
+
+     # Login procedure
+     my $client = RPC::pClient->new('sock' => $sock,
+                                    'application' => $MY_APPLICATION,
+                                    'version' => $MY_VERSION,
+                                    'user' => $MY_USER,
+                                    'password' => $MY_PASSWORD);
+     if (!ref($client)) {
+         die "Cannot create client: $client\n";
+     }
+
+     # Call multiply function
+     my $a = $client->Call("multiply", 3, 4);
+     if ($client->error) {
+         die "An error occurred while multiplying: $a\n";
+     }
+
+AUTHOR
+======
+
+   Jochen Wiedmann, wiedmann@neckar-alb.de
+
+SEE ALSO
+========
+
+   `pRPC::Server(3)' in this node, `Storable(3)' in this node,
+`Sys::Syslog(3)' in this node
+
+   For an example application, see `DBD::pNET(3)' in this node.
+
+
+File: pm.info,  Node: RPC/pServer,  Next: RTF/Document,  Prev: RPC/pClient,  Up: Module List
+
+Perl extension for writing pRPC servers
+***************************************
+
+NAME
+====
+
+   RPC::pServer - Perl extension for writing pRPC servers
+
+SYNOPSIS
+========
+
+     use RPC::pServer;
+     
+     $sock = IO::Socket::INET->new('LocalPort' => 9000,
+     				'Proto' => 'tcp',
+     				'Listen' = 5,
+     				'Reuse' => 1);
+
+     $connection = new RPC::pServer('sock' => $sock,
+     				      'configFile' => $file,
+     				      'funcTable' => $funcTableRef,
+     				      # other attributes #
+     				     );
+
+     while ($running) {
+         $connection->Loop();
+         if ($connection->error) {
+     	  # Do something
+         }
+     }
+
+DESCRIPTION
+===========
+
+   pRPC (Perl RPC) is a package that simplifies the writing of Perl based
+client/server applications. RPC::pServer is the package used on the server
+side, and you guess what Net::pRPC::Client is for. See
+`Net::pRPC::Client(3)' in this node for this part.
+
+   pRPC works by defining a set of of functions that may be executed by
+the client. For example, the server might offer a function "multiply" to
+the client. Now a function call
+
+     @result = $con->Call('multiply', $a, $b);
+
+   on the client will be mapped to a corresponding call
+
+     multiply($con, $data, $a, $b);
+
+   on the server. (See the funcTable description below for $data.) The
+function call's result will be returned to the client and stored in the
+array @result. Simple, eh? :-)
+
+Server methods
+--------------
+
+new
+     The server constructor. Unlike the usual constructors, this one will
+     in general not return immediately, at least not for a server running
+     as a daemon. Instead it will return if a connection is established
+     with a connection object as result.  The result will be an error
+     string or the connection object, thus you will typically do a
+
+          $con = RPC::pServer->new ( ...);
+          if (!ref($con)) {
+              print "Error $con.\n";
+          } else {
+              # Accept connection
+              ...
+          }
+
+Accept
+Deny
+     After a connection is established, the server should call either of
+     these methods. If he calls Accept(), he should continue with calling
+     the Loop() method for processing the clients requests.
+
+Loop
+     When a connection is established, the Loop method must be called. It
+     will process the client's requests. If Loop() returns FALSE, an error
+     occurred. It is the main programs task to decide what to do in that
+     case.
+
+Encrypt
+     This method can be used to get or set the cipher attribute, thus the
+     encryption mode. If the method is passed an argument, the argument
+     will be used as the new encryption mode. ('undef' for no encryption.)
+     In either case the current encryption mode will be returned. Example:
+
+          # Get the current encryption mode
+          $mode = $server->Encrypt();
+
+          # Currently disable encryption
+          $server->Encrypt(undef);
+
+          # Switch back to the old mode
+          $server->Encrypt($mode);
+
+Server attributes
+-----------------
+
+   Server attributes will typically be supplied with the new constructor.
+
+configFile
+     RPC::pServer has a builtin authorization mechanism based on a
+     configuration file. If you want to use this mechanism, just supply
+     the name of a configuration file with the attribute configFile and
+     the server will accept or deny connections based on the configuration
+     file.
+
+     The authorization scheme is host based, but you may add user based
+     functionality with the user and password attributes. See `' in this
+     node below.
+
+client
+     This attribute is useful in conjunction with the configFile.  If the
+     server has authorized a client by using the config file, he will
+     create a hash ref with all the client attributes and store a
+     reference to this hash under the key client.  Thus you can easily
+     extend the configuration file for your own purposes, at least as long
+     as host based configuration is sufficient for you.
+
+sock
+     An object of type IO::Socket, if this program is running as a daemon.
+     An accept() call will be executed on this socket in order to wait for
+     connections. See `IO::Socket(3)' in this node.
+
+     An inetd based server should leave this attribute empty: The method
+     will use STDIN and STDOUT instead.
+
+     Note: The latter is not yet functionable, I first need to work out
+     how to create an object of type IO::socket for an inetd based
+     server's STDIN and STDOUT. It seems this is currently not supported
+     by IO::Socket.
+
+cipher
+     This attribute can be used to add encryption quite easily. pRPC is not
+     bound to a certain encryption method, but to a block encryption API.
+     The attribute is an object supporting the methods blocksize, encrypt
+     and decrypt. For example, the modules Crypt::DES and Crypt::IDEA
+     support such an interface.
+
+     Do not modify this attribute directly, use the encrypt method
+     instead!  However, it is legal to pass the attribute to the
+     constructor.
+
+     Example:
+
+          use Crypt::DES;
+          $crypt = DES->new(pack("H*", "0123456789abcdef"));
+          $client->Encrypt($crypt);
+
+          # or, to stop encryption
+          $client->Encrypt(undef);
+
+     You might prefer encryption being client dependent, so there is the
+     additional possibility to setup encryption in the server configuration
+     file. See `' in this node. Client encryption definitions take
+     precedence over the cipher attribute.
+
+     However, you can set or remove encryption on the fly (putting undef
+     as attribute value will stop encryption), but you have to be sure,
+     that both sides change the encryption mode.
+
+funcTable
+     This attribute is a hash reference. The hash keys are the names of
+     methods, that the client may execute on the server.  The hash values
+     are hash references (again). The RPC::pServer module will use the key
+     'code' only: It contains a code reference to the function performing
+     the clients function call. The first argument of the function call
+     will be the connection object itself, the second will be the
+     'funcTable' value. You are free to use this hash reference in any way
+     you want, the exception being the 'code' key. The function must
+     return a list: In case of errors the results will be the values 0,
+     followed by a textual error message. In case of success, it ought to
+     return nonzero, followed by the result list being sent to the client.
+
+stderr
+     a value of TRUE will enable logging messages to STDERR, the default
+     is using syslog(); if the stderr attribute is FALSE, you might call
+     openlog() to configure the application name and facility. See
+     `Sys::Syslog(3)' in this node.
+
+debug
+     this will cause the server to log debugging information about client
+     requests using the Log method. A value of 0 disables debugging.
+
+application
+version
+user
+password
+     it is part of the pRPC authorization process, that the client must
+     obeye a login procedure where he will pass an application name, a
+     protocol version and optionally a user name and password.  These are
+     not used by pRPC, but when the new method returns with a connection
+     object, the main program may use these for additional authorization.
+
+     These attributes are read-only.
+
+io
+     this attribute is a Storable object created for communication with
+     the client. You may use this, for example, when you want to change
+     the encryption mode with Storable::Encrypt(). See `Storable(3)' in
+     this node.
+
+CONFIGURATION FILE
+==================
+
+   The server configuration file is currently not much more than a
+collection of client names or ip numbers that should be permitted or
+denied to connect to the server. Any client is represented by a definition
+like the following:
+
+     accept .*\.neckar-alb\.de
+         encryption    DES
+         key           063fde7982defabc
+         encryptModule Crypt::DES
+
+     deny .*
+
+   In other words a client definition begins with either `accept pattern'
+or `deny pattern', followed by some client attributes, each of the
+attributes being on a separate line, followed by the attribute value.  The
+pattern is a perl regular expression matching either the clients host name
+or IP number. In particular this means that you have to escape dots, for
+example a client with IP number 194.77.118.1 is represented by the pattern
+`194\.77\.118\.1'.
+
+   Currently known attributes are:
+
+encryption
+key
+encryptionModule
+     These will be used for creating an encryption object which is used
+     for communication with the client, see `Storable(3)' in this node for
+     details. The object is created with a sequence like
+
+          use $encryptionModule;
+          $cipher = $encryption->new(pack("H*", $key));
+
+     encryptionModule defaults to encryption, the reason why we need both
+     is the brain damaged design of the *Note Crypt/IDEA: Crypt/IDEA, and
+     *Note Crypt/DES: Crypt/DES, modules, which use different module and
+     package names without any obvious reason.
+
+   You may add any other attribute you want, thus extending your
+authorization file. The RPC::pServer module will simply ignore them, but
+your main program will find them in the client attribute of the
+RPC::pServer object. This can be used for additional client dependent
+configuration.
+
+PREDEFINED FUNCTIONS
+====================
+
+   RPC::pServer offers some predefined methods which are designed for ease
+in work with objects. In short they allow creation of objects on the
+server, passing handles to the client and working with these handles in a
+fashion similar to the use of the true objects.
+
+   The handle functions need to share some common data, namely a hash
+array of object handles (keys) and objects (values). The problem is, how
+to allocate these variables. By keeping a multithreaded environment in
+mind, we suggest to store the hash on the stack of the server's main loop.
+
+   The handle functions get access to this loop, by looking into the
+'handles' attribute of the respective entry in the 'funcTables' hash. See
+above for a description of the 'funcTables' hash.
+
+   See below for an example of using the handle functions.
+
+NewHandle
+     This method can be inserted into the servers function table. The
+     client may call this function to create objects and receive handles
+     to the objects. The corresponding entry in the function table must
+     have a key classes: This is a list reference with class names. The
+     client is restricted to create objects of these classes only.
+
+     The NewHandle function expects, that the constructor returns an
+     object in case of success or 'undef' otherwise. Note, that this isn't
+     true in all cases, for example the RPC::pServer and Net::pRPC::Client
+     classes behave different. In that cases you have to write your own
+     constructor with a special error handling. The StoreHandle method
+     below will help you.  Constructors with a different name than new are
+     another example when you need StoreHandle directly.
+
+StoreHandle
+     After you have created an object on behave of the clients request,
+     you'd like to store it for later use. This is what StoreHandle does
+     for you. It returns an object handle which may be passed back to the
+     client. The client can pass the objects back to the server for use in
+     CallMethod or UseHandle.
+
+NewHandle
+     The NewHandle is mainly a wrapper for StoreHandle. It creates an
+     object of the given class, passes it to StoreHandle and returns the
+     result. The NewHandle method is designed for direct use within the
+     servers function table.
+
+UseHandle
+     This is the counterpart of StoreHandle: It gets an object handle,
+     passed by the client, as argument and returns the corresponding
+     object, if any. An 'undef' value will be returned for an invalid
+     handle.
+
+CallMethod
+     This function receives an object handle as argument and the name of a
+     method being executed. The method will be invoked on the
+     corresponding object and the result will be returned.
+
+     A special method is 'DESTROY', valid for any object handle. It
+     disposes the object, the handle becomes invalid.
+
+   All handle functions are demonstrated in the following example.
+
+EXAMPLE
+=======
+
+   Enough wasted time, spread the example, not the word. :-) Let's write a
+simple server, say a spreadsheet server. Of course we are not interested
+in the details of the spreadsheet part (which could well be implemented in
+a separate program), the spreadsheet example is choosen, because it is
+obvious, that such a server is dealing with complex data structures. For
+example, a "sum" method should be able to add over complete rows, columns
+or even rectangular regions of the spreadsheet. And another thing,
+obviously a spread- sheet could easily be represented by perl data
+structures: The spreadsheet itself could be a list of lists, the elements
+of the latter lists being hash references, each describing one column. You
+see, such a spreadsheet is an ideal object for the `Storable(3)' in this
+node class. But now, for something completely different:
+
+     #!/usr/local/bin/perl -wT # Note the -T switch! I mean it!
+     use 5.0004;               # Yes, this really *is* required.
+     use strict;               # Always a good choice.
+
+     use IO::Socket();
+     use RPC::pServer;
+
+     # Constants
+     $MY_APPLICATION = "Test Application";
+     $MY_VERSION = 1.0;
+
+     # Functions that the clients may execute; for simplicity
+     # these aren't designed in an object oriented manner.
+
+     # Function returning a simple scalar
+     sub sum ($$$$$) {
+     	my($con, $data, $spreadsheet, $from, $to) = @_;
+         # Example: $from = A3, $to = B5
+     	my($sum) = SpreadSheet::Sum($spreadsheet, $from, $to);
+     	return (1, $sum);
+     }
+
+     # Function returning another spreadsheet, thus a complex object
+     sub double ($$$$$) {
+         my($con, $data, $spreadsheet, $from, $to);
+         # Doubles the region given by $from and $to, returns
+         # a spreadsheet
+     	my($newSheet) = SpreadSheet::Double($spreadsheet, $from, $to);
+     	(1, $newSheet);
+     }
+
+     # Quit function; showing the use of $data
+     sub quit ($$) {
+     	my($con, $data) = @_;
+     	$$data = 0;   # Tell the server's Loop() method, that we
+                       # are done.
+         (1, "Bye!");
+     }
+
+     # Now we give the handle functions a try. First of all, a
+     # spreadsheet constructor:
+     sub spreadsheet ($$$$) {
+     	my ($con, $data, $rows, $cols) = @_;
+     	my ($sheet, $handle);
+     	if (!defined($sheet = SpreadSheet::Empty($rows, $cols))) {
+     	    $con->error = "Cannot create spreadsheet";
+     	    return (0, $con->error);
+     	}
+     	if (!defined($handle = StoreHandle($con, $data, $sheet))) {
+     	    return (0, $con->error); # StoreHandle stored error message
+     	}
+     	(1, $handle);
+     }
+
+     # Now a similar function to "double", except that a spreadsheet
+     # is doubled, which is stored locally on the server and not
+     # remotely on the client
+     sub rdouble ($$$$$) {
+         my($con, $data, $sHandle, $from, $to);
+     	my($spreadsheet) = UseHandle($con, $data, $sHandle);
+     	if (!defined($spreadsheet)) {
+     	    return (0, $con->error); # UseHandle stored an error message
+     	}
+         # Doubles the region given by $from and $to, returns
+         # a spreadsheet
+     	my($newSheet) = SpreadSheet::Double($spreadsheet, $from, $to);
+     	my($handle);
+     	if (!defined($handle = StoreHandle($con, $data, $newSheet))) {
+     	    return (0, $con->error); # StoreHandle stored error message
+     	}
+     	(1, $newSheet);
+     }
+
+     # This function is called for any valid connection to a client
+     # In a loop it processes the clients requests.
+     #
+     # Note, that we are using local data only, thus we should be
+     # safe in a multithreaded environment. (Of course, noone knows
+     # about the spreadsheet functions ... ;-)
+     sub Server ($) {
+         my($con) = shift;
+         my($con, $configFile, %funcTable);
+         my($running) = 1;
+     	my(%handles) = (); # Note: handle hash is on the local stack
+
+     # First, create the servers function table. Note the
+     # references to the handle hash in entries that access
+     # the handle functions.
+             %funcTable = {
+         'sum'         => { 'code' => &sum },
+         'double'      => { 'code' => &list },
+         'quit'        => { 'code' => &quit,
+     		       'data' = \$running }
+         'spreadsheet' => { 'code' => \&spreadsheet,
+     		       'handles' => \%handles },
+         'rdouble'     => { 'code' => \&rdouble,
+     		       'handles' = \%handles },
+
+     # An alternative to the 'spreadsheet' entry above;
+     'NewHandle'   => { 'code' => \&RPC::pServer::NewHandle,
+     			       'handles' => \%handles,
+     			       'classes' => [ 'Spreadsheet' ] },
+
+     # Give client access to *all* (!) spreadsheet methods
+     'CallMethod'  => { 'code' => \&RPC::pServer::CallMethod,
+     			       'handles' => \%handles }
+     	};
+
+     $con->{'funcTable'} = \%funcTable;
+
+     while($running) {
+     	    if (!$con->Loop()) {
+     		$con->Log('err', "Exiting.\n"); # Error already logged
+     		exit 10;
+     	    }
+     }
+     	$con->Log('notice', "Client quits.\n");
+     	exit 0;
+         }
+
+     # Avoid Zombie ball ...
+     sub childGone { my $pid = wait; $SIG{CHLD} = \&childGone; }
+
+     # Now for main
+     {
+         my ($iAmDaemon, $sock);
+
+     # Process command line arguments ...
+             ...
+
+     # If running as daemon: Create a socket object.
+     	if ($iAmDaemon) {
+     	    $sock = IO::Socket->new('Proto' => 'tcp',
+     				    'Listen' => SOMAXCONN,
+     				    'LocalPort' => 'wellKnownPort(42)',
+     				    'LocalAddr' => Socket::INADDR_ANY
+     				   );
+     	} else {
+     	    $sock = undef; # Let RPC::pServer create a sock object
+     	}
+
+     while (1) {
+     	    # Wait for a client establishing a connection
+     	    my $con = RPC::pServer('sock' => $sock,
+     				   'configFile' => 'testapp.conf');
+         if (!ref($con)) {
+     		print STDERR "Cannot create server: $con\n";
+     	    } else {
+     		if ($con->{'application'} ne $MY_APPLICATION) {
+     		    # Whatever this client wants to connect to:
+     		    # It's not us :-)
+     		    $con->Deny("This is a $MY_APPLICATION server. Go away");
+     		} elsif ($con->{'version'} > $MY_VERSION) {
+     		    # We are running an old version of the protocol :-(
+     		    $con->Deny("Sorry, but this is version $MY_VERSION");
+     		} elsif (!IsAuthorizedUser($con->{'user'},
+     					   $con->{'password'})) {
+     		    $con->Deny("Access denied");
+     		} else {
+     		    # Ok, we accept the client. Spawn a child and let
+     		    # the child do anything else.
+     		    my $pid = fork();
+     		    if (!defined($pid)) {
+     			$con->Deny("Cannot fork: $!");
+     		    } elsif ($pid == 0) {
+     			# I am the child
+     			$con->Accept("Welcome to the pleasure dome ...");
+     			Server();
+     		    }
+     		}
+     	    }
+     	}
+         }
+
+SECURITY
+========
+
+   It has to be said: pRPC based servers are a potential security problem!
+I did my best to avoid security problems, but it is more than likely, that
+I missed something. Security was a design goal, but not *the* design goal.
+(A well known problem ...)
+
+   I highly recommend the following design principles:
+
+Protection against "trusted" users
+----------------------------------
+
+perlsec
+     Read the perl security FAQ (`perldoc perlsec') and use the -T switch.
+
+taintperl
+     Use the -T switch. I mean it!
+
+Verify data
+     Never untaint strings withouth verification, better verify twice.
+     For example the CallMethod function first checks, whether an object
+     handle is in a a proper format (currently integer numbers, but don't
+     rely on that, it could change). If it is, then it will still be
+     verified, that an object with the given handle exists.
+
+Be restrictive
+     Think twice, before you give a client access to a function. In
+     particular, think twice, before you give a client access to objects
+     via the handle methods: If a client can coerce CallMethod() on an
+     object, he has access to *all* methods of that object!
+
+perlsec
+     And just in case I forgot it: Read the perlsec man page. :-)
+
+Protection against untrusted users
+----------------------------------
+
+Host based authorization
+     pRPC has a builtin host based authorization scheme; use it!  See `'
+     in this node.
+
+User based authorization
+     pRPC has no builtin user based authorization scheme; that doesn't
+     mean, that you should not implement one.
+
+Encryption
+     Using encryption with pRPC is extremely easy. There is absolutely no
+     reason for communicating unencrypted with the clients. Even more: I
+     recommend two phase encryption: The first phase is the login phase,
+     where to use a host based key. As soon as the user has authorized,
+     you should switch to a user based key. See the DBD::pNET agent for an
+     example.
+
+AUTHOR
+======
+
+   Jochen Wiedmann, wiedmann@neckar-alb.de
+
+SEE ALSO
+========
+
+   `Net::pRPC::Client(3)' in this node, `Storable(3)' in this node,
+`Sys::Syslog(3)' in this node
+
+   See `DBD::pNET(3)' in this node for an example application.
+
+
+File: pm.info,  Node: RTF/Document,  Next: Randomize,  Prev: RPC/pServer,  Up: Module List
+
+Perl extension for generating Rich Text (RTF) Files
+***************************************************
+
+NAME
+====
+
+   RTF::Document - Perl extension for generating Rich Text (RTF) Files
+
+DESCRIPTION
+===========
+
+   RTF::Document is a module for generating Rich Text Format (RTF)
+documents that can be used by most text converters and word processors.
+
+   For a listing of properties, consult the %DOCINFO and %PROPERTIES hashes
+in the source code.
+
+REQUIRED MODULES
+================
+
+     Carp
+     POSIX
+     Convert::Units::Type 0.33
+
+EXAMPLE
+=======
+
+     use RTF::Document;
+
+     # Document properties
+
+     $rtf = new RTF::Document(
+       {
+         doc_page_width => '8.5in',
+         doc_page_height => '11in'
+       }
+     );
+
+     # Font definitions
+
+     $fAvantGarde = $rtf->add_font ("AvantGarde",
+        { family=>swiss,
+          default=>1
+        } );
+     $fCourier = $rtf->add_font ("Courier",
+       { family=>monospace, pitch=>fixed,
+         alternates=>["Courier New", "American Typewriter"]
+       } );
+
+     # Color definitions
+
+     $cRed   = $rtf->add_color ( { red=>255 } );
+     $cGreen = $rtf->add_color ( { green=>128 } );
+     $cCustm = $rtf->add_color ( { red=>0x66, blue=>0x33, green=>0x33 } );
+
+     $cBlack = $rtf->add_color ( { name=>'black' } );
+     $cWhite = $rtf->add_color ( { gray=>'100%' } );
+
+     $cNavy = $rtf->add_color ( { blue=>'100%', gray=>'50%' } );
+
+     # style definitions
+
+     $sNormal = $rtf->add_style( "Normal",
+       { font=>$fAvantGarde, font_size=>'12pt',
+         color_foreground=>$cBlack },
+       { type=>paragraph, default=>1 }
+     );
+
+     $sGreen = $rtf->add_style( "Green",
+       { color_foreground=>$cGreen },
+       { type=>character, additive=>1 }
+     );
+
+     # Mix any combo of properties and text...
+
+     $rtf->add_text( $rtf->root(),
+        "Default text\n\n",
+
+     { bold=>1, underline=>continuous },
+     "Bold/Underlined Text\n\n",
+
+     { font_size=>'20pt', font=>$fCourier,
+       color_foreground=>$cRed },
+     "Bigger, Red and Monospaced.\n\n",
+
+     { style_default=>paragraph },
+     { style_default=>character },
+
+     "This is ",
+     [ { style=>$sGreen }, "green" ],
+     " styled.\n\n"
+
+     );
+
+     open FILE, ">MyFile.rtf";
+     binmode FILE;
+     print FILE $rtf->rtf();
+     close FILE;
+
+DOCUMENT STRUCTURE
+==================
+
+   For purposes of using this module, a Rich Text (RTF) Document can be
+subdivided into groups. Groups can be considered containers for text and
+*controls* (controlling document and text properties).
+
+   For all intents and purposes, a group limits the scope of controls. So
+if we set the "bold" character property within a group, the text will be
+bold only within that group (until it is turned off within that group).
+
+   When generating a RTF document using this module, we are only concerned
+with the root group (also called the "Document Area"). (The "Header"
+groups are taken care of automatically by this module.)
+
+   The Document Area is subdivided into *sections*. Each section is
+subdivided into paragraphs.
+
+METHODS
+=======
+
+   Some of the methods are documented below. (Methods not documented here
+may be changed in future versions.)
+
+new
+---
+
+     $rtf = new RTF::Document( \%DocumentProperties );
+
+   Creates a new RTF document object.
+
+root
+----
+
+     $gRoot = $rtf->root();
+
+   Returns the "root" group in the RTF document.
+
+new_group
+---------
+
+     $gMyGroup = $rtf->new_group();
+
+   Creates a new group (not inside of the RTF document).
+
+add_group
+---------
+
+     $gChildOfRoot = $rtf->add_group();
+     $gChildOfChild = $rtf->add_group( $gChild );
+
+   Adds a child group to the specfied group. If no group is specified, the
+"root" group is assumed.
+
+     $rtf->add_group( $rtf->root(), $gMyGroup );
+
+   Adds a group to the specified parent group (in this case, the root
+group).
+
+add_raw
+-------
+
+     $rtf->add_raw( $group, '\par', "Some Text" );
+
+   Adds raw controls and text to the group. This method is intended for
+internal use only.
+
+add_text
+--------
+
+     $rtf->add_text( $group, "Some text ", { bold=>1 }, "more text" );
+
+   Adds text and controls to a group. Text is escaped.
+
+add_font
+--------
+
+add_color
+---------
+
+add_style
+---------
+
+PROPERTIES
+==========
+
+Document Properties
+-------------------
+
+Section Properties
+------------------
+
+Paragraph Properties
+--------------------
+
+Character Properties
+--------------------
+
+KNOWN ISSUES
+============
+
+   This module should be considered in the "alpha" stage. Use at your own
+risk.
+
+   There are no default document or style properties produced by this
+module, with the exception of the character set. If you want to make sure
+that a *specific* font, color, or style is used, you must specify it.
+Otherwise you rely on the assumptions of whatever RTF reader someone is
+using.
+
+   This module does not insert newlines anywhere in the text, even though
+some RTF writers break lines before they exceed 225 characters.  This may
+or may not be an issue with some reader software.
+
+   Unknown font or style properties will generally be ignored without
+warning.
+
+   This module supports some newer RTF controls (used in Word 95/Word 97)
+that may are not understood by older RTF readers.
+
+   Once a Font, Color or Style is added, it cannot be changed. No checking
+for redundant entries is done.
+
+   Generally, it is not possible to reference a not-yet-created Style with
+the next or basedon attributes. However, you can use the constances "last",
+"self" or "next" to reference the last style added, the current style
+being added, or the next style that will be added, respectively.
+
+   Specifying properties in a particular order within a group does not
+guarantee that they will be emitted in that order. If order matters,
+specify them separetly. For instance,
+
+     $rtf->add_text($rtf->root, { style_default=>character, bold=>1 } );
+
+   should be (if you want to ensure character styles are reset before
+setting bold text):
+
+     $rtf->add_text($rtf->root, { style_default=>character }, { bold=>1 } );
+
+   Also note that duplicate properties within the same group won't work.
+i.e., If you want to set "style_default" for both paragraphs and
+characters, you must do so in separate groups.
+
+   This isn't so much as a bug as the way Perl handles hashes.
+
+Unimplemented Features
+----------------------
+
+   A rather large number of features and control words are not handled in
+this version. Among the major features:
+
+Annotations and Comments
+Bookmarks
+Bullets and Paragraph Numbering
+     Some support has been added. The backwards-compatability controls for
+     numbered paragraphs used by older readers has not been added because
+     it is not properly handled by newer readers.
+
+Character Sets and Internationalization
+     Non-"ANSI" character sets (i.e., Macintosh) and Unicode character
+     sets are not supported (at least not intentionally). There is no
+     support for Asian character sets in this version of the module.
+
+     Unicode character escapes are not implemented.
+
+     Language codes (defining a default language, or a language for a
+     group of characters) are not implemented.
+
+     Bi-directional and text-flow controls are not implemented.
+
+Embedded Images and OLE Objects
+File Tables
+Footnotes and Endnotes
+Forms
+Headers and Footers
+Hyphenation Control
+     Some minimal controls have been added.
+
+Lists and List Tables
+     Not implemented: List Tables are really a kind of style sheet for
+     lists.  Priority will be given to support generic bullets and
+     paragraph numbering.
+
+Page Numbering
+     Minimal definition, untested.
+
+Printer Bin Controls
+Revision Tables
+Special Characters and Document Variables
+     Most special characters not not implemented, with the exception of
+     tabs. Double newline characters are converted to a new paragraph
+     control, and single newlines are converted to a new line control.
+
+Tabs
+Tables and Frames
+SEE ALSO
+========
+
+   Microsoft Technical Support and Application Note, "Rich Text Format
+(RTF) Specification and Sample Reader Program", Version 1.5.
+
+   *Convert::Units::Type*.
+
+AUTHOR
+======
+
+   Robert Rothenberg <wlkngowl@unix.asb.com>
+
+LICENSE
+=======
+
+   Copyright (c) 1999-2000 Robert Rothenberg. All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+
+File: pm.info,  Node: Randomize,  Next: Rc,  Prev: RTF/Document,  Up: Module List
+
+Perl extension for randomizing things.
+**************************************
+
+NAME
+====
+
+   Randomize - Perl extension for randomizing things.
+
+SYNOPSIS
+========
+
+     use Randomize;
+     my $randomizer = Randomize->new(\@rules);
+     while (1) {
+       my $random_hash = $randomizer->generate();
+     }
+
+DESCRIPTION
+===========
+
+   This packages takes a set of randomization rules in the form of an
+array reference, and creates random hashes on request based on the rules
+given.
+
+   I know that doesn't make sense, so here's an example.
+
+     my @randomizer_rules =
+       [ {Field  => 'Street',
+          Values => [{Data   => ['Preston', 'Hillcrest'],
+                      Weight => 1},
+                     {Data   => ['Coit'],
+                      Weight => 2}]},
+         {Field  => 'Number',
+          Values => [18100..18299]}
+       };
+
+     my $randomizer = Randomize->new(\@randomizer_rules);
+     while (1)
+       my $hashref = $randomizer->generate();
+     }
+
+   The key is @randomizer_rules.  What this list tells Randomizer is that,
+every time you invoke the generate() method, you want to get back a
+reference to a hash that looks like:
+
+     $hashref = { Street => 'Preston',
+                  Number => 18111 };
+
+   where the Number is between 18100 and 18299 and the Street is either
+Preston, Hillcrest, or Coit.  Further, you want the numbers to be evenly
+distributed, but you want the street to be Coit half the time, and evenly
+distributed between Preston and Hillcrest the rest of the time.
+
+   So, if you called $randomizer->generate() 1000 times, you'd get roughly
+500 addresses on Coit and 250 addresses each on Preston and Hillcrest.
+
+   Let's look at a more complicated @randomizer_rules now.
+
+     my @randomizer_rules =
+       ( {Field  => 'Street',
+          Values => [{Data   => ['Preston', 'Hillcrest'],
+                      Weight => 1},
+                     {Data   => ['Coit'],
+                      Weight => 2}]},
+         {Field  => 'Number',
+          Values => [{Precondition => "<<Street>> eq 'Preston'",
+                      Alternatives => [{Data => [18100..18199],
+                                        Weight => 1},
+                                       {Data => [18200..18299],
+                                        Weight => 9}]},
+                     {Precondition    => 'DEFAULT',
+                      Alternatives => [{Data => [18100..18299],
+                                        Weight => 1}]}]}
+       );
+
+   Given this, the generate() method will still return a hash reference in
+the form
+
+     $hashref = { Street => 'Preston',
+                  Number => 18111 };
+
+   with the same streets and address ranges.  However, if the street
+picked happens to be Preston, 90% of the addresses generated will be in
+the range 18200 to 18299.
+
+   In final example, note the Retry_If clause:
+
+     my @randomizer_rules =
+       ( {Field  => 'Street',
+          Values => [{Data   => ['Preston', 'Hillcrest'],
+                      Weight => 1},
+                     {Data   => ['Coit'],
+                      Weight => 2}]},
+         {Field  => 'Number',
+          Values => [{Precondition => "<<Street>> eq 'Preston'",
+                      Alternatives => [{Data => [18100..18199],
+                                        Weight => 1},
+                                       {Data => [18200..18299],
+                                        Weight => 9}],
+                      Retry_If     => ['defined $main::addr1 && <<Number>> == $main::addr1->{Number}']},
+                     {Precondition    => 'DEFAULT',
+                      Alternatives => [{Data => [18100..18299],
+                                        Weight => 1}]}]}
+       );
+
+     my $randomizer = Randomize->new(\@randomizer_rules);
+     while (1)
+       $main::addr1 = $main::addr2 = undef;
+       $main::addr1 = $randomizer->generate();
+       $main::addr2 = $randomizer->generate();
+     }
+
+   In this example, we're generating pairs of addresses.  The Retry_If
+clause ensures that we never get a pair of identical addresses on Preston.
+It's still possible to get identical addresses on Coit or Hillcrest,
+however.
+
+   Retry_If clauses may also appear at the same level as Field and Values,
+like so:
+
+     my @randomizer_rules =
+       ( {Field  => 'Street',
+          Values => ['Preston', 'Hillcrest', 'Coit']},
+         {Field  => 'Number',
+          Values => [18100..18299],
+          Retry_If => ['<<Street>> eq 'Coit' && <<Number>> eq 18200']}
+       );
+
+   This ruleset tells Randomize to try again if the address generated is
+18200 Coit.
+
+   There is also one special rule that Randomize looks for:  "DEBUG".  A
+"DEBUG ON" rule turns debugging messages on so you can see what's
+happening when you call generate().  It also attempts to print the code it
+generates to a file.  You can optionally pass the filename in, like "DEBUG
+ON myfile.code", or if you don't specify a file, the default output file
+is "Randomize.code".  If the file can't be opened for writing, a warning
+is sent to standard error, but execution of your program is otherwise
+unaffected.
+
+   Correspondingly, a "DEBUG OFF" rule turns debugging off, although the
+code is still printed.  Placement of "DEBUG ON" and "DEBUG OFF" statements
+determines which fields debugging information is printed for.  For
+example, take a look at the following ruleset:
+
+     my @randomizer_rules =
+       ( 'DEBUG ON',
+         {Field  => 'Street',
+          Values => ['Preston', 'Hillcrest', 'Coit']},
+         'DEBUG OFF',
+         {Field  => 'Number',
+          Values => [18100..18299],
+          Retry_If => ['<<Street>> eq 'Coit' && <<Number>> eq 18200']},
+       );
+
+   This ruleset results in debugging information being printed for
+generation of the "Street" field, but not for the "Number" field, and code
+will be printed to the file "Randomize.code".
+
+   NOTE:  Randomize cannot currently generate anything other than simple
+hashes.  If you want a complex data structure, you'll have to either build
+it yourself by moving items around in the returned hash, or by using
+multiple randomize objects.
+
+EXPORT
+------
+
+   None.
+
+AUTHOR
+======
+
+   Brand Hilton
+
+PUBLIC METHODS
+==============
+
+new
+===
+
+Description
+-----------
+
+   This is the constructor for Randomize objects.  It takes one parameter:
+a reference to an array containing randomizer rules.  From these rules,
+the generate() method is created.  If an error is detected in the rules,
+the package variable $Randomize::errmsg will contain the error message and
+new() will return undef.
+
+Syntax
+------
+
+     $randomizer = Randomize->new(\@rules);
+
+     $randomizer  - On success, a Randomize object.
+
+     \@rules      - A reference to an array containing
+                    Randomize rules, as described in the
+                    DESCRIPTION section.
+
+generate
+========
+
+Description
+-----------
+
+   This method returns a reference to a hash.  The hash contains the fields
+you specified in your randomizer rules.  Each call to generate() gives you
+a new hash, with a new set of randomized values.
+
+   NOTE:  If you wish to specify a value for one or more fields of the
+hash, you can pass in the field and its value.
+
+Syntax
+------
+
+     $hashref = $randomizer->generate( [ $fieldname, $value, ... ] );
+
+     $hashref    - A hash reference returned by generate().
+
+     $randomizer - A Randomize object.
+
+     $fieldname  - The name of a field in the hash.
+
+     $value      - The value you wish that field to take
+                   this time through.
+
+

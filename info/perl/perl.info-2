@@ -1,0 +1,3149 @@
+This is Info file perl.info, produced by Makeinfo version 1.68 from the
+input file bigperl.texi.
+
+   settitle perl
+
+
+File: perl.info,  Node: perl5005delta,  Next: perl5004delta,  Prev: perldelta,  Up: Top
+
+what's new for perl5.005
+************************
+
+NAME
+====
+
+   perldelta - what's new for perl5.005
+
+DESCRIPTION
+===========
+
+   This document describes differences between the 5.004 release and this
+one.
+
+About the new versioning system
+===============================
+
+   Perl is now developed on two tracks: a maintenance track that makes
+small, safe updates to released production versions with emphasis on
+compatibility; and a development track that pursues more aggressive
+evolution.  Maintenance releases (which should be considered production
+quality) have subversion numbers that run from 1 to 49, and development
+releases (which should be considered "alpha" quality) run from 50 to 99.
+
+   Perl 5.005 is the combined product of the new dual-track development
+scheme.
+
+Incompatible Changes
+====================
+
+WARNING:  This version is not binary compatible with Perl 5.004.
+----------------------------------------------------------------
+
+   Starting with Perl 5.004_50 there were many deep and far-reaching
+changes to the language internals.  If you have dynamically loaded
+extensions that you built under perl 5.003 or 5.004, you can continue to
+use them with 5.004, but you will need to rebuild and reinstall those
+extensions to use them 5.005.  See INSTALL for detailed instructions on
+how to upgrade.
+
+Default installation structure has changed
+------------------------------------------
+
+   The new Configure defaults are designed to allow a smooth upgrade from
+5.004 to 5.005, but you should read INSTALL for a detailed discussion of
+the changes in order to adapt them to your system.
+
+Perl Source Compatibility
+-------------------------
+
+   When none of the experimental features are enabled, there should be
+very few user-visible Perl source compatibility issues.
+
+   If threads are enabled, then some caveats apply. `@_' and $_ become
+lexical variables.  The effect of this should be largely transparent to
+the user, but there are some boundary conditions under which user will
+need to be aware of the issues.  For example, `local(@_)' results in a
+"Can't localize lexical variable @_ ..." message.  This may be enabled in
+a future version.
+
+   Some new keywords have been introduced.  These are generally expected to
+have very little impact on compatibility.  See `New `INIT' in this node
+keyword', `New `lock' in this node keyword', and `New `qr' in this node
+operator'.
+
+   Certain barewords are now reserved.  Use of these will provoke a warning
+if you have asked for them with the -w switch.  See ``our' in this node is
+now a reserved word'.
+
+C Source Compatibility
+----------------------
+
+   There have been a large number of changes in the internals to support
+the new features in this release.
+
+Core sources now require ANSI C compiler
+     An ANSI C compiler is now required to build perl.  See INSTALL.
+
+All Perl global variables must now be referenced with an explicit prefix
+     All Perl global variables that are visible for use by extensions now
+     have a `PL_' prefix.  New extensions should not refer to perl globals
+     by their unqualified names.  To preserve sanity, we provide limited
+     backward compatibility for globals that are being widely used like
+     sv_undef and `na' (which should now be written as PL_sv_undef, PL_na
+     etc.)
+
+     If you find that your XS extension does not compile anymore because a
+     perl global is not visible, try adding a `PL_' prefix to the global
+     and rebuild.
+
+     It is strongly recommended that all functions in the Perl API that
+     don't begin with `perl' be referenced with a Perl_ prefix.  The bare
+     function names without the Perl_ prefix are supported with macros,
+     but this support may cease in a future release.
+
+     See `"API LISTING"', *Note Perlguts: perlguts,.
+
+Enabling threads has source compatibility issues
+     Perl built with threading enabled requires extensions to use the new
+     `dTHR' macro to initialize the handle to access per-thread data.  If
+     you see a compiler error that talks about the variable `thr' not
+     being declared (when building a module that has XS code),  you need
+     to add `dTHR;' at the beginning of the block that elicited the error.
+
+     The API function `perl_get_sv("@",FALSE)' should be used instead of
+     directly accessing perl globals as `GvSV(errgv)'.  The API call is
+     backward compatible with existing perls and provides source
+     compatibility with threading is enabled.
+
+     See `"C Source Compatibility"' in this node for more information.
+
+Binary Compatibility
+--------------------
+
+   This version is NOT binary compatible with older versions.  All
+extensions will need to be recompiled.  Further binaries built with
+threads enabled are incompatible with binaries built without.  This should
+largely be transparent to the user, as all binary incompatible
+configurations have their own unique architecture name, and extension
+binaries get installed at unique locations.  This allows coexistence of
+several configurations in the same directory hierarchy.  See INSTALL.
+
+Security fixes may affect compatibility
+---------------------------------------
+
+   A few taint leaks and taint omissions have been corrected.  This may
+lead to "failure" of scripts that used to work with older versions.
+Compiling with -DINCOMPLETE_TAINTS provides a perl with minimal amounts of
+changes to the tainting behavior.  But note that the resulting perl will
+have known insecurities.
+
+   Oneliners with the -e switch do not create temporary files anymore.
+
+Relaxed new mandatory warnings introduced in 5.004
+--------------------------------------------------
+
+   Many new warnings that were introduced in 5.004 have been made
+optional.  Some of these warnings are still present, but perl's new
+features make them less often a problem.  See `New Diagnostics' in this
+node.
+
+Licensing
+---------
+
+   Perl has a new Social Contract for contributors.  See
+`Porting/Contract'.
+
+   The license included in much of the Perl documentation has changed.
+Most of the Perl documentation was previously under the implicit GNU
+General Public License or the Artistic License (at the user's choice).
+Now much of the documentation unambiguously states the terms under which
+it may be distributed.  Those terms are in general much less restrictive
+than the GNU GPL.  See *Note Perl: perl, and the individual perl man pages
+listed therein.
+
+Core Changes
+============
+
+Threads
+-------
+
+   WARNING: Threading is considered an *experimental* feature.  Details of
+the implementation may change without notice.  There are known limitations
+and some bugs.  These are expected to be fixed in future versions.
+
+   See `README.threads'.
+
+Compiler
+--------
+
+   WARNING: The Compiler and related tools are considered *experimental*.
+Features may change without notice, and there are known limitations and
+bugs.  Since the compiler is fully external to perl, the default
+configuration will build and install it.
+
+   The Compiler produces three different types of transformations of a
+perl program.  The C backend generates C code that captures perl's state
+just before execution begins.  It eliminates the compile-time overheads of
+the regular perl interpreter, but the run-time performance remains
+comparatively the same.  The CC backend generates optimized C code
+equivalent to the code path at run-time.  The CC backend has greater
+potential for big optimizations, but only a few optimizations are
+implemented currently.  The Bytecode backend generates a platform
+independent bytecode representation of the interpreter's state just before
+execution.  Thus, the Bytecode back end also eliminates much of the
+compilation overhead of the interpreter.
+
+   The compiler comes with several valuable utilities.
+
+   B::Lint is an experimental module to detect and warn about suspicious
+code, especially the cases that the -w switch does not detect.
+
+   B::Deparse can be used to demystify perl code, and understand how perl
+optimizes certain constructs.
+
+   B::Xref generates cross reference reports of all definition and use of
+variables, subroutines and formats in a program.
+
+   B::Showlex show the lexical variables used by a subroutine or file at a
+glance.
+
+   perlcc is a simple frontend for compiling perl.
+
+   See `ext/B/README', *Note B: (pm.info)B,, and the respective compiler
+modules.
+
+Regular Expressions
+-------------------
+
+   Perl's regular expression engine has been seriously overhauled, and
+many new constructs are supported.  Several bugs have been fixed.
+
+   Here is an itemized summary:
+
+Many new and improved optimizations
+     Changes in the RE engine:
+
+          Unneeded nodes removed;
+          Substrings merged together;
+          New types of nodes to process (SUBEXPR)* and similar expressions
+              quickly, used if the SUBEXPR has no side effects and matches
+              strings of the same length;
+          Better optimizations by lookup for constant substrings;
+          Better search for constants substrings anchored by $ ;
+
+     Changes in Perl code using RE engine:
+
+          More optimizations to s/longer/short/;
+          study() was not working;
+          /blah/ may be optimized to an analogue of index() if $& $` $' not seen;
+          Unneeded copying of matched-against string removed;
+          Only matched part of the string is copying if $` $' were not seen;
+
+Many bug fixes
+     Note that only the major bug fixes are listed here.  See Changes for
+     others.
+
+          Backtracking might not restore start of $3.
+          No feedback if max count for * or + on "complex" subexpression
+              was reached, similarly (but at compile time) for {3,34567}
+          Primitive restrictions on max count introduced to decrease a
+              possibility of a segfault;
+          (ZERO-LENGTH)* could segfault;
+          (ZERO-LENGTH)* was prohibited;
+          Long REs were not allowed;
+          /RE/g could skip matches at the same position after a
+            zero-length match;
+
+New regular expression constructs
+     The following new syntax elements are supported:
+
+          (?<=RE)
+          (?<!RE)
+          (?{ CODE })
+          (?i-x)
+          (?i:RE)
+          (?(COND)YES_RE|NO_RE)
+          (?>RE)
+          \z
+
+New operator for precompiled regular expressions
+     See `New `qr' in this node operator'.
+
+Other improvements
+          Better debugging output (possibly with colors),
+                      even from non-debugging Perl;
+          RE engine code now looks like C, not like assembler;
+          Behaviour of RE modifiable by `use re' directive;
+          Improved documentation;
+          Test suite significantly extended;
+          Syntax [:^upper:] etc., reserved inside character classes;
+
+Incompatible changes
+          (?i) localized inside enclosing group;
+          $( is not interpolated into RE any more;
+          /RE/g may match at the same position (with non-zero length)
+              after a zero-length match (bug fix).
+
+   See *Note Perlre: perlre, and *Note Perlop: perlop,.
+
+Improved malloc()
+-----------------
+
+   See banner at the beginning of `malloc.c' for details.
+
+Quicksort is internally implemented
+-----------------------------------
+
+   Perl now contains its own highly optimized qsort() routine.  The new
+qsort() is resistant to inconsistent comparison functions, so Perl's
+`sort()' will not provoke coredumps any more when given poorly written
+sort subroutines.  (Some C library `qsort()'s that were being used before
+used to have this problem.)  In our testing, the new `qsort()' required
+the minimal number of pair-wise compares on average, among all known
+`qsort()' implementations.
+
+   See `perlfunc/sort'.
+
+Reliable signals
+----------------
+
+   Perl's signal handling is susceptible to random crashes, because signals
+arrive asynchronously, and the Perl runtime is not reentrant at arbitrary
+times.
+
+   However, one experimental implementation of reliable signals is
+available when threads are enabled.  See `Thread::Signal'.  Also see
+INSTALL for how to build a Perl capable of threads.
+
+Reliable stack pointers
+-----------------------
+
+   The internals now reallocate the perl stack only at predictable times.
+In particular, magic calls never trigger reallocations of the stack,
+because all reentrancy of the runtime is handled using a "stack of stacks".
+This should improve reliability of cached stack pointers in the internals
+and in XSUBs.
+
+More generous treatment of carriage returns
+-------------------------------------------
+
+   Perl used to complain if it encountered literal carriage returns in
+scripts.  Now they are mostly treated like whitespace within program text.
+Inside string literals and here documents, literal carriage returns are
+ignored if they occur paired with linefeeds, or get interpreted as
+whitespace if they stand alone.  This behavior means that literal carriage
+returns in files should be avoided.  You can get the older, more
+compatible (but less generous) behavior by defining the preprocessor symbol
+`PERL_STRICT_CR' when building perl.  Of course, all this has nothing
+whatever to do with how escapes like `\r' are handled within strings.
+
+   Note that this doesn't somehow magically allow you to keep all text
+files in DOS format.  The generous treatment only applies to files that
+perl itself parses.  If your C compiler doesn't allow carriage returns in
+files, you may still be unable to build modules that need a C compiler.
+
+Memory leaks
+------------
+
+   substr, pos and vec don't leak memory anymore when used in lvalue
+context.  Many small leaks that impacted applications that embed multiple
+interpreters have been fixed.
+
+Better support for multiple interpreters
+----------------------------------------
+
+   The build-time option `-DMULTIPLICITY' has had many of the details
+reworked.  Some previously global variables that should have been
+per-interpreter now are.  With care, this allows interpreters to call each
+other.  See the `PerlInterp' extension on CPAN.
+
+Behavior of local() on array and hash elements is now well-defined
+------------------------------------------------------------------
+
+   See `"Temporary Values via local()"', *Note Perlsub: perlsub,.
+
+`%!' is transparently tied to the *Note Errno: (pm.info)Errno, module
+---------------------------------------------------------------------
+
+   See *Note Perlvar: perlvar,, and *Note Errno: (pm.info)Errno,.
+
+Pseudo-hashes are supported
+---------------------------
+
+   See *Note Perlref: perlref,.
+
+`EXPR foreach EXPR' is supported
+--------------------------------
+
+   See *Note Perlsyn: perlsyn,.
+
+Keywords can be globally overridden
+-----------------------------------
+
+   See *Note Perlsub: perlsub,.
+
+$^E is meaningful on Win32
+--------------------------
+
+   See *Note Perlvar: perlvar,.
+
+`foreach (1..1000000)' optimized
+--------------------------------
+
+   `foreach (1..1000000)' is now optimized into a counting loop.  It does
+not try to allocate a 1000000-size list anymore.
+
+`Foo::' can be used as implicitly quoted package name
+-----------------------------------------------------
+
+   Barewords caused unintuitive behavior when a subroutine with the same
+name as a package happened to be defined.  Thus, `new Foo @args', use the
+result of the call to `Foo()' instead of `Foo' being treated as a literal.
+The recommended way to write barewords in the indirect object slot is
+`new Foo:: @args'.  Note that the method new() is called with a first
+argument of `Foo', not `Foo::' when you do that.
+
+`exists $Foo::{Bar::}' tests existence of a package
+---------------------------------------------------
+
+   It was impossible to test for the existence of a package without
+actually creating it before.  Now `exists $Foo::{Bar::}' can be used to
+test if the `Foo::Bar' namespace has been created.
+
+Better locale support
+---------------------
+
+   See *Note Perllocale: perllocale,.
+
+Experimental support for 64-bit platforms
+-----------------------------------------
+
+   Perl5 has always had 64-bit support on systems with 64-bit longs.
+Starting with 5.005, the beginnings of experimental support for systems
+with 32-bit long and 64-bit 'long long' integers has been added.  If you
+add -DUSE_LONG_LONG to your ccflags in config.sh (or manually define it in
+perl.h) then perl will be built with 'long long' support.  There will be
+many compiler warnings, and the resultant perl may not work on all
+systems.  There are many other issues related to third-party extensions
+and libraries.  This option exists to allow people to work on those issues.
+
+prototype() returns useful results on builtins
+----------------------------------------------
+
+   See `prototype', *Note Perlfunc: perlfunc,.
+
+Extended support for exception handling
+---------------------------------------
+
+   `die()' now accepts a reference value, and `$@' gets set to that value
+in exception traps.  This makes it possible to propagate exception
+objects.  This is an undocumented *experimental* feature.
+
+Re-blessing in DESTROY() supported for chaining DESTROY() methods
+-----------------------------------------------------------------
+
+   See `Destructors', *Note Perlobj: perlobj,.
+
+All printf format conversions are handled internally
+----------------------------------------------------
+
+   See `printf', *Note Perlfunc: perlfunc,.
+
+New `INIT' keyword
+------------------
+
+   `INIT' subs are like BEGIN and END, but they get run just before the
+perl runtime begins execution.  e.g., the Perl Compiler makes use of
+`INIT' blocks to initialize and resolve pointers to XSUBs.
+
+New lock keyword
+----------------
+
+   The lock keyword is the fundamental synchronization primitive in
+threaded perl.  When threads are not enabled, it is currently a noop.
+
+   To minimize impact on source compatibility this keyword is "weak",
+i.e., any user-defined subroutine of the same name overrides it, unless a
+`use Thread' has been seen.
+
+New `qr//' operator
+-------------------
+
+   The `qr//' operator, which is syntactically similar to the other
+quote-like operators, is used to create precompiled regular expressions.
+This compiled form can now be explicitly passed around in variables, and
+interpolated in other regular expressions.  See *Note Perlop: perlop,.
+
+our is now a reserved word
+--------------------------
+
+   Calling a subroutine with the name our will now provoke a warning when
+using the -w switch.
+
+Tied arrays are now fully supported
+-----------------------------------
+
+   See *Note Tie/Array: (pm.info)Tie/Array,.
+
+Tied handles support is better
+------------------------------
+
+   Several missing hooks have been added.  There is also a new base class
+for TIEARRAY implementations.  See *Note Tie/Array: (pm.info)Tie/Array,.
+
+4th argument to substr
+----------------------
+
+   substr() can now both return and replace in one operation.  The optional
+4th argument is the replacement string.  See `substr', *Note Perlfunc:
+perlfunc,.
+
+Negative LENGTH argument to splice
+----------------------------------
+
+   splice() with a negative LENGTH argument now work similar to what the
+LENGTH did for substr().  Previously a negative LENGTH was treated as 0.
+See `splice', *Note Perlfunc: perlfunc,.
+
+Magic lvalues are now more magical
+----------------------------------
+
+   When you say something like `substr($x, 5) = "hi"', the scalar returned
+by substr() is special, in that any modifications to it affect $x.  (This
+is called a 'magic lvalue' because an 'lvalue' is something on the left
+side of an assignment.)  Normally, this is exactly what you would expect
+to happen, but Perl uses the same magic if you use substr(), pos(), or
+vec() in a context where they might be modified, like taking a reference
+with \ or as an argument to a sub that modifies `@_'.  In previous
+versions, this 'magic' only went one way, but now changes to the scalar
+the magic refers to ($x in the above example) affect the magic lvalue too.
+For instance, this code now acts differently:
+
+     $x = "hello";
+     sub printit {
+     	$x = "g'bye";
+     	print $_[0], "\n";
+     }
+     printit(substr($x, 0, 5));
+
+   In previous versions, this would print "hello", but it now prints
+"g'bye".
+
+<> now reads in records
+-----------------------
+
+   If $/ is a reference to an integer, or a scalar that holds an integer,
+<> will read in records instead of lines. For more info, see `$', *Note
+Perlvar: perlvar,.
+
+Supported Platforms
+===================
+
+   Configure has many incremental improvements.  Site-wide policy for
+building perl can now be made persistent, via Policy.sh.  Configure also
+records the command-line arguments used in `config.sh'.
+
+New Platforms
+-------------
+
+   BeOS is now supported.  See `README.beos'.
+
+   DOS is now supported under the DJGPP tools.  See `README.dos' (installed
+as *Note Perldos: perldos, on some systems).
+
+   MiNT is now supported.  See `README.mint'.
+
+   MPE/iX is now supported.  See `README.mpeix'.
+
+   MVS (aka OS390, aka Open Edition) is now supported.  See `README.os390'
+(installed as *Note Perlos390: perlos390, on some systems).
+
+   Stratus VOS is now supported.  See `README.vos'.
+
+Changes in existing support
+---------------------------
+
+   Win32 support has been vastly enhanced.  Support for Perl Object, a C++
+encapsulation of Perl.  GCC and EGCS are now supported on Win32.  See
+`README.win32', aka *Note Perlwin32: perlwin32,.
+
+   VMS configuration system has been rewritten.  See `README.vms'
+(installed as `README_vms' in this node on some systems).
+
+   The hints files for most Unix platforms have seen incremental
+improvements.
+
+Modules and Pragmata
+====================
+
+New Modules
+-----------
+
+B
+     Perl compiler and tools.  See *Note B: (pm.info)B,.
+
+Data::Dumper
+     A module to pretty print Perl data.  See *Note Data/Dumper:
+     (pm.info)Data/Dumper,.
+
+Dumpvalue
+     A module to dump perl values to the screen. See *Note Dumpvalue:
+     (pm.info)Dumpvalue,.
+
+Errno
+     A module to look up errors more conveniently.  See *Note Errno:
+     (pm.info)Errno,.
+
+File::Spec
+     A portable API for file operations.
+
+ExtUtils::Installed
+     Query and manage installed modules.
+
+ExtUtils::Packlist
+     Manipulate .packlist files.
+
+Fatal
+     Make functions/builtins succeed or die.
+
+IPC::SysV
+     Constants and other support infrastructure for System V IPC operations
+     in perl.
+
+Test
+     A framework for writing testsuites.
+
+Tie::Array
+     Base class for tied arrays.
+
+Tie::Handle
+     Base class for tied handles.
+
+Thread
+     Perl thread creation, manipulation, and support.
+
+attrs
+     Set subroutine attributes.
+
+fields
+     Compile-time class fields.
+
+re
+     Various pragmata to control behavior of regular expressions.
+
+Changes in existing modules
+---------------------------
+
+Benchmark
+     You can now run tests for x seconds instead of guessing the right
+     number of tests to run.
+
+Carp
+     Carp has a new function cluck(). cluck() warns, like carp(), but also
+     adds a stack backtrace to the error message, like confess().
+
+CGI
+     CGI has been updated to version 2.42.
+
+Fcntl
+     More Fcntl constants added: F_SETLK64, F_SETLKW64, O_LARGEFILE for
+     large (more than 4G) file access (the 64-bit support is not yet
+     working, though, so no need to get overly excited), Free/Net/OpenBSD
+     locking behaviour flags F_FLOCK, F_POSIX, Linux F_SHLCK, and
+     O_ACCMODE: the mask of O_RDONLY, O_WRONLY, and O_RDWR.
+
+Math::Complex
+     The accessors methods Re, Im, arg, abs, rho, theta, methods can
+     ($z->Re()) now also act as mutators ($z->Re(3)).
+
+Math::Trig
+     A little bit of radial trigonometry (cylindrical and spherical) added,
+     for example the great circle distance.
+
+POSIX
+     POSIX now has its own platform-specific hints files.
+
+DB_File
+     DB_File supports version 2.x of Berkeley DB.  See
+     `ext/DB_File/Changes'.
+
+MakeMaker
+     MakeMaker now supports writing empty makefiles, provides a way to
+     specify that site umask() policy should be honored.  There is also
+     better support for manipulation of .packlist files, and getting
+     information about installed modules.
+
+     Extensions that have both architecture-dependent and
+     architecture-independent files are now always installed completely in
+     the architecture-dependent locations.  Previously, the shareable parts
+     were shared both across architectures and across perl versions and
+     were therefore liable to be overwritten with newer versions that
+     might have subtle incompatibilities.
+
+CPAN
+     See <perlmodinstall> and *Note CPAN: (pm.info)CPAN,.
+
+Cwd
+     Cwd::cwd is faster on most platforms.
+
+Benchmark
+     Keeps better time.
+
+Utility Changes
+===============
+
+   h2ph and related utilities have been vastly overhauled.
+
+   perlcc, a new experimental front end for the compiler is available.
+
+   The crude GNU configure emulator is now called `configure.gnu' to avoid
+trampling on Configure under case-insensitive filesystems.
+
+   perldoc used to be rather slow.  The slower features are now optional.
+In particular, case-insensitive searches need the -i switch, and recursive
+searches need -r.  You can set these switches in the `PERLDOC' environment
+variable to get the old behavior.
+
+Documentation Changes
+=====================
+
+   Config.pm now has a glossary of variables.
+
+   `Porting/patching.pod' has detailed instructions on how to create and
+submit patches for perl.
+
+   *Note Perlport: perlport, specifies guidelines on how to write portably.
+
+   *Note Perlmodinstall: perlmodinstall, describes how to fetch and
+install modules from CPAN sites.
+
+   Some more Perl traps are documented now.  See *Note Perltrap: perltrap,.
+
+   *Note Perlopentut: perlopentut, gives a tutorial on using open().
+
+   *Note Perlreftut: perlreftut, gives a tutorial on references.
+
+   *Note Perlthrtut: perlthrtut, gives a tutorial on threads.
+
+New Diagnostics
+===============
+
+Ambiguous call resolved as CORE::%s(), qualify as such or use &
+     (W) A subroutine you have declared has the same name as a Perl
+     keyword, and you have used the name without qualification for calling
+     one or the other.  Perl decided to call the builtin because the
+     subroutine is not imported.
+
+     To force interpretation as a subroutine call, either put an ampersand
+     before the subroutine name, or qualify the name with its package.
+     Alternatively, you can import the subroutine (or pretend that it's
+     imported with the `use subs' pragma).
+
+     To silently interpret it as the Perl operator, use the `CORE::' prefix
+     on the operator (e.g. `CORE::log($x)') or by declaring the subroutine
+     to be an object method (see *Note Attrs: (pm.info)attrs,).
+
+Bad index while coercing array into hash
+     (F) The index looked up in the hash found as the 0'th element of a
+     pseudo-hash is not legal.  Index values must be at 1 or greater.  See
+     *Note Perlref: perlref,.
+
+Bareword "%s" refers to nonexistent package
+     (W) You used a qualified bareword of the form `Foo::', but the
+     compiler saw no other uses of that namespace before that point.
+     Perhaps you need to predeclare a package?
+
+Can't call method "%s" on an undefined value
+     (F) You used the syntax of a method call, but the slot filled by the
+     object reference or package name contains an undefined value.
+     Something like this will reproduce the error:
+
+          $BADREF = 42;
+          process $BADREF 1,2,3;
+          $BADREF->process(1,2,3);
+
+Can't check filesystem of script "%s" for nosuid
+     (P) For some reason you can't check the filesystem of the script for
+     nosuid.
+
+Can't coerce array into hash
+     (F) You used an array where a hash was expected, but the array has no
+     information on how to map from keys to array indices.  You can do that
+     only with arrays that have a hash reference at index 0.
+
+Can't goto subroutine from an eval-string
+     (F) The "goto subroutine" call can't be used to jump out of an eval
+     "string".  (You can use it to jump out of an eval {BLOCK}, but you
+     probably don't want to.)
+
+Can't localize pseudo-hash element
+     (F) You said something like `< local $ar-'{'key'} >>, where $ar is a
+     reference to a pseudo-hash.  That hasn't been implemented yet, but
+     you can get a similar effect by localizing the corresponding array
+     element directly - `< local $ar-'[$ar->[0]{'key'}] >>.
+
+Can't use %%! because Errno.pm is not available
+     (F) The first time the %! hash is used, perl automatically loads the
+     Errno.pm module. The Errno module is expected to tie the %! hash to
+     provide symbolic names for $! errno values.
+
+Cannot find an opnumber for "%s"
+     (F) A string of a form `CORE::word' was given to prototype(), but
+     there is no builtin with the name word.
+
+Character class syntax [. .] is reserved for future extensions
+     (W) Within regular expression character classes ([]) the syntax
+     beginning with "[." and ending with ".]" is reserved for future
+     extensions.  If you need to represent those character sequences
+     inside a regular expression character class, just quote the square
+     brackets with the backslash: "\[." and ".\]".
+
+Character class syntax [: :] is reserved for future extensions
+     (W) Within regular expression character classes ([]) the syntax
+     beginning with "[:" and ending with ":]" is reserved for future
+     extensions.  If you need to represent those character sequences
+     inside a regular expression character class, just quote the square
+     brackets with the backslash: "\[:" and ":\]".
+
+Character class syntax [= =] is reserved for future extensions
+     (W) Within regular expression character classes ([]) the syntax
+     beginning with "[=" and ending with "=]" is reserved for future
+     extensions.  If you need to represent those character sequences
+     inside a regular expression character class, just quote the square
+     brackets with the backslash: "\[=" and "=\]".
+
+%s: Eval-group in insecure regular expression
+     (F) Perl detected tainted data when trying to compile a regular
+     expression that contains the `(?{ ... })' zero-width assertion, which
+     is unsafe.  See `(?{ code })', *Note Perlre: perlre,, and `(?{ code
+     })', *Note Perlsec: perlsec,.
+
+%s: Eval-group not allowed, use re 'eval'
+     (F) A regular expression contained the `(?{ ... })' zero-width
+     assertion, but that construct is only allowed when the `use re
+     'eval'' pragma is in effect.  See `(?{ code })', *Note Perlre:
+     perlre,.
+
+%s: Eval-group not allowed at run time
+     (F) Perl tried to compile a regular expression containing the `(?{
+     ... })' zero-width assertion at run time, as it would when the
+     pattern contains interpolated values.  Since that is a security risk,
+     it is not allowed.  If you insist, you may still do this by
+     explicitly building the pattern from an interpolated string at run
+     time and using that in an eval().  See `(?{ code })', *Note Perlre:
+     perlre,.
+
+Explicit blessing to " (assuming package main)
+     (W) You are blessing a reference to a zero length string.  This has
+     the effect of blessing the reference into the package main.  This is
+     usually not what you want.  Consider providing a default target
+     package, e.g. bless($ref, $p || 'MyPackage');
+
+Illegal hex digit ignored
+     (W) You may have tried to use a character other than 0 - 9 or A - F
+     in a hexadecimal number.  Interpretation of the hexadecimal number
+     stopped before the illegal character.
+
+No such array field
+     (F) You tried to access an array as a hash, but the field name used is
+     not defined.  The hash at index 0 should map all valid field names to
+     array indices for that to work.
+
+No such field "%s" in variable %s of type %s
+     (F) You tried to access a field of a typed variable where the type
+     does not know about the field name.  The field names are looked up in
+     the %FIELDS hash in the type package at compile time.  The %FIELDS
+     hash is usually set up with the 'fields' pragma.
+
+Out of memory during ridiculously large request
+     (F) You can't allocate more than 2^31+"small amount" bytes.  This
+     error is most likely to be caused by a typo in the Perl program.
+     e.g., `$arr[time]' instead of `$arr[$time]'.
+
+Range iterator outside integer range
+     (F) One (or both) of the numeric arguments to the range operator ".."
+     are outside the range which can be represented by integers internally.
+     One possible workaround is to force Perl to use magical string
+     increment by prepending "0" to your numbers.
+
+Recursive inheritance detected while looking for method '%s' in package '%s'
+     (F) More than 100 levels of inheritance were encountered while
+     invoking a method.  Probably indicates an unintended loop in your
+     inheritance hierarchy.
+
+Reference found where even-sized list expected
+     (W) You gave a single reference where Perl was expecting a list with
+     an even number of elements (for assignment to a hash). This usually
+     means that you used the anon hash constructor when you meant to use
+     parens. In any case, a hash requires key/value *pairs*.
+
+          %hash = { one => 1, two => 2, };   # WRONG
+          %hash = [ qw/ an anon array / ];   # WRONG
+          %hash = ( one => 1, two => 2, );   # right
+          %hash = qw( one 1 two 2 );                 # also fine
+
+Undefined value assigned to typeglob
+     (W) An undefined value was assigned to a typeglob, a la `*foo =
+     undef'.  This does nothing.  It's possible that you really mean
+     `undef *foo'.
+
+Use of reserved word "%s" is deprecated
+     (D) The indicated bareword is a reserved word.  Future versions of
+     perl may use it as a keyword, so you're better off either explicitly
+     quoting the word in a manner appropriate for its context of use, or
+     using a different name altogether.  The warning can be suppressed for
+     subroutine names by either adding a & prefix, or using a package
+     qualifier, e.g. `&our()', or `Foo::our()'.
+
+perl: warning: Setting locale failed.
+     (S) The whole warning message will look something like:
+
+          perl: warning: Setting locale failed.
+          perl: warning: Please check that your locale settings:
+                  LC_ALL = "En_US",
+                  LANG = (unset)
+              are supported and installed on your system.
+          perl: warning: Falling back to the standard locale ("C").
+
+     Exactly what were the failed locale settings varies.  In the above the
+     settings were that the LC_ALL was "En_US" and the LANG had no value.
+     This error means that Perl detected that you and/or your system
+     administrator have set up the so-called variable system but Perl could
+     not use those settings.  This was not dead serious, fortunately: there
+     is a "default locale" called "C" that Perl can and will use, the
+     script will be run.  Before you really fix the problem, however, you
+     will get the same error message each time you run Perl.  How to really
+     fix the problem can be found in `"LOCALE PROBLEMS"', *Note
+     Perllocale: perllocale,.
+
+Obsolete Diagnostics
+====================
+
+Can't mktemp()
+     (F) The mktemp() routine failed for some reason while trying to
+     process a -e switch.  Maybe your /tmp partition is full, or clobbered.
+
+     Removed because -e doesn't use temporary files any more.
+
+Can't write to temp file for -e: %s
+     (F) The write routine failed for some reason while trying to process
+     a -e switch.  Maybe your /tmp partition is full, or clobbered.
+
+     Removed because -e doesn't use temporary files any more.
+
+Cannot open temporary file
+     (F) The create routine failed for some reason while trying to process
+     a -e switch.  Maybe your /tmp partition is full, or clobbered.
+
+     Removed because -e doesn't use temporary files any more.
+
+regexp too big
+     (F) The current implementation of regular expressions uses shorts as
+     address offsets within a string.  Unfortunately this means that if
+     the regular expression compiles to longer than 32767, it'll blow up.
+     Usually when you want a regular expression this big, there is a better
+     way to do it with multiple statements.  See *Note Perlre: perlre,.
+
+Configuration Changes
+=====================
+
+   You can use "Configure -Uinstallusrbinperl" which causes installperl to
+skip installing perl also as /usr/bin/perl.  This is useful if you prefer
+not to modify /usr/bin for some reason or another but harmful because many
+scripts assume to find Perl in /usr/bin/perl.
+
+BUGS
+====
+
+   If you find what you think is a bug, you might check the headers of
+recently posted articles in the comp.lang.perl.misc newsgroup.  There may
+also be information at http://www.perl.com/perl/, the Perl Home Page.
+
+   If you believe you have an unreported bug, please run the *perlbug*
+program included with your release.  Make sure you trim your bug down to a
+tiny but sufficient test case.  Your bug report, along with the output of
+`perl -V', will be sent off to <`perlbug@perl.com'> to be analysed by the
+Perl porting team.
+
+SEE ALSO
+========
+
+   The Changes file for exhaustive details on what changed.
+
+   The INSTALL file for how to build Perl.
+
+   The README file for general stuff.
+
+   The `Artistic' and `Copying' files for copyright information.
+
+HISTORY
+=======
+
+   Written by Gurusamy Sarathy <`gsar@activestate.com'>, with many
+contributions from The Perl Porters.
+
+   Send omissions or corrections to <`perlbug@perl.com'>.
+
+
+File: perl.info,  Node: perlamiga,  Next: perlcygwin,  Prev: perlhist,  Up: Top
+
+Perl under Amiga OS
+*******************
+
+NAME
+====
+
+   perlamiga - Perl under Amiga OS
+
+SYNOPSIS
+========
+
+   One can read this document in the following formats:
+
+     man perlamiga
+     multiview perlamiga.guide
+
+   to list some (not all may be available simultaneously), or it may be
+read *as is*: either as `README.amiga', or `pod/perlamiga.pod'.
+
+DESCRIPTION
+===========
+
+Prerequisites
+-------------
+
+*Unix emulation for AmigaOS: ixemul.library*
+     You need the Unix emulation for AmigaOS, whose most important part is
+     *ixemul.library*. For a minimum setup, get the following archives from
+     ftp://ftp.ninemoons.com/pub/ade/current or a mirror:
+
+     ixemul-46.0-bin.lha ixemul-46.0-env-bin.lha pdksh-4.9-bin.lha
+     ADE-misc-bin.lha
+
+     Note that there might be newer versions available by the time you read
+     this.
+
+     Note also that this is a minimum setup; you might want to add other
+     packages of *ADE* (the *Amiga Developers Environment*).
+
+*Version of Amiga OS*
+     You need at the very least AmigaOS version 2.0. Recommended is
+     version 3.1.
+
+Starting Perl programs under AmigaOS
+------------------------------------
+
+   Start your Perl program foo with arguments `arg1 arg2 arg3' the same
+way as on any other platform, by
+
+     perl foo arg1 arg2 arg3
+
+   If you want to specify perl options `-my_opts' to the perl itself (as
+opposed to to your program), use
+
+     perl -my_opts foo arg1 arg2 arg3
+
+   Alternately, you can try to get a replacement for the system's Execute
+command that honors the #!/usr/bin/perl syntax in scripts and set the s-Bit
+of your scripts. Then you can invoke your scripts like under UNIX with
+
+     foo arg1 arg2 arg3
+
+   (Note that having *nixish full path to perl `/usr/bin/perl' is not
+necessary, `perl' would be enough, but having full path would make it
+easier to use your script under *nix.)
+
+Shortcomings of Perl under AmigaOS
+----------------------------------
+
+   Perl under AmigaOS lacks some features of perl under UNIX because of
+deficiencies in the UNIX-emulation, most notably:
+
+fork()
+some features of the UNIX filesystem regarding link count and file dates
+inplace operation (the -i switch) without backup file
+umask() works, but the correct permissions are only set when the file is       finally close()d
+INSTALLATION
+============
+
+   Change to the installation directory (most probably ADE:), and extract
+the binary distribution:
+
+   lha -mraxe x perl-5.003-bin.lha
+
+   or
+
+   tar xvzpf perl-5.003-bin.tgz
+
+   (Of course you need lha or tar and gunzip for this.)
+
+   For installation of the Unix emulation, read the appropriate docs.
+
+Accessing documentation
+=======================
+
+Manpages
+--------
+
+   If you have man installed on your system, and you installed perl
+manpages, use something like this:
+
+     man perlfunc
+     man less
+     man ExtUtils.MakeMaker
+
+   to access documentation for different components of Perl. Start with
+
+     man perl
+
+   Note: You have to modify your man.conf file to search for manpages in
+the /ade/lib/perl5/man/man3 directory, or the man pages for the perl
+library will not be found.
+
+   Note that dot (.) is used as a package separator for documentation for
+packages, and as usual, sometimes you need to give the section - 3 above -
+to avoid shadowing by the *less(1) manpage*.
+
+HTML
+----
+
+   If you have some WWW browser available, you can build HTML docs.  Cd to
+directory with `.pod' files, and do like this
+
+     cd /ade/lib/perl5/pod
+     pod2html
+
+   After this you can direct your browser the file `perl.html' in this
+directory, and go ahead with reading docs.
+
+   Alternatively you may be able to get these docs prebuilt from CPAN.
+
+GNU info files
+--------------
+
+   Users of `Emacs' would appreciate it very much, especially with `CPerl'
+mode loaded. You need to get latest `pod2info' from CPAN, or, alternately,
+prebuilt info pages.
+
+`LaTeX' docs
+------------
+
+   can be constructed using `pod2latex'.
+
+BUILD
+=====
+
+   Here we discuss how to build Perl under AmigaOS.
+
+Prerequisites
+-------------
+
+   You need to have the latest *ADE* (Amiga Developers Environment) from
+ftp://ftp.ninemoons.com/pub/ade/current.  Also, you need a lot of free
+memory, probably at least 8MB.
+
+Getting the perl source
+-----------------------
+
+   You can either get the latest perl-for-amiga source from Ninemoons and
+extract it with:
+
+     tar xvzpf perl-5.004-src.tgz
+
+   or get the official source from CPAN:
+
+     http://www.perl.com/CPAN/src/5.0
+
+   Extract it like this
+
+     tar xvzpf perl5.004.tar.gz
+
+   You will see a message about errors while extracting Configure. This is
+normal and expected. (There is a conflict with a similarly-named file
+configure, but it causes no harm.)
+
+Making
+------
+
+     sh configure.gnu --prefix=/ade
+
+   Now
+
+     make
+
+Testing
+-------
+
+   Now run
+
+     make test
+
+   Some tests will be skipped because they need the fork() function:
+
+   `io/pipe.t', `op/fork.t', `lib/filehand.t', `lib/open2.t',
+`lib/open3.t', `lib/io_pipe.t', `lib/io_sock.t'
+
+Installing the built perl
+-------------------------
+
+   Run
+
+     make install
+
+AUTHOR
+======
+
+   Norbert Pueschel, pueschel@imsdd.meb.uni-bonn.de
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: perl.info,  Node: perlapi,  Next: perlintern,  Prev: perlcall,  Up: Top
+
+autogenerated documentation for the perl public API
+***************************************************
+
+NAME
+====
+
+   perlapi - autogenerated documentation for the perl public API
+
+DESCRIPTION
+===========
+
+   This file contains the documentation of the perl public API generated by
+embed.pl, specifically a listing of functions, macros, flags, and variables
+that may be used by extension writers.  The interfaces of any functions
+that are not listed here are subject to change without notice.  For this
+reason, blindly using functions listed in proto.h is to be avoided when
+writing extensions.
+
+   Note that all Perl API global variables must be referenced with the
+`PL_' prefix.  Some macros are provided for compatibility with the older,
+unadorned names, but this support may be disabled in a future release.
+
+   The listing is alphabetical, case insensitive.
+
+AvFILL
+     Same as `av_len()'.  Deprecated, use `av_len()' instead.
+
+          int	AvFILL(AV* av)
+
+av_clear
+     Clears an array, making it empty.  Does not free the memory used by
+     the array itself.
+
+          void	av_clear(AV* ar)
+
+av_extend
+     Pre-extend an array.  The key is the index to which the array should
+     be extended.
+
+          void	av_extend(AV* ar, I32 key)
+
+av_fetch
+     Returns the SV at the specified index in the array.  The key is the
+     index.  If `lval' is set then the fetch will be part of a store.
+     Check that the return value is non-null before dereferencing it to a
+     `SV*'.
+
+     See `"Understanding the Magic of Tied Hashes and Arrays"', *Note
+     Perlguts: perlguts, for more information on how to use this function
+     on tied arrays.
+
+          SV**	av_fetch(AV* ar, I32 key, I32 lval)
+
+av_len
+     Returns the highest index in the array.  Returns -1 if the array is
+     empty.
+
+          I32	av_len(AV* ar)
+
+av_make
+     Creates a new AV and populates it with a list of SVs.  The SVs are
+     copied into the array, so they may be freed after the call to
+     av_make.  The new AV will have a reference count of 1.
+
+          AV*	av_make(I32 size, SV** svp)
+
+av_pop
+     Pops an SV off the end of the array.  Returns `&PL_sv_undef' if the
+     array is empty.
+
+          SV*	av_pop(AV* ar)
+
+av_push
+     Pushes an SV onto the end of the array.  The array will grow
+     automatically to accommodate the addition.
+
+          void	av_push(AV* ar, SV* val)
+
+av_shift
+     Shifts an SV off the beginning of the array.
+
+          SV*	av_shift(AV* ar)
+
+av_store
+     Stores an SV in an array.  The array index is specified as key.  The
+     return value will be NULL if the operation failed or if the value did
+     not need to be actually stored within the array (as in the case of
+     tied arrays). Otherwise it can be dereferenced to get the original
+     `SV*'.  Note that the caller is responsible for suitably incrementing
+     the reference count of val before the call, and decrementing it if
+     the function returned NULL.
+
+     See `"Understanding the Magic of Tied Hashes and Arrays"', *Note
+     Perlguts: perlguts, for more information on how to use this function
+     on tied arrays.
+
+          SV**	av_store(AV* ar, I32 key, SV* val)
+
+av_undef
+     Undefines the array.  Frees the memory used by the array itself.
+
+          void	av_undef(AV* ar)
+
+av_unshift
+     Unshift the given number of undef values onto the beginning of the
+     array.  The array will grow automatically to accommodate the
+     addition.  You must then use av_store to assign values to these new
+     elements.
+
+          void	av_unshift(AV* ar, I32 num)
+
+call_argv
+     Performs a callback to the specified Perl sub.  See *Note Perlcall:
+     perlcall,.
+
+     NOTE: the perl_ form of this function is deprecated.
+
+          I32	call_argv(const char* sub_name, I32 flags, char** argv)
+
+call_method
+     Performs a callback to the specified Perl method.  The blessed object
+     must be on the stack.  See *Note Perlcall: perlcall,.
+
+     NOTE: the perl_ form of this function is deprecated.
+
+          I32	call_method(const char* methname, I32 flags)
+
+call_pv
+     Performs a callback to the specified Perl sub.  See *Note Perlcall:
+     perlcall,.
+
+     NOTE: the perl_ form of this function is deprecated.
+
+          I32	call_pv(const char* sub_name, I32 flags)
+
+call_sv
+     Performs a callback to the Perl sub whose name is in the SV.  See
+     *Note Perlcall: perlcall,.
+
+     NOTE: the perl_ form of this function is deprecated.
+
+          I32	call_sv(SV* sv, I32 flags)
+
+CLASS
+     Variable which is setup by xsubpp to indicate the class name for a
+     C++ XS constructor.  This is always a `char*'.  See THIS.
+
+          char*	CLASS
+
+Copy
+     The XSUB-writer's interface to the C memcpy function.  The src is the
+     source, dest is the destination, `nitems' is the number of items, and
+     type is the type.  May fail on overlapping copies.  See also Move.
+
+          void	Copy(void* src, void* dest, int nitems, type)
+
+croak
+     This is the XSUB-writer's interface to Perl's die function.  Use this
+     function the same way you use the C printf function.  See warn.
+
+          void	croak(const char* pat, ...)
+
+CvSTASH
+     Returns the stash of the CV.
+
+          HV*	CvSTASH(CV* cv)
+
+dMARK
+     Declare a stack marker variable, mark, for the XSUB.  See MARK and
+     dORIGMARK.
+
+          dMARK;
+
+dORIGMARK
+     Saves the original stack mark for the XSUB.  See ORIGMARK.
+
+          dORIGMARK;
+
+dSP
+     Declares a local copy of perl's stack pointer for the XSUB, available
+     via the SP macro.  See SP.
+
+          dSP;
+
+dXSARGS
+     Sets up stack and mark pointers for an XSUB, calling dSP and dMARK.
+     This is usually handled automatically by xsubpp.  Declares the items
+     variable to indicate the number of items on the stack.
+
+          dXSARGS;
+
+dXSI32
+     Sets up the ix variable for an XSUB which has aliases.  This is
+     usually handled automatically by xsubpp.
+
+          dXSI32;
+
+ENTER
+     Opening bracket on a callback.  See LEAVE and *Note Perlcall:
+     perlcall,.
+
+          ENTER;
+
+eval_pv
+     Tells Perl to eval the given string and return an SV* result.
+
+     NOTE: the perl_ form of this function is deprecated.
+
+          SV*	eval_pv(const char* p, I32 croak_on_error)
+
+eval_sv
+     Tells Perl to eval the string in the SV.
+
+     NOTE: the perl_ form of this function is deprecated.
+
+          I32	eval_sv(SV* sv, I32 flags)
+
+EXTEND
+     Used to extend the argument stack for an XSUB's return values. Once
+     used, guarrantees that there is room for at least `nitems' to be
+     pushed onto the stack.
+
+          void	EXTEND(SP, int nitems)
+
+fbm_compile
+     Analyses the string in order to make fast searches on it using
+     fbm_instr() - the Boyer-Moore algorithm.
+
+          void	fbm_compile(SV* sv, U32 flags)
+
+fbm_instr
+     Returns the location of the SV in the string delimited by str and
+     `strend'.  It returns Nullch if the string can't be found.  The sv
+     does not have to be fbm_compiled, but the search will not be as fast
+     then.
+
+          char*	fbm_instr(unsigned char* big, unsigned char* bigend, SV* littlesv, U32 flags)
+
+FREETMPS
+     Closing bracket for temporaries on a callback.  See SAVETMPS and
+     *Note Perlcall: perlcall,.
+
+          FREETMPS;
+
+get_av
+     Returns the AV of the specified Perl array.  If create is set and the
+     Perl variable does not exist then it will be created.  If create is
+     not set and the variable does not exist then NULL is returned.
+
+     NOTE: the perl_ form of this function is deprecated.
+
+          AV*	get_av(const char* name, I32 create)
+
+get_cv
+     Returns the CV of the specified Perl subroutine.  If create is set and
+     the Perl subroutine does not exist then it will be declared (which
+     has the same effect as saying `sub name;').  If create is not set and
+     the subroutine does not exist then NULL is returned.
+
+     NOTE: the perl_ form of this function is deprecated.
+
+          CV*	get_cv(const char* name, I32 create)
+
+get_hv
+     Returns the HV of the specified Perl hash.  If create is set and the
+     Perl variable does not exist then it will be created.  If create is
+     not set and the variable does not exist then NULL is returned.
+
+     NOTE: the perl_ form of this function is deprecated.
+
+          HV*	get_hv(const char* name, I32 create)
+
+get_sv
+     Returns the SV of the specified Perl scalar.  If create is set and the
+     Perl variable does not exist then it will be created.  If create is
+     not set and the variable does not exist then NULL is returned.
+
+     NOTE: the perl_ form of this function is deprecated.
+
+          SV*	get_sv(const char* name, I32 create)
+
+GIMME
+     A backward-compatible version of GIMME_V which can only return
+     G_SCALAR or G_ARRAY; in a void context, it returns G_SCALAR.
+     Deprecated.  Use GIMME_V instead.
+
+          U32	GIMME
+
+GIMME_V
+     The XSUB-writer's equivalent to Perl's wantarray.  Returns G_VOID,
+     G_SCALAR or G_ARRAY for void, scalar or array context, respectively.
+
+          U32	GIMME_V
+
+GvSV
+     Return the SV from the GV.
+
+          SV*	GvSV(GV* gv)
+
+gv_fetchmeth
+     Returns the glob with the given name and a defined subroutine or
+     NULL.  The glob lives in the given stash, or in the stashes
+     accessible via @ISA and @UNIVERSAL.
+
+     The argument level should be either 0 or -1.  If `level==0', as a
+     side-effect creates a glob with the given name in the given stash
+     which in the case of success contains an alias for the subroutine,
+     and sets up caching info for this glob.  Similarly for all the
+     searched stashes.
+
+     This function grants `"SUPER"' token as a postfix of the stash name.
+     The GV returned from gv_fetchmeth may be a method cache entry, which
+     is not visible to Perl code.  So when calling call_sv, you should not
+     use the GV directly; instead, you should use the method's CV, which
+     can be obtained from the GV with the `GvCV' macro.
+
+          GV*	gv_fetchmeth(HV* stash, const char* name, STRLEN len, I32 level)
+
+gv_fetchmethod
+     See `gv_fetchmethod_autoload' in this node.
+
+          GV*	gv_fetchmethod(HV* stash, const char* name)
+
+gv_fetchmethod_autoload
+     Returns the glob which contains the subroutine to call to invoke the
+     method on the stash.  In fact in the presence of autoloading this may
+     be the glob for "AUTOLOAD".  In this case the corresponding variable
+     $AUTOLOAD is already setup.
+
+     The third parameter of gv_fetchmethod_autoload determines whether
+     AUTOLOAD lookup is performed if the given method is not present:
+     non-zero means yes, look for AUTOLOAD; zero means no, don't look for
+     AUTOLOAD.  Calling gv_fetchmethod is equivalent to calling
+     gv_fetchmethod_autoload with a non-zero `autoload' parameter.
+
+     These functions grant `"SUPER"' token as a prefix of the method name.
+     Note that if you want to keep the returned glob for a long time, you
+     need to check for it being "AUTOLOAD", since at the later time the
+     call may load a different subroutine due to $AUTOLOAD changing its
+     value. Use the glob created via a side effect to do this.
+
+     These functions have the same side-effects and as gv_fetchmeth with
+     `level==0'.  name should be writable if contains ':' or `' '''. The
+     warning against passing the GV returned by gv_fetchmeth to call_sv
+     apply equally to these functions.
+
+          GV*	gv_fetchmethod_autoload(HV* stash, const char* name, I32 autoload)
+
+gv_stashpv
+     Returns a pointer to the stash for a specified package.  name should
+     be a valid UTF-8 string.  If create is set then the package will be
+     created if it does not already exist.  If create is not set and the
+     package does not exist then NULL is returned.
+
+          HV*	gv_stashpv(const char* name, I32 create)
+
+gv_stashsv
+     Returns a pointer to the stash for a specified package, which must be
+     a valid UTF-8 string.  See gv_stashpv.
+
+          HV*	gv_stashsv(SV* sv, I32 create)
+
+G_ARRAY
+     Used to indicate array context.  See GIMME_V, GIMME and *Note
+     Perlcall: perlcall,.
+
+G_DISCARD
+     Indicates that arguments returned from a callback should be
+     discarded.  See *Note Perlcall: perlcall,.
+
+G_EVAL
+     Used to force a Perl eval wrapper around a callback.  See *Note
+     Perlcall: perlcall,.
+
+G_NOARGS
+     Indicates that no arguments are being sent to a callback.  See *Note
+     Perlcall: perlcall,.
+
+G_SCALAR
+     Used to indicate scalar context.  See GIMME_V, GIMME, and *Note
+     Perlcall: perlcall,.
+
+G_VOID
+     Used to indicate void context.  See GIMME_V and *Note Perlcall:
+     perlcall,.
+
+HEf_SVKEY
+     This flag, used in the length slot of hash entries and magic
+     structures, specifies the structure contains a `SV*' pointer where a
+     `char*' pointer is to be expected. (For information only-not to be
+     used).
+
+HeHASH
+     Returns the computed hash stored in the hash entry.
+
+          U32	HeHASH(HE* he)
+
+HeKEY
+     Returns the actual pointer stored in the key slot of the hash entry.
+     The pointer may be either `char*' or `SV*', depending on the value of
+     `HeKLEN()'.  Can be assigned to.  The `HePV()' or `HeSVKEY()' macros
+     are usually preferable for finding the value of a key.
+
+          void*	HeKEY(HE* he)
+
+HeKLEN
+     If this is negative, and amounts to HEf_SVKEY, it indicates the entry
+     holds an `SV*' key.  Otherwise, holds the actual length of the key.
+     Can be assigned to. The `HePV()' macro is usually preferable for
+     finding key lengths.
+
+          STRLEN	HeKLEN(HE* he)
+
+HePV
+     Returns the key slot of the hash entry as a `char*' value, doing any
+     necessary dereferencing of possibly `SV*' keys.  The length of the
+     string is placed in len (this is a macro, so do not use `&len').  If
+     you do not care about what the length of the key is, you may use the
+     global variable PL_na, though this is rather less efficient than
+     using a local variable.  Remember though, that hash keys in perl are
+     free to contain embedded nulls, so using `strlen()' or similar is not
+     a good way to find the length of hash keys. This is very similar to
+     the `SvPV()' macro described elsewhere in this document.
+
+          char*	HePV(HE* he, STRLEN len)
+
+HeSVKEY
+     Returns the key as an `SV*', or Nullsv if the hash entry does not
+     contain an `SV*' key.
+
+          SV*	HeSVKEY(HE* he)
+
+HeSVKEY_force
+     Returns the key as an `SV*'.  Will create and return a temporary
+     mortal `SV*' if the hash entry contains only a `char*' key.
+
+          SV*	HeSVKEY_force(HE* he)
+
+HeSVKEY_set
+     Sets the key to a given `SV*', taking care to set the appropriate
+     flags to indicate the presence of an `SV*' key, and returns the same
+     `SV*'.
+
+          SV*	HeSVKEY_set(HE* he, SV* sv)
+
+HeVAL
+     Returns the value slot (type `SV*') stored in the hash entry.
+
+          SV*	HeVAL(HE* he)
+
+HvNAME
+     Returns the package name of a stash.  See SvSTASH, CvSTASH.
+
+          char*	HvNAME(HV* stash)
+
+hv_clear
+     Clears a hash, making it empty.
+
+          void	hv_clear(HV* tb)
+
+hv_delete
+     Deletes a key/value pair in the hash.  The value SV is removed from
+     the hash and returned to the caller.  The `klen' is the length of the
+     key.  The flags value will normally be zero; if set to G_DISCARD then
+     NULL will be returned.
+
+          SV*	hv_delete(HV* tb, const char* key, U32 klen, I32 flags)
+
+hv_delete_ent
+     Deletes a key/value pair in the hash.  The value SV is removed from
+     the hash and returned to the caller.  The flags value will normally
+     be zero; if set to G_DISCARD then NULL will be returned.  hash can be
+     a valid precomputed hash value, or 0 to ask for it to be computed.
+
+          SV*	hv_delete_ent(HV* tb, SV* key, I32 flags, U32 hash)
+
+hv_exists
+     Returns a boolean indicating whether the specified hash key exists.
+     The `klen' is the length of the key.
+
+          bool	hv_exists(HV* tb, const char* key, U32 klen)
+
+hv_exists_ent
+     Returns a boolean indicating whether the specified hash key exists.
+     hash can be a valid precomputed hash value, or 0 to ask for it to be
+     computed.
+
+          bool	hv_exists_ent(HV* tb, SV* key, U32 hash)
+
+hv_fetch
+     Returns the SV which corresponds to the specified key in the hash.
+     The `klen' is the length of the key.  If `lval' is set then the fetch
+     will be part of a store.  Check that the return value is non-null
+     before dereferencing it to a `SV*'.
+
+     See `"Understanding the Magic of Tied Hashes and Arrays"', *Note
+     Perlguts: perlguts, for more information on how to use this function
+     on tied hashes.
+
+          SV**	hv_fetch(HV* tb, const char* key, U32 klen, I32 lval)
+
+hv_fetch_ent
+     Returns the hash entry which corresponds to the specified key in the
+     hash.  hash must be a valid precomputed hash number for the given
+     key, or 0 if you want the function to compute it.  IF `lval' is set
+     then the fetch will be part of a store.  Make sure the return value
+     is non-null before accessing it.  The return value when `tb' is a
+     tied hash is a pointer to a static location, so be sure to make a
+     copy of the structure if you need to store it somewhere.
+
+     See `"Understanding the Magic of Tied Hashes and Arrays"', *Note
+     Perlguts: perlguts, for more information on how to use this function
+     on tied hashes.
+
+          HE*	hv_fetch_ent(HV* tb, SV* key, I32 lval, U32 hash)
+
+hv_iterinit
+     Prepares a starting point to traverse a hash table.  Returns the
+     number of keys in the hash (i.e. the same as `HvKEYS(tb)').  The
+     return value is currently only meaningful for hashes without tie
+     magic.
+
+     NOTE: Before version 5.004_65, hv_iterinit used to return the number
+     of hash buckets that happen to be in use.  If you still need that
+     esoteric value, you can get it through the macro `HvFILL(tb)'.
+
+          I32	hv_iterinit(HV* tb)
+
+hv_iterkey
+     Returns the key from the current position of the hash iterator.  See
+     hv_iterinit.
+
+          char*	hv_iterkey(HE* entry, I32* retlen)
+
+hv_iterkeysv
+     Returns the key as an `SV*' from the current position of the hash
+     iterator.  The return value will always be a mortal copy of the key.
+     Also see hv_iterinit.
+
+          SV*	hv_iterkeysv(HE* entry)
+
+hv_iternext
+     Returns entries from a hash iterator.  See hv_iterinit.
+
+          HE*	hv_iternext(HV* tb)
+
+hv_iternextsv
+     Performs an hv_iternext, hv_iterkey, and hv_iterval in one operation.
+
+          SV*	hv_iternextsv(HV* hv, char** key, I32* retlen)
+
+hv_iterval
+     Returns the value from the current position of the hash iterator.  See
+     hv_iterkey.
+
+          SV*	hv_iterval(HV* tb, HE* entry)
+
+hv_magic
+     Adds magic to a hash.  See sv_magic.
+
+          void	hv_magic(HV* hv, GV* gv, int how)
+
+hv_store
+     Stores an SV in a hash.  The hash key is specified as key and `klen'
+     is the length of the key.  The hash parameter is the precomputed hash
+     value; if it is zero then Perl will compute it.  The return value
+     will be NULL if the operation failed or if the value did not need to
+     be actually stored within the hash (as in the case of tied hashes).
+     Otherwise it can be dereferenced to get the original `SV*'.  Note
+     that the caller is responsible for suitably incrementing the
+     reference count of val before the call, and decrementing it if the
+     function returned NULL.
+
+     See `"Understanding the Magic of Tied Hashes and Arrays"', *Note
+     Perlguts: perlguts, for more information on how to use this function
+     on tied hashes.
+
+          SV**	hv_store(HV* tb, const char* key, U32 klen, SV* val, U32 hash)
+
+hv_store_ent
+     Stores val in a hash.  The hash key is specified as key.  The hash
+     parameter is the precomputed hash value; if it is zero then Perl will
+     compute it.  The return value is the new hash entry so created.  It
+     will be NULL if the operation failed or if the value did not need to
+     be actually stored within the hash (as in the case of tied hashes).
+     Otherwise the contents of the return value can be accessed using the
+     `He???' macros described here.  Note that the caller is responsible
+     for suitably incrementing the reference count of val before the call,
+     and decrementing it if the function returned NULL.
+
+     See `"Understanding the Magic of Tied Hashes and Arrays"', *Note
+     Perlguts: perlguts, for more information on how to use this function
+     on tied hashes.
+
+          HE*	hv_store_ent(HV* tb, SV* key, SV* val, U32 hash)
+
+hv_undef
+     Undefines the hash.
+
+          void	hv_undef(HV* tb)
+
+isALNUM
+     Returns a boolean indicating whether the C `char' is an ascii
+     alphanumeric character or digit.
+
+          bool	isALNUM(char ch)
+
+isALPHA
+     Returns a boolean indicating whether the C `char' is an ascii
+     alphabetic character.
+
+          bool	isALPHA(char ch)
+
+isDIGIT
+     Returns a boolean indicating whether the C `char' is an ascii digit.
+
+          bool	isDIGIT(char ch)
+
+isLOWER
+     Returns a boolean indicating whether the C `char' is a lowercase
+     character.
+
+          bool	isLOWER(char ch)
+
+isSPACE
+     Returns a boolean indicating whether the C `char' is whitespace.
+
+          bool	isSPACE(char ch)
+
+isUPPER
+     Returns a boolean indicating whether the C `char' is an uppercase
+     character.
+
+          bool	isUPPER(char ch)
+
+items
+     Variable which is setup by xsubpp to indicate the number of items on
+     the stack.  See `"Variable-length Parameter Lists"', *Note Perlxs:
+     perlxs,.
+
+          I32	items
+
+ix
+     Variable which is setup by xsubpp to indicate which of an XSUB's
+     aliases was used to invoke it.  See `"The ALIAS: Keyword"', *Note
+     Perlxs: perlxs,.
+
+          I32	ix
+
+LEAVE
+     Closing bracket on a callback.  See ENTER and *Note Perlcall:
+     perlcall,.
+
+          LEAVE;
+
+looks_like_number
+     Test if an the content of an SV looks like a number (or is a number).
+
+          I32	looks_like_number(SV* sv)
+
+MARK
+     Stack marker variable for the XSUB.  See dMARK.
+
+mg_clear
+     Clear something magical that the SV represents.  See sv_magic.
+
+          int	mg_clear(SV* sv)
+
+mg_copy
+     Copies the magic from one SV to another.  See sv_magic.
+
+          int	mg_copy(SV* sv, SV* nsv, const char* key, I32 klen)
+
+mg_find
+     Finds the magic pointer for type matching the SV.  See sv_magic.
+
+          MAGIC*	mg_find(SV* sv, int type)
+
+mg_free
+     Free any magic storage used by the SV.  See sv_magic.
+
+          int	mg_free(SV* sv)
+
+mg_get
+     Do magic after a value is retrieved from the SV.  See sv_magic.
+
+          int	mg_get(SV* sv)
+
+mg_length
+     Report on the SV's length.  See sv_magic.
+
+          U32	mg_length(SV* sv)
+
+mg_magical
+     Turns on the magical status of an SV.  See sv_magic.
+
+          void	mg_magical(SV* sv)
+
+mg_set
+     Do magic after a value is assigned to the SV.  See sv_magic.
+
+          int	mg_set(SV* sv)
+
+Move
+     The XSUB-writer's interface to the C memmove function.  The src is the
+     source, dest is the destination, `nitems' is the number of items, and
+     type is the type.  Can do overlapping moves.  See also Copy.
+
+          void	Move(void* src, void* dest, int nitems, type)
+
+New
+     The XSUB-writer's interface to the C malloc function.
+
+          void	New(int id, void* ptr, int nitems, type)
+
+newAV
+     Creates a new AV.  The reference count is set to 1.
+
+          AV*	newAV()
+
+Newc
+     The XSUB-writer's interface to the C malloc function, with cast.
+
+          void	Newc(int id, void* ptr, int nitems, type, cast)
+
+newCONSTSUB
+     Creates a constant sub equivalent to Perl `sub FOO () { 123 }' which
+     is eligible for inlining at compile-time.
+
+          void	newCONSTSUB(HV* stash, char* name, SV* sv)
+
+newHV
+     Creates a new HV.  The reference count is set to 1.
+
+          HV*	newHV()
+
+newRV_inc
+     Creates an RV wrapper for an SV.  The reference count for the
+     original SV is incremented.
+
+          SV*	newRV_inc(SV* sv)
+
+newRV_noinc
+     Creates an RV wrapper for an SV.  The reference count for the original
+     SV is not incremented.
+
+          SV*	newRV_noinc(SV *sv)
+
+NEWSV
+     Creates a new SV.  A non-zero len parameter indicates the number of
+     bytes of preallocated string space the SV should have.  An extra byte
+     for a tailing NUL is also reserved.  (SvPOK is not set for the SV
+     even if string space is allocated.)  The reference count for the new
+     SV is set to 1.  id is an integer id between 0 and 1299 (used to
+     identify leaks).
+
+          SV*	NEWSV(int id, STRLEN len)
+
+newSViv
+     Creates a new SV and copies an integer into it.  The reference count
+     for the SV is set to 1.
+
+          SV*	newSViv(IV i)
+
+newSVnv
+     Creates a new SV and copies a floating point value into it.  The
+     reference count for the SV is set to 1.
+
+          SV*	newSVnv(NV n)
+
+newSVpv
+     Creates a new SV and copies a string into it.  The reference count
+     for the SV is set to 1.  If len is zero, Perl will compute the length
+     using strlen().  For efficiency, consider using newSVpvn instead.
+
+          SV*	newSVpv(const char* s, STRLEN len)
+
+newSVpvf
+     Creates a new SV an initialize it with the string formatted like
+     sprintf.
+
+          SV*	newSVpvf(const char* pat, ...)
+
+newSVpvn
+     Creates a new SV and copies a string into it.  The reference count
+     for the SV is set to 1.  Note that if len is zero, Perl will create a
+     zero length string.  You are responsible for ensuring that the source
+     string is at least len bytes long.
+
+          SV*	newSVpvn(const char* s, STRLEN len)
+
+newSVrv
+     Creates a new SV for the RV, rv, to point to.  If rv is not an RV then
+     it will be upgraded to one.  If `classname' is non-null then the new
+     SV will be blessed in the specified package.  The new SV is returned
+     and its reference count is 1.
+
+          SV*	newSVrv(SV* rv, const char* classname)
+
+newSVsv
+     Creates a new SV which is an exact duplicate of the original SV.
+
+          SV*	newSVsv(SV* old)
+
+newSVuv
+     Creates a new SV and copies an unsigned integer into it.  The
+     reference count for the SV is set to 1.
+
+          SV*	newSVuv(UV u)
+
+newXS
+     Used by xsubpp to hook up XSUBs as Perl subs.
+
+newXSproto
+     Used by xsubpp to hook up XSUBs as Perl subs.  Adds Perl prototypes to
+     the subs.
+
+Newz
+     The XSUB-writer's interface to the C malloc function.  The allocated
+     memory is zeroed with `memzero'.
+
+          void	Newz(int id, void* ptr, int nitems, type)
+
+Nullav
+     Null AV pointer.
+
+Nullch
+     Null character pointer.
+
+Nullcv
+     Null CV pointer.
+
+Nullhv
+     Null HV pointer.
+
+Nullsv
+     Null SV pointer.
+
+ORIGMARK
+     The original stack mark for the XSUB.  See dORIGMARK.
+
+perl_alloc
+     Allocates a new Perl interpreter.  See *Note Perlembed: perlembed,.
+
+          PerlInterpreter*	perl_alloc()
+
+perl_construct
+     Initializes a new Perl interpreter.  See *Note Perlembed: perlembed,.
+
+          void	perl_construct(PerlInterpreter* interp)
+
+perl_destruct
+     Shuts down a Perl interpreter.  See *Note Perlembed: perlembed,.
+
+          void	perl_destruct(PerlInterpreter* interp)
+
+perl_free
+     Releases a Perl interpreter.  See *Note Perlembed: perlembed,.
+
+          void	perl_free(PerlInterpreter* interp)
+
+perl_parse
+     Tells a Perl interpreter to parse a Perl script.  See *Note
+     Perlembed: perlembed,.
+
+          int	perl_parse(PerlInterpreter* interp, XSINIT_t xsinit, int argc, char** argv, char** env)
+
+perl_run
+     Tells a Perl interpreter to run.  See *Note Perlembed: perlembed,.
+
+          int	perl_run(PerlInterpreter* interp)
+
+PL_DBsingle
+     When Perl is run in debugging mode, with the -d switch, this SV is a
+     boolean which indicates whether subs are being single-stepped.
+     Single-stepping is automatically turned on after every step.  This is
+     the C variable which corresponds to Perl's $DB::single variable.  See
+     PL_DBsub.
+
+          SV *	PL_DBsingle
+
+PL_DBsub
+     When Perl is run in debugging mode, with the -d switch, this GV
+     contains the SV which holds the name of the sub being debugged.  This
+     is the C variable which corresponds to Perl's $DB::sub variable.  See
+     PL_DBsingle.
+
+          GV *	PL_DBsub
+
+PL_DBtrace
+     Trace variable used when Perl is run in debugging mode, with the -d
+     switch.  This is the C variable which corresponds to Perl's $DB::trace
+     variable.  See PL_DBsingle.
+
+          SV *	PL_DBtrace
+
+PL_dowarn
+     The C variable which corresponds to Perl's $^W warning variable.
+
+          bool	PL_dowarn
+
+PL_modglobal
+     PL_modglobal is a general purpose, interpreter global HV for use by
+     extensions that need to keep information on a per-interpreter basis.
+     In a pinch, it can also be used as a symbol table for extensions to
+     share data among each other.  It is a good idea to use keys prefixed
+     by the package name of the extension that owns the data.
+
+          HV*	PL_modglobal
+
+PL_na
+     A convenience variable which is typically used with SvPV when one
+     doesn't care about the length of the string.  It is usually more
+     efficient to either declare a local variable and use that instead or
+     to use the SvPV_nolen macro.
+
+          STRLEN	PL_na
+
+PL_sv_no
+     This is the false SV.  See PL_sv_yes.  Always refer to this as
+     `&PL_sv_no'.
+
+          SV	PL_sv_no
+
+PL_sv_undef
+     This is the undef SV.  Always refer to this as `&PL_sv_undef'.
+
+          SV	PL_sv_undef
+
+PL_sv_yes
+     This is the `true' SV.  See PL_sv_no.  Always refer to this as
+     `&PL_sv_yes'.
+
+          SV	PL_sv_yes
+
+POPi
+     Pops an integer off the stack.
+
+          IV	POPi
+
+POPl
+     Pops a long off the stack.
+
+          long	POPl
+
+POPn
+     Pops a double off the stack.
+
+          NV	POPn
+
+POPp
+     Pops a string off the stack.
+
+          char*	POPp
+
+POPs
+     Pops an SV off the stack.
+
+          SV*	POPs
+
+PUSHi
+     Push an integer onto the stack.  The stack must have room for this
+     element.  Handles 'set' magic.  See XPUSHi.
+
+          void	PUSHi(IV iv)
+
+PUSHMARK
+     Opening bracket for arguments on a callback.  See PUTBACK and *Note
+     Perlcall: perlcall,.
+
+          PUSHMARK;
+
+PUSHn
+     Push a double onto the stack.  The stack must have room for this
+     element.  Handles 'set' magic.  See XPUSHn.
+
+          void	PUSHn(NV nv)
+
+PUSHp
+     Push a string onto the stack.  The stack must have room for this
+     element.  The len indicates the length of the string.  Handles 'set'
+     magic.  See XPUSHp.
+
+          void	PUSHp(char* str, STRLEN len)
+
+PUSHs
+     Push an SV onto the stack.  The stack must have room for this element.
+     Does not handle 'set' magic.  See XPUSHs.
+
+          void	PUSHs(SV* sv)
+
+PUSHu
+     Push an unsigned integer onto the stack.  The stack must have room
+     for this element.  See XPUSHu.
+
+          void	PUSHu(UV uv)
+
+PUTBACK
+     Closing bracket for XSUB arguments.  This is usually handled by
+     xsubpp.  See PUSHMARK and *Note Perlcall: perlcall, for other uses.
+
+          PUTBACK;
+
+Renew
+     The XSUB-writer's interface to the C realloc function.
+
+          void	Renew(void* ptr, int nitems, type)
+
+Renewc
+     The XSUB-writer's interface to the C realloc function, with cast.
+
+          void	Renewc(void* ptr, int nitems, type, cast)
+
+require_pv
+     Tells Perl to require a module.
+
+     NOTE: the perl_ form of this function is deprecated.
+
+          void	require_pv(const char* pv)
+
+RETVAL
+     Variable which is setup by xsubpp to hold the return value for an
+     XSUB. This is always the proper type for the XSUB. See `"The RETVAL
+     Variable"', *Note Perlxs: perlxs,.
+
+          (whatever)	RETVAL
+
+Safefree
+     The XSUB-writer's interface to the C free function.
+
+          void	Safefree(void* src, void* dest, int nitems, type)
+
+savepv
+     Copy a string to a safe spot.  This does not use an SV.
+
+          char*	savepv(const char* sv)
+
+savepvn
+     Copy a string to a safe spot.  The len indicates number of bytes to
+     copy.  This does not use an SV.
+
+          char*	savepvn(const char* sv, I32 len)
+
+SAVETMPS
+     Opening bracket for temporaries on a callback.  See FREETMPS and
+     *Note Perlcall: perlcall,.
+
+          SAVETMPS;
+
+SP
+     Stack pointer.  This is usually handled by xsubpp.  See dSP and
+     SPAGAIN.
+
+SPAGAIN
+     Refetch the stack pointer.  Used after a callback.  See *Note
+     Perlcall: perlcall,.
+
+          SPAGAIN;
+
+ST
+     Used to access elements on the XSUB's stack.
+
+          SV*	ST(int ix)
+
+strEQ
+     Test two strings to see if they are equal.  Returns true or false.
+
+          bool	strEQ(char* s1, char* s2)
+
+strGE
+     Test two strings to see if the first, `s1', is greater than or equal
+     to the second, `s2'.  Returns true or false.
+
+          bool	strGE(char* s1, char* s2)
+
+strGT
+     Test two strings to see if the first, `s1', is greater than the
+     second, `s2'.  Returns true or false.
+
+          bool	strGT(char* s1, char* s2)
+
+strLE
+     Test two strings to see if the first, `s1', is less than or equal to
+     the second, `s2'.  Returns true or false.
+
+          bool	strLE(char* s1, char* s2)
+
+strLT
+     Test two strings to see if the first, `s1', is less than the second,
+     `s2'.  Returns true or false.
+
+          bool	strLT(char* s1, char* s2)
+
+strNE
+     Test two strings to see if they are different.  Returns true or false.
+
+          bool	strNE(char* s1, char* s2)
+
+strnEQ
+     Test two strings to see if they are equal.  The len parameter
+     indicates the number of bytes to compare.  Returns true or false. (A
+     wrapper for strncmp).
+
+          bool	strnEQ(char* s1, char* s2, STRLEN len)
+
+strnNE
+     Test two strings to see if they are different.  The len parameter
+     indicates the number of bytes to compare.  Returns true or false. (A
+     wrapper for strncmp).
+
+          bool	strnNE(char* s1, char* s2, STRLEN len)
+
+StructCopy
+     This is an architecture-independant macro to copy one structure to
+     another.
+
+          void	StructCopy(type src, type dest, type)
+
+SvCUR
+     Returns the length of the string which is in the SV.  See SvLEN.
+
+          STRLEN	SvCUR(SV* sv)
+
+SvCUR_set
+     Set the length of the string which is in the SV.  See SvCUR.
+
+          void	SvCUR_set(SV* sv, STRLEN len)
+
+SvEND
+     Returns a pointer to the last character in the string which is in the
+     SV.  See SvCUR.  Access the character as *(SvEND(sv)).
+
+          char*	SvEND(SV* sv)
+
+SvGETMAGIC
+     Invokes mg_get on an SV if it has 'get' magic.  This macro evaluates
+     its argument more than once.
+
+          void	SvGETMAGIC(SV* sv)
+
+SvGROW
+     Expands the character buffer in the SV so that it has room for the
+     indicated number of bytes (remember to reserve space for an extra
+     trailing NUL character).  Calls sv_grow to perform the expansion if
+     necessary.  Returns a pointer to the character buffer.
+
+          void	SvGROW(SV* sv, STRLEN len)
+
+SvIOK
+     Returns a boolean indicating whether the SV contains an integer.
+
+          bool	SvIOK(SV* sv)
+
+SvIOKp
+     Returns a boolean indicating whether the SV contains an integer.
+     Checks the private setting.  Use SvIOK.
+
+          bool	SvIOKp(SV* sv)
+
+SvIOK_off
+     Unsets the IV status of an SV.
+
+          void	SvIOK_off(SV* sv)
+
+SvIOK_on
+     Tells an SV that it is an integer.
+
+          void	SvIOK_on(SV* sv)
+
+SvIOK_only
+     Tells an SV that it is an integer and disables all other OK bits.
+
+          void	SvIOK_only(SV* sv)
+
+SvIV
+     Coerces the given SV to an integer and returns it.
+
+          IV	SvIV(SV* sv)
+
+SvIVX
+     Returns the integer which is stored in the SV, assuming SvIOK is true.
+
+          IV	SvIVX(SV* sv)
+
+SvLEN
+     Returns the size of the string buffer in the SV.  See SvCUR.
+
+          STRLEN	SvLEN(SV* sv)
+
+SvNIOK
+     Returns a boolean indicating whether the SV contains a number,
+     integer or double.
+
+          bool	SvNIOK(SV* sv)
+
+SvNIOKp
+     Returns a boolean indicating whether the SV contains a number,
+     integer or double.  Checks the private setting.  Use SvNIOK.
+
+          bool	SvNIOKp(SV* sv)
+
+SvNIOK_off
+     Unsets the NV/IV status of an SV.
+
+          void	SvNIOK_off(SV* sv)
+
+SvNOK
+     Returns a boolean indicating whether the SV contains a double.
+
+          bool	SvNOK(SV* sv)
+
+SvNOKp
+     Returns a boolean indicating whether the SV contains a double.
+     Checks the private setting.  Use SvNOK.
+
+          bool	SvNOKp(SV* sv)
+
+SvNOK_off
+     Unsets the NV status of an SV.
+
+          void	SvNOK_off(SV* sv)
+
+SvNOK_on
+     Tells an SV that it is a double.
+
+          void	SvNOK_on(SV* sv)
+
+SvNOK_only
+     Tells an SV that it is a double and disables all other OK bits.
+
+          void	SvNOK_only(SV* sv)
+
+SvNV
+     Coerce the given SV to a double and return it.
+
+          NV	SvNV(SV* sv)
+
+SvNVX
+     Returns the double which is stored in the SV, assuming SvNOK is true.
+
+          NV	SvNVX(SV* sv)
+
+SvOK
+     Returns a boolean indicating whether the value is an SV.
+
+          bool	SvOK(SV* sv)
+
+SvOOK
+     Returns a boolean indicating whether the SvIVX is a valid offset
+     value for the SvPVX.  This hack is used internally to speed up
+     removal of characters from the beginning of a SvPV.  When SvOOK is
+     true, then the start of the allocated string buffer is really (SvPVX
+     - SvIVX).
+
+          bool	SvOOK(SV* sv)
+
+SvPOK
+     Returns a boolean indicating whether the SV contains a character
+     string.
+
+          bool	SvPOK(SV* sv)
+
+SvPOKp
+     Returns a boolean indicating whether the SV contains a character
+     string.  Checks the private setting.  Use SvPOK.
+
+          bool	SvPOKp(SV* sv)
+
+SvPOK_off
+     Unsets the PV status of an SV.
+
+          void	SvPOK_off(SV* sv)
+
+SvPOK_on
+     Tells an SV that it is a string.
+
+          void	SvPOK_on(SV* sv)
+
+SvPOK_only
+     Tells an SV that it is a string and disables all other OK bits.
+
+          void	SvPOK_only(SV* sv)
+
+SvPV
+     Returns a pointer to the string in the SV, or a stringified form of
+     the SV if the SV does not contain a string.  Handles 'get' magic.
+
+          char*	SvPV(SV* sv, STRLEN len)
+
+SvPVX
+     Returns a pointer to the string in the SV.  The SV must contain a
+     string.
+
+          char*	SvPVX(SV* sv)
+
+SvPV_force
+     Like <SvPV> but will force the SV into becoming a string (SvPOK).
+     You want force if you are going to update the SvPVX directly.
+
+          char*	SvPV_force(SV* sv, STRLEN len)
+
+SvPV_nolen
+     Returns a pointer to the string in the SV, or a stringified form of
+     the SV if the SV does not contain a string.  Handles 'get' magic.
+
+          char*	SvPV_nolen(SV* sv)
+
+SvREFCNT
+     Returns the value of the object's reference count.
+
+          U32	SvREFCNT(SV* sv)
+
+SvREFCNT_dec
+     Decrements the reference count of the given SV.
+
+          void	SvREFCNT_dec(SV* sv)
+
+SvREFCNT_inc
+     Increments the reference count of the given SV.
+
+          SV*	SvREFCNT_inc(SV* sv)
+
+SvROK
+     Tests if the SV is an RV.
+
+          bool	SvROK(SV* sv)
+
+SvROK_off
+     Unsets the RV status of an SV.
+
+          void	SvROK_off(SV* sv)
+
+SvROK_on
+     Tells an SV that it is an RV.
+
+          void	SvROK_on(SV* sv)
+
+SvRV
+     Dereferences an RV to return the SV.
+
+          SV*	SvRV(SV* sv)
+
+SvSETMAGIC
+     Invokes mg_set on an SV if it has 'set' magic.  This macro evaluates
+     its argument more than once.
+
+          void	SvSETMAGIC(SV* sv)
+
+SvSetSV
+     Calls sv_setsv if dsv is not the same as ssv.  May evaluate arguments
+     more than once.
+
+          void	SvSetSV(SV* dsb, SV* ssv)
+
+SvSetSV_nosteal
+     Calls a non-destructive version of sv_setsv if dsv is not the same as
+     ssv. May evaluate arguments more than once.
+
+          void	SvSetSV_nosteal(SV* dsv, SV* ssv)
+
+SvSTASH
+     Returns the stash of the SV.
+
+          HV*	SvSTASH(SV* sv)
+
+SvTAINT
+     Taints an SV if tainting is enabled
+
+          void	SvTAINT(SV* sv)
+
+SvTAINTED
+     Checks to see if an SV is tainted. Returns TRUE if it is, FALSE if
+     not.
+
+          bool	SvTAINTED(SV* sv)
+
+SvTAINTED_off
+     Untaints an SV. Be *very* careful with this routine, as it
+     short-circuits some of Perl's fundamental security features. XS
+     module authors should not use this function unless they fully
+     understand all the implications of unconditionally untainting the
+     value. Untainting should be done in the standard perl fashion, via a
+     carefully crafted regexp, rather than directly untainting variables.
+
+          void	SvTAINTED_off(SV* sv)
+
+SvTAINTED_on
+     Marks an SV as tainted.
+
+          void	SvTAINTED_on(SV* sv)
+
+SvTRUE
+     Returns a boolean indicating whether Perl would evaluate the SV as
+     true or false, defined or undefined.  Does not handle 'get' magic.
+
+          bool	SvTRUE(SV* sv)
+
+SvTYPE
+     Returns the type of the SV.  See svtype.
+
+          svtype	SvTYPE(SV* sv)
+
+svtype
+     An enum of flags for Perl types.  These are found in the file *sv.h*
+     in the svtype enum.  Test these flags with the SvTYPE macro.
+
+SVt_IV
+     Integer type flag for scalars.  See svtype.
+
+SVt_NV
+     Double type flag for scalars.  See svtype.
+
+SVt_PV
+     Pointer type flag for scalars.  See svtype.
+
+SVt_PVAV
+     Type flag for arrays.  See svtype.
+
+SVt_PVCV
+     Type flag for code refs.  See svtype.
+
+SVt_PVHV
+     Type flag for hashes.  See svtype.
+
+SVt_PVMG
+     Type flag for blessed scalars.  See svtype.
+
+SvUPGRADE
+     Used to upgrade an SV to a more complex form.  Uses sv_upgrade to
+     perform the upgrade if necessary.  See svtype.
+
+          void	SvUPGRADE(SV* sv, svtype type)
+
+SvUV
+     Coerces the given SV to an unsigned integer and returns it.
+
+          UV	SvUV(SV* sv)
+
+SvUVX
+     Returns the unsigned integer which is stored in the SV, assuming
+     SvIOK is true.
+
+          UV	SvUVX(SV* sv)
+
+sv_2mortal
+     Marks an SV as mortal.  The SV will be destroyed when the current
+     context ends.
+
+          SV*	sv_2mortal(SV* sv)
+
+sv_bless
+     Blesses an SV into a specified package.  The SV must be an RV.  The
+     package must be designated by its stash (see `gv_stashpv()').  The
+     reference count of the SV is unaffected.
+
+          SV*	sv_bless(SV* sv, HV* stash)
+
+sv_catpv
+     Concatenates the string onto the end of the string which is in the SV.
+     Handles 'get' magic, but not 'set' magic.  See sv_catpv_mg.
+
+          void	sv_catpv(SV* sv, const char* ptr)
+
+sv_catpvf
+     Processes its arguments like sprintf and appends the formatted output
+     to an SV.  Handles 'get' magic, but not 'set' magic.  `SvSETMAGIC()'
+     must typically be called after calling this function to handle 'set'
+     magic.
+
+          void	sv_catpvf(SV* sv, const char* pat, ...)
+
+sv_catpvf_mg
+     Like sv_catpvf, but also handles 'set' magic.
+
+          void	sv_catpvf_mg(SV *sv, const char* pat, ...)
+
+sv_catpvn
+     Concatenates the string onto the end of the string which is in the
+     SV.  The len indicates number of bytes to copy.  Handles 'get' magic,
+     but not 'set' magic.  See sv_catpvn_mg.
+
+          void	sv_catpvn(SV* sv, const char* ptr, STRLEN len)
+
+sv_catpvn_mg
+     Like sv_catpvn, but also handles 'set' magic.
+
+          void	sv_catpvn_mg(SV *sv, const char *ptr, STRLEN len)
+
+sv_catpv_mg
+     Like sv_catpv, but also handles 'set' magic.
+
+          void	sv_catpv_mg(SV *sv, const char *ptr)
+
+sv_catsv
+     Concatenates the string from SV `ssv' onto the end of the string in SV
+     `dsv'.  Handles 'get' magic, but not 'set' magic.  See sv_catsv_mg.
+
+          void	sv_catsv(SV* dsv, SV* ssv)
+
+sv_catsv_mg
+     Like sv_catsv, but also handles 'set' magic.
+
+          void	sv_catsv_mg(SV *dstr, SV *sstr)
+
+sv_chop
+     Efficient removal of characters from the beginning of the string
+     buffer.  SvPOK(sv) must be true and the `ptr' must be a pointer to
+     somewhere inside the string buffer.  The `ptr' becomes the first
+     character of the adjusted string.
+
+          void	sv_chop(SV* sv, char* ptr)
+
+sv_cmp
+     Compares the strings in two SVs.  Returns -1, 0, or 1 indicating
+     whether the string in `sv1' is less than, equal to, or greater than
+     the string in `sv2'.
+
+          I32	sv_cmp(SV* sv1, SV* sv2)
+
+sv_dec
+     Auto-decrement of the value in the SV.
+
+          void	sv_dec(SV* sv)
+
+sv_derived_from
+     Returns a boolean indicating whether the SV is derived from the
+     specified class.  This is the function that implements
+     UNIVERSAL::isa.  It works for class names as well as for objects.
+
+          bool	sv_derived_from(SV* sv, const char* name)
+
+sv_eq
+     Returns a boolean indicating whether the strings in the two SVs are
+     identical.
+
+          I32	sv_eq(SV* sv1, SV* sv2)
+
+sv_grow
+     Expands the character buffer in the SV.  This will use sv_unref and
+     will upgrade the SV to SVt_PV.  Returns a pointer to the character
+     buffer.  Use SvGROW.
+
+          char*	sv_grow(SV* sv, STRLEN newlen)
+
+sv_inc
+     Auto-increment of the value in the SV.
+
+          void	sv_inc(SV* sv)
+
+sv_insert
+     Inserts a string at the specified offset/length within the SV.
+     Similar to the Perl substr() function.
+
+          void	sv_insert(SV* bigsv, STRLEN offset, STRLEN len, char* little, STRLEN littlelen)
+
+sv_isa
+     Returns a boolean indicating whether the SV is blessed into the
+     specified class.  This does not check for subtypes; use
+     sv_derived_from to verify an inheritance relationship.
+
+          int	sv_isa(SV* sv, const char* name)
+
+sv_isobject
+     Returns a boolean indicating whether the SV is an RV pointing to a
+     blessed object.  If the SV is not an RV, or if the object is not
+     blessed, then this will return false.
+
+          int	sv_isobject(SV* sv)
+
+sv_len
+     Returns the length of the string in the SV.  See also SvCUR.
+
+          STRLEN	sv_len(SV* sv)
+
+sv_magic
+     Adds magic to an SV.
+
+          void	sv_magic(SV* sv, SV* obj, int how, const char* name, I32 namlen)
+
+sv_mortalcopy
+     Creates a new SV which is a copy of the original SV.  The new SV is
+     marked as mortal.
+
+          SV*	sv_mortalcopy(SV* oldsv)
+
+sv_newmortal
+     Creates a new SV which is mortal.  The reference count of the SV is
+     set to 1.
+
+          SV*	sv_newmortal()
+
+sv_setiv
+     Copies an integer into the given SV.  Does not handle 'set' magic.
+     See sv_setiv_mg.
+
+          void	sv_setiv(SV* sv, IV num)
+
+sv_setiv_mg
+     Like sv_setiv, but also handles 'set' magic.
+
+          void	sv_setiv_mg(SV *sv, IV i)
+
+sv_setnv
+     Copies a double into the given SV.  Does not handle 'set' magic.  See
+     sv_setnv_mg.
+
+          void	sv_setnv(SV* sv, NV num)
+
+sv_setnv_mg
+     Like sv_setnv, but also handles 'set' magic.
+
+          void	sv_setnv_mg(SV *sv, NV num)
+
+sv_setpv
+     Copies a string into an SV.  The string must be null-terminated.
+     Does not handle 'set' magic.  See sv_setpv_mg.
+
+          void	sv_setpv(SV* sv, const char* ptr)
+
+sv_setpvf
+     Processes its arguments like sprintf and sets an SV to the formatted
+     output.  Does not handle 'set' magic.  See sv_setpvf_mg.
+
+          void	sv_setpvf(SV* sv, const char* pat, ...)
+
+sv_setpvf_mg
+     Like sv_setpvf, but also handles 'set' magic.
+
+          void	sv_setpvf_mg(SV *sv, const char* pat, ...)
+
+sv_setpviv
+     Copies an integer into the given SV, also updating its string value.
+     Does not handle 'set' magic.  See sv_setpviv_mg.
+
+          void	sv_setpviv(SV* sv, IV num)
+
+sv_setpviv_mg
+     Like sv_setpviv, but also handles 'set' magic.
+
+          void	sv_setpviv_mg(SV *sv, IV iv)
+
+sv_setpvn
+     Copies a string into an SV.  The len parameter indicates the number of
+     bytes to be copied.  Does not handle 'set' magic.  See sv_setpvn_mg.
+
+          void	sv_setpvn(SV* sv, const char* ptr, STRLEN len)
+
+sv_setpvn_mg
+     Like sv_setpvn, but also handles 'set' magic.
+
+          void	sv_setpvn_mg(SV *sv, const char *ptr, STRLEN len)
+
+sv_setpv_mg
+     Like sv_setpv, but also handles 'set' magic.
+
+          void	sv_setpv_mg(SV *sv, const char *ptr)
+
+sv_setref_iv
+     Copies an integer into a new SV, optionally blessing the SV.  The rv
+     argument will be upgraded to an RV.  That RV will be modified to
+     point to the new SV.  The `classname' argument indicates the package
+     for the blessing.  Set `classname' to Nullch to avoid the blessing.
+     The new SV will be returned and will have a reference count of 1.
+
+          SV*	sv_setref_iv(SV* rv, const char* classname, IV iv)
+
+sv_setref_nv
+     Copies a double into a new SV, optionally blessing the SV.  The rv
+     argument will be upgraded to an RV.  That RV will be modified to
+     point to the new SV.  The `classname' argument indicates the package
+     for the blessing.  Set `classname' to Nullch to avoid the blessing.
+     The new SV will be returned and will have a reference count of 1.
+
+          SV*	sv_setref_nv(SV* rv, const char* classname, NV nv)
+
+sv_setref_pv
+     Copies a pointer into a new SV, optionally blessing the SV.  The rv
+     argument will be upgraded to an RV.  That RV will be modified to
+     point to the new SV.  If the pv argument is NULL then PL_sv_undef
+     will be placed into the SV.  The `classname' argument indicates the
+     package for the blessing.  Set `classname' to Nullch to avoid the
+     blessing.  The new SV will be returned and will have a reference
+     count of 1.
+
+     Do not use with other Perl types such as HV, AV, SV, CV, because those
+     objects will become corrupted by the pointer copy process.
+
+     Note that sv_setref_pvn copies the string while this copies the
+     pointer.
+
+          SV*	sv_setref_pv(SV* rv, const char* classname, void* pv)
+
+sv_setref_pvn
+     Copies a string into a new SV, optionally blessing the SV.  The
+     length of the string must be specified with n.  The rv argument will
+     be upgraded to an RV.  That RV will be modified to point to the new
+     SV.  The `classname' argument indicates the package for the blessing.
+     Set `classname' to Nullch to avoid the blessing.  The new SV will be
+     returned and will have a reference count of 1.
+
+     Note that sv_setref_pv copies the pointer while this copies the
+     string.
+
+          SV*	sv_setref_pvn(SV* rv, const char* classname, char* pv, STRLEN n)
+
+sv_setsv
+     Copies the contents of the source SV `ssv' into the destination SV
+     `dsv'.  The source SV may be destroyed if it is mortal.  Does not
+     handle 'set' magic.  See the macro forms SvSetSV, SvSetSV_nosteal and
+     sv_setsv_mg.
+
+          void	sv_setsv(SV* dsv, SV* ssv)
+
+sv_setsv_mg
+     Like sv_setsv, but also handles 'set' magic.
+
+          void	sv_setsv_mg(SV *dstr, SV *sstr)
+
+sv_setuv
+     Copies an unsigned integer into the given SV.  Does not handle 'set'
+     magic.  See sv_setuv_mg.
+
+          void	sv_setuv(SV* sv, UV num)
+
+sv_setuv_mg
+     Like sv_setuv, but also handles 'set' magic.
+
+          void	sv_setuv_mg(SV *sv, UV u)
+
+sv_unref
+     Unsets the RV status of the SV, and decrements the reference count of
+     whatever was being referenced by the RV.  This can almost be thought
+     of as a reversal of newSVrv.  See SvROK_off.
+
+          void	sv_unref(SV* sv)
+
+sv_upgrade
+     Upgrade an SV to a more complex form.  Use SvUPGRADE.  See svtype.
+
+          bool	sv_upgrade(SV* sv, U32 mt)
+
+sv_usepvn
+     Tells an SV to use `ptr' to find its string value.  Normally the
+     string is stored inside the SV but sv_usepvn allows the SV to use an
+     outside string.  The `ptr' should point to memory that was allocated
+     by malloc.  The string length, len, must be supplied.  This function
+     will realloc the memory pointed to by `ptr', so that pointer should
+     not be freed or used by the programmer after giving it to sv_usepvn.
+     Does not handle 'set' magic.  See sv_usepvn_mg.
+
+          void	sv_usepvn(SV* sv, char* ptr, STRLEN len)
+
+sv_usepvn_mg
+     Like sv_usepvn, but also handles 'set' magic.
+
+          void	sv_usepvn_mg(SV *sv, char *ptr, STRLEN len)
+
+sv_vcatpvfn
+     Processes its arguments like vsprintf and appends the formatted output
+     to an SV.  Uses an array of SVs if the C style variable argument list
+     is missing (NULL).  When running with taint checks enabled, indicates
+     via `maybe_tainted' if results are untrustworthy (often due to the
+     use of locales).
+
+          void	sv_vcatpvfn(SV* sv, const char* pat, STRLEN patlen, va_list* args, SV** svargs, I32 svmax, bool *maybe_tainted)
+
+sv_vsetpvfn
+     Works like `vcatpvfn' but copies the text into the SV instead of
+     appending it.
+
+          void	sv_vsetpvfn(SV* sv, const char* pat, STRLEN patlen, va_list* args, SV** svargs, I32 svmax, bool *maybe_tainted)
+
+THIS
+     Variable which is setup by xsubpp to designate the object in a C++
+     XSUB.  This is always the proper type for the C++ object.  See CLASS
+     and `"Using XS With C++"', *Note Perlxs: perlxs,.
+
+          (whatever)	THIS
+
+toLOWER
+     Converts the specified character to lowercase.
+
+          char	toLOWER(char ch)
+
+toUPPER
+     Converts the specified character to uppercase.
+
+          char	toUPPER(char ch)
+
+warn
+     This is the XSUB-writer's interface to Perl's warn function.  Use this
+     function the same way you use the C printf function.  See croak.
+
+          void	warn(const char* pat, ...)
+
+XPUSHi
+     Push an integer onto the stack, extending the stack if necessary.
+     Handles 'set' magic. See PUSHi.
+
+          void	XPUSHi(IV iv)
+
+XPUSHn
+     Push a double onto the stack, extending the stack if necessary.
+     Handles 'set' magic.  See PUSHn.
+
+          void	XPUSHn(NV nv)
+
+XPUSHp
+     Push a string onto the stack, extending the stack if necessary.  The
+     len indicates the length of the string.  Handles 'set' magic.  See
+     PUSHp.
+
+          void	XPUSHp(char* str, STRLEN len)
+
+XPUSHs
+     Push an SV onto the stack, extending the stack if necessary.  Does not
+     handle 'set' magic.  See PUSHs.
+
+          void	XPUSHs(SV* sv)
+
+XPUSHu
+     Push an unsigned integer onto the stack, extending the stack if
+     necessary.  See PUSHu.
+
+          void	XPUSHu(UV uv)
+
+XS
+     Macro to declare an XSUB and its C parameter list.  This is handled by
+     xsubpp.
+
+XSRETURN
+     Return from XSUB, indicating number of items on the stack.  This is
+     usually handled by xsubpp.
+
+          void	XSRETURN(int nitems)
+
+XSRETURN_EMPTY
+     Return an empty list from an XSUB immediately.
+
+          XSRETURN_EMPTY;
+
+XSRETURN_IV
+     Return an integer from an XSUB immediately.  Uses XST_mIV.
+
+          void	XSRETURN_IV(IV iv)
+
+XSRETURN_NO
+     Return `&PL_sv_no' from an XSUB immediately.  Uses XST_mNO.
+
+          XSRETURN_NO;
+
+XSRETURN_NV
+     Return an double from an XSUB immediately.  Uses XST_mNV.
+
+          void	XSRETURN_NV(NV nv)
+
+XSRETURN_PV
+     Return a copy of a string from an XSUB immediately.  Uses XST_mPV.
+
+          void	XSRETURN_PV(char* str)
+
+XSRETURN_UNDEF
+     Return `&PL_sv_undef' from an XSUB immediately.  Uses XST_mUNDEF.
+
+          XSRETURN_UNDEF;
+
+XSRETURN_YES
+     Return `&PL_sv_yes' from an XSUB immediately.  Uses XST_mYES.
+
+          XSRETURN_YES;
+
+XST_mIV
+     Place an integer into the specified position pos on the stack.  The
+     value is stored in a new mortal SV.
+
+          void	XST_mIV(int pos, IV iv)
+
+XST_mNO
+     Place `&PL_sv_no' into the specified position pos on the stack.
+
+          void	XST_mNO(int pos)
+
+XST_mNV
+     Place a double into the specified position pos on the stack.  The
+     value is stored in a new mortal SV.
+
+          void	XST_mNV(int pos, NV nv)
+
+XST_mPV
+     Place a copy of a string into the specified position pos on the stack.
+     The value is stored in a new mortal SV.
+
+          void	XST_mPV(int pos, char* str)
+
+XST_mUNDEF
+     Place `&PL_sv_undef' into the specified position pos on the stack.
+
+          void	XST_mUNDEF(int pos)
+
+XST_mYES
+     Place `&PL_sv_yes' into the specified position pos on the stack.
+
+          void	XST_mYES(int pos)
+
+XS_VERSION
+     The version identifier for an XS module.  This is usually handled
+     automatically by ExtUtils::MakeMaker.  See XS_VERSION_BOOTCHECK.
+
+XS_VERSION_BOOTCHECK
+     Macro to verify that a PM module's $VERSION variable matches the XS
+     module's XS_VERSION variable.  This is usually handled automatically
+     by xsubpp.  See `"The VERSIONCHECK: Keyword"', *Note Perlxs: perlxs,.
+
+          XS_VERSION_BOOTCHECK;
+
+Zero
+     The XSUB-writer's interface to the C `memzero' function.  The dest is
+     the destination, `nitems' is the number of items, and type is the
+     type.
+
+          void	Zero(void* dest, int nitems, type)
+
+AUTHORS
+=======
+
+   Until May 1997, this document was maintained by Jeff Okamoto
+<okamoto@corp.hp.com>.  It is now maintained as part of Perl itself.
+
+   With lots of help and suggestions from Dean Roehrich, Malcolm Beattie,
+Andreas Koenig, Paul Hudson, Ilya Zakharevich, Paul Marquess, Neil Bowers,
+Matthew Green, Tim Bunce, Spider Boardman, Ulrich Pfeifer, Stephen
+McCamant, and Gurusamy Sarathy.
+
+   API Listing originally by Dean Roehrich <roehrich@cray.com>.
+
+   Updated to be autogenerated from comments in the source by Benjamin
+Stuhl.
+
+SEE ALSO
+========
+
+   perlguts(1), perlxs(1), perlxstut(1), perlintern(1)
+
+

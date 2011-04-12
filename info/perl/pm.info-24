@@ -1,0 +1,2061 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Apache/MP3/Playlist,  Next: Apache/MP3/Sorted,  Prev: Apache/MP3,  Up: Module List
+
+Manage directories of MP3 files with sorting and persistent playlists
+*********************************************************************
+
+NAME
+====
+
+   Apache::MP3::Playlist - Manage directories of MP3 files with sorting
+and persistent playlists
+
+SYNOPSIS
+========
+
+     # httpd.conf or srm.conf
+     AddType audio/mpeg    mp3 MP3
+
+     # httpd.conf or access.conf
+     <Location /songs>
+       SetHandler perl-script
+       PerlHandler Apache::MP3::Playlist
+       PerlSetVar  SortField     Title
+       PerlSetVar  Fields        Title,Artist,Album,Duration
+     </Location>
+
+DESCRIPTION
+===========
+
+   Apache::MP3::Playlist subclasses Apache::MP3::Sorted to allow the user
+to build playlists across directories.  Playlists are stored in cookies
+and are persistent for the life of the browser.  See *Note Apache/MP3:
+Apache/MP3, and *Note Apache/MP3/Sorted: Apache/MP3/Sorted, for details on
+installing and using.
+
+CUSTOMIZATION
+=============
+
+   The "playlist" class in the `apache_mp3.css' cascading stylesheet
+defines the color of the playlist area and associated buttons.
+
+METHODS
+=======
+
+   Apache::MP3::Playlist overrides the following methods:
+
+     run(), directory_bottom(), control_buttons() and directory_top().
+
+   It adds several new methods:
+
+$result = $mp3->process_playlist
+     Process buttons that affect the playlist.
+
+$hashref = $mp3->lookup_descriptions(@uris)
+     Look up the description fields for the MP3 files indicated by the list
+     of URIs (not paths) and return a hashref.
+
+@list = $mp3->playlist([@list])
+     Get or set the current stored playlist.  In a list context returns the
+     list of URIs of stored MP3 files.  In a scalar context returns an
+     array reference.  Pass a list of URIs to set the playlist.
+
+Linking to this module
+======================
+
+   The following new linking conventions apply:
+
+Add MP3 files to the user's playlist
+     Append "/playlist.m3u?Add+to+Playlist;file=file1;file=file2..." to the
+     name of the directory that contains the files:
+
+          <a
+          href="/Songs/Madonna/playlist.m3u?Add+to+Playlist=1;file=like_a_virgin.mp3;file=evita.mp3">
+          Two favorites</a>
+
+Add all MP3 files in a directory to the user's playlist:
+     Append "/playlist.m3u?Add+All+to+Playlist" to the name of the
+     directory that contains the files:
+
+          <a
+          href="/Songs/Madonna/playlist.m3u?Add+All+to+Playlist=1">
+          Madonna'a a Momma</a>
+
+Delete some MP3 files from the user's playlist:
+     Append
+     "/playlist.m3u?Clear+Selected=1;playlist=1;file=file1;file=file2..."
+     to the name of the current directory.
+
+     NOTE: the file names must be absolute URLs, not relative URLs.  This
+     is because the playlist spans directories.  By the same token, the
+     current directory does not have to contain the removed song(s).
+     Example:
+
+          <a
+          href="/Songs/Springsteen/playlist.m3u?Clear+Selected=1;
+               playlist=1;file=/Songs/Madonna/like_a_virgin.mp3">
+          No longer a virgin, alas</a>
+
+Clear user's playlist:
+     Append "/playlist.m3u?Clear+All=1;playlist=1" to the name of the
+     current directory.
+
+     Example:
+
+          <a href="/Songs/Springsteen/playlist.m3u?Clear+All=1;playlist=1">
+            A virgin playlist</a>
+
+Stream the playlist
+     Append "/playlist.m3u?Play+All=1;playlist=1" to the name of the
+     current directory.
+
+     Example:
+
+          <a href="/Songs/Madonna/playlist.m3u?Play+All=1;playlist=1">
+             Stream me!</a>
+
+Stream the playlist in random order
+     As above, but use "Shuffle+All" rather than "Play+All".
+
+Stream part of the playlist
+     Append
+     "/playlist.m3u?Play+Selected=1;playlist=1;file=file1;file=file2..."
+     to the name of the current directory.
+
+     NOTE: the files must be full URLs.  It is not strictly necessary for
+     them to be on the current playlist, so this allows you to stream
+     playlists of arbitrary sets of MP3 files.
+
+     Example:
+
+          <a
+          href="/Songs/playlist.m3u?Play+Selected=1;
+               playlist=1;file=/Songs/Madonna/like_a_virgin.mp3;
+               file=/Songs/Madonna/working_girl.mp3;
+               file=/Songs/Beatles/let_it_be.mp3">
+          Madonna and John, together again for the first time</a>
+
+BUGS
+====
+
+   This module uses client-side cookies to mantain the playlist.  This
+limits the number of songs that can be placed in the playlist to about 50
+songs.
+
+ACKNOWLEDGEMENTS
+================
+
+   Chris Nandor came up with the idea for the persistent playlist and
+implemented it using server-side DBM files.  I reimplemented it using
+client-side cookies, which simplifies maintenance and security, but limits
+playlists in size.
+
+AUTHOR
+======
+
+   Copyright 2000, Lincoln Stein <lstein@cshl.org>.
+
+   This module is distributed under the same terms as Perl itself.  Feel
+free to use, modify and redistribute it as long as you retain the correct
+attribution.
+
+SEE ALSO
+========
+
+   *Note Apache/MP3/Sorted: Apache/MP3/Sorted,, *Note Apache/MP3:
+Apache/MP3,, *Note MP3/Info: MP3/Info,, *Note Apache: Apache,
+
+
+File: pm.info,  Node: Apache/MP3/Sorted,  Next: Apache/MakeCapital,  Prev: Apache/MP3/Playlist,  Up: Module List
+
+Generate sorted streamable directories of MP3 files
+***************************************************
+
+NAME
+====
+
+   Apache::MP3::Sorted - Generate sorted streamable directories of MP3
+files
+
+SYNOPSIS
+========
+
+     # httpd.conf or srm.conf
+     AddType audio/mpeg    mp3 MP3
+
+     # httpd.conf or access.conf
+     <Location /songs>
+       SetHandler perl-script
+       PerlHandler Apache::MP3::Sorted
+       PerlSetVar  SortFields    Album,Title,-Duration
+       PerlSetVar  Fields        Title,Artist,Album,Duration
+     </Location>
+
+DESCRIPTION
+===========
+
+   Apache::MP3::Sorted subclasses Apache::MP3 to allow for sorting of MP3
+listings by various criteria.  See *Note Apache/MP3: Apache/MP3, for
+details on installing and using.
+
+CUSTOMIZING
+===========
+
+   This class adds one new Apache configuration variable, SortFields.
+This is a list of the names of the fields to sort by default when the MP3
+file listing is first displayed, after which the user can change the sort
+field by clicking on the column headers.
+
+SortFields field
+     The value of SortFields may contain the names of any of the fields in
+     the listing, such as Title, or *Album* Duration.  By default, the
+     sort direction will be alphabetically or numerically ascending.
+     Reverse this by placing a "-" in front of the field name (for
+     symmetry, you can also prepend a "+" to signify normal ascending
+     order).  After the initial sort, the user can change the sort order by
+     clicking on the column headings of the file listing table.
+
+     Examples:
+
+          PerlSetVar SortFields  Album,Title    # sort ascending by album, then title
+          PerlSetVar SortFields  +Artist,-Kbps  # sort ascending by artist, descending by kbps
+
+     When constructing a playlist from a recursive directory listing,
+     sorting will be global across all directories.  If no sort order is
+     specified, then the module reverts to sorting by file and directory
+     name.  A good value for SortFields is to sort by Artist,Album and
+     track:
+
+          PerlSetVar SortFields Artist,Album,Track
+
+     Alternatively, you might want to sort by Description, which
+     effectively sorts by title, artist and album.
+
+     The following are valid fields:
+
+          Field        Description
+
+          album	 The album
+          artist       The artist
+          bitrate      Streaming rate of song in kbps
+          comment      The comment field
+          description	 Description, as controlled by DescriptionFormat
+          duration     Duration of the song in hour, minute, second format
+          filename	 The physical name of the .mp3 file
+          genre        The genre
+          samplerate   Sample rate, in KHz
+          seconds      Duration of the song in seconds
+          title        The title of the song
+          track	 The track number
+
+     Field names are case insensitive.
+
+METHODS
+=======
+
+   Apache::MP3::Sorted overrides the following methods:
+
+     sort_mp3s()  mp3_table_header()   mp3_list_bottom()
+
+   It adds one new method:
+
+$field = $mp3->sort_fields
+     Returns a list of the names of the fields to sort on by default.
+
+BUGS
+====
+
+   Let me know.
+
+AUTHOR
+======
+
+   Copyright 2000, Lincoln Stein <lstein@cshl.org>.
+
+   This module is distributed under the same terms as Perl itself.  Feel
+free to use, modify and redistribute it as long as you retain the correct
+attribution.
+
+ACKNOWLEDGEMENTS
+================
+
+   Tim Ayers <tayers@bridge.com> conceived and implemented the multiple
+field sorting system.
+
+SEE ALSO
+========
+
+   *Note Apache/MP3: Apache/MP3,, *Note MP3/Info: MP3/Info,, *Note Apache:
+Apache,
+
+
+File: pm.info,  Node: Apache/MakeCapital,  Next: Apache/MimeXML,  Prev: Apache/MP3/Sorted,  Up: Module List
+
+convert server output to uppercase
+**********************************
+
+NAME
+====
+
+   Apache::MakeCapital - convert server output to uppercase
+
+SYNOPSIS
+========
+
+   In the conf/access.conf file of your Apache installation, add lines like
+
+     <Files *.html>
+     SetHandler perl-script
+     PerlHandler Apache::OutputChain Apache::MakeCapital Apache::PassHtml
+     </Files>
+
+DESCRIPTION
+===========
+
+   This is a module to show the use of module *Apache::OutputChain*.  The
+function handler simply inserts this module into the chain, calling
+
+     Apache::OutputChain::handler($r, __PACKAGE__);
+
+   This is the initialization stage. The second parameter in the call to
+*Apache::OutputChain::handler* must be a name of this class, so that
+*Apache::OutputChain* will know, whom to put into the chain.
+
+   The package also must define function PRINT, that will be called in the
+chain. In this example, it capitalized all output being sent. It will mess
+up the links (A HREF's) so is really just for illustration ;-)
+
+AUTHOR
+======
+
+   (c) 1997-1998 Jan Pazdziora, adelton@fi.muni.cz,
+http://www.fi.muni.cz/~adelton/ at Faculty of Informatics, Masaryk
+University, Brno, Czech Republic
+
+
+File: pm.info,  Node: Apache/MimeXML,  Next: Apache/Mmap,  Prev: Apache/MakeCapital,  Up: Module List
+
+mod_perl mime encoding sniffer for XML files
+********************************************
+
+NAME
+====
+
+   Apache::MimeXML - mod_perl mime encoding sniffer for XML files
+
+SYNOPSIS
+========
+
+   Simply add this line to srm.conf or httpd.conf:
+
+     PerlTypeHandler +Apache::MimeXML
+
+   Alternatively add it only for certain files or directories using the
+standard Apache methods. There is about a 30% slowdown for files using
+this module, so you probably want to restrict it to certain XML locations
+only.
+
+DESCRIPTION
+===========
+
+   An XML Content-Type sniffer. This module reads the encoding attribute
+in the xml declaration and returns an appropriate content-type heading. If
+no encoding declaration is found it returns utf-8 or utf-16 depending on
+the specific encoding.
+
+CONFIGURATION
+=============
+
+   There are a few small configuration options for this module, allowing
+you to set various parameters.
+
+XMLMimeType
+-----------
+
+   Allows you to set the mime type for XML files:
+
+     PerlSetVar XMLMimeType application/xml
+
+   That changes the mime type from the default text/xml to
+application/xml. You can use this on a per-directory basis.
+
+XMLUtf16EncodingBE
+------------------
+
+   Allows you to set the encoding of big-endian (read: normal) utf 16
+(unicode) documents. The default is 'utf-16'
+
+     PerlSetVar XMLUtf16EncodingBE utf-16-be
+
+XMLUtf16EncodingLE
+------------------
+
+   Allows you to set the encoding of little-endian utf-16 encoded
+documents. The default is 'utf-16-le'
+
+     PerlSetVar XMLUtf16EncodingLE utf-16-wierd
+
+Use From Other Modules
+======================
+
+   If you want to use Apache::MimeXML's detection routines from other
+modules, you can manually call the check_for_xml() or check_for_xml_file()
+functions yourself. check_for_xml_file() takes a single parameter of a
+filename, and check_for_xml() can take either an XML string, or an open
+filehandle of some sort. The functions returns the encoding if they find
+that the parameter contains XML, otherwise they return nothing:
+
+     my $encoding;
+     if ($encoding =
+         Apache::MimeXML::check_for_xml_file($filename)) {
+         print "$filename is XML in the $encoding encoding\n";
+     }
+
+AUTHOR
+======
+
+   Matt Sergeant matt@sergeant.org
+
+LICENCE
+=======
+
+   This module is distributed under the same terms as perl itself
+
+
+File: pm.info,  Node: Apache/Mmap,  Next: Apache/Mmap/Handle,  Prev: Apache/MimeXML,  Up: Module List
+
+Associates a scalar with a mmap'd file
+**************************************
+
+NAME
+====
+
+   Apache::Mmap - Associates a scalar with a mmap'd file
+
+SYNOPSIS
+========
+
+     use Apache::Mmap qw(mmap munmap);
+
+     $mappedfile = mmap 'example.html';
+     print $$mappedfile;
+     munmap 'example.html';
+
+     open( FILE, "jrandomfile" ) or die "Can't open file: $!";
+     tie $scalar, 'Apache::Mmap',
+         *FILE, 0, Apache::Mmap::PROT_READ, Apache::Mmap::MAP_SHARED;
+     print "jrandomfile contents:\n$scalar\n";
+     untie $scalar;
+
+DESCRIPTION
+===========
+
+   `Apache::Mmap' provides a facility for using the `mmap(2)' system call
+to have the OS map a file into a process' address space.
+
+   Two interfaces are provided:
+
+   * `mmap' and `munmap' methods which provide a persistant caching
+     mechanisim similar to that provided by `Apache::DBI' for database
+     handles.
+
+   * A set of methods which implement the TIESCALAR interface allowing a
+     scalar variable to be tied to a mapped region of memory.  Reading or
+     writing to the tied scalar accesses the mapped buffer.
+
+Simple Interface
+================
+
+   The simple interface provides two functions, `mmap' and `munmap', to
+manipulate a mapped area.  The mapped area is accessed using the scalar
+reference returned by `mmap'.
+
+`mmap'
+------
+
+   The `mmap' function takes the name of a file to map into memory as its
+argument.  An optional second argument may be given to specify what
+protections should be set on the mapped region.  This argument should be
+one of *"r"* (the default), *"w"*, or *"rw"*.  If the file is successfully
+mapped a reference to a scalar will be returned.  Remember that you need
+to prepend an `$' to dereference the scalar and get the contents:
+
+     $mapped = mmap '/tmp/foo', "rw";
+     print "/tmp/foo:\n", $$mapped, "\n";
+     $$mapped = "New contents\n";
+
+   The Apache::Mmap module keeps track of all of the files mapped using
+the `mmap' function.  If you call `mmap' with a file which is alredy
+mapped a reference to the already mapped scalar will be returned.
+
+`munmap'
+--------
+
+   Calling `munmap' with a filename removes the association between memory
+and existing mmapped file.  If `munmap' is called with a file which is not
+currently mapped, undef will be returned.  If the file is successfully
+unmapped 1 will be returned.  Keep in mind that you should be careful
+unmapping a file if you have multiple copies of the reference returned by
+`mmap'.
+
+Tie Interface
+=============
+
+   *To be written.  Look at how Apache::Mmap::mmap does it.*
+
+Apache::Mmap::handler
+=====================
+
+   A handler method is provided by the Apache::Mmap module suitable for
+use under mod_perl with Apache.  To use the handler, add something similar
+to the following to your `access.conf' file:
+
+     <Location /mmapped.html>
+     SetHandler perl-script
+     PerlHandler Apache::Mmap
+     </Location>
+
+   replacing */mmaped.html* as apropriate.  Your performance may vary.
+See the benchmarking scripts in the `eg' directory of the distribution.
+
+Warning Mapping with Offsets
+============================
+
+   Some platforms (Solaris for example) require files to be mapped on
+memory page boundaries.  If you map with an offset, the offset must be on
+a page boundary (e.g. with 4k pages, if you wanted to map with an offset
+of 6k into the file, you would need to map starting at an offset of 4k and
+look 2k in from the beginning of the mapped region (I hope that made
+sense)).
+
+   A future version will provide access to the `getpagesize()' system call
+on platforms where it is available (SYSV and 4.4BSD).  You may also look
+into the `Sys::Sysconf' module which provides access to `_SC' macros from
+system header files for use with `POSIX::sysconf'.  Some platforms (again,
+Solaris) provide an `_SC_PAGESIZE' constant.
+
+TODO
+====
+
+   Keep track of the mode a file was mapped as for caching purposes.  Warn
+if a different mode is specified, or remap as requested?
+
+   Implement some sort of locking (flock, SysV semaphores, . . .) on the
+mapped area.
+
+   Add support for the msync(2) and mlock(2) system calls.
+
+   Add support for madvise(2) on platforms supporting it.
+
+   Add hook to getpagesize(2) for platforms which require mappings at
+offsets to be on page boundaries.
+
+   Add some way of specifying if the file's size should be truncated to
+the length of the last scalar inserted on unmapping.  Likewise figure out
+a good way to extend the file/mapped region if needed.
+
+   Look into using the Storable module for sharing hashes and arrays (like
+IPC::Shareable module does for shm).
+
+   Make sure things work on more architectures/os's than Sparc/Solaris
+2.5.1 and i586/Linux 2.0.30.
+
+AUTHOR
+======
+
+   Mike Fletcher, lemur1@mindspring.com
+
+   This module is based on (and incorporates some code from) Malcolm
+Beattie's *Mmap-alpha2* module.
+
+SEE ALSO
+========
+
+   mmap(2), perltie(1), perl(1), Malcolm Beattie's *Mmap* module.
+
+
+File: pm.info,  Node: Apache/Mmap/Handle,  Next: Apache/Module,  Prev: Apache/Mmap,  Up: Module List
+
+Associates a file handle with a mmaped file
+*******************************************
+
+NAME
+====
+
+   Apache::Mmap::Handle - Associates a file handle with a mmaped file
+
+SYNOPSIS
+========
+
+     use Apache::Mmap::Handle ();
+
+     tie *MMAP, 'Apache::Mmap::Handle', $filename, 'r';
+     print while( <MMAP> );
+     untie *MMAP;
+
+DESCRIPTION
+===========
+
+   `Apache::Mmap::Handler' implements the TIEHANDLE interface to allow
+tieing a filehandle to a file which has been mapped into memory using the
+`Apache::Mmap' module.
+
+AUTHOR
+======
+
+   Mike Fletcher, lemur1@mindspring.com
+
+SEE ALSO
+========
+
+   Apache::Mmap module, mmap(2), perltie(1), perl(1).
+
+
+File: pm.info,  Node: Apache/Module,  Next: Apache/ModuleDoc,  Prev: Apache/Mmap/Handle,  Up: Module List
+
+Interface to Apache C module structures
+***************************************
+
+NAME
+====
+
+   Apache::Module - Interface to Apache C module structures
+
+SYNOPSIS
+========
+
+     use Apache::Module ();
+
+DESCRIPTION
+===========
+
+   This module provides an interface to the list of apache modules
+configured with your httpd and their `module *' structures.
+
+METHODS
+=======
+
+top_module
+     This method returns a pointer the first module in Apache's internal
+     list of modules.
+
+          Example:
+
+          my $top_module = Apache::Module->top_module;
+
+          print "Configured modules: \n";
+
+          for (my $modp = $top_module; $modp; $modp = $modp->next) {
+          	print $modp->name, "\n";
+          }
+
+find($module_name)
+     This method returns a pointer to the module structure if found, under
+     otherwise.
+
+          Example:
+
+          for (qw(proxy perl include cgi)) {
+              if(my $modp = Apache::Module->find($_)) {
+          	 print "$_ module is configured\n";
+                  print "with enabled commands: \n";
+
+          for (my $cmd = $modp->cmds; $cmd; $cmd = $cmd->next) {
+              print "   ", $cmd->name, "\n";
+          }
+               }
+               else {
+          print "$_ module is not configured\n";
+               }
+           }
+
+handlers
+     Returns a pointer to the module response handler table.
+
+     Example:
+
+          print "module ", $modp->name, " handles:\n";
+
+          for (my $hand = $modp->handlers; $hand; $hand = $hand->next) {
+          	print $hand->content_type, "\n";
+          }
+
+Other Stuff
+     There's more you can do with this module, I will document it later.
+     For now, see Apache::ModuleDoc and Apache::ShowRequest for examples.
+
+AUTHOR
+======
+
+   Doug MacEachern
+
+SEE ALSO
+========
+
+   Apache::ModuleDoc(3), Apache::ShowRequest(3), Apache(3), mod_perl(3).
+
+
+File: pm.info,  Node: Apache/ModuleDoc,  Next: Apache/Motd,  Prev: Apache/Module,  Up: Module List
+
+Self documentation for Apache C modules
+***************************************
+
+NAME
+====
+
+   Apache::ModuleDoc - Self documentation for Apache C modules
+
+SYNOPSIS
+========
+
+     <Location /manual/mod>
+      SetHandler perl-script
+      PerlHandler Apache::ModuleDoc
+     </Location>
+
+DESCRIPTION
+===========
+
+   This modules provides a documentation template for Apache C modules.
+The Location for which this module is configured should be where the
+standard Apache module documentation lives.  If a request URI relative to
+that Location is a module name (not the .html file), *Apache::ModuleDoc*
+will do it's work, otherwise it will `DECLINE' to handle the request.
+
+AUTHOR
+======
+
+   Doug MacEachern
+
+SEE ALSO
+========
+
+   Apache::Module(3), Apache(3), mod_perl(3)
+
+
+File: pm.info,  Node: Apache/Motd,  Next: Apache/MyConfig,  Prev: Apache/ModuleDoc,  Up: Module List
+
+Provide motd (Message of the Day) functionality to a webserver
+**************************************************************
+
+NAME
+====
+
+   Apache::Motd - Provide motd (Message of the Day) functionality to a
+webserver
+
+SYNOPSIS
+========
+
+     in your httpd.conf
+
+     <Directive /path/>
+       PerlHeaderParserHandler Apache::Motd
+       PerlSetVar MessageFile   /path/to/motd/message
+       PerlSetVar CookieName     CookieName [default: seenMOTD]
+       PerlSetVar ExpireCookie   CookieExpirationTime [default: +1d]
+       PerlSetVar RedirectInSecs N [default: 10]
+       PerlSetVar SupportCookieLess (1|0) [default: 1]
+
+DESCRIPTION
+===========
+
+   This Apache Perl module provides a web administrator the ability to
+configure a webserver with motd (Message of the Day) functionality, just
+like you find on UNIX systems. This allows custom messages to appear when
+visitors enter a website or a section of the website, without the need to
+modify any webpages or web application code!  The message can be a "Message
+of the Day", "Terms of Use", "Server Going Down in N Hours", etc. When
+applied in the main server configuration (i.e. non
+<Location|Directory|Files> directives), any webpage accessed on the
+webserver will redirect the visitor to the custom message momentarily.
+Then after N seconds, will be redirected to their originally requested
+URI, at the same time setting a cookie so that subsequent requests will
+not be directed to the custom message.  A link to the requested URI can
+also be provided, so that the user has the option of proceeding without
+having to wait the entire redirect time. (See motd.txt example provided in
+this distribution)
+
+   The intention of this module is to provide an alternate and more
+efficient method of notifying your web users of potential downtime or
+problems affecting your webserver and/or webservices.
+
+CONFIGURATION
+=============
+
+   The module can be placed in <Location>, <Directory>, <Files> and main
+server configuration areas.
+
+MessageFile
+     The absolute path to the file that contains the custom message.
+
+          i.e. MessageFile /usr/local/apache/motd.txt
+
+     If the file is not found in the specified directory all requests will
+     not be directed to the motd.  Therefore you can rename,delete this
+     file from the specified location to disable the motd without having
+     to edit the httpd.conf entry and/or restart the web server.
+
+     See *MessageFile Format* for a description how the message should be
+     used.
+
+RedirectInSecs (default: 10 seconds)
+     This sets the wait time (in seconds) before the visitor is redirected
+     to the initally requested URI
+
+CookieName (default: seenMOTD)
+     Set the name of the cookie name
+
+ExpireCookie (default: +1d, 1 day)
+     Set the expiration time for the cookie
+
+SupportCookieLess (default: 1)
+     This option is set by default to handle clients that do not support
+     cookies or that have cookies turned off. It performs an external
+     redirect to the requested $uri along with a `ct=1' query_string to
+     test if the client accepts cookies. If the external redirect
+     successfully sets the cookie, the user is presented with the motd,
+     otherwise the user is not directed to the motd but to the $uri.
+
+     Future versions will correctly support non-cookie clients via URL
+     munging.
+
+     Setting this option to 0 is ideally used for when you are totally
+     certain that all your visitors will accept cookies. This is usually
+     much faster since it elminates the external redirect. ***Use with
+     caution. Cookieless clients will get the motd message and *only* the
+     motd if this option is false.
+
+     Example:
+
+     <Location />
+      PerlHeaderParserHandler Apache::Motd
+      PerlSetVar MessageFile /proj/www/motd.txt
+      PerlSetVar CookieName TermUsage
+      PerlSetVar RedirectInSecs 5
+     </Location>
+
+     The example above, sets a server wide message (/proj/www/motd.txt) that
+     sets a cookie called TermUsage which expires in one day (default value)
+     and redirects the user to the original URI in 5 seconds.
+
+Message File Format
+===================
+
+   The text file should at least include the folowing tag variables.  These
+tags provide neccessary information to allow redirection to the original
+request and the time (in secs) before the redirection take place.
+
+VAR_URI
+     This tag will be replaced with the requested URI.
+
+     Recommended usage:
+
+     <a href="<VAR_URI>">click here to proceed</a>
+
+     The above example provides a link to the original requested URI, so
+     that a user can click and bypass the time redirect.
+
+VAR_REDIRECT
+     This tag will be replaced with the value set in RedirectInSecs.
+     Which can be used in the meta tag for redirection.
+
+   Example:
+
+     ...
+     <head>
+     <meta http-equiv="refresh" content="<VAR_REDIRECT>;URL=<VAR_URI>">
+     ...
+     </head>
+     ...
+
+   The custom message should at least contain a redirect (using a meta
+tag) and a link to allow users to bypass the redirect time (for impatient
+users and as a courtesy). Omitting these will result in the page not
+redirecting the user to the initially requested page.
+
+NOTES
+=====
+
+   *Bypassing Motd*
+
+   <Directory> and <Location> configuration settings propogate to
+sub-directories and sub-locations matches. One way to turn off the motd on
+a motd'd sub-directories and locations is to do the following:
+
+     <Location />
+      PerlHeaderParserHandler Apache::Motd
+     </Location>
+
+     ## Bypass motd on locations under /foo
+     <Location /foo>
+      PerlHeaderParserHandler Apache::Motd:OK
+     </Location>
+
+     **Example courtesy of Jerrad Pierce
+
+   Logging
+
+   There are two times Apache::Motd logs non-error messages to the apache
+error_logs. One instance is when the motd is displayed and the other is
+when the motd is bypassed because cookies were rejected.
+
+     ## motd displayed sample entry
+     [Wed Dec 13 14:17:57 2000] [error] Motd::Display for URI: /requested/doc.html from $remote_ip
+
+     ## motd is bypassed sample entry
+     [Wed Dec 13 14:17:57 2000] [error] Motd::Bypassed by $remote_ip
+
+   These entries can by used to gather statistics about how many times the
+motd is being encountered and how many times it's being bypassed.
+
+BUGS
+====
+
+Minimal Support for cookie-less clients
+     Browsers that have their cookies turned off or that do not support
+     them will not see the motd. I hope to implement a URL-based solution
+     so that Apache::Motd will support these browsers correctly. So in the
+     meantime, you must find other ways of relaying your urgent messages
+     to your visitors.
+
+No error checking on the custom message
+     The template is not checked for the neccessary information required
+     for the redirection to work properly, i.e. usage of <VAR_URI> and
+     <VAR_REDIRECT>.  Therefore not using the available tags as described
+     will result in unpredictable behavior.
+
+REQUIREMENTS
+============
+
+     L<mod_perl>, L<Apache::Cookie>
+
+CREDITS
+=======
+
+   Fixes, Bug Reports, Optimizations and Ideas have been generously
+provided by:
+
+   Jerrad Pierce <jpierce@cpan.org>  - no-cache pragma on motd file  -
+motd bypass on sub-directories and location matches  - no-cookie browser
+problem bug report
+
+AUTHOR
+======
+
+     Carlos Ramirez <carlos@quantumfx.com>
+
+COPYRIGHT
+=========
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   If you have questions or problems regarding use or installation of this
+module please feel free to email me directly.
+
+
+File: pm.info,  Node: Apache/MyConfig,  Next: Apache/Mysql,  Prev: Apache/Motd,  Up: Module List
+
+build options access
+********************
+
+NAME
+====
+
+   Apache::MyConfig - build options access
+
+SYNOPSIS
+========
+
+     use Apache::MyConfig;
+     die unless $Apache::MyConfig::Setup{PERL_FILE_API};
+
+DESCRIPTION
+===========
+
+   *Apache::MyConfig* module provides access to the various hooks and
+features set when mod_perl is built.  This circumvents the need to set up
+a live server just to find out if a certain callback hook is available.
+
+   Itterate through %Apache::MyConfig::Setup to get obtain build
+information then see Appendix B of the Eagle book for more detail on each
+key.
+
+
+File: pm.info,  Node: Apache/Mysql,  Next: Apache/NNTPGateway,  Prev: Apache/MyConfig,  Up: Module List
+
+Initiate a persistent database connection to Mysql
+**************************************************
+
+NAME
+====
+
+   Apache::Mysql - Initiate a persistent database connection to Mysql
+
+SYNOPSIS
+========
+
+     use Apache::Mysql;
+
+     $dbh = Apache::Mysql->connect(...);
+
+DESCRIPTION
+===========
+
+   This module supplies a persistent database connection to Mysql. You
+will need to have mysqlperl installed on your system. You should really
+use Apache::DBI instead of this module (this module was written when
+DBI::Mysql had problems, which have since been corrected).
+
+   This is the first version of the first module I have ever written, so
+expect errors! Any feedback or suggestions are gratefully received.
+
+   All you really need is to replace Mysql with Apache::Mysql.  When
+connecting to a database the module looks if a database handle from a
+previous connect request is already stored. If not, a new connection is
+established and the handle is stored for later re-use. The destroy method
+has been intentionally left empty.
+
+SEE ALSO
+========
+
+   Apache(3), Mysql(3)
+
+AUTHORS    MySQL and mysqlperl by Michael (Monty) Widenius <month@tcx.se>   mod_perl by Doug MacEachern <dougm@osf.org>  Apache::Mysql by Neil Jensen <njensen@habaneros.com>
+=============================================================================================================================================================================
+
+
+File: pm.info,  Node: Apache/NNTPGateway,  Next: Apache/OWA,  Prev: Apache/Mysql,  Up: Module List
+
+A NNTP interface for mod_perl enabled Apache web server.
+********************************************************
+
+NAME
+====
+
+   *Apache::NNTPGateway* - A NNTP interface for mod_perl enabled Apache
+web server.
+
+SYNOPSIS
+========
+
+     You must be using mod_perl, see http://perl.apache.org/ for details.
+
+     For the correct work your apache configuration would contain apache
+     directives look like these:
+
+     In httpd.conf (or any other apache configuration file):
+
+     <Location "/path/to/newsgroup">
+        SetHandler		perl-script
+        PerlHandler		Apache::NNTPGateway
+        PerlSetVar		NTTPGatewayNewsGroup "newsgroup"
+        PerlSetVar		NTTPGateway... (see L<CONFIGURATION> Directives)
+     </Location>
+
+DESCRIPTION
+===========
+
+     This module implements a per group interface to NNTP (Usenet)
+     News-Groups, it allow users to list, read, post, followup ... articles
+     in a given newsgroup/newsserver depending of configuration. This is
+     not a replacement for a real powerful newsreader client but just
+     pretend to be a simple, useful mapping of some news articles into a
+     web space.
+
+ACTIONS
+-------
+
+     Here is the list of all actions that can be performed on the current newsgroup.
+
+list
+          List articles, all articles from the current newsgroup or only unread
+          articles if the user/client allready did a B<catchup>.
+
+catchup
+          Mark all current articles as read. This use a Cookie.
+
+last
+          Read the last article available from the newsserver.
+
+read
+          Read article by ID.
+
+followup
+          Post a followup to an article.
+
+post
+          Post an new article to the current newsgroup.
+
+CONFIGURATION
+=============
+
+     Except some very few optional adjustements in the module source
+     itself all configuration is done with B<PerlSetVar> directives in
+     Apache configurations files.
+
+Directives
+----------
+
+     All following features of this PerlHandler, will be set in the apache
+     configuration files. For this you can use PerlSetVar apache
+     directive.
+
+NNTPGatewayNewsGroup
+          (string, B<mandatory>)
+
+          The newsgroup used for the current NNTPGateway location. Not setting
+          this will make NNTPGateway fail.
+
+NNTPGatewayStop
+          (boolean, I<optional>)
+
+          Tell to completely disable NNTPGateway, useful for temporary maintainance.
+
+NNTPGatewayDefaultAction
+          (ACTION name, I<optional>) Default value: B<last>
+
+          Default action used when nothing specified. (see L<ACTIONS>).
+
+NNTPGatewayNewsServer
+          (string, I<optional>)
+
+          When using correctly configured perl modules B<Net::Domain>,
+          B<Net::Config> on a correctly configured system this should not be
+          changed, in theory NNTPGateway could be able to handle multiples
+          news server but this is greatly nor recommended (see L<BUGS>) unless
+          you really know what you are doing.
+
+NNTPGatewayOrganization
+          (string, B<recommended>) Default value: B<The Disoganized Corp>
+
+          Set the Organization header when posting articles.
+
+NNTPGatewayTitle
+          (string, I<optional>)
+          
+          Title displayed in NNTPGateway pages.
+
+NNTPGatewayStyleSheet
+          (string, I<optional>)
+
+          Set the style sheet used in NNTPGateway pages, or none. There are
+          some few classes in the generated HTML, check the source to use them
+          in your style sheet.
+
+NNTPGatewayAnonymousPostAllowed
+          (boolean, I<optional>) Default value: B<off>
+
+          Allow anonymous posting in the current group.
+
+NNTPGatewayAnonymousPosters
+          (list, I<optional>) Default value: B<anonymous=Anonymous>
+
+          A list of pair email=Name that could be used for anonymous
+          posts. I'm B<Absolutely> not responsible for any abuse of this
+          feature, this is up to the webmaster to control it's usage.
+          
+          Ex:
+          C<PerlSetVar NNTPGatewayAnonymousPosters "anon=The Unknown Soldier,president=The Big Boss">
+
+NNTPGatewayNonLocalPostOk
+          (boolean, I<optional>) Default value: B<off>
+
+          Allow user who do not have local (to the same web server machine -
+          checked with getpwnam) login account to post articles, in B<non>
+          anonymous post mode the users should have been identified themselves
+          anyway (with identd or server auth).
+
+NNTPGatewayUsersNamesCaseInsensitive
+          (boolean, I<optional>) Default value: B<off>
+
+          Check users names in a case insensitive manner.
+
+NNTPGatewayDisabledActions
+          (ACTIONS list, I<optional>) Default value: B<none>
+
+          List of L<ACTIONS> that are B<not> allowed to be performed by users for
+          the current config. (see L<ACTIONS>).
+
+NNTPGatewayTemplatesDir
+          (string, L<optional>) Default value: B<lib/templates/NNTPGateway/>
+          
+          ServerRoot relative Directory where to find HTML templates files (not yet Implemented).
+          
+          =item NNTPGatewayDebug
+
+          (boolean, I<optional>) Default value: B<off>
+          
+          Set this to debug NNTPGateway.
+
+SECURITY
+========
+
+     If you B<allow> Anonymous posting absolutely no security checks are
+     performed unless you protect access to the Location this handler is
+     located on, but that is not the job of this module.
+
+     If you B<deny> Anonymous posting, the handler will check
+     B<remote_ident> (via Identd) or B<remote_user> and will check if
+     they are valid username by checking C<getpwnam()> (a list of some
+     generic usernames such as: root, anonymous ... are not considered as
+     valid too, even if they are), if directive
+     B<NNTPGatewayNonLocalPostOk> had not been set, if they are not they
+     are rejected, if they are they could post and the From header will
+     be set to that username. That is the only security check the handler
+     will do, it is up to other apaches modules to correctly protect the
+     Location and set valid usernames (enable identd or loggin via
+     AuthNIS or anything else).
+
+     Furthermore the webmaster could disable the use of some actions such
+     as post, followup ...
+
+BUGS
+====
+
+     The connection to the nntp server is handled in a global variable so
+     that the connection is common to all requests in the current apache
+     child process. Due to that, when the module is used with 2 differents
+     configs (in 2 <Location xxx>) setting 2 differents newsservers and
+     that 2 requests are made in the same child with these 2 configs (or
+     more) ... the second request could re-use a NNTP connection (open
+     during the 1st request) already open to the B<first> server. I do not
+     want to make the nntp object a local variable, because the connection
+     is a long process ... But anyway, I have some few ideas of how to
+     solve the problem, but as I am lazy and my configuration do not have
+     this problem I am waiting for pressure from eventual module users
+     ...;-)
+
+Changes
+=======
+
+v0.8
+          * Cookie domain better handled for catchup.
+          * NNTPGatewayNewsGroupTest removed. Set up a new Location and set
+            NNTPGatewayNewsGroup to the test group and NNTPGatewayDebug on to
+            acheive the same fonctionnality.
+          * Some more directives to control users checking
+            (NNTPGatewayUsersNamesCaseInsensitive, NNTPGatewayNonLocalPostOk).
+          * Some handling of Cache-Control.
+          * Made this module ready for my first CPAN contribution ;-)
+          ** Cleaning source code.
+          ** Cleaning Documentation.
+          ** CPAN Enabled distrib (Makefile.PL, .tar.gz dist, README file, CPAN
+             ID ...).
+
+v0.7
+          * The configuration directive B<NNTPGatewayCatchupCookieName> do not exists anymore.
+          * Disconnections to news server start to be better handled.
+          
+          =item v0.6
+
+          First public release
+
+TODO
+====
+
+   * Safe sharing of the NNTP global.
+
+   *      Using an HTML Template system (maybe HTML::Template) instead of hard coded html.
+
+   *      Improving the LANG selection stuff (maybe adding a new configuration directive?)
+
+   *      Improving the C<check_user()> stuff for more security.
+
+   *      more stuff ...
+
+SEE ALSO
+========
+
+     perl(1), mod_perl(3), Apache(3), Net::NNTP(3), Net::Domain(3),
+     Net::Config(3), rfc977
+
+COPYRIGHT
+=========
+
+     The application and accompanying modules are Copyright CENA Toulouse.
+     It is free software and can be used, copied and redistributed at the
+     same terms as perl itself.
+
+AUTHOR
+======
+
+     heddy Boubaker <boubaker@cena.fr>
+
+     Home page:
+     http://www.tls.cena.fr/~boubaker/WWW/Apache-NNTPGateway.shtml
+
+
+File: pm.info,  Node: Apache/OWA,  Next: Apache/Options,  Prev: Apache/NNTPGateway,  Up: Module List
+
+Run OWA applications under Apache/mod_perl
+******************************************
+
+NAME
+====
+
+   Apache::OWA - Run OWA applications under Apache/mod_perl
+
+SYNOPSIS
+========
+
+   Runs Oracle PL/SQL apllications written using Oracle's PL/SQL Web
+Toolkit under Apache/mod_perl.
+
+REQUIREMENTS
+============
+
+   DBI, DBD::Oracle, Apache::DBI, Apache::Request (libapreq), Oracle
+PL/SQL Web Toolkit (any version should work)
+
+DESCRIPTION
+===========
+
+   Example configuration.
+
+     <Location /scott/>
+        SetHandler perl-script
+        PerlHandler Apache::OWA;
+        PerlSetVar DAD oracle:scott:tiger
+     </Location>
+
+   This configuration means that calling
+"http://server/scott/print_cgi_env" executes the pl/sql procedure
+"scott.print_cgi_env".
+
+   Other configuration options:
+
+     PerlSetVar SCHEMA oas_public
+        This lets you execute procedures under a different schema (user)
+        than the ones specified in the DAD-string.
+
+     PerlSetVar DEBUG 1
+        0 - No debugging. This is the default.
+        1 - Light debugging and verbose errors sent to the browser.
+            Useful while developing procedures.
+        2 - Heavy debugging of Apache::OWA inetrnal stuff.
+
+     PerlAuthenHandler Apache::OWA
+        This invokes my special authentication handler that can do a few clever
+        things. Then it passes control on to the content-handler, so if you
+        use this you don't need to specify "PerlHandler Apache::OWA". It
+        might also be useful in combination with "PerlSetVar SCHEMA".
+
+     PerlSetVar DB_AUTH true
+        Uses database uername and password to authenticate. If no DAD-string
+        is set, it can also use the supplied username and password to execute
+        your PL/SQL application.
+
+     PerlSetVar DB_PROC_AUTH schema.function
+        Uses an arbitrary PL/SQL procedure or function to authenticate.
+        The procedure should take the username and password as arguments
+        and return 0 for success and more than 0 for failure.
+
+     PerlSetVar NEVER_USE_WEIRD_TYPES 1
+        Only set this if you know that you never use multi-value CGI variables
+        that need to be mapped to PL/SQL Table datatypes. Finding these datatypes
+        is some extra work and will slow down executions a little bit.
+
+   For further documentation see the README.
+
+AUTHOR
+======
+
+   Svante Sormark, svinto@ita.chalmers.se.  Latest version available from
+http://www.ita.chalmers.se/~svinto/apache
+
+   Contibutions from:
+
+     Slava Kalashnikov <slava@intes.odessa.ua>
+
+     Gunnar Hellekson <g.hellekson@trilux.com> and
+     Erich Morisse <e.morisse@trilux.com> of Trilux Internet Group, Ltd.
+
+COPYRIGHT
+=========
+
+   The Apache::OWS module is free software; you can redistribute it and/or
+modify it under the same terms as Perl or Apache.
+
+SEE ALSO
+========
+
+   *Note Apache: Apache,, `mod_perl' in this node, `DBI' in this node,
+`DBD::Oracle' in this node, *Note Apache/DBI: Apache/DBI,
+
+
+File: pm.info,  Node: Apache/Options,  Next: Apache/OutputChain,  Prev: Apache/OWA,  Up: Module List
+
+OPT_* defines from httpd_core.h
+*******************************
+
+NAME
+====
+
+   Apache::Options - OPT_* defines from httpd_core.h
+
+SYNOPSIS
+========
+
+     use Apache::Options;
+
+DESCRIPTION
+===========
+
+   The *Apache::Options* module will export the following bitmask
+constants:
+
+     OPT_NONE
+     OPT_INDEXES
+     OPT_INCLUDES
+     OPT_SYMLINKS
+     OPT_EXECCGI
+     OPT_UNSET
+     OPT_INCNOEXEC
+     OPT_SYM_OWNER
+     OPT_MULTI
+     OPT_ALL
+
+   These constants can be used to check the return value from
+Apache->request->allow_options() method.
+
+   This module is simply a stub which imports from *Note Apache/Constants:
+Apache/Constants,, just as if you had said `use Apache::Constants
+':options';'.
+
+SEE ALSO
+========
+
+   *Note Apache: Apache,, *Note Apache/Constants: Apache/Constants,
+
+
+File: pm.info,  Node: Apache/OutputChain,  Next: Apache/PHLogin,  Prev: Apache/Options,  Up: Module List
+
+chain stacked Perl handlers
+***************************
+
+NAME
+====
+
+   Apache::OutputChain - chain stacked Perl handlers
+
+SYNOPSIS
+========
+
+   You need reasonably new version of Apache httpd, compiled with mod_perl
+with PERL_STACKED_HANDLERS enabled. In the conf/access.conf file of your
+Apache installation, add lines like
+
+     <Files *.html>
+     SetHandler perl-script
+     PerlHandler Apache::OutputChain Apache::SSIChain Apache::PassHtml
+     </Files>
+
+   Also, this module can be used as a base for other Apache::*Chain
+handlers - inherit from it to get the chaining features.
+
+DESCRIPTION
+===========
+
+   This module allows chaining perl of handlers in Apache, which allows you
+to make filter modules that take output from previous handlers, make some
+modifications, and pass the output to the next handler or out to browser.
+
+   Normal handler modules specify functions handler that do the job -
+authenticate, log, or send back the response. With chaining modules, the
+handler function only registers the handler into chain. It is done by tie
+of STDOUT. The module then catches output of other handlers in its
+function PRINT, that gets called whenever something is printed to tied
+handle, can modify or otherwise process the output and send it further on.
+
+   The `PerlHandler' above shows the typical configuration: first,
+*Apache::OutputChain* starts the chaining feature. Then, there is a list
+of chaining modules, in reverse order. Here shown is *Apache::SSIChain*;
+if you would also want to gzip the output, you would write something like
+
+     Apache::OutputChain Apache::GzipChain Apache::SSIChain
+
+   Note that you probably want to do SSI first and gzip the result, that's
+why the modules are written in that (reverse) order in the configuration
+file.
+
+   As the last in the chaining chain, there should be some module that
+actually produces the data: *Apache::PassHtml*, *Apache::PassFile*,
+*Apache::PassExec*, or even Apache::Registry.
+
+INTERNALS
+=========
+
+   I will try to explain how this feature is achieved, because I hope you
+could help me to make it better and mature.
+
+   When the handler function is called, it checks if it gets a reference
+to a class. If this is true, then this function was called from some other
+handler that wants to be put into the chain. If not, it's probably an
+initialization (first call) of this package (*Apache::OutputChain*) and we
+will supply name of this package.  Note that other chaining modules should
+call inherited handler from their own handlers.
+
+   Now we check, where is STDOUT tied. If it is Apache, we are the first
+one trying to be put into the chain. If it is not, there is somebody in
+the chain already. We call tie on the STDOUT, steal it from anybody who
+had it before - either Apache or the other class.
+
+   When later anybody prints into STDOUT, it will call function PRINT of
+the first class in the chain (the last one that registered). If there is
+not other class behind, the print method of Apache will be called. If this
+is not the last user defined handler in the chain, we will call PRINT
+method of the next class.
+
+VERSION
+=======
+
+   0.07
+
+AUTHOR
+======
+
+   (c) 1997-1999 Jan Pazdziora, adelton@fi.muni.cz,
+http://www.fi.muni.cz/~adelton/ at Faculty of Informatics, Masaryk
+University, Brno, Czech Republic
+
+SEE ALSO
+========
+
+   Apache::GzipChain(3) by Andreas Koenig for solution that gzips the
+output on the fly; Apache::SSIChain(3) for SSI parsing module; mod_perl(1)
+by Doug MacEachern for the great Perl in Apache project.
+
+   Apache::MakeCapital(3) for a simple example of inheriting from this
+module.
+
+   www.apache.org, www.perl.com.
+
+
+File: pm.info,  Node: Apache/PHLogin,  Next: Apache/PageKit,  Prev: Apache/OutputChain,  Up: Module List
+
+authenticates via a PH database
+*******************************
+
+NAME
+====
+
+   Apache::PHLogin - authenticates via a PH database
+
+SYNOPSIS
+========
+
+     #in .htaccess
+     AuthName MyPHLoginAuth
+     AuthType Basic
+     PerlAuthenHandler Apache::PHLogin::handler
+     
+     PerlSetVar PHLogin_host ph.psu.edu
+     PerlSetVar PHLogin_port 105
+     PerlSetVar PHLogin_timeout 5
+
+     Options Indexes FollowSymLinks ExecCGI
+     
+     require valid-user
+
+DESCRIPTION
+===========
+
+   The PH(CCSO) Nameserver is a database commonly used as an online
+phonebook server for organizations. See
+http://people.qualcomm.com/ppomes/ph.html for details. This module uses
+the Net::PH module by Graham Barr <gbarr@pobox.com> and Alex Hristov
+<hristov@slb.com>.
+
+SEE ALSO
+========
+
+   mod_perl(1), Apache::AuthenCache(3), Net::PH(3)
+
+AUTHOR
+======
+
+   John Groenveld <groenveld@acm.org>
+
+COPYRIGHT
+=========
+
+   This package is Copyright (C) 1998 by John Groenveld. It may be copied,
+used and redistributed under the same terms as perl itself.
+
+
+File: pm.info,  Node: Apache/PageKit,  Next: Apache/PageKit/Config,  Prev: Apache/PHLogin,  Up: Module List
+
+Application framework using mod_perl and HTML::Template
+*******************************************************
+
+NAME
+====
+
+   Apache::PageKit - Application framework using mod_perl and
+HTML::Template
+
+SYNOPSIS
+========
+
+   In httpd.conf
+
+     SetHandler perl-script
+     PerlSetVar PKIT_ROOT /path/to/pagekit/files
+
+     PerlHandler +Apache::PageKit
+     <Perl>
+           Apache::PageKit::startup("/path/to/pagekit/files");
+     </Perl>
+
+   In MyPageKit/Common.pm
+
+     package MyPageKit::Common;
+
+     use base 'Apache::PageKit::Model';
+
+     sub pkit_dbi_connect {
+       return DBI->connect("DBI:mysql:db","user","passwd");
+     }
+
+     sub pkit_session_setup {
+       my $model = shift;
+       my $dbh = $model->dbh;
+       return {
+     	session_lock_class => 'MySQL',
+     	session_store_class => 'MySQL',
+     	session_args => {
+     			Handle => $dbh,
+     			LockHandle => $dbh,
+     			},
+     	};
+     }
+
+     sub pkit_auth_credential {
+       my ($pk, @credentials) = @_;
+
+     # create a session key from @credentials
+     # your code here.........
+
+     return $ses_key;
+       }
+
+     sub pkit_auth_session_key {
+       my ($pk, $ses_key) = @_;
+
+     # check whether $ses_key is valid, if so return user id in $user_id
+     # your code here.........
+
+     return $ok ? $user_id : undef;
+       }
+
+DESCRIPTION
+===========
+
+   PageKit is an mod_perl based application framework that uses
+HTML::Template and XML to separate code, design, and content. Includes
+session management, authentication, form validation, co-branding, and a
+content management system.
+
+   Its goal is to solve all the common problems of web programming, and to
+make the creation and maintenance of dynamic web sites fast, easy and
+enjoyable.
+
+   You have to write a module named MyPageKit::Common that inherits from
+Apache::PageKit::Model and provides methods common across the site.  For
+example, if you wish to support authentication, it must include the two
+methods pkit_auth_credential and pkit_auth_session_key.
+
+   For more information, visit http://www.pagekit.org/ or
+http://sourceforge.net/projects/pagekit/
+
+OBJECTS
+=======
+
+   Each `$pk' object contains the following objects:
+
+$pk->{apr}
+     An *Note Apache/Request: Apache/Request, object.  This gets the
+     request parameters and can also be used to set the default values in
+     HTML form when fill_in_form is set.
+
+$pk->{config}
+     An *Note Apache/PageKit/Config: Apache/PageKit/Config, object, which
+     loads and accesses global, server and page attributes.
+
+$pk->{content}
+     An *Note Apache/PageKit/Content: Apache/PageKit/Content, object,
+     which accesses the content stored in the XML files.
+
+$pk->{model}
+     An `MyPageKit::Common' in this node class object, derived from *Note
+     Apache/PageKit/Model: Apache/PageKit/Model,.
+
+$pk->{session}
+     Returns a reference to a hash tied to *Note Apache/PageKit/Session:
+     Apache/PageKit/Session,.
+
+$pk->{view}
+     An *Note Apache/PageKit/View: Apache/PageKit/View, object, which
+     interfaces with the HTML::Template templates.
+
+Features
+========
+
+Model/View/Content/Controller approach to design
+     The Model is the user provided classes, which encapsulate the
+     business logic behind the web site.
+
+     The View is a set of *Note HTML/Template: HTML/Template, templates.
+     *Note Apache/PageKit/View: Apache/PageKit/View, acts as a bridge
+     between the templates and the controller.
+
+     The Content is stored in XML files in the Content/xml directory.  You
+     may also store the content in the HTML::Template templates, if you
+     don't need to seperate the View from the Content.
+
+     The Controller is a subclass of *Note Apache/PageKit:
+     Apache/PageKit,, which reads the client request, accesses the back
+     end, and uses *Note Apache/PageKit/View: Apache/PageKit/View, to fill
+     in the data needed by the templates.
+
+Seperation of Perl from HTML
+     By using *Note HTML/Template: HTML/Template,, this application
+     enforces an important divide - design and programming.  Designers can
+     edit HTML without having to deal with any Perl, while programmers can
+     edit the Perl code with having to deal with any HTML.
+
+Seperation of Content from Design with XML
+     By using the `<CONTENT_VAR>' and `<CONTENT_LOOP>' elements, you can
+     autofill the corresponding `<CONTENT_VAR>' and `<CONTENT_LOOP>' tags
+     in the template.
+
+     This is an easy way of using XML with HTML::Template that doesn't
+     require the use of stylesheets.
+
+Page based attributes
+     The attributes of each Page are stored in the Config/Config.xml file.
+     This makes it easy to change Pages across the site.  *Note
+     Apache/PageKit/Config: Apache/PageKit/Config, provides a wrapper
+     around this XML file.
+
+     For example, to require a login for a page, all you have to do is
+     change the  require_login attribute of the XML `<PAGE>' tag to *yes*,
+     instead of modifying the Perl code or moving the script to a
+     protected directory.
+
+Automatic Dispatching of URIs
+     Apache::PageKit translates `$r->uri' into a class and method in the
+     user provided classes.  In the example in the synopsis, the URI
+     `/account/update' will map to
+     `MyPageKit::PageCode::account->page_update'.
+
+Easy error handling.
+     Both warnings and fatal errors can be displayed on the screen for
+     easy debugging in a development environment, or e-mailed to the site
+     adminstrator in a production environment, as specified in the Apache
+     `ServerAdmin' configuration directive.
+
+     You have to require *Note Apache/PageKit/Error: Apache/PageKit/Error,
+     to turn on error handling.
+
+Session Management
+     Provides easy access to a hash tied to *Note Apache/PageKit/Session:
+     Apache/PageKit/Session,.
+
+Authentication
+     Restricts access to pages based on the require_login attribute.  If
+     require_login is set to recent, then PageKit requires that session is
+     currently active in the last recent_login_timeout seconds.
+
+Form Validation
+     Uses *Note HTML/FormValidator: HTML/FormValidator, to provide easy
+     form validation.  Highlights fields in red that user filled
+     incorrectly by using the `<PKIT_ERRORFONT NAME="FIELD_NAME">
+     </PKIT_ERRORFONT>' tag.  To use, pass an input profile to the
+     validate method of *Note Apache/PageKit/Model: Apache/PageKit/Model,
+     from your perl code option.
+
+Sticky HTML Forms
+     Uses *Note HTML/FillInForm: HTML/FillInForm, to implement Sticky CGI
+     Forms.
+
+     One useful application is after a user submits an HTML form without
+     filling out a required field.  PageKit will display the HTML form
+     with all the form elements containing the submitted info.
+
+Multiple Views/Co-branding
+     Any page can have multiple views, by using the pkit_view request
+     parameter.  One example is Printable pages.  Another is having the
+     same web site branded differently for different companies.
+
+Components
+     PageKit can easily share HTML templates across multiple pages using
+     components.  In addition, you may specify Perl code that gets called
+     every time a component is used by adding a component_*component_id*
+     method to the Perl module specified by `component_dispatch_prefix'.
+
+Language Localization
+     You may specify language properties by the `xml:lang' attribute for
+     <CONTENT_VAR> and <CONTENT_LOOP> tags in the XML content files.
+
+     The language displayed is based on the user's preference, defaulting
+     to the browser settings.
+
+METHODS
+=======
+
+   The following methods are available to the user as Apache::PageKit API.
+
+prepare_page
+     This executes all of the back-end business logic need for preparing
+     the page, including executing the page and component code.
+
+prepare_view
+     This fills in the view template with all of the data from the back-end
+
+print_view
+     Called as a last step to output filled in view template.
+
+startup
+     This function should be called at server startup from your httpd.conf
+     file:
+
+          <Perl>
+                Apache::PageKit::startup("/path/to/pagekit/files");
+          </Perl>
+
+     Where the first (and only) argument is the root directory of the
+     PageKit application.  It loads /path/to/pagekit/files/Model into the
+     perl search path so that PageKit can make calls into
+     MyPageKit::Common and other Model classes.  It also loads the Config
+     and Content XML files and pre-parses the View template files.
+
+MARKUP TAGS
+===========
+
+   Most tags get "compiled" into <TMPL_VAR>, <TMPL_LOOP>, <TMPL_IF>,
+<TMPL_UNLESS>, and <TMPL_ELSE> tags.  See the *Note HTML/Template:
+HTML/Template, manpage for description of these tags.
+
+<PKIT_COMPONENT NAME="component_id">
+     Calls the component code (if applicable) and includes the template for
+     the component *component_id*.
+
+     Note that components get dynamically loaded at runtime.  For example
+     you can do the following:
+
+          <MODEL_LOOP NAME="foo">
+            <PKIT_COMPONENT NAME="<MODEL_VAR NAME="bar">">
+          </MODEL_LOOP>
+
+<PKIT_ERRORFONT NAME="FIELD_NAME"> </PKIT_ERRORFONT>
+     This tag highlights fields in red that *Note Apache/PageKit/Model:
+     Apache/PageKit/Model, reported as being filled in incorrectly.
+
+<PKIT_LOOP NAME="BREAD_CRUMB"> </PKIT_LOOP>
+     Displays a bread crumb trail (a Yahoo-like horizontal navigation that
+     looks like Top > Category > Sub Category > Current Page ) for pages
+     that have `bread_crumb' set to *yes*.
+
+     Template should contain code that looks like
+
+          <PKIT_LOOP NAME="BREAD_CRUMB">
+            <PKIT_UNLESS NAME="__LAST__"><a href="/<PKIT_VAR NAME="page">"></PKIT_UNLESS><PKIT_VAR NAME="NAME"><PKIT_UNLESS NAME="__LAST__"></a></PKIT_UNLESS>
+            <PKIT_UNLESS NAME="__LAST__"> &gt; </PKIT_UNLESS>
+          </PKIT_LOOP>
+
+<PKIT_VAR NAME="LAST_CRUMB">
+     Returns the last crumb (typically the page that the user is currently
+     viewing).
+
+          <PKIT_VAR NAME="LAST_CRUMB">
+
+     This is particularly useful in the HTML title bar.
+
+<PKIT_VAR NAME="LOGINOUT_LINK">
+     If user is logged in, provides link to log out.  If user is not
+     logged in, provides link to log in.
+
+<PKIT_LOOP NAME="MESSAGE"> </PKIT_LOOP>
+     Displays messages passed to `$model->pkit_message' method.
+
+     Template should contain something that looks like
+
+          <PKIT_LOOP NAME="MESSAGE">
+             <PKIT_IF NAME="IS_ERROR"><font color="#ff0000"></PKIT_IF>
+             <PKIT_VAR NAME="MESSAGE">
+             <PKIT_IF NAME="IS_ERROR"></font></PKIT_IF>
+             <p>
+          </PKIT_LOOP>
+
+     This code will display error message seperated by the HTML `<p>' tag,
+     highlighting error messages in red.
+
+<PKIT_VAR NAME="SELFURL">
+     The URL of the current page, including CGI parameters.  Appends a '&'
+     or '?' at the end to allow additionial parameters.
+
+<PKIT_IF NAME="VIEW:*view*"> </PKIT_IF>
+     Set to true if pkit_view request parameter equals *view*.
+
+OPTIONS
+=======
+
+   Global, server and page configuration variables are described in the
+*Note Apache/PageKit/Config: Apache/PageKit/Config, perldoc page.  In
+addition you can set up the session management in `MyPageKit::Common' in
+this node.
+
+REQUEST PARAMETERS
+==================
+
+   These are parameters that are specified in GET requests and POST
+requests where *Content-type* is one of
+*application/x-www-form-urlencoded* or *multipart/form-data*.
+
+pkit_credential_#
+     Login data, typically userid/login/email (pkit_credential_0) and
+     password (pkit_credential_1).
+
+pkit_done
+     The page to return to after the user has finished logging in or
+     creating a new account.
+
+pkit_lang
+     Sets the user's preferred language, using a ISO 639 identifier.
+
+pkit_login_page
+     This parameter is used to specify the page that user attempted to
+     login from.  If the login fails, this page is redisplayed.
+
+pkit_remember
+     If set to true upon login, will save user's cookie so that they are
+     still logged in next time they restart their browser.
+
+pkit_view
+     Used to implement multiple views/co-branding.  For example, if set to
+     print, will search for templates in the `View/print' directory before
+     using templates in the `View/Default' directory, and sets the
+     `pkit_view:print' parameter in the view to true.
+
+FREQUENTLY ASKED QUESTIONS
+==========================
+
+   Please look in here before you send me an email.
+
+   1) I get a segmentation fault when I start the PageKit enabled Apache
+server.
+
+   PageKit requires XML::Parser, which is incompatible with the expat
+library included in Apache.  You'll have to configure Apache with
+`--disable-rule=expat'.
+
+   For more information see http://axkit.org/faq.xml under "I install
+AxKit and Apache segfaults when it starts".
+
+SEE ALSO
+========
+
+   *Note Apache/PageKit/Config: Apache/PageKit/Config,, *Note
+Apache/PageKit/Content: Apache/PageKit/Content,, *Note
+Apache/PageKit/Error: Apache/PageKit/Error,, *Note Apache/PageKit/Model:
+Apache/PageKit/Model,, *Note Apache/PageKit/View: Apache/PageKit/View,,
+*Note Apache/Request: Apache/Request,, *Note HTML/FillInForm:
+HTML/FillInForm,, *Note HTML/Template: HTML/Template,, *Note
+HTML/FormValidator: HTML/FormValidator,
+
+VERSION
+=======
+
+   This document describes Apache::PageKit module version 0.96
+
+NOTES
+=====
+
+   Requires mod_perl, XML::Parser, HTML::Clean, HTML::FillInForm,
+HTML::FormValidator, and HTML::Template.
+
+   I wrote these modules because I needed an application framework that
+was based on mod_perl and seperated HTML from Perl.  HTML::Embperl,
+Apache::ASP and HTML::Mason are frameworks that work with mod_perl, but
+embed Perl code in HTML.  The development was inspired in part by
+Webmacro, which is an open-source Java servlet framework that seperates
+Code from HTML.
+
+   The goal is of these modules is to develop a framework that provides
+most of the functionality that is common across dynamic web sites,
+including session management, authorization, form validation, component
+design, error handling, and content management.
+
+   If you have used (or are considering using) these modules to build a
+web site, please drop me a line with the URL of your web site.  My e-mail
+is tj@anidea.com.  Thanks!
+
+BUGS
+====
+
+   This framework is in alpha stage.  The interface may change in later
+releases.
+
+   Please submit any bug reports, comments, or suggestions to
+tjmather@anidea.com, or join the Apache::PageKit mailing list at
+http://lists.sourceforge.net/mailman/listinfo/pagekit-users
+
+TODO
+====
+
+   Associate sessions with authenticated user ID.
+
+   Add web based editing tools allowing authorized user to edit View,
+Content and Configuration files
+
+   Add more tests to the test suite.
+
+   Make content sharable across pages.
+
+   Move Apache::PageKit::Error to seperate distribtuion, use CGI::Carp?
+
+   Add <PKIT_SELFURL_WITHOUT param1 param2> tag.
+
+AUTHOR
+======
+
+   T.J. Mather (tjmather@anidea.com)
+
+CREDITS
+=======
+
+   Fixes, Bug Reports, Docs have been generously provided by:
+
+     Stu Pae
+     Chris Burbridge
+
+   Thanks!
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000, AnIdea Corporation.  All rights Reserved.  PageKit
+is a trademark of AnIdea Corporation.
+
+LICENSE
+=======
+
+   This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE.  See the Ricoh Source Code Public
+License for more details.
+
+   You can redistribute this module and/or modify it only under the terms
+of the Ricoh Source Code Public License.
+
+   You should have received a copy of the Ricoh Source Code Public License
+along with this program; if not, obtain one at
+http://www.pagekit.org/license
+
+

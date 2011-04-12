@@ -1,0 +1,1772 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Bio/DB/GenPept,  Next: Bio/DB/NCBIHelper,  Prev: Bio/DB/GenBank,  Up: Module List
+
+Database object interface to GenPept
+************************************
+
+NAME
+====
+
+   Bio::DB::GenPept - Database object interface to GenPept
+
+SYNOPSIS
+========
+
+     $gb = new Bio::DB::GenPept;
+
+     $seq = $gb->get_Seq_by_id('195055'); # Unique ID
+
+     # or ...
+
+     $seq = $gb->get_Seq_by_acc('DEECTH'); # Accession Number
+
+     my $seqio = $gb->get_Stream_by_id(['195055', 'DEECTH']);
+     while( my $seq = $seqio->next_seq ) {
+     	print "seq is is ", $seq->display_id, "\n";
+     }
+
+DESCRIPTION
+===========
+
+   Allows the dynamic retrieval of Sequence objects (Bio::Seq) from the
+GenPept database at NCBI, via an Entrez query.
+
+   WARNING: Please do NOT spam the Entrez web server with multiple
+requests.  NCBI offers Batch Entrez for this purpose.  Batch Entrez
+support will likely be supported in a future version of DB::GenPept.
+
+   Currently the only return format supported by NCBI Entrez for GenPept
+database is GenPept format, so any format specification passed to GenPept
+will be ignored still be forced to GenPept format (which is just GenBank
+format).
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules. Send your comments and suggestions preferably to one of
+the Bioperl mailing lists. Your participation is much appreciated.
+
+     bioperl-l@bioperl.org              - General discussion
+     http://bioperl.org/MailList.shtml  - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.   Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR - Aaron Mackey, Jason Stajich
+====================================
+
+   Email amackey@virginia.edu Email jason@chg.mc.duke.edu
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+get_params
+----------
+
+     Title   : get_params
+     Usage   : my %params = $self->get_params($mode)
+     Function: Returns key,value pairs to be passed to NCBI database
+               for either 'batch' or 'single' sequence retrieval method
+     Returns : a key,value pair hash
+     Args    : 'single' or 'batch' mode for retrieval
+
+default_format
+--------------
+
+     Title   : default_format
+     Usage   : my $format = $self->default_format
+     Function: Returns default sequence format for this module
+     Returns : string
+     Args    : none
+
+Routines from Bio::DB::WebDBSeqI and Bio::DB::RandomAccessI
+===========================================================
+
+get_Seq_by_id
+-------------
+
+     Title   : get_Seq_by_id
+     Usage   : $seq = $db->get_Seq_by_id('ROA1_HUMAN')
+     Function: Gets a Bio::Seq object by its name
+     Returns : a Bio::Seq object
+     Args    : the id (as a string) of a sequence
+     Throws  : "id does not exist" exception
+
+get_Stream_by_acc
+-----------------
+
+     Title   : get_Stream_by_acc
+     Usage   : $seq = $db->get_Seq_by_acc($acc);
+     Function: Gets a series of Seq objects by accession numbers
+     Returns : a Bio::SeqIO stream object
+     Args    : $ref : a reference to an array of accession numbers for
+                      the desired sequence entries
+     Note    : For GenBank, this just calls the same code for get_Stream_by_id()
+
+Routines implemented by Bio::DB::NCBIHelper
+===========================================
+
+get_request
+-----------
+
+     Title   : get_request
+     Usage   : my $url = $self->get_request
+     Function: HTTP::Request
+     Returns :
+     Args    : %qualifiers = a hash of qualifiers (ids, format, etc)
+
+get_Stream_by_batch
+-------------------
+
+     Title   : get_Stream_by_batch
+     Usage   : $seq = $db->get_Stream_by_batch($ref);
+     Function: Retrieves Seq objects from Entrez 'en masse', rather than one
+               at a time.  For large numbers of sequences, this is far superior
+               than get_Stream_by_[id/acc]().
+     Example :
+     Returns : a Bio::SeqIO stream object
+     Args    : $ref : either an array reference, a filename, or a filehandle
+               from which to get the list of unique ids/accession numbers.
+
+get_Stream_by_id
+----------------
+
+     Title   : get_Stream_by_id
+     Usage   : $stream = $db->get_Stream_by_id( [$uid1, $uid2] );
+     Function: Gets a series of Seq objects by unique identifiers
+     Returns : a Bio::SeqIO stream object
+     Args    : $ref : a reference to an array of unique identifiers for
+                      the desired sequence entries
+
+get_Stream_by_acc (2)
+---------------------
+
+     Title   : get_Stream_by_acc
+     Usage   : $seq = $db->get_Seq_by_acc($acc);
+     Function: Gets a series of Seq objects by accession numbers
+     Returns : a Bio::SeqIO stream object
+     Args    : $ref : a reference to an array of accession numbers for
+                      the desired sequence entries
+     Note    : For GenBank, this just calls the same code for get_Stream_by_id()
+
+request_format
+--------------
+
+     Title   : request_format
+     Usage   : my $format = $self->request_format;
+               $self->request_format($format);
+     Function: Get/Set sequence format retrieval
+     Returns : string representing format
+     Args    : $format = sequence format
+
+
+File: pm.info,  Node: Bio/DB/NCBIHelper,  Next: Bio/DB/RandomAccessI,  Prev: Bio/DB/GenPept,  Up: Module List
+
+A collection of routines useful for queries to NCBI databases.
+**************************************************************
+
+NAME
+====
+
+   Bio::DB::NCBIHelper - A collection of routines useful for queries to
+NCBI databases.
+
+SYNOPSIS
+========
+
+     Do not use this module directly.
+     # get a Bio::DB::NCBIHelper object somehow
+     my $seqio = $db->get_Stream_by_acc(['MUSIGHBA1']);
+     foreach my $seq ( $seqio->next_seq ) {
+      # process seq
+     }
+
+DESCRIPTION
+===========
+
+   Provides a single place to setup some common methods for querying NCBI
+web databases.  This module is just centralizes the methods for
+constructing a URL for querying NCBI GenBank and NCBI GenPept and the
+common HTML stripping done in `postprocess_data' in this node().
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules. Send your comments and suggestions preferably to one of
+the Bioperl mailing lists. Your participation is much appreciated.
+
+     bioperl-l@bioperl.org              - General discussion
+     http://bioperl.org/MailList.shtml  - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.  Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR - Jason Stajich
+======================
+
+   Email jason@chg.mc.duke.edu
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+get_params
+----------
+
+     Title   : get_params
+     Usage   : my %params = $self->get_params($mode)
+     Function: Returns key,value pairs to be passed to NCBI database
+               for either 'batch' or 'single' sequence retrieval method
+     Returns : a key,value pair hash
+     Args    : 'single' or 'batch' mode for retrieval
+
+default_format
+--------------
+
+     Title   : default_format
+     Usage   : my $format = $self->default_format
+     Function: Returns default sequence format for this module
+     Returns : string
+     Args    : none
+
+get_request
+-----------
+
+     Title   : get_request
+     Usage   : my $url = $self->get_request
+     Function: HTTP::Request
+     Returns :
+     Args    : %qualifiers = a hash of qualifiers (ids, format, etc)
+
+get_Stream_by_batch
+-------------------
+
+     Title   : get_Stream_by_batch
+     Usage   : $seq = $db->get_Stream_by_batch($ref);
+     Function: Retrieves Seq objects from Entrez 'en masse', rather than one
+               at a time.  For large numbers of sequences, this is far superior
+               than get_Stream_by_[id/acc]().
+     Example :
+     Returns : a Bio::SeqIO stream object
+     Args    : $ref : either an array reference, a filename, or a filehandle
+               from which to get the list of unique ids/accession numbers.
+
+postprocess_data
+----------------
+
+     Title   : postprocess_data
+     Usage   : $self->postprocess_data ( 'type' => 'string',
+     				     'location' => \$datastr);
+     Function: process downloaded data before loading into a Bio::SeqIO
+     Returns : void
+     Args    : hash with two keys - 'type' can be 'string' or 'file'
+                                  - 'location' either file location or string
+                                               reference containing data
+
+request_format
+--------------
+
+     Title   : request_format
+     Usage   : my ($req_format, $ioformat) = $self->request_format;
+               $self->request_format("genbank");
+               $self->request_format("fasta");
+     Function: Get/Set sequence format retrieval. The get-form will normally not
+               be used outside of this and derived modules.
+     Returns : Array of two strings, the first representing the format for
+               retrieval, and the second specifying the corresponding SeqIO format.
+     Args    : $format = sequence format
+
+
+File: pm.info,  Node: Bio/DB/RandomAccessI,  Next: Bio/DB/SeqI,  Prev: Bio/DB/NCBIHelper,  Up: Module List
+
+Abstract interface for a sequence database
+******************************************
+
+NAME
+====
+
+   Bio::DB::RandomAccessI - Abstract interface for a sequence database
+
+SYNOPSIS
+========
+
+     #
+     # get a database object somehow using a concrete class
+     #
+
+     $seq = $db->get_Seq_by_id('ROA1_HUMAN');
+
+     #
+     # $seq is a Bio::Seq object
+     #
+
+DESCRIPTION
+===========
+
+   This is a pure interface class - in other words, all this does is define
+methods which other (concrete) classes will actually implement.
+
+   The Bio::DB::RandomAccessI class defines what methods a generic
+database class should have. At the moment it is just the ability to make
+Bio::Seq objects from a name (id) or a accession number.
+
+CONTACT
+=======
+
+   Ewan Birney originally wrote this class.
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution. Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+get_Seq_by_id
+-------------
+
+     Title   : get_Seq_by_id
+     Usage   : $seq = $db->get_Seq_by_id('ROA1_HUMAN')
+     Function: Gets a Bio::Seq object by its name
+     Returns : a Bio::Seq object
+     Args    : the id (as a string) of a sequence
+     Throws  : "id does not exist" exception
+
+get_Seq_by_acc
+--------------
+
+     Title   : get_Seq_by_acc
+     Usage   : $seq = $db->get_Seq_by_acc('X77802');
+     Function: Gets a Bio::Seq object by accession number
+     Returns : A Bio::Seq object
+     Args    : accession number (as a string)
+     Throws  : "acc does not exist" exception
+
+
+File: pm.info,  Node: Bio/DB/SeqI,  Next: Bio/DB/SwissProt,  Prev: Bio/DB/RandomAccessI,  Up: Module List
+
+Abstract Interface for Sequence databases
+*****************************************
+
+NAME
+====
+
+   Bio::DB::SeqI - Abstract Interface for Sequence databases
+
+SYNOPSIS
+========
+
+     # get a Bio::DB::SeqI somehow
+
+     $seq = $seqdb->get_Seq_by_id('some-id');
+     $seq = $seqdb->get_Seq_by_acc('some-accession-number');
+
+     @ids = $seqdb->get_all_ids();
+     $stream = $seqdb->get_PrimarySeq_stream();
+     while((my $seq = $stream->next_seq()) {
+        # $seq is a PrimarySeqI compliant object
+     }
+
+DESCRIPTION
+===========
+
+   Abstract interface for a sequence database
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules. Send your comments and suggestions preferably  to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     vsns-bcd-perl@lists.uni-bielefeld.de          - General discussion
+     vsns-bcd-perl-guts@lists.uni-bielefeld.de     - Technically-oriented discussion
+     http://bio.perl.org/MailList.html             - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.   Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR - Ewan Birney
+====================
+
+   Email birney@ebi.ac.uk
+
+   Describe contact details here
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+Methods inherieted from Bio::DB::RandomAccessI
+==============================================
+
+get_Seq_by_id
+-------------
+
+     Title   : get_Seq_by_id
+     Usage   : $seq = $db->get_Seq_by_id('ROA1_HUMAN')
+     Function: Gets a Bio::Seq object by its name
+     Returns : a Bio::Seq object
+     Args    : the id (as a string) of a sequence
+     Throws  : "id does not exist" exception
+
+get_Seq_by_acc
+--------------
+
+     Title   : get_Seq_by_acc
+     Usage   : $seq = $db->get_Seq_by_acc('X77802');
+     Function: Gets a Bio::Seq object by accession number
+     Returns : A Bio::Seq object
+     Args    : accession number (as a string)
+     Throws  : "acc does not exist" exception
+
+Methods [that were] specific for Bio::DB::SeqI
+==============================================
+
+get_PrimarySeq_stream
+---------------------
+
+     Title   : get_PrimarySeq_stream
+     Usage   : $stream = get_PrimarySeq_stream
+     Function: Makes a Bio::DB::SeqStreamI compliant object
+               which provides a single method, next_primary_seq
+     Returns : Bio::DB::SeqStreamI
+     Args    : none
+
+get_all_primary_ids
+-------------------
+
+     Title   : get_all_ids
+     Usage   : @ids = $seqdb->get_all_primary_ids()
+     Function: gives an array of all the primary_ids of the
+               sequence objects in the database. These
+               maybe ids (display style) or accession numbers
+               or something else completely different - they
+               *are not* meaningful outside of this database
+               implementation.
+     Example :
+     Returns : an array of strings
+     Args    : none
+
+get_Seq_by_primary_id
+---------------------
+
+     Title   : get_Seq_by_primary_id
+     Usage   : $seq = $db->get_Seq_by_primary_id($primary_id_string);
+     Function: Gets a Bio::Seq object by the primary id. The primary
+               id in these cases has to come from $db->get_all_primary_ids.
+               There is no other way to get (or guess) the primary_ids
+               in a database.
+
+     The other possibility is to get Bio::PrimarySeqI objects
+     via the get_PrimarySeq_stream and the primary_id field
+     on these objects are specified as the ids to use here.
+      Returns : A Bio::Seq object
+      Args    : accession number (as a string)
+      Throws  : "acc does not exist" exception
+
+
+File: pm.info,  Node: Bio/DB/SwissProt,  Next: Bio/DB/UpdateableSeqI,  Prev: Bio/DB/SeqI,  Up: Module List
+
+Database object interface to SwissProt retrieval
+************************************************
+
+NAME
+====
+
+   Bio::DB::SwissProt - Database object interface to SwissProt retrieval
+
+SYNOPSIS
+========
+
+     use Bio::DB::SwissProt;
+
+     $sp = new Bio::DB::SwissProt;
+
+     $seq = $sp->get_Seq_by_id('P43780'); # SwissProtID
+     # or ...
+     $seq = $sp->get_Seq_by_acc('P43780'); # SwissProtID
+     # can only query on SwissProtID at expasy right now
+
+     # choose a different server to query
+     $sp = new Bio::DB::SwissProt('-hostlocation' => 'canada');
+
+     $seq = $sp->get_Seq_by_id('P43780'); # SwissProtID
+
+DESCRIPTION
+===========
+
+   Allows the dynamic retrieval of Sequence objects (Bio::Seq) from the
+SwissProt database via an expasy retrieval.  Perhaps through SRS later.
+
+   In order to make changes transparent we have host type (currently only
+expasy) and location (default to switzerland) separated out.  This allows
+the user to pick the closest expasy mirror for running their queries.
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules. Send your comments and suggestions preferably  to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     bioperl-l@bioperl.org                         - General discussion
+     http://bio.perl.org/MailList.html             - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.   Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR - Jason Stajich
+======================
+
+   Email Jason Stajich <jason@chg.mc.duke.edu>
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+Routines from Bio::DB::WebDBSeqI
+================================
+
+get_request
+-----------
+
+     Title   : get_request
+     Usage   : my $url = $self->get_request
+     Function: returns a HTTP::Request object
+     Returns :
+     Args    : %qualifiers = a hash of qualifiers (ids, format, etc)
+
+postprocess_data
+----------------
+
+     Title   : postprocess_data
+     Usage   : $self->postprocess_data ( 'type' => 'string',
+     				     'location' => \$datastr);
+     Function: process downloaded data before loading into a Bio::SeqIO
+     Returns : void
+     Args    : hash with two keys - 'type' can be 'string' or 'file'
+                                  - 'location' either file location or string
+                                               reference containing data
+
+default_format
+--------------
+
+     Title   : default_format
+     Usage   : my $format = $self->default_format
+     Function: Returns default sequence format for this module
+     Returns : string
+     Args    : none
+
+Bio::DB::SwissProt specific routines
+====================================
+
+servertype
+----------
+
+     Title   : servertype
+     Usage   : my $servertype = $self->servertype
+               $self->servertype($servertype);
+     Function: Get/Set server type
+     Returns : string
+     Args    : server type string [optional]
+
+hostlocation
+------------
+
+     Title   : hostlocation
+     Usage   : my $location = $self->hostlocation()
+              $self->hostlocation($location)
+     Function: Set/Get Hostlocation
+     Returns : string representing hostlocation
+     Args    : string specifying hostlocation [optional]
+
+location_url
+------------
+
+     Title   : location
+     Usage   : my $url = $self->location_url()
+     Function: Get host url
+     Returns : string representing url
+     Args    : none
+
+
+File: pm.info,  Node: Bio/DB/UpdateableSeqI,  Next: Bio/DB/WebDBSeqI,  Prev: Bio/DB/SwissProt,  Up: Module List
+
+An interface for writing to a database of sequences.
+****************************************************
+
+NAME
+====
+
+   Bio::DB::UpdateableSeqI - An interface for writing to a database of
+sequences.
+
+SYNOPSIS
+========
+
+     # get a Bio::DB::UpdateableSeqI somehow
+     eval {
+     	my ( @updatedseqs, @newseqs, @deadseqs);
+     	my $seq = $db->get_Seq_by_id('ROA1_HUMAN');
+     	$seq->desc('a new description');
+     
+     	push @updatedseqs, $seq;
+
+     $db->write_seq(\@updatedseqs, \@newseqs, \@deadseqs);
+         };
+         if( $@ ) {
+     print STDERR "an error when trying to write seq : $@\n";
+         }
+
+DESCRIPTION
+===========
+
+   This module seeks to provide a simple method for pushing sequence
+changes back to a Sequence Database - which can be an SQL compliant
+database, a file based database, AceDB, etc.
+
+AUTHOR
+======
+
+   Jason Stajich <jason@chg.mc.duke.edu>
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution. Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bioperl.org
+     http://www.bioperl.org/bioperl-bugs/
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+write_seq
+---------
+
+     Title   : write_seq
+     Usage   : write_seq(\@updatedseqs, \@addedseqs, \@deadseqs)
+     Function: updates sequences in first array,
+               adds sequences in the second array,
+               and removes sequences in the third array.
+     Example :
+     Returns :
+     Args    : arrays of sequence objects that must be obtained from
+               Bio::DB::UpdateableSeqI.
+
+_add_seq
+--------
+
+     Title   : _add_seq
+     Usage   : _add_seq($seq)
+     Function: Adds a new sequence
+     Example :
+     Returns : will throw an exception if
+               sequences accession number already exists
+     Args    : a new seq object - should have an accession number
+
+_remove_seq
+-----------
+
+     Title   : _remove_seq
+     Usage   : _remove_seq($seq)
+     Function: Removes an existing sequence
+     Example :
+     Returns : will throw an exception if
+               sequence does not exists for the primary_id
+     Args    : a seq object that was retrieved from Bio::DB::UpdateableSeqI
+
+_update_seq
+-----------
+
+     Title   : _update_seq
+     Usage   : _update_seq($seq)
+     Function: Updates a sequence
+     Example :
+     Returns : will throw an exception if
+               sequence is out of sync from expected val.
+     Args    : a seq object that was retrieved from Bio::DB::UpdateableSeqI
+
+Methods inherieted from Bio::DB::RandomAccessI
+==============================================
+
+get_Seq_by_id
+-------------
+
+     Title   : get_Seq_by_id
+     Usage   : $seq = $db->get_Seq_by_id('ROA1_HUMAN')
+     Function: Gets a Bio::Seq object by its name
+     Returns : a Bio::Seq object
+     Args    : the id (as a string) of a sequence
+     Throws  : "id does not exist" exception
+
+get_Seq_by_acc
+--------------
+
+     Title   : get_Seq_by_acc
+     Usage   : $seq = $db->get_Seq_by_acc('X77802');
+     Function: Gets a Bio::Seq object by accession number
+     Returns : A Bio::Seq object
+     Args    : accession number (as a string)
+     Throws  : "acc does not exist" exception
+
+Methods inheirited from Bio::DB::SeqI
+=====================================
+
+get_PrimarySeq_stream
+---------------------
+
+     Title   : get_PrimarySeq_stream
+     Usage   : $stream = get_PrimarySeq_stream
+     Function: Makes a Bio::DB::SeqStreamI compliant object
+               which provides a single method, next_primary_seq
+     Returns : Bio::DB::SeqStreamI
+     Args    : none
+
+get_all_primary_ids
+-------------------
+
+     Title   : get_all_ids
+     Usage   : @ids = $seqdb->get_all_primary_ids()
+     Function: gives an array of all the primary_ids of the
+               sequence objects in the database. These
+               maybe ids (display style) or accession numbers
+               or something else completely different - they
+               *are not* meaningful outside of this database
+               implementation.
+     Example :
+     Returns : an array of strings
+     Args    : none
+
+get_Seq_by_primary_id
+---------------------
+
+     Title   : get_Seq_by_primary_id
+     Usage   : $seq = $db->get_Seq_by_primary_id($primary_id_string);
+     Function: Gets a Bio::Seq object by the primary id. The primary
+               id in these cases has to come from $db->get_all_primary_ids.
+               There is no other way to get (or guess) the primary_ids
+               in a database.
+
+     The other possibility is to get Bio::PrimarySeqI objects
+     via the get_PrimarySeq_stream and the primary_id field
+     on these objects are specified as the ids to use here.
+      Returns : A Bio::Seq object
+      Args    : accession number (as a string)
+      Throws  : "acc does not exist" exception
+
+
+File: pm.info,  Node: Bio/DB/WebDBSeqI,  Next: Bio/DBLinkContainerI,  Prev: Bio/DB/UpdateableSeqI,  Up: Module List
+
+Object Interface to generalize Web Databases for   retrieving sequences
+***********************************************************************
+
+NAME
+====
+
+   Bio::DB::WebDBSeqI - Object Interface to generalize Web Databases for
+retrieving sequences
+
+SYNOPSIS
+========
+
+     # get a WebDBSeqI object somehow
+     # assuming it is a nucleotide db
+     my $seq = $db->get_Seq_by_id('ROA1_HUMAN')
+
+DESCRIPTION
+===========
+
+   Provides core set of functionality for connecting to a web based
+database for retriving sequences.
+
+   Users wishing to add another Web Based Sequence Dabatase will need to
+extend this class (see Bio::DB::SwissProt or Bio::DB::NCBIHelper for
+examples) and implement the get_request method which returns a
+HTTP::Request for the specified uids (accessions, ids, etc depending on
+what query types the database accepts).
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules. Send your comments and suggestions preferably to one of
+the Bioperl mailing lists. Your participation is much appreciated.
+
+     bioperl-l@bioperl.org              - General discussion
+     http://bioperl.org/MailList.shtml  - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.  Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR - Jason Stajich
+======================
+
+   Email jason@chg.mc.duke.edu
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+get_Seq_by_id
+-------------
+
+     Title   : get_Seq_by_id
+     Usage   : $seq = $db->get_Seq_by_id('ROA1_HUMAN')
+     Function: Gets a Bio::Seq object by its name
+     Returns : a Bio::Seq object
+     Args    : the id (as a string) of a sequence
+     Throws  : "id does not exist" exception
+
+get_Seq_by_acc
+--------------
+
+     Title   : get_Seq_by_acc
+     Usage   : $seq = $db->get_Seq_by_acc('X77802');
+     Function: Gets a Bio::Seq object by accession number
+     Returns : A Bio::Seq object
+     Args    : accession number (as a string)
+     Throws  : "acc does not exist" exception
+
+get_request
+-----------
+
+     Title   : get_request
+     Usage   : my $url = $self->get_request
+     Function: returns a HTTP::Request object
+     Returns :
+     Args    : %qualifiers = a hash of qualifiers (ids, format, etc)
+
+get_Stream_by_id
+----------------
+
+     Title   : get_Stream_by_id
+     Usage   : $stream = $db->get_Stream_by_id( [$uid1, $uid2] );
+     Function: Gets a series of Seq objects by unique identifiers
+     Returns : a Bio::SeqIO stream object
+     Args    : $ref : a reference to an array of unique identifiers for
+                      the desired sequence entries
+
+get_Stream_by_acc
+-----------------
+
+     Title   : get_Stream_by_acc
+     Usage   : $seq = $db->get_Seq_by_acc([$acc1, $acc2]);
+     Function: Gets a series of Seq objects by accession numbers
+     Returns : a Bio::SeqIO stream object
+     Args    : $ref : a reference to an array of accession numbers for
+                      the desired sequence entries
+     Note    : For GenBank, this just calls the same code for get_Stream_by_id()
+
+default_format
+--------------
+
+     Title   : default_format
+     Usage   : my $format = $self->default_format
+     Function: Returns default sequence format for this module
+     Returns : string
+     Args    : none
+
+request_format
+--------------
+
+     Title   : request_format
+     Usage   : my ($req_format, $ioformat) = $self->request_format;
+               $self->request_format("genbank");
+               $self->request_format("fasta");
+     Function: Get/Set sequence format retrieval. The get-form will normally not
+               be used outside of this and derived modules.
+     Returns : Array of two strings, the first representing the format for
+               retrieval, and the second specifying the corresponding SeqIO format.
+     Args    : $format = sequence format
+
+get_seq_stream
+--------------
+
+     Title   : get_seq_stream
+     Usage   : my $seqio = $self->get_seq_sream(%qualifiers)
+     Function: builds a url and queries a web db
+     Returns : a Bio::SeqIO stream capable of producing sequence
+     Args    : %qualifiers = a hash qualifiers that the implementing class
+               will process to make a url suitable for web querying
+
+url_base_address
+----------------
+
+     Title   : url_base_address
+     Usage   : my $address = $self->url_base_address or
+               $self->url_base_address($address)
+     Function: Get/Set the base URL for the Web Database
+     Returns : Base URL for the Web Database
+     Args    : $address - URL for the WebDatabase
+
+proxy
+-----
+
+     Title   : proxy
+     Usage   : $httpproxy = $db->proxy('http')  or
+               $db->proxy(['http','ftp'], 'http://myproxy' )
+     Function: Get/Set a proxy for use of proxy
+     Returns : a string indicating the proxy
+     Args    : $protocol : an array ref of the protocol(s) to set/get
+               $proxyurl : url of the proxy to use for the specified protocol
+
+retrieval_type
+--------------
+
+     Title   : retrieval_type
+     Usage   : $self->retrieval_type($type);
+               my $type = $self->retrieval_type
+     Function: Get/Set a proxy for retrieval_type (io_string or tempfile)
+     Returns : string representing retrieval type
+     Args    : $value - the value to store
+
+url_params
+----------
+
+     Title   : url_params
+     Usage   : my $params = $self->url_params or
+               $self->url_params($params)
+     Function: Get/Set the URL parameters for the Web Database
+     Returns : url parameters for Web Database
+     Args    : $params - parameters to be appended to the URL for the WebDatabase
+
+ua
+--
+
+     Title   : ua
+     Usage   : my $ua = $self->ua or
+               $self->ua($ua)
+     Function: Get/Set a LWP::UserAgent for use
+     Returns : reference to LWP::UserAgent Object
+     Args    : $ua - must be a LWP::UserAgent
+
+postprocess_data
+----------------
+
+     Title   : postprocess_data
+     Usage   : $self->postprocess_data ( 'type' => 'string',
+     				     'location' => \$datastr);
+     Function: process downloaded data before loading into a Bio::SeqIO
+     Returns : void
+     Args    : hash with two keys - 'type' can be 'string' or 'file'
+                                  - 'location' either file location or string
+                                               reference containing data
+
+
+File: pm.info,  Node: Bio/DBLinkContainerI,  Next: Bio/Factory/DriverFactory,  Prev: Bio/DB/WebDBSeqI,  Up: Module List
+
+Abstract interface for any object wanting to use                           database cross references
+****************************************************************************************************
+
+NAME
+====
+
+   Bio::DBLinkContainerI - Abstract interface for any object wanting to use
+                       database cross references
+
+SYNOPSIS
+========
+
+     # get an objects containing database cross reference
+
+     foreach $obj ( @objs ) {
+             if( $obj->isa('Bio::DBLinkContainerI') ) {
+                     foreach $dblink ( $obj->each_DBLink() ) {
+                             # do stuff
+                     }
+             }
+     }
+
+DESCRIPTION
+===========
+
+   This interface defines the functions one can expect for any object
+wanting to use database cross-references. This class does not actually
+provide any implemention, it just provides the definitions of what methods
+one can call.
+
+   The database cross-references are implemented as *Note
+Bio/Annotation/DBLink: Bio/Annotation/DBLink, objects.
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules. Send your comments and suggestions preferably to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     bioperl-l@bioperl.org              - General discussion
+     http://bioperl.org/MailList.shtml  - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.  Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR - Heikki Lehvaslaiho
+===========================
+
+   Email:  heikki@ebi.ac.uk Address:
+
+     EMBL Outstation, European Bioinformatics Institute
+     Wellcome Trust Genome Campus, Hinxton
+     Cambs. CB10 1SD, United Kingdom
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+each_DBLink
+-----------
+
+     Title   : each_DBLink
+     Usage   : foreach $ref ( $self->each_DBlink() )
+     Function: gets an array of DBlink of objects
+     Example :
+     Returns : an array of Bio::Annotation::DBLink objects
+     Args    : none
+
+
+File: pm.info,  Node: Bio/Factory/DriverFactory,  Next: Bio/Factory/SeqAnalysisParserFactory,  Prev: Bio/DBLinkContainerI,  Up: Module List
+
+Base class for factory classes loading drivers
+**********************************************
+
+NAME
+====
+
+   Bio::Factory::DriverFactory - Base class for factory classes loading
+drivers
+
+SYNOPSIS
+========
+
+     #this class is not instantiable
+
+DESCRIPTION
+===========
+
+   This a base class for factory classes that load drivers. Normally, you
+don't instantiate this class directly.
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules. Send your comments and suggestions preferably  to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     bioperl-l@bioperl.org                - General discussion
+     http://bio.perl.org/MailList.html    - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.  Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR - Jason Stajich
+======================
+
+   Email Jason Stajich <jason@chg.mc.duke.edu>
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+register_driver
+---------------
+
+     Title   : register_driver
+     Usage   : $factory->register_driver("genscan", "Bio::Tools::Genscan");
+     Function: Registers a driver a factory class should be able to instantiate.
+
+     This method can be called both as an instance and as a class
+     method.
+
+     Returns :
+     Args    : Key of the driver (string) and the module implementing the driver
+               (string).
+
+driver_table
+------------
+
+     Title   : driver_table
+     Usage   : $table = $factory->driver_table();
+     Function: Returns a reference to the hash table storing associations of
+               methods with drivers.
+
+     You use this table to look up registered methods (keys) and
+     drivers (values).
+
+     In this implementation the table is class-specific and therefore
+     shared by all instances. You can override this in a derived class,
+     but note that this method can be called both as an instance and a
+     class method.
+
+     This will be the table used by the object internally. You should
+     definitely know what you're doing if you modify the table's
+     contents. Modifications are shared by _all_ instances, those present
+     and those yet to be created.
+
+     Returns : A reference to a hash table.
+     Args    :
+
+get_driver
+----------
+
+     Title   : get_driver
+     Usage   : $module = $factory->get_driver("genscan");
+     Function: Returns the module implementing a driver registered under the
+               given key.
+     Example :
+     Returns : A string.
+     Args    : Key of the driver (string).
+
+_load_module
+------------
+
+     Title   : _load_module
+     Usage   : $self->_load_module("Bio::Tools::Genscan");
+     Function: Loads up (like use) a module at run time on demand.
+     Example :
+     Returns : TRUE on success
+     Args    :
+
+
+File: pm.info,  Node: Bio/Factory/SeqAnalysisParserFactory,  Next: Bio/Factory/SeqAnalysisParserFactoryI,  Prev: Bio/Factory/DriverFactory,  Up: Module List
+
+class capable of               creating SeqAnalysisParserI compliant parsers
+****************************************************************************
+
+NAME
+====
+
+   Bio::Factory::SeqAnalysisParserFactory - class capable of
+creating SeqAnalysisParserI compliant parsers
+
+SYNOPSIS
+========
+
+     # initialize an object implementing this interface, e.g.
+     $factory = Bio::Factory::SeqAnalysisParserFactory->new();
+     # find out the methods it knows about
+     print "registered methods: ",
+           join(', ', keys($factory->driver_table())), "\n";
+     # obtain a parser object
+     $parser = $factory->get_parser(-input=>$inputobj,
+                                    -params=>[@params],
+     		                   -method => $method);
+     # $parser is an object implementing Bio::SeqAnalysisParserI
+     # annotate sequence with features produced by parser
+     while(my $feat = $parser->next_feature()) {
+     	$seq->add_SeqFeature($feat);
+     }
+
+DESCRIPTION
+===========
+
+   This is a factory class capable of instantiating SeqAnalysisParserI
+implementing parsers.
+
+   The concept behind this class and the interface it implements
+(Bio::Factory::SeqAnalysisParserFactoryI) is a generic analysis result
+parsing in high-throughput automated sequence annotation pipelines. See
+Bio::SeqAnalysisParserI for more documentation of this concept.
+
+   You can always find out the methods an instance of this class knows
+about by the way given in the SYNOPSIS section. By default, and assuming
+that the documentation is up-to-date, this will comprise of genscan, mzef,
+estscan, blast, hmmer, gff, and sim4 (all case-insensitive).
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules. Send your comments and suggestions preferably  to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     bioperl-l@bioperl.org                - General discussion
+     http://bio.perl.org/MailList.html    - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.   Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR - Hilmar Lapp, Jason Stajich
+===================================
+
+   Email Hilmar Lapp <hlapp@gmx.net>, Jason Stajich <jason@chg.mc.duke.edu>
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+get_parser
+----------
+
+     Title   : get_parser
+     Usage   : $factory->get_parser(-input=>$inputobj,
+                                    [ -params=>[@params] ],
+     		                -method => $method)
+     Function: Creates and returns a parser object for the given input and method.
+               Both file names and streams (filehandles) are allowed.
+
+     Parameters (-params argument) are passed on to the parser object
+     and therefore are specific to the parser to be created.
+      Example :
+      Returns : A Bio::SeqAnalysisParserI implementing object. Exception if
+     creation of the parser object fails.
+      Args    : B<input>  - object/file where analysis results are coming from,
+     	   B<params> - parameter to use when parsing/running analysis
+     	   B<method> - method of analysis
+
+
+File: pm.info,  Node: Bio/Factory/SeqAnalysisParserFactoryI,  Next: Bio/Index/Abstract,  Prev: Bio/Factory/SeqAnalysisParserFactory,  Up: Module List
+
+interface describing objects capable               of creating SeqAnalysisParserI compliant parsers
+***************************************************************************************************
+
+NAME
+====
+
+   Bio::Factory::SeqAnalysisParserFactoryI - interface describing objects
+capable               of creating SeqAnalysisParserI compliant parsers
+
+SYNOPSIS
+========
+
+     # initialize an object implementing this interface, e.g.
+     $factory = Bio::Factory::SeqAnalysisParserFactory->new();
+     # obtain a parser object
+     $parser = $factory->get_parser(-input=>$inputobj,
+                                    -params=>[@params],
+     		                   -method => $method);
+     # $parser is an object implementing Bio::SeqAnalysisParserI
+     # annotate sequence with features produced by parser
+     while(my $feat = $parser->next_feature()) {
+     	$seq->add_SeqFeature($feat);
+     }
+
+DESCRIPTION
+===========
+
+   This is an interface for factory classes capable of instantiating
+SeqAnalysisParserI implementing parsers.
+
+   The concept behind the interface is a generic analysis result parsing
+in high-throughput automated sequence annotation pipelines. See
+Bio::SeqAnalysisParserI for more documentation of this concept.
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules. Send your comments and suggestions preferably  to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     bioperl-l@bioperl.org                - General discussion
+     http://bio.perl.org/MailList.html    - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.   Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR - Hilmar Lapp, Jason Stajich
+===================================
+
+   Email Hilmar Lapp <hlapp@gmx.net>, Jason Stajich <jason@chg.mc.duke.edu>
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+get_parser
+----------
+
+     Title   : get_parser
+     Usage   : $factory->get_parser(-input=>$inputobj,
+                                    [ -params=>[@params] ],
+     		                -method => $method)
+     Function: Creates and returns a parser object for the given input and method.
+               The type of input which is suitable depends on the implementation,
+               but a good-style implementation should allow both file names and
+               streams (filehandles).
+
+     A particular implementation may not be able to create a parser for
+     the requested method. In this case it shall return undef.
+
+     Parameters (-params argument) are passed on to the parser object
+     and therefore are specific to the parser to be created. An
+     implementation of this interface should make this argument optional.
+      Example :
+      Returns : A Bio::SeqAnalysisParserI implementing object.
+      Args    : B<input>  - object/file where analysis results are coming from,
+     	   B<params> - parameter to use when parsing/running analysis
+     	   B<method> - method of analysis
+
+
+File: pm.info,  Node: Bio/Index/Abstract,  Next: Bio/Index/AbstractSeq,  Prev: Bio/Factory/SeqAnalysisParserFactoryI,  Up: Module List
+
+Abstract interface for indexing a flat file
+*******************************************
+
+NAME
+====
+
+   Bio::Index::Abstract - Abstract interface for indexing a flat file
+
+SYNOPSIS
+========
+
+   You should not be using this module directly
+
+USING DB_FILE
+=============
+
+   To use DB_File and not SDBM for this index, pass the value:
+
+     -dbm_package => 'DB_File'
+
+   to new (see below).
+
+DESCRIPTION
+===========
+
+   This object provides the basic mechanism to associate positions in
+files with names. The position and filenames are stored in DBM which can
+then be accessed later on. It is the equivalent of flat file indexing (eg,
+SRS or efetch).
+
+   This object is the guts to the mechanism, which will be used by the
+specific objects inheriting from it.
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules. Send your comments and suggestions preferably to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     bioperl-l@bioperl.org             - General discussion
+     http://bioperl.org/MailList.shtml - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.  Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR - Ewan Birney, James Gilbert
+===================================
+
+   Email - birney@sanger.ac.uk, jgrg@sanger.ac.uk
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with an "_" (underscore).
+
+new
+---
+
+     Usage   : $index = Bio::Index::Abstract->new(
+                   -filename    => $dbm_file,
+                   -write_flag  => 0,
+                   -dbm_package => 'DB_File',
+                   -verbose     => 0);
+     Function: Returns a new index object.  If filename is
+               specified, then open_dbm() is immediately called.
+               Bio::Index::Abstract->new() will usually be called
+               directly only when opening an existing index.
+     Returns : A new index object
+     Args    : -filename    The name of the dbm index file.
+               -write_flag  TRUE if write access to the dbm file is
+                            needed.
+               -dbm_package The Perl dbm module to use for the
+                            index.
+               -verbose     Print debugging output to STDERR if
+                            TRUE.
+
+filename
+--------
+
+     Title   : filename
+     Usage   : $value = $self->filename();
+               $self->filename($value);
+     Function: Gets or sets the name of the dbm index file.
+     Returns : The current value of filename
+     Args    : Value of filename if setting, or none if
+               getting the value.
+
+write_flag
+----------
+
+     Title   : write_flag
+     Usage   : $value = $self->write_flag();
+               $self->write_flag($value);
+     Function: Gets or sets the value of write_flag, which
+               is wether the dbm file should be opened with
+               write access.
+     Returns : The current value of write_flag (default 0)
+     Args    : Value of write_flag if setting, or none if
+               getting the value.
+
+dbm_package
+-----------
+
+     Usage   : $value = $self->dbm_package();
+               $self->dbm_package($value);
+
+     Function: Gets or sets the name of the Perl dbm module used.
+               If the value is unset, then it returns the value of
+               the package variable $USE_DBM_TYPE or if that is
+               unset, then it chooses the best available dbm type,
+               choosing 'DB_File' in preference to 'SDBM_File'.
+               Bio::Abstract::Index may work with other dbm file
+               types.
+
+     Returns : The current value of dbm_package
+     Args    : Value of dbm_package if setting, or none if
+               getting the value.
+
+db
+--
+
+     Title   : db
+     Usage   : $index->db
+     Function: Returns a ref to the hash which is tied to the dbm
+               file.  Used internally when adding and retrieving
+               data from the database.
+     Example : $db = $index->db();
+               $db->{ $some_key } = $data
+               $data = $index->db->{ $some_key };
+     Returns : ref to HASH
+     Args    : NONE
+
+get_stream
+----------
+
+     Title   : get_stream
+     Usage   : $stream = $index->get_stream( $id );
+     Function: Returns a file handle with the file pointer
+               at the approprite place
+
+     This provides for a way to get the actual
+     file contents and not an object
+
+     WARNING: you must parse the record deliminter
+     *yourself*. Abstract wont do this for you
+     So this code
+     
+     $fh = $index->get_stream($myid);
+     while( <$fh> ) {
+        # do something
+     }
+     will parse the entire file if you don't put in
+     a last statement in, like
+
+     while( <$fh> ) {
+        /^\/\// && last; # end of record
+        # do something
+     }
+
+     Returns : A filehandle object
+     Args    : string represents the accession number
+     Notes   : This method should not be used without forethought
+
+open_dbm
+--------
+
+     Usage   : $index->open_dbm()
+     Function: Opens the dbm file associated with the index
+               object.  Write access is only given if explicitly
+               asked for by calling new(-write => 1) or having set
+               the write_flag(1) on the index object.  The type of
+               dbm file opened is that returned by dbm_package().
+               The name of the file to be is opened is obtained by
+               calling the filename() method.
+
+     Example : $index->_open_dbm()
+     Returns : 1 on success
+
+_version
+--------
+
+     Title   : _version
+     Usage   : $type = $index->_version()
+     Function: Returns a string which identifes the version of an
+               index module.  Used to permanently identify an index
+               file as having been created by a particular version
+               of the index module.  Must be provided by the sub class
+     Example :
+     Returns :
+     Args    : none
+
+_code_base
+----------
+
+     Title   : _code_base
+     Usage   : $code = $db->_code_base();
+     Function:
+     Example :
+     Returns : Code package to be used with this
+     Args    :
+
+_type_and_version
+-----------------
+
+     Title   : _type_and_version
+     Usage   : Called by _initalize
+     Function: Checks that the index opened is made by the same index
+               module and version of that module that made it.  If the
+               index is empty, then it adds the information to the
+               database.
+     Example :
+     Returns : 1 or exception
+     Args    : none
+
+_check_file_sizes
+-----------------
+
+     Title   : _check_file_sizes
+     Usage   : $index->_check_file_sizes()
+     Function: Verifies that the files listed in the database
+               are the same size as when the database was built,
+               or throws an exception.  Called by the new()
+               function.
+     Example :
+     Returns : 1 or exception
+     Args    :
+
+make_index
+----------
+
+     Title   : make_index
+     Usage   : $index->make_index( FILE_LIST )
+     Function: Takes a list of file names, checks that they are
+               all fully qualified, and then calls _filename() on
+               each.  It supplies _filename() with the name of the
+               file, and an integer which is stored with each record
+               created by _filename().  Can be called multiple times,
+               and can be used to add to an existing index file.
+     Example : $index->make_index( '/home/seqs1', '/home/seqs2', '/nfs/pub/big_db' );
+     Returns : Number of files indexed
+     Args    : LIST OF FILES
+
+_filename
+---------
+
+     Title   : _filename
+     Usage   : $index->_filename( FILE INT )
+     Function: Indexes the file
+     Example :
+     Returns :
+     Args    :
+
+_file_handle
+------------
+
+     Title   : _file_handle
+     Usage   : $fh = $index->_file_handle( INT )
+     Function: Returns an open filehandle for the file
+               index INT.  On opening a new filehandle it
+               caches it in the @{$index->_filehandle} array.
+               If the requested filehandle is already open,
+               it simply returns it from the array.
+     Example : $fist_file_indexed = $index->_file_handle( 0 );
+     Returns : ref to a filehandle
+     Args    : INT
+
+_file_count
+-----------
+
+     Title   : _file_count
+     Usage   : $index->_file_count( INT )
+     Function: Used by the index building sub in a sub class to
+               track the number of files indexed.  Sets or gets
+               the number of files indexed when called with or
+               without an argument.
+     Example :
+     Returns : INT
+     Args    : INT
+
+add_record
+----------
+
+     Title   : add_record
+     Usage   : $index->add_record( $id, @stuff );
+     Function: Calls pack_record on @stuff, and adds the result
+               of pack_record to the index database under key $id.
+               If $id is a reference to an array, then a new entry
+               is added under a key corresponding to each element
+               of the array.
+     Example : $index->add_record( $id, $fileNumber, $begin, $end )
+     Returns : TRUE on success or FALSE on failure
+     Args    : ID LIST
+
+pack_record
+-----------
+
+     Title   : pack_record
+     Usage   : $packed_string = $index->pack_record( LIST )
+     Function: Packs an array of scalars into a single string
+               joined by ASCII 034 (which is unlikely to be used
+               in any of the strings), and returns it.
+     Example : $packed_string = $index->pack_record( $fileNumber, $begin, $end )
+     Returns : STRING or undef
+     Args    : LIST
+
+unpack_record
+-------------
+
+     Title   : unpack_record
+     Usage   : $index->unpack_record( STRING )
+     Function: Splits the sting provided into an array,
+               splitting on ASCII 034.
+     Example : ( $fileNumber, $begin, $end ) = $index->unpack_record( $self->db->{$id} )
+     Returns : A 3 element ARRAY
+     Args    : STRING containing ASCII 034
+
+DESTROY
+-------
+
+     Title   : DESTROY
+     Usage   : Called automatically when index goes out of scope
+     Function: Closes connection to database and handles to
+               sequence files
+     Returns : NEVER
+     Args    : NONE
+
+

@@ -1,0 +1,1869 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: WWW/Search/YahooNews,  Next: WWW/SearchResult,  Prev: WWW/Search/Yahoo/Classifieds/Employment,  Up: Module List
+
+backend for searching Yahoo News
+********************************
+
+NAME
+====
+
+   WWW::Search::YahooNews - backend for searching Yahoo News
+
+SYNOPSIS
+========
+
+   use WWW::Search; $query = "Bob Hope"; $search = new
+WWW::Search('YahooNews');
+$search->native_query(WWW::Search::escape_query($query));
+$search->maximum_to_retrieve(100); while (my $result =
+$search->next_result()) {
+
+   $url = $result->url; $title = $result->title; $desc =
+$result->description;
+
+   print "<a href=$url>$title</a><br>$desc<p>\n"; }
+
+DESCRIPTION
+===========
+
+   This class is a Yahoo specialization of WWW::Search. It handles making
+and interpreting Yahoo News Searches. Yahoo allows searching a wide
+variety of news sources like SEC and PRWire to name a few.
+`http://www.search.news.yahoo.com'.
+
+HOW DOES IT WORK?
+=================
+
+   `native_setup_search' is called (from `WWW::Search::setup_search')
+before we do anything.  It initializes our private variables (which all
+begin with underscore) and sets up a URL to the first results page in
+`{_next_url}'.
+
+   `native_retrieve_some' is called (from `WWW::Search::retrieve_some')
+whenever more hits are needed.  It calls `WWW::Search::http_request' to
+fetch the page specified by `{_next_url}'.  It then parses this page,
+appending any search hits it finds to `{cache}'.  If it finds a "next"
+button in the text, it sets `{_next_url}' to point to the page for the next
+set of results, otherwise it sets it to undef to indicate we"re done.
+
+AUTHOR
+======
+
+   This Backend is will now be maintained and supported by Jim Smyser.
+Flames to: <jsmyser@bigfoot.com>
+
+LEGALESE
+========
+
+   THIS SOFTWARE IS PROVIDED "AS IS" AND WITHOUT ANY EXPRESS OR IMPLIED
+WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+
+CHANGES
+=======
+
+   1.0 First release.
+
+
+File: pm.info,  Node: WWW/SearchResult,  Next: WWW/Sitemap,  Prev: WWW/Search/YahooNews,  Up: Module List
+
+class for results returned from WWW::Search
+*******************************************
+
+NAME
+====
+
+   WWW::SearchResult - class for results returned from WWW::Search
+
+SYNOPSIS
+========
+
+     require WWW::Search;
+     require WWW::SearchResult;
+     $search = new WWW::Search;
+     $search->native_query(WWW::Search::escape_query($query));
+     # get first result
+     $result = $search->next_result();
+
+DESCRIPTION
+===========
+
+   A framework for returning the results of `WWW::Search'.
+
+SEE ALSO
+========
+
+   *Note WWW/Search: WWW/Search,
+
+REQUIRED RESULTS
+================
+
+   The particular fields returned in a result are backend- (search
+engine-) dependent.  However, all search engines are required to return a
+url and title.  (This list may grow in the future.)
+
+METHODS AND FUNCTIONS
+=====================
+
+new
+---
+
+   To create a new WWW::SearchResult, call
+
+     $result = new WWW::SearchResult();
+
+url
+---
+
+   Returns the primary URL.  Note that there may be a list of urls, see
+also methods urls and add_url.  Nothing special is guaranteed about the
+primary URL other than that it is the first one returned by the back end.
+
+   Every result is required to have at least one URL.
+
+urls
+----
+
+   Return a reference to an array of urls.  There is also a primary URL
+(url).  See also add_url.
+
+add_url
+-------
+
+   Add a URL to the list.
+
+related_urls, add_related_url, related_titles, add_related_title
+----------------------------------------------------------------
+
+   Analgous to urls, these functions provide lists of related URLs and
+their titles.  These point to things the search engine thinks you might
+want.
+
+title, description, score, change_date, index_date, size, raw
+-------------------------------------------------------------
+
+   Set or get attributes of the result.
+
+   None of these attributes is guaranteed to be provided by a given
+backend.  If an attribute is not provided its method will return undef.
+
+   Typical contents of these attributes:
+
+title
+     The title of the hit result (typically that provided by the 'TITLE'
+     HTML tag).
+
+description
+     A brief description of the result, as provided (or not) by the search
+     engine.  Often the first few sentences of the document.
+
+source
+     Source is either the base url for this result (as listed on the search
+     engine's results page) or another copy of the full url path of the
+     result.  It might also indicate the source site address where the
+     resource was found, for example, 'http://www.cnn.com' if the search
+     result page said "found at CNN.com".
+
+     This value is backend-specific; in fact very few backends set this
+     value.
+
+score
+     A backend specific, numeric score of the search result.  The exact
+     range of scores is search-engine specific.  Usually larger scores are
+     better, but this is no longer required.  See normalized_score for a
+     backend independent score.
+
+normalized_score
+     SORRY, THIS IS NOT IMPLEMENTED.
+
+     This is intended to be a backend-independent score of the search
+     result.  The range of this score is between 0 and 1000.  Higher values
+     indicate better quality results.
+
+change_date
+     When the result was last changed.
+
+index_date
+     When the search engine indexed the result.
+
+size
+     The approximate size of the result, in bytes.  This is only an
+     approximation because search backends often report the size as
+     "18.4K"; the best we can do with that number is return it as the value
+     of 18.4 * 1024.
+
+raw
+     The raw HTML for the entire result.  Raw should be exactly the raw
+     HTML for one entry.  It should not include list or table setup
+     commands (like ul or table tags), but it may include list item or
+     table data commands (like li, tr, or td).  Whether raw contains a list
+     entry, table row, br-separated lines, or plain text is search-engine
+     dependent.  In fact, many backends do not even return it at all.
+
+company, location, source
+-------------------------
+
+   More attributes of the result.
+
+
+File: pm.info,  Node: WWW/Sitemap,  Next: Watchdog/Base,  Prev: WWW/SearchResult,  Up: Module List
+
+functions for generating a site map for a given site URL.
+*********************************************************
+
+NAME
+====
+
+   WWW::Sitemap - functions for generating a site map for a given site URL.
+
+SYNOPSIS
+========
+
+     use WWW::Sitemap;
+     use LWP::UserAgent;
+
+     my $ua = new LWP::UserAgent;
+     my $sitemap = new WWW::Sitemap(
+         EMAIL       => 'your@email.address',
+         USERAGENT   => $ua,
+         ROOT        => 'http://www.my.com/'
+     );
+
+     $sitemap->url_callback(
+         sub {
+             my ( $url, $depth, $title, $summary ) = @_;
+             print STDERR "URL: $url\n";
+             print STDERR "DEPTH: $depth\n";
+             print STDERR "TITLE: $title\n";
+             print STDERR "SUMMARY: $summary\n";
+             print STDERR "\n";
+         }
+     );
+     $sitemap->generate();
+     $sitemap->option( 'VERBOSE' => 1 );
+     my $len = $sitemap->option( 'SUMMARY_LENGTH' );
+
+     my $root = $sitemap->root();
+     for my $url ( $sitemap->urls() )
+     {
+         if ( $sitemap->is_internal_url( $url ) )
+         {
+             # do something ...
+         }
+         my @links = $sitemap->links( $url );
+         my $title = $sitemap->title( $url );
+         my $summary = $sitemap->summary( $url );
+         my $depth = $sitemap->depth( $url );
+     }
+     $sitemap->traverse(
+         sub {
+             my ( $sitemap, $url, $depth, $flag ) = @_;
+             if ( $flag == 0 )
+             {
+                 # do something at the start of a list of sub-pages ...
+             }
+             elsif( $flag == 1 )
+             {
+                 # do something for each page ...
+             }
+             elsif( $flag == 2 )
+             {
+                 # do something at the end of a list of sub-pages ...
+             }
+         }
+     )
+
+DESCRIPTION
+===========
+
+   The `WWW::Sitemap' module creates a sitemap for a site, by traversing
+the site using the WWW::Robot module. The sitemap object has methods to
+access a list of all the urls in the site, and a list of all the links for
+each of these urls. It is also possible to access the title of each url,
+and a summary generated from each url. The depth of each url can also be
+accessed; the depth is the minimum number of links from the root URL to
+that page.
+
+CONSTRUCTOR
+===========
+
+WWW::Sitemap->new [ $option => $value ] ...
+-------------------------------------------
+
+   Possible option are:
+
+USERAGENT
+     User agent used to do the robot traversal. Defaults to LWP::UserAgent.
+
+VERBOSE
+     Verbose flag, for printing out useful messages during traversal
+     [0|1]. Defaults to 0.
+
+SUMMARY_LENGTH
+     Maximum length of (automatically generated) summary.
+
+EMAIL
+     E-Mail address robot uses to identify itself with. This option is
+     required.
+
+DEPTH
+     Maximum depth of traversal.
+
+ROOT
+     Root URL of the site for which the sitemap is being created. This
+     option is required.
+
+          my $sitemap = new WWW::Sitemap(
+              EMAIL       => 'your@email.address',
+              USERAGENT   => $ua,
+              ROOT        => 'http://www.my.com/'
+          );
+
+METHODS
+=======
+
+generate( )
+-----------
+
+   Method for generating the sitemap, based on the constructor options.
+
+     $sitemap->generate();
+
+url_callback( sub { ... } )
+---------------------------
+
+   This method allows you to define a callback that will be invoked on
+every URL that is traversed while generating the sitemap. This is
+basically to allow bespoke verbose reporting. The callback should be of
+the form:
+
+     sub {
+         my ( $url, $depth, $title, $summary ) = @_;
+
+     # do something ...
+
+     }
+
+option( $option [ => $value ] )
+-------------------------------
+
+   Iterface to get / set options after object construction.
+
+     $sitemap->option( 'VERBOSE' => 1 );
+     my $len = $sitemap->option( 'SUMMARY_LENGTH' );
+
+root()
+------
+
+   returns the root URL for the site.
+
+     my $root = $sitemap->root();
+
+urls()
+------
+
+   Returns a list of all the URLs on the sitemap.
+
+     for my $url ( $sitemap->urls() )
+     {
+         # do something ...
+     }
+
+is_internal_url( $url )
+-----------------------
+
+   Returns 1 if $url is an internal URL (i.e. if `$url =~ /^$root/'.
+
+     if ( $sitemap->is_internal_url( $url ) )
+     {
+         # do something ...
+     }
+
+links( $url )
+-------------
+
+   Returns a list of all the links from a given URL in the site map.
+
+     my @links = $sitemap->links( $url );
+
+title( $url )
+-------------
+
+   Returns the title of the URL.
+
+     my $title = $sitemap->title( $url );
+
+summary( $url )
+---------------
+
+   Returns a summary of the URL - either from the `<META
+NAME=DESCRIPTION'> tag or generated automatically using HTML::Summary.
+
+     my $summary = $sitemap->summary( $url );
+     
+     =head2 depth( $url )
+
+   Returns the minimum number of links to traverse from the root URL of
+the site to this URL.
+
+     my $depth = $sitemap->depth( $url );
+
+traverse( \&callback )
+----------------------
+
+   The travese method traverses the sitemap, starting at the root node, and
+visiting each URL in the order that they would be displayed in a sequential
+sitemap of the site. The callback is called in a number of places in the
+traversal, indicated by the $flag argument to the callback:
+
+$flag = 0
+     Before each set of daughter URLs of a given URL.
+
+$flag = 1
+     For each URL.
+
+$flag = 2
+     After each set of daughter URLs of a given URL.
+
+   See the sitemapper.pl script distributed with this module for an
+example of the use of the traverse method.
+
+     $sitemap->traverse(
+         sub {
+             my ( $sitemap, $url, $depth, $flag ) = @_;
+             if ( $flag == 0 )
+             {
+                 # do something at the start of a list of sub-pages ...
+             }
+             elsif( $flag == 1 )
+             {
+                 # do something for each page ...
+             }
+             elsif( $flag == 2 )
+             {
+                 # do something at the end of a list of sub-pages ...
+             }
+         }
+     );
+
+SEE ALSO
+========
+
+     LWP::UserAgent
+     HTML::Summary
+     WWW::Robot
+
+AUTHOR
+======
+
+   Ave Wrigley <Ave.Wrigley@itn.co.uk>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997 Canon Research Centre Europe (CRE). All rights
+reserved.  This script and any associated documentation or files cannot be
+distributed outside of CRE without express prior permission from CRE.
+
+
+File: pm.info,  Node: Watchdog/Base,  Next: Watchdog/HTTP,  Prev: WWW/Sitemap,  Up: Module List
+
+Watchdog base class
+*******************
+
+NAME
+====
+
+   Watchdog::Base - Watchdog base class
+
+SYNOPSIS
+========
+
+     use Watchdog::Base;
+
+DESCRIPTION
+===========
+
+   *Watchdog::Base* is the Watchdog base class.
+
+CLASS METHODS
+=============
+
+new($name,$host,$port)
+----------------------
+
+   Returns a new *Watchdog::Base* object.  $name is a string which will
+identify the service to a human.  $host is the name of the host providing
+the service (default is 'localhost').  $port is the port on which the
+service listens.
+
+OBJECT METHODS
+==============
+
+id()
+----
+
+   Return a string describing the name of a service and the host (and
+optionally the port) on which it runs.
+
+AUTHOR
+======
+
+   Paul Sharpe <paul@miraclefish.com>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1998 Paul Sharpe. England.  All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+
+File: pm.info,  Node: Watchdog/HTTP,  Next: Watchdog/Mysql,  Prev: Watchdog/Base,  Up: Module List
+
+Test status of HTTP service
+***************************
+
+NAME
+====
+
+   Watchdog::HTTP - Test status of HTTP service
+
+SYNOPSIS
+========
+
+     use Watchdog::HTTP;
+     $h = new Watchdog::HTTP($name,$host,$port);
+     print $h->id, $h->is_alive ? ' is alive' : ' is dead', "\n";
+
+DESCRIPTION
+===========
+
+   *Watchdog::HTTP* is an extension for monitoring an HTTP server.
+
+CLASS METHODS
+=============
+
+new($name,$host,$port)
+----------------------
+
+   Returns a new *Watchdog::HTTP* object.  $name is a string which will
+identify the service to a human (default is 'httpd').  $host is the
+hostname which is running the service (default is 'localhost').  $port is
+the port on which the service listens (default is 80).
+
+OBJECT METHODS
+==============
+
+is_alive()
+----------
+
+   Returns true if an HTTP GET method succeeds for the URL
+*http://$host:$port/* or false if it doesn't.
+
+SEE ALSO
+========
+
+   *Note Watchdog/Base: Watchdog/Base,
+
+AUTHOR
+======
+
+   Paul Sharpe <paul@miraclefish.com>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1998 Paul Sharpe. England.  All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+
+File: pm.info,  Node: Watchdog/Mysql,  Next: Watchdog/Process,  Prev: Watchdog/HTTP,  Up: Module List
+
+Test status of Mysql service
+****************************
+
+NAME
+====
+
+   Watchdog::Mysql - Test status of Mysql service
+
+SYNOPSIS
+========
+
+     use Watchdog::Mysql;
+     $h = new Watchdog::Mysql($name,$host,$port,$db);
+     ($alive,$error) = $h->is_alive;
+     print $h->id, $alive ? ' is alive' : " is dead: $error", "\n";
+
+DESCRIPTION
+===========
+
+   *Watchdog::Mysql* is an extension for monitoring a Mysql server.
+
+CLASS METHODS
+=============
+
+new($name,$host,$port,$db)
+--------------------------
+
+   Returns a new *Watchdog::Mysql* object.  $name is a string which will
+identify the service to a human (default is 'mysql').  $host is the
+hostname which is running the service (default is 'localhost').  $port is
+the port on which the service listens (default is 3306).  $db is a
+database with no access control (default is 'test').
+
+OBJECT METHODS
+==============
+
+id()
+----
+
+   Return a string describing the Mysql service.
+
+is_alive()
+----------
+
+   Returns (1,undef) if the mysql server can be 'pinged' or (0,$error)
+where $error is a DBI error string if it can't.
+
+SEE ALSO
+========
+
+   *Note Watchdog/Base: Watchdog/Base,
+
+   `DBI' in this node
+
+AUTHOR
+======
+
+   Paul Sharpe <paul@miraclefish.com>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1998 Paul Sharpe. England.  All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+
+File: pm.info,  Node: Watchdog/Process,  Next: Watchdog/Util,  Prev: Watchdog/Mysql,  Up: Module List
+
+Check for process in process table
+**********************************
+
+NAME
+====
+
+   Watchdog::Process - Check for process in process table
+
+SYNOPSIS
+========
+
+     use Watchdog::Process;
+     $s = new Watchdog::Process($name,$pstring);
+     print $s->id, $s->is_alive ? ' is alive' : ' is dead', "\n";
+
+DESCRIPTION
+===========
+
+   *Watchdog::Process* is an extension for monitoring processes running on
+a Unix host.  The class provides a trivial method for determining whether
+a service is alive.  *This class has only been successfully tested on
+Solaris 2.6*.
+
+CLASS METHODS
+=============
+
+new($name,$pstring)
+-------------------
+
+   Returns a new *Watchdog::Process* object.  $name is a string which will
+identify the service to a human.  *$pstring* is a string which can be used
+to identify a process in the process table.
+
+is_alive()
+----------
+
+   Returns true if the service is alive, else false.
+
+BUGS
+====
+
+   This class is *unreliable* on Linux as
+*Proc::ProcessTable::Process::cmndline()* sometimes returns undef.
+
+SEE ALSO
+========
+
+   *Note Proc/ProcessTable: Proc/ProcessTable,
+
+AUTHOR
+======
+
+   Paul Sharpe <paul@miraclefish.com>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1998 Paul Sharpe. England.  All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+
+File: pm.info,  Node: Watchdog/Util,  Next: WeakRef,  Prev: Watchdog/Process,  Up: Module List
+
+Watchdog utility functions
+**************************
+
+NAME
+====
+
+   Watchdog::Util - Watchdog utility functions
+
+SYNOPSIS
+========
+
+     use Watchdog::Util;
+
+DESCRIPTION
+===========
+
+AUTHOR
+======
+
+   Paul Sharpe ltpaul@miraclefish.com>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1998 Paul Sharpe. England.  All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+
+File: pm.info,  Node: WeakRef,  Next: Weather/PIL,  Prev: Watchdog/Util,  Up: Module List
+
+an API to the Perl weak references
+**********************************
+
+NAME
+====
+
+   WeakRef - an API to the Perl weak references
+
+SYNOPSIS
+========
+
+     use WeakRef;
+
+     for($i=0; $i<100000; $i++) {
+     	my $x = {};
+     	my $y = {};
+     	$x->{Y} = $y;
+     	$y->{X} = $y;
+     	weaken($x->{Y});
+     } # no memory leak
+
+     if(isweak($ref)) {
+     }
+
+DESCRIPTION
+===========
+
+   A patch to Perl 5.005_55 by the author implements a core API for weak
+references. This module is a Perl-level interface to that API, allowing
+weak references to be created in Perl.
+
+   A weak reference is just like an ordinary Perl reference except that it
+isn't included in the reference count of the thing referred to.  This
+means that once all references to a particular piece of data are weak, the
+piece of data is freed and all the weak references are set to undef. This
+is particularly useful for implementing circular data structures without
+memory leaks or caches of objects.
+
+   The command
+
+     use WeakRef;
+
+   exports two symbols to the user's namespace by default: weaken and
+isweak. weaken takes a single argument, the reference to be weakened, and
+returns the same value.  The idiom
+
+     weaken($this->{Thing}->{Parent} = $this);
+
+   is useful.
+
+   The isweak command takes a single parameter and returns true if the
+parameter is a weak reference, undef otherwise.
+
+BUGS
+====
+
+   None known.
+
+AUTHOR
+======
+
+   Tuomas J. Lukka		lukka@iki.fi
+
+   Copyright (c) 1999 Tuomas J. Lukka. All rights reserved. This program
+is free software; you can redistribute it and/or modify it under the same
+terms as perl itself.
+
+BLATANT PLUG
+============
+
+   This module and the patch to the core Perl were written in connection
+with the APress book `Tuomas J. Lukka's Definitive Guide to Object-Oriented
+Programming in Perl', to avoid explaining why certain things would have to
+be done in cumbersome ways.
+
+
+File: pm.info,  Node: Weather/PIL,  Next: Weather/Product,  Prev: WeakRef,  Up: Module List
+
+
+
+NAME
+====
+
+   Weather::PIL -
+
+DESCRIPTION
+===========
+
+EXAMPLE
+=======
+
+AUTHOR
+======
+
+   Robert Rothenberg <wlkngowl@unix.asb.com>
+
+
+File: pm.info,  Node: Weather/Product,  Next: Weather/Product/NWS,  Prev: Weather/PIL,  Up: Module List
+
+routines for parsing WMO-style weather products
+***********************************************
+
+NAME
+====
+
+   Weather::Product - routines for parsing WMO-style weather products
+
+DESCRIPTION
+===========
+
+   Weather::Product is a base module for parsing World Meterological
+Assication (WMO) standard weather products (as in forecasts, observations,
+etc.) as might come from various weather services.
+
+   More "sophisiticated" parsing of U.S. National Weather Service (NWS)
+weather products (by AWIPS Product Identifiers or zones) is done in the
+`Weather::Product::NWS' module (which inherits methods from this module).
+
+EXAMPLE
+=======
+
+     use Weather::Product;
+
+     $forecast = new Weather::Product 'data/text/FPUS61/KOKX.TXT';
+
+     print $forecast->text{FPUS61);
+
+METHODS
+=======
+
+new
+---
+
+   A new weather product may be constructed and initialized the usual
+fashion:
+
+     $obj = new Weather::Product
+
+   or,
+
+     $obj = new Weather::Product LIST
+
+   where LIST contains file names or URLs of weather products to
+*`"import"' in this node*.
+
+initialize
+----------
+
+   An internal method called by *`"new"' in this node*.
+
+import
+------
+
+     $obj->import LIST
+
+   Imports  and parses files or URLs containing weather products. This is
+used by the *`"new"' in this node* method if files or URLs are specified.
+
+   import can be used to update the object with a newer weather product or
+to merge additional parts, addendums, etc. (not implemented in this
+version).
+
+   Be aware that the *`"parse"' in this node* method called by import will
+not allow incompatible (read: "different") weather products to be
+imported. You should create a new object for each product.
+
+   In other words, "FPUS51" and "FPUS61" are different products, requiring
+different instances of `Weather::Product'.
+
+parse
+-----
+
+     $obj->parse STRING
+
+   Parses the weather product (contained in STRING) into a WMO header (see
+`Weather::WMO') and associated text. Product names derived from the WMO
+header are added to the *`"products"' in this node* list which link to the
+associated text.
+
+   Assumes STRING is a valid weather product (containing a valid WMO header
+line). This is used by the *`"import"' in this node* method (and
+indirectly by *`"new"' in this node*).
+
+add
+---
+
+     $obj->add PRODUCT, LINK
+
+   An internal method for adding pointers to products, used by *`"parse"'
+in this node*.  For more information on the gory details, see *`"pointer"'
+in this node*.
+
+age
+---
+
+     $obj->age(PRODUCT)
+
+   Returns the age (in hours) of the specified PRODUCT.
+
+   See *`"max_age"' in this node* to set a maximum allowable age.
+
+purge
+-----
+
+     $obj->purge()
+
+   Purges "orphaned" weather products. In other words, garbage collection.
+(See *`"pointer"' in this node* for information how data is stored.)
+
+   Weather products older than *`"max_age"' in this node* are also removed.
+
+   This will only occur when another weather product (presumably an
+updated one) is imported into the object (using *`"import"' in this node*
+and *`"parse"' in this node*).
+
+     $obj->purge LIST
+
+   Purges the weather products specified in LIST, if they exist. Orphaned
+products will also be purged.
+
+pointer
+-------
+
+     $obj->pointer PRODUCT, FIELD
+
+   This is an internal method for returning a "pointer" to a PRODUCT (or
+to a specified `FIELD' in that PRODUCT).
+
+   Basically, all parsed products are stored in a hash called data. Another
+hash called products contains pointers to the appropriate entry in data.
+
+   While this structure may seem pointless (pun intended) for this module,
+it is useful for the `Weather::Product::NWS module', where some of the
+products (AWIPS IDs and individual zones) are linked to substrings of data.
+
+products
+--------
+
+     LIST = $obj->products;
+
+   Returns a list of available products (by name).
+
+   The definition of a "product" is a bit loose in this module. The WMO
+product identifier (ie, "FPUS51" or "FPCN55") is added.
+
+   The reporting station (ie, "KNYC" or "CWNT") is also listed as a product
+in cases where different stations may issue products with the same
+identifier (such reports should really be handled with the
+`Weather::Product::NWS' module and not this one).
+
+time
+----
+
+     TIME = $obj->time PRODUCT
+
+   For example,
+
+     $time = localtime($forecast->time('FPUS81'));
+
+   returns the timestamp of the parsed weather product.
+
+   Now a note about these timestamps: they are converted to Perl-friendly
+time from the WMO header (using *`"int_time"' in this node*). WMO
+timestamps there are in the form of `DDHHMM', where `DD' is the day of the
+month, and `HHMM' is the time, in UTC (we treat it as GMT here; the
+difference between the two is academic).
+
+   Why should you care? If for some strange reason you are parsing products
+from a previous month, you'll get inaccurate timestamps.  The module may
+even return a null.
+
+   A future version of this module might attempt to fetch a "base time"
+from local files or URLs.
+
+int_time
+--------
+
+     TIME = Weather::Product::int_time WMO_TIME, BASE
+
+   Attempts to convert WMO-style timestamps (found in WMO headers and UGC
+lines) to something Perl-friendly. If no `BASE' is specified, the current
+time (from the Perl function time) is used.
+
+   See *`"time"' in this node* for a note about the limitations of
+WMO-style timestamps.
+
+WMO
+---
+
+     WMO = $obj->WMO(PRODUCT)
+
+   Returns the WMO header of the specified product (as a `Weather::WMO'
+object).  For example,
+
+     $WMO = $forecast->WMO('FPUS41');
+     print "This forecast comes from station ", $WMO->station, "\n";
+
+text
+----
+
+     $text = $obj->text(PRODUCT)
+
+   Perhaps the most important method. This returns the actual text of the
+weather product. For example,
+
+     print $forecast->text('FPUS41'), "\n";
+
+   If text returns a null value, there is no product by that name. (It is
+possible that the product has been `purged|"purge"' in this node.)
+
+max_age
+-------
+
+   When called without arguments, returns the maximum allowable age (in
+hours) for products. The default is 0.
+
+   When called with an argument, sets the maximum allowable age. A useful
+setting might be for 30 hours.
+
+   The *`"purge"' in this node* method will remove weather products older
+than the maximum allowable age.
+
+   A potential pitfall for setting this property to too low a number is
+that products will be removed as soon as they are parsed. This may or may
+not be a good thing.
+
+KNOWN BUGS
+==========
+
+   This version of the module does not (yet) handle addendums or multi-part
+weather products.
+
+   Other issues with returning the *`"time"' in this node* of a product
+are explained above, are are a limitation of the WMO header format, not
+this module.
+
+SEE ALSO
+========
+
+   `Weather::WMO' and `Weather::Product::NWS'.
+
+   Perusing documentation on the format of WMO-style weather products
+online from the U.S. National Weather Service http://www.nws.noaa.gov may
+also be of help.
+
+DISCLAIMER
+==========
+
+   I am not a meteorologist nor am I associated with any weather service.
+This module grew out of a hack which would fetch weather reports every
+morning and send them to my pager. So I said to myself "Why not do this
+the right way..." and spent a bit of time surfing around the web looking
+for documentation about this stuff....
+
+AUTHOR
+======
+
+   Robert Rothenberg <wlkngowl@unix.asb.com>
+
+
+File: pm.info,  Node: Weather/Product/NWS,  Next: Weather/UGC,  Prev: Weather/Product,  Up: Module List
+
+routines for parsing NWS weather products
+*****************************************
+
+NAME
+====
+
+   Weather::Product::NWS - routines for parsing NWS weather products
+
+DESCRIPTION
+===========
+
+   Weather::Product::NWS is a module for parsing U.S. National Weather
+Service (NWS) weather products. Products can be fetched from local files,
+URLs, or parsed directly from pre-fetched data.
+
+   Weather products are organized by zones and counties (as well as WMO and
+AWIPS Product IDs) along with relevant timestamps and expiration dates.
+
+EXAMPLE
+=======
+
+KNOWN BUGS
+==========
+
+   This version of the module does not (yet) handle addendums or multi-part
+weather products.
+
+   Other issues with returning the time are are a limitation of the WMO
+header format, not this module.
+
+SEE ALSO
+========
+
+   `Weather::WMO', `Weather::PIL', `Weather::UGC' and `Weather::Product'.
+
+   Perusing documentation on the format of WMO-style weather products
+online from the U.S. National Weather Service http://www.nws.noaa.gov may
+also be of help.
+
+DISCLAIMER
+==========
+
+   I am not a meteorologist nor am I associated with any weather service.
+This module grew out of a hack which would fetch weather reports every
+morning and send them to my pager. So I said to myself "Why not do this
+the right way..." and spent a bit of time surfing around the web looking
+for documentation about this stuff....
+
+AUTHOR
+======
+
+   Robert Rothenberg <wlkngowl@unix.asb.com>
+
+
+File: pm.info,  Node: Weather/UGC,  Next: Weather/WMO,  Prev: Weather/Product/NWS,  Up: Module List
+
+routines for parsing Universal Generic Code (UGC) lines
+*******************************************************
+
+NAME
+====
+
+   Weather::UGC - routines for parsing Universal Generic Code (UGC) lines
+
+DESCRIPTION
+===========
+
+   Weather::UGC is a module for parsing Universal Generic Code (UGC) lines
+in National Weather Service (NWS) products.
+
+   For more information, see http://iwin.nws.noaa.gov/emwin/winugc.htm
+
+EXAMPLE
+=======
+
+     require Weather::UGC;
+
+     $line = "NYZ078>081-NJZ002>004-011-141200-";
+
+     unless (Weather::UGC::valid($line)) {
+         die "\'$line\' is not a valid UGC line.\n";
+     }
+
+     $ugc = new Weather::UGC($line);
+
+     print $ugc->UGC, " refers to the following zones:\n";
+     foreach ($ugc->zones) {
+         print $_, (
+          (Weather::UGC::valid ZONE, $_) ? "\n" : " (invalid zone name\?)\n"
+         );
+     }
+
+AUTHOR
+======
+
+   Robert Rothenberg <wlkngowl@unix.asb.com>
+
+
+File: pm.info,  Node: Weather/WMO,  Next: WebCache/Digest,  Prev: Weather/UGC,  Up: Module List
+
+routines for parsing WMO abbreviated header lines
+*************************************************
+
+NAME
+====
+
+   Weather::WMO - routines for parsing WMO abbreviated header lines
+
+DESCRIPTION
+===========
+
+   Weather::WMO is a module for parsing WMO abbreviated header lines in
+World Meterological Organization-formatted weather products.
+
+EXAMPLE
+=======
+
+     require Weather::WMO;
+
+     $line = "FPUS61 KOKX 171530";
+
+     unless (Weather::WMO::valid($line)) {
+         die "\'$line\' is not a valid header.\n";
+     }
+
+     $WMO = new Weather::WMO($line);
+
+     print "WMO\t", $WMO->WMO, "\n";
+     print "product\t", $WMO->product, "\n";     # FPUS61
+     print "station\t", $WMO->station, "\n";     # KOKX
+     print "time\t", $WMO->time, "\n";           # "171530"
+
+     # other constructors
+     $WMO = new Weather::WMO qw(FPUS51 KNYC 041200 PAA);
+
+     $WMO = new Weather::WMO;
+     $WMO->WMO="FPUS51 KNYC 041200 (PAA)";
+
+METHODS
+=======
+
+PRODUCT
+-------
+
+   An exported text constant. `PRODUCT = 'PRODUCT''.
+
+new
+---
+
+   The object constructor:
+
+     $obj = new Weather::WMO SCALAR
+
+   where SCALAR is the WMO header (without any trailing spaces, newlines or
+carriage returns).
+
+   An alternative constructor may be used:
+
+     $obj = new Weather::WMO LIST
+
+   where LIST contains the individual parts of the WMO header (see the
+`examples|"EXAMPLE"' in this node above).
+
+valid
+-----
+
+     Weather::WMO::valid SCALAR
+
+   Returns `true' if the header specified in SCALAR looks like a valid WMO
+header line. Otherwise false.
+
+cmp
+---
+
+   Compares two WMO objects.
+
+     $obj1->cmp $obj2
+
+   Returns `true' if `obj2' is the same *`"product"' in this node* as
+`obj1'.
+
+WMO
+---
+
+   When called without arguments it returns the WMO header as a string.
+
+   When called with arguments, it assigns a value to the WMO header (if
+none has already been assigned).
+
+product
+-------
+
+   Returns the "product" portion (`T1T2A1A2ii') of the WMO header.
+
+station
+-------
+
+   Returns the "station" portion of the WMO header.
+
+time
+----
+
+   Returns the timestamp of the WMO header, in WMO format (`DDHHMM' where
+`DD' is the day of the month and `HHMM' is the time, in UGC).
+
+   This time can be converted to a Perl-friendly format using the
+*Weather::Product::int_time* function.
+
+addendum
+--------
+
+   Returns the "addendum" (or `BBB') portion of the WMO header.
+
+region
+------
+
+   Returns the geographical region code of the weather product, if
+applicable.  Otherwise it returns undef.
+
+T1, T2, T1T2, TT, A1, A2, A1A2, ii, BBB
+---------------------------------------
+
+   Returns the equivalent portion of the WMO header.
+
+KNOWN BUGS
+==========
+
+   This module only performs simple string validation and parsing of WMO
+header lines.  It does not check if the product or station is actually
+valid, or if the timestamp is valid.
+
+   "Non-standard" header lines used by a specific weather service may not
+be handled properly.
+
+SEE ALSO
+========
+
+   `Weather::Product' and `Weather::Product::NWS', which make use of this
+module.
+
+   For more information about what WMO heading lines are, see
+http://www.nws.noaa.gov/oso/head.shtml
+
+DISCLAIMER
+==========
+
+   I am not a meteorologist nor am I associated with any weather service.
+This module grew out of a hack which would fetch weather reports every
+morning and send them to my pager. So I said to myself "Why not do this
+the right way..." and spent a bit of time surfing around the web looking
+for documentation about this stuff....
+
+AUTHOR
+======
+
+   Robert Rothenberg <wlkngowl@unix.asb.com>
+
+
+File: pm.info,  Node: WebCache/Digest,  Next: WebCache/ICP,  Prev: Weather/WMO,  Up: Module List
+
+a Cache Digest implementation in Perl
+*************************************
+
+NAME
+====
+
+   WebCache::Digest - a Cache Digest implementation in Perl
+
+SYNOPSIS
+========
+
+     use WebCache::Digest;
+
+     # fetching a digest via HTTP
+     $d = new WebCache::Digest;
+     $d->fetch("flibbertigibbet.swedish-chef.org", 3128);
+
+     # dump header fields out for info
+     print STDERR $d->dump_header();
+
+     # saving a digest
+     $d->save("flib");
+
+     # loading a digest
+     $e = new WebCache::Digest;
+     $e->load("flib");
+
+     # creating a new digests
+     $f = new WebCache::Digest;
+     $f->create; # defaults to a digest with 500 URL capacity
+
+     # registering a URL and method in the digest
+     $f->register("get", "http://www.kha0s.org/">;
+     if ($f->lookup("get", "http://www.kha0s.org/">) {
+       print "hit!\n";
+     }
+
+     # access to raw header and digest contents
+     print "header: " . unpack("H*", $f->header) . "\n";
+     print "digest: " . unpack("H*", $f->digest) . "\n";
+
+     # access to digest header block elements
+     print "Current version:      " . $f->current_version . "\n";
+     print "Required version:     " . $f->required_version . "\n";
+     print "Capacity:             " . $f->capacity . "\n";
+     print "Count:                " . $f->count . "\n";
+     print "Deletion count:       " . $f->del_count . "\n";
+     print "Size in bytes:        " . $f->size_in_bytes . "\n";
+     print "Bits per entry:       " . $f->bits_per_entry . "\n";
+
+DESCRIPTION
+===========
+
+   This Perl module implements version 5 of the Cache Digest specification.
+For more information about Cache Digests, check out the Squid FAQ:
+
+     http://squid.nlanr.net/Squid/FAQ/FAQ-16.html
+
+   A copy of the specification is included with this distribution as the
+file `cache-digest-v5.txt'.
+
+   This code has been benchmarked on a 400MHz PII running Linux at 1866
+lookups per second (or 112000 per minute, 560000 in five minutes), with a
+cache digest of 500000 URLs.
+
+   Cache Digests are summaries of the contents of WWW cache servers, which
+are made available to other WWW caches and may also be used internally
+within the server which generates them.  They allow a WWW cache server
+such as Squid to determine whether or not a particular Internet resource
+(designated by its URL and the HTTP method which is being used to fetch
+it) was cached at the time the digest was generated.  Unlike other
+mechanisms such as the Internet Cache Protocol (ICP - see RFC 2186), Cache
+Digests do not generate a continuous stream of request/response pairs, and
+do not add latency to each URL which is looked up.
+
+   Since we provide routines to both lookup URLs in Cache Digests and also
+register them in Cache Digests, it should be trivial to use this code to
+devise innovative applications which take advantage of Cache Digests to
+fool genuine WWW caches into treating them like WWW caches.  For example,
+mirror servers could register all the URLs which they're aware of for the
+resources they mirror, so that cache servers which peer with them will
+always get a cache 'hit' on the mirror server for any reference to any of
+the mirrored resources.
+
+   We also provide methods to store Cache Digests to disk and load them
+back in again, in addition to creating new Digests and fetching them from
+WWW caches which support the protocol.  This can be used to take a
+'snapshot' of the state of a WWW cache at any particular point in time, or
+for saving state if building a Cache Digest powered server.
+
+METHODS
+=======
+
+   We only describe public methods and method arguments here.  Anything
+else should be considered private, at least for now.
+
+new
+     Constructor function, creates a new WebCache::Digest object.  As yet
+     this takes no arguments.
+
+create
+     Fills in the data structures for a WebCache::Digest object, given the
+     number of lots to make available for URLs via the capacity parameter.
+
+fetch
+     Tries to fetch a Cache Digest from the machine whose domain name (or
+     IP address) and port number are specified (in this order) in the first
+     and second parameters.  Returns 0 on failure, and 1 on success.
+
+dump_header
+     Dump the fields in the Cache Digest header out as plain text to, e.g.
+     for debugging purposes.
+
+save
+     Saves the WebCache::Digest object to the filename supplied as its
+     parameter.  Returns 0 on failure, 1 on success.
+
+load
+     Populates the WebCache::Digest object with contents of the filename
+     supplied as its parameter.  Returns 0 on failure, 1 on success.
+
+lookup
+     Given an HTTP method and URL (in that order) as parameters, try to
+     look them up in the Cache Digest.  Returns 1 if the URL is a Cache
+     Digest hit, or 0 otherwise.
+
+register
+     Given an HTTP method and URL (in that order) as parameters, register
+     them in the Cache Digest.
+
+header
+     The raw Cache Digest header.
+
+digest
+     The raw Cache Digest object, sans header.
+
+current_version
+     The current version number from the Digest object.
+
+required_version
+     The required version number from the Digest object.  Implementations
+     should support at least this version for interoperability.
+
+capacity
+     The number of 'slots' for URLs in the Digest.
+
+count
+     The number of slots which have been filled.
+
+del_count
+     The number of deletion attempts - Squid doesn't currently delete any
+     URLs (e.g. on their becoming stale) but simply discards them the next
+     time the Digest is rebuilt.  Deleting one URL's information without
+     affecting others is impossible with Cache Digests as currently
+     conceived - where a given bit of the Digest may be used in looking up
+     multiple URLs.
+
+size_in_bytes
+     The size of the Digest in bytes when stored in transfer format.
+
+bits_per_entry
+     The number of bits in the Cache Digest consumed for each entry.
+
+hash_func_count
+     The number of times the Cache Digest hash function (see the
+     specification for more information on this) is called for each URL.
+
+BUGS
+====
+
+   This is a first release, and there are probably lots of hideous bugs
+waiting to catch you out - consider it pre-alpha code!
+
+   Something else to watch out for is that the name may well change -
+depending on feedback from the *comp.lang.perl.modules* Usenet conference.
+
+   We use far too much memory - a more efficient approach to processing
+the Cache Digest needs to be hacked in.
+
+   We should be consistent and always use one form of arguments - either
+hash array or fixed position arguments.  Mixing the two is confusing.
+However...  most methods don't need named (hash array) arguments, except
+for create.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1999, Martin Hamilton.  All rights reserved.
+
+   This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   It was developed by the JANET Web Cache Service, which is funded by the
+Joint Information Systems Committee (JISC) of the UK Higher Education
+Funding Councils.
+
+AUTHOR
+======
+
+   Martin Hamilton <martinh@gnu.org>
+
+
+File: pm.info,  Node: WebCache/ICP,  Next: WebFS/FileCopy,  Prev: WebCache/Digest,  Up: Module List
+
+Internet Cache Protocol client and server
+*****************************************
+
+NAME
+====
+
+   *WebCache::ICP* - Internet Cache Protocol client and server
+
+SYNOPSIS
+========
+
+     use WebCache::ICP;
+
+     $i = new WebCache::ICP;
+     $i->opcode("OP_QUERY");
+     $i->payload("http://www.w3.org/");
+     $i->send(host => $host, port => $port);
+     $i->recv;
+     $i->dump;
+     $i->hex_dump;
+
+     $j = new WebCache::ICP($packet);
+     $j->dump;
+
+     $k = new WebCache::ICP;
+     $k->server(callback => \&not_so_stubby);
+
+     # sample callback, just prints URLs requested
+     sub not_so_stubby {
+       my ($self, $fd, $sin, $request) = @_;
+       $self = $self->burst($request);
+       print "url: " . $self->payload . "\n";
+       $self->opcode("OP_MISS_NOFETCH");
+       $self->send(fd => $fd, sin => $sin);
+     }
+
+DESCRIPTION
+===========
+
+   This Perl module implements client and server side support for the
+Internet Cache Protocol, as defined in RFCs 2186 and 2187.  It provides
+methods for creating ICP packets, breaking the contents of ICP packets out
+into a Perl object, sending and receiving ICP packets, plus a simple ICP
+server which you can bolt your own callback functions onto.
+
+   NB This is just a first release, so expect the unexpected!  Many
+features either don't work properly, or don't exist yet :-)
+
+METHODS
+=======
+
+   ICP objects can either be created anew:
+
+     $i = new WebCache::ICP;
+
+   Or created based on the contents of a variable, which it's assumed is a
+raw ICP packet, fresh off the wire:
+
+     $i = new WebCache::ICP($packet);
+
+   If you don't supply a variable from which the ICP object should be
+created, we try to set you up with some sensible defaults - creating a
+query packet (opcode 2 or "OP_QUERY"), protocol version 2, a sequence
+number of 1, and no options.
+
+   Note that you can re-use a WebCache::ICP object over and over again, so
+as to avoid incurring the overheads of object creation and destruction
+with high volume client/server applications.
+
+   The following methods may be used on ICP objects to get or (with
+optional parameter) set the corresponding fields in the ICP packet:
+
+$i->opcode
+     This method fetches the ICP opcode from the object.  This is normally
+     a number between 0 and 23.  With a numeric parameter, the opcode for
+     the object is set to this number.  You can also supply one of the
+     following strings as an alternative to the numeric parameter:
+
+          "OP_INVALID"
+          "OP_QUERY"
+          "OP_HIT"
+          "OP_MISS"
+          "OP_ERR"
+          "UNUSED5"
+          "UNUSED6"
+          "UNUSED7"
+          "UNUSED8"
+          "UNUSED9"
+          "OP_SECHO"
+          "OP_DECHO"
+          "UNUSED12"
+          "UNUSED13"
+          "UNUSED14"
+          "UNUSED15"
+          "UNUSED16"
+          "UNUSED17"
+          "UNUSED18"
+          "UNUSED19"
+          "UNUSED20"
+          "OP_MISS_NOFETCH"
+          "OP_DENIED"
+          "OP_HIT_OBJ"
+
+     Each of these will be interpolated into the appropriate ICP opcode
+     internally by the WebCache::ICP module.  We don't check the opcode
+     number is valid, so if you wanted to, you could put opcodes greater
+     than 23 in here...
+
+$i->version
+     This method lets you set or fetch the ICP protocol version number.
+     Currently this is set to 2 for most/all real world applications of
+     ICP, but you could put the version number of your choice in here.
+
+$i->length
+     This method lets you fetch the packet length of an ICP object when
+     it's expressed as an on-the-wire packet.  This may get a bit confused
+     if you manipulate the contents of an ICP object, but it's 'guaranteed'
+     to be correct if you create a new ICP object based on a raw packet.
+
+$i->sequence
+     This method lets you fetch (or, with an optional parameter: set), the
+     ICP sequence number.
+
+$i->options
+     This method lets you fetch or set the options field for the ICP
+     object.  At the moment we simply expect you to supply a plausible
+     value for this.  In future there will probably be a more
+     sophisticated way to set a particular option by name.
+
+$i->option_data
+     This method lets you fetch or set the supplementary data associated
+     with the options set for the ICP object.  Again we assume that you
+     know what you want to put in here!
+
+$i->peer_addr
+     This method lets you fetch or set the source address associated with
+     the ICP packet once sent/received down the wire.  In practice this is
+     normally set to all zeroes.
+
+$i->payload
+     This method lets you fetch or set the payload proper of the ICP
+     packet.
+
+$i->assemble
+     This method turns an ICP object into an on-the-wire format packet,
+     which is returned as its result.  Note that it adds a 4 byte null
+     filled prefix to the payload of ICP query packets.  This is normally
+     used in ICP to record the IP address of the machine which is causing
+     the ICP query to be sent.
+
+$i->burst
+     This method takes a raw ICP packet and turns it into an ICP object.
+     It's used behind the scenes by the 'new' method when constructing an
+     ICP object from an on-the-wire packet, but you can also call it
+     directly.
+
+$i->dump
+     This method dumps out the contents of the various ICP header fields
+     and the payload, as interpreted by the WebCache::ICP module, to
+     STDOUT.  It's intended for use in debugging.
+
+$i->hex_dump
+     This method tries to create an ICP on-the-wire format packet and then
+     dump it out to STDOUT, based on the WebCache::ICP object being
+     operated on.
+
+$i->send
+     This method causes an ICP wire format packet to be sent.  It can be
+     used in a variety of ways depending on the options which it's called
+     with, viz.
+
+     If you already have the packet you want to send, you can supply the
+     'packet' parameter:
+
+          $i->send(packet => $p);
+
+     If not, the packet will be generated from the WebCache::ICP object
+     being operated on, using the 'assemble' method.
+
+     If you already have an active socket for talking to the server, you
+     can supply its file handle and packed IP address/port using the 'fd'
+     and 'sin' parameters:
+
+          $i->send(fd => \*SOCK, sin => $s);
+
+     If not, you'll need to supply the 'host' and 'port' parameters - the
+     socket will automatically be created, and then destroyed after the
+     packet is sent.
+
+$i->recv
+     This method waits for an ICP packet to arrive, and then returns the
+     raw packet for further processing.  You can either pass the file
+     handle of a socket which is already bound to the port:
+
+          $i->recv(fd => \*SOCK);
+
+     or you can supply the port number yourself:
+
+          $i->recv(port => 3131);
+
+     in which case the 'recv' method will take care of getting you a socket
+     and destroying it later.
+
+$i->server
+     This method uses pretty much all of the other code to implement a
+     simple ICP server with user defined callbacks to be executed on
+     receipt of an incoming ICP packet.  Once it is called, the flow of
+     execution will pass here, and the program will block waiting for
+     packets to arrive...
+
+     You can either pass the file handle of a socket which is already bound
+     to the port you want to listen on:
+
+          $i->server(fd => \*SOCK);
+
+     or you can supply the port number yourself:
+
+          $i->server(port => 3131);
+
+     in which case the 'server' method will take care of getting you a
+     socket and destroying it later.
+
+     The ICP server comes with a simple built-in callback function, which
+     always returns an ICP hit ("OP_HIT") response using the 'send'
+     method, and logs the packet received to STDOUT using the 'dump'
+     method.  This default callback will be invoked if you run the server
+     without nominating an alternative.
+
+     If you supply a reference to a function in the 'callback' parameter,
+     the 'server' method will try to pass this the packet contents and
+     peer info on receipt of each packet, e.g.
+
+          $i->server(callback => \&not_so_stubby);
+
+     The return code from the callback function isn't used in the 'server'
+     method.  The callback function will be supplied with three parameters:
+
+          1) the file descriptor which the packet was received on
+          2) the packed IP address/port number from which it was received
+          3) the raw on-the-wire ICP packet which was received
+
+TODO
+====
+
+   Need to factor in an opcode for ICP referrals.
+
+   Should have ability to get/set options by name.
+
+   Should be possible to run ICP over TCP - cf. HTCP, though.
+
+   Should allow for holding connection open when running over TCP.
+
+   Should be possible to have the ICP server running in non-blocking mode,
+possibly as part of a larger set of file handles using select.
+
+BUGS
+====
+
+   This is just a first release, so expect the unexpected!
+
+   The hex_dump method doesn't take account of the 4 byte client IP address
+prefix to the payload of ICP query packets.
+
+   We currently bind to INADDR_ANY when listening for incoming ICP packets,
+but we should probably let the luser choose which interface(s) to use.
+
+   Timeouts and corrupted packets aren't handled gracefully yet.
+
+   There's no way with the 'recv' method to find out the peer's IP address
+and port number, since we only return the raw packet contents.
+
+   Originally used IO::Socket, but stopped because it seemed to leak
+memory.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1999, Martin Hamilton <martinh@gnu.org>.
+
+   This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   It was developed by the JANET Web Cache Service, with funding from the
+Joint Information Systems Committee (JISC) of the UK Higher Education
+Funding Councils and TERENA, the Trans-European Research and Education
+Networking Association.
+
+AUTHOR
+======
+
+   Martin Hamilton <martinh@gnu.org>
+
+

@@ -1,0 +1,1673 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Class/Singleton,  Next: Class/Struct,  Prev: Class/SelfMethods,  Up: Module List
+
+Implementation of a "Singleton" class
+*************************************
+
+NAME
+====
+
+   Class::Singleton - Implementation of a "Singleton" class
+
+SYNOPSIS
+========
+
+     use Class::Singleton;
+
+     my $one = Class::Singleton->instance();   # returns a new instance
+     my $two = Class::Singleton->instance();   # returns same instance
+
+DESCRIPTION
+===========
+
+   This is the Class::Singleton module.  A Singleton describes an object
+class that can have only one instance in any system.  An example of a
+Singleton might be a print spooler or system registry.  This module
+implements a Singleton class from which other classes can be derived.  By
+itself, the Class::Singleton module does very little other than manage the
+instantiation of a single object.  In deriving a class from
+Class::Singleton, your module will inherit the Singleton instantiation
+method and can implement whatever specific functionality is required.
+
+   For a description and discussion of the Singleton class, see "Design
+Patterns", Gamma et al, Addison-Wesley, 1995, ISBN 0-201-63361-2.
+
+PREREQUISITES
+=============
+
+   Class::Singleton requires Perl version 5.004 or later.  If you have an
+older version of Perl, please upgrade to latest version.  Perl 5.004 is
+known to be stable and includes new features and bug fixes over previous
+versions.  Perl itself is available from your nearest CPAN site (see
+INSTALLATION below).
+
+INSTALLATION
+============
+
+   The Class::Singleton module is available from CPAN. As the 'perlmod' man
+page explains:
+
+     CPAN stands for the Comprehensive Perl Archive Network.
+     This is a globally replicated collection of all known Perl
+     materials, including hundreds of unbunded modules.
+
+     [...]
+
+     For an up-to-date listing of CPAN sites, see
+     http://www.perl.com/perl/ or ftp://ftp.perl.com/perl/ .
+
+   The module is available in the following directories:
+
+     /modules/by-module/Class/Class-Singleton-<version>.tar.gz
+     /authors/id/ABW/Class-Singleton-<version>.tar.gz
+
+   For the latest information on Class-Singleton or to download the latest
+pre-release/beta version of the module, consult the definitive reference:
+
+     http://www.kfs.org/~abw/perl/
+
+   Class::Singleton is distributed as a single gzipped tar archive file:
+
+     Class-Singleton-<version>.tar.gz
+
+   Note that "<version>" represents the current version number, of the
+form "1.23".  See `REVISION' in this node below to determine the current
+version number for Class::Singleton.
+
+   Unpack the archive to create an installation directory:
+
+     gunzip Class-Singleton-<version>.tar.gz
+     tar xvf Class-Singleton-<version>.tar
+
+   'cd' into that directory, make, test and install the module:
+
+     cd Class-Singleton-<version>
+     perl Makefile.PL
+     make
+     make test
+     make install
+
+   The 'make install' will install the module on your system.  You may need
+root access to perform this task.  If you install the module in a local
+directory (for example, by executing "perl Makefile.PL LIB=~/lib" in the
+above - see `perldoc MakeMaker' for full details), you will need to ensure
+that the PERL5LIB environment variable is set to include the location, or
+add a line to your scripts explicitly naming the library location:
+
+     use lib '/local/path/to/lib';
+
+USING THE CLASS::SINGLETON MODULE
+=================================
+
+   To import and use the Class::Singleton module the following line should
+appear in your Perl script:
+
+     use Class::Singleton;
+
+   The instance() method is used to create a new Class::Singleton instance,
+or return a reference to an existing instance.  Using this method, it is
+only possible to have a single instance of the class in any system.
+
+     my $highlander = Class::Singleton->instance();
+
+   Assuming that no Class::Singleton object currently exists, this first
+call to instance() will create a new Class::Singleton and return a
+reference to it.  Future invocations of instance() will return the same
+reference.
+
+     my $macleod    = Class::Singleton->instance();
+
+   In the above example, both $highlander and $macleod contain the same
+reference to a Class::Singleton instance.  There can be only one.
+
+DERIVING SINGLETON CLASSES
+==========================
+
+   A module class may be derived from Class::Singleton and will inherit the
+instance() method that correctly instantiates only one object.
+
+     package PrintSpooler;
+     use vars qw(@ISA);
+     @ISA = qw(Class::Singleton);
+
+     # derived class specific code
+     sub submit_job {
+         ...
+     }
+
+     sub cancel_job {
+         ...
+     }
+
+   The PrintSpooler class defined above could be used as follows:
+
+     use PrintSpooler;
+
+     my $spooler = PrintSpooler->instance();
+
+     $spooler->submit_job(...);
+
+   The instance() method calls the _new_instance() constructor method the
+first and only time a new instance is created.  All parameters passed to
+the instance() method are forwarded to _new_instance().  In the base class
+this method returns a blessed reference to an empty hash array.  Derived
+classes may redefine it to provide specific object initialisation or change
+the underlying object type (to a list reference, for example).
+
+     package MyApp::Database;
+     use vars qw( $ERROR );
+     use base qw( Class::Singleton );
+     use DBI;
+
+     $ERROR = '';
+
+     # this only gets called the first time instance() is called
+     sub _new_instance {
+     	my $class = shift;
+     	my $self  = bless { }, $class;
+     	my $db    = shift || "myappdb";
+     	my $host  = shift || "localhost";
+
+     unless (defined ($self->{ DB }
+     		 = DBI->connect("DBI:mSQL:$db:$host"))) {
+         $ERROR = "Cannot connect to database: $DBI::errstr\n";
+         # return failure;
+         return undef;
+     }
+
+     # any other initialisation...
+     
+     # return sucess
+     $self;
+         }
+
+   The above example might be used as follows:
+
+     use MyApp::Database;
+
+     # first use - database gets initialised
+     my $database = MyApp::Database->instance();
+     die $MyApp::Database::ERROR unless defined $database;
+
+   Some time later on in a module far, far away...
+
+     package MyApp::FooBar
+     use MyApp::Database;
+
+     sub new {
+     	# usual stuff...
+     
+     	# this FooBar object needs access to the database; the Singleton
+     	# approach gives a nice wrapper around global variables.
+
+     # subsequent use - existing instance gets returned
+     my $database = MyApp::Database->instance();
+
+     # the new() isn't called if an instance already exists,
+     # so the above constructor shouldn't fail, but we check
+     # anyway.  One day things might change and this could be the
+     # first call to instance()...
+     die $MyAppDatabase::ERROR unless defined $database;
+
+     # more stuff...
+         }
+
+   The Class::Singleton instance() method uses a package variable to store
+a reference to any existing instance of the object.  This variable,
+"_instance", is coerced into the derived class package rather than the
+base class package.
+
+   Thus, in the MyApp::Database example above, the instance variable would
+be:
+
+     $MyApp::Database::_instance;
+
+   This allows different classes to be derived from Class::Singleton that
+can co-exist in the same system, while still allowing only one instance of
+any one class to exists.  For example, it would be possible to derive both
+'PrintSpooler' and 'MyApp::Database' from Class::Singleton and have a
+single instance of each in a system, rather than a single instance of
+*either*.
+
+AUTHOR
+======
+
+   Andy Wardley, `<abw@cre.canon.co.uk>'
+
+   Web Technology Group, Canon Research Centre Europe Ltd.
+
+   Thanks to Andreas Koenig `<andreas.koenig@anima.de>' for providing some
+significant speedup patches and other ideas.
+
+REVISION
+========
+
+   $Revision: 1.3 $
+
+COPYRIGHT
+=========
+
+   Copyright (C) 1998 Canon Research Centre Europe Ltd.  All Rights
+Reserved.
+
+   This module is free software; you can redistribute it and/or modify it
+under the term of the Perl Artistic License.
+
+SEE ALSO
+========
+
+Canon Research Centre Europe Perl Pages
+     http://www.cre.canon.co.uk/perl/
+
+The Author's Home Page
+     http://www.kfs.org/~abw/
+
+Design Patterns
+     Class::Singleton is an implementation of the Singleton class
+     described in "Design Patterns", Gamma et al, Addison-Wesley, 1995,
+     ISBN 0-201-63361-2
+
+
+File: pm.info,  Node: Class/Struct,  Next: Class/Struct/FIELDS,  Prev: Class/Singleton,  Up: Module List
+
+declare struct-like datatypes as Perl classes
+*********************************************
+
+NAME
+====
+
+   Class::Struct - declare struct-like datatypes as Perl classes
+
+SYNOPSIS
+========
+
+     use Class::Struct;
+             # declare struct, based on array:
+     struct( CLASS_NAME => [ ELEMENT_NAME => ELEMENT_TYPE, ... ]);
+             # declare struct, based on hash:
+     struct( CLASS_NAME => { ELEMENT_NAME => ELEMENT_TYPE, ... });
+
+     package CLASS_NAME;
+     use Class::Struct;
+             # declare struct, based on array, implicit class name:
+     struct( ELEMENT_NAME => ELEMENT_TYPE, ... );
+
+     package Myobj;
+     use Class::Struct;
+             # declare struct with four types of elements:
+     struct( s => '$', a => '@', h => '%', c => 'My_Other_Class' );
+
+     $obj = new Myobj;               # constructor
+
+     # scalar type accessor:
+         $element_value = $obj->s;           # element value
+         $obj->s('new value');               # assign to element
+
+     # array type accessor:
+         $ary_ref = $obj->a;                 # reference to whole array
+         $ary_element_value = $obj->a(2);    # array element value
+         $obj->a(2, 'new value');            # assign to array element
+
+     # hash type accessor:
+         $hash_ref = $obj->h;                # reference to whole hash
+         $hash_element_value = $obj->h('x'); # hash element value
+         $obj->h('x', 'new value');        # assign to hash element
+
+     # class type accessor:
+         $element_value = $obj->c;           # object reference
+         $obj->c->method(...);               # call method of object
+         $obj->c(new My_Other_Class);        # assign a new object
+
+DESCRIPTION
+===========
+
+   Class::Struct exports a single function, `struct'.  Given a list of
+element names and types, and optionally a class name, `struct' creates a
+Perl 5 class that implements a "struct-like" data structure.
+
+   The new class is given a constructor method, new, for creating struct
+objects.
+
+   Each element in the struct data has an accessor method, which is used
+to assign to the element and to fetch its value.  The default accessor can
+be overridden by declaring a sub of the same name in the package.  (See
+Example 2.)
+
+   Each element's type can be scalar, array, hash, or class.
+
+The `struct()' function
+-----------------------
+
+   The `struct' function has three forms of parameter-list.
+
+     struct( CLASS_NAME => [ ELEMENT_LIST ]);
+     struct( CLASS_NAME => { ELEMENT_LIST });
+     struct( ELEMENT_LIST );
+
+   The first and second forms explicitly identify the name of the class
+being created.  The third form assumes the current package name as the
+class name.
+
+   An object of a class created by the first and third forms is based on
+an array, whereas an object of a class created by the second form is based
+on a hash. The array-based forms will be somewhat faster and smaller; the
+hash-based forms are more flexible.
+
+   The class created by `struct' must not be a subclass of another class
+other than UNIVERSAL.
+
+   It can, however, be used as a superclass for other classes. To
+facilitate this, the generated constructor method uses a two-argument
+blessing.  Furthermore, if the class is hash-based, the key of each
+element is prefixed with the class name (see *Perl Cookbook*, Recipe
+13.12).
+
+   A function named new must not be explicitly defined in a class created
+by `struct'.
+
+   The *ELEMENT_LIST* has the form
+
+     NAME => TYPE, ...
+
+   Each name-type pair declares one element of the struct. Each element
+name will be defined as an accessor method unless a method by that name is
+explicitly defined; in the latter case, a warning is issued if the warning
+flag (-w) is set.
+
+Element Types and Accessor Methods
+----------------------------------
+
+   The four element types - scalar, array, hash, and class - are
+represented by strings - `'$'', `'@'', `'%'', and a class name -
+optionally preceded by a '*'.
+
+   The accessor method provided by `struct' for an element depends on the
+declared type of the element.
+
+Scalar (`'$'' or `'*$'')
+     The element is a scalar, and by default is initialized to undef (but
+     see `Initializing with new' in this node).
+
+     The accessor's argument, if any, is assigned to the element.
+
+     If the element type is `'$'', the value of the element (after
+     assignment) is returned. If the element type is `'*$'', a reference
+     to the element is returned.
+
+Array (`'@'' or `'*@'')
+     The element is an array, initialized by default to `()'.
+
+     With no argument, the accessor returns a reference to the element's
+     whole array (whether or not the element was specified as `'@'' or
+     `'*@'').
+
+     With one or two arguments, the first argument is an index specifying
+     one element of the array; the second argument, if present, is
+     assigned to the array element.  If the element type is `'@'', the
+     accessor returns the array element value.  If the element type is
+     `'*@'', a reference to the array element is returned.
+
+Hash (`'%'' or `'*%'')
+     The element is a hash, initialized by default to `()'.
+
+     With no argument, the accessor returns a reference to the element's
+     whole hash (whether or not the element was specified as `'%'' or
+     `'*%'').
+
+     With one or two arguments, the first argument is a key specifying one
+     element of the hash; the second argument, if present, is assigned to
+     the hash element.  If the element type is `'%'', the accessor returns
+     the hash element value.  If the element type is `'*%'', a reference
+     to the hash element is returned.
+
+Class (`'Class_Name'' or `'*Class_Name'')
+     The element's value must be a reference blessed to the named class or
+     to one of its subclasses. The element is initialized to the result of
+     calling the new constructor of the named class.
+
+     The accessor's argument, if any, is assigned to the element. The
+     accessor will croak if this is not an appropriate object reference.
+
+     If the element type does not start with a '*', the accessor returns
+     the element value (after assignment). If the element type starts with
+     a '*', a reference to the element itself is returned.
+
+Initializing with new
+---------------------
+
+   `struct' always creates a constructor called new. That constructor may
+take a list of initializers for the various elements of the new struct.
+
+   Each initializer is a pair of values: *element name*` => 'value.  The
+initializer value for a scalar element is just a scalar value. The
+initializer for an array element is an array reference. The initializer
+for a hash is a hash reference.
+
+   The initializer for a class element is also a hash reference, and the
+contents of that hash are passed to the element's own constructor.
+
+   See Example 3 below for an example of initialization.
+
+EXAMPLES
+========
+
+Example 1
+     Giving a struct element a class type that is also a struct is how
+     structs are nested.  Here, `timeval' represents a time (seconds and
+     microseconds), and `rusage' has two elements, each of which is of
+     type `timeval'.
+
+          use Class::Struct;
+
+          struct( rusage => {
+              ru_utime => timeval,  # seconds
+              ru_stime => timeval,  # microseconds
+          });
+
+          struct( timeval => [
+              tv_secs  => '$',
+              tv_usecs => '$',
+          ]);
+
+          # create an object:
+              my $t = new rusage;
+
+          # $t->ru_utime and $t->ru_stime are objects of type timeval.
+          # set $t->ru_utime to 100.0 sec and $t->ru_stime to 5.0 sec.
+              $t->ru_utime->tv_secs(100);
+              $t->ru_utime->tv_usecs(0);
+              $t->ru_stime->tv_secs(5);
+              $t->ru_stime->tv_usecs(0);
+
+Example 2
+     An accessor function can be redefined in order to provide additional
+     checking of values, etc.  Here, we want the count element always to
+     be nonnegative, so we redefine the count accessor accordingly.
+
+          package MyObj;
+          use Class::Struct;
+
+          # declare the struct
+          struct ( 'MyObj', { count => '$', stuff => '%' } );
+
+          # override the default accessor method for 'count'
+          sub count {
+              my $self = shift;
+              if ( @_ ) {
+                  die 'count must be nonnegative' if $_[0] < 0;
+                  $self->{'count'} = shift;
+                  warn "Too many args to count" if @_;
+              }
+              return $self->{'count'};
+          }
+
+          package main;
+          $x = new MyObj;
+          print "\$x->count(5) = ", $x->count(5), "\n";
+                                  # prints '$x->count(5) = 5'
+
+          print "\$x->count = ", $x->count, "\n";
+                                  # prints '$x->count = 5'
+
+          print "\$x->count(-5) = ", $x->count(-5), "\n";
+                                  # dies due to negative argument!
+
+Example 3
+     The constructor of a generated class can be passed a list of
+     *element*=>value pairs, with which to initialize the struct.  If no
+     initializer is specified for a particular element, its default
+     initialization is performed instead. Initializers for non-existent
+     elements are silently ignored.
+
+     Note that the initializer for a nested struct is specified as an
+     anonymous hash of initializers, which is passed on to the nested
+     struct's constructor.
+
+          use Class::Struct;
+
+          struct Breed =>
+          {
+              name  => '$',
+              cross => '$',
+          };
+
+          struct Cat =>
+          [
+              name     => '$',
+              kittens  => '@',
+              markings => '%',
+              breed    => 'Breed',
+          ];
+
+          my $cat = Cat->new( name     => 'Socks',
+                              kittens  => ['Monica', 'Kenneth'],
+                              markings => { socks=>1, blaze=>"white" },
+                              breed    => { name=>'short-hair', cross=>1 },
+                            );
+
+          print "Once a cat called ", $cat->name, "\n";
+          print "(which was a ", $cat->breed->name, ")\n";
+          print "had two kittens: ", join(' and ', @{$cat->kittens}), "\n";
+
+Author and Modification History
+===============================
+
+   Modified by Damian Conway, 1999-03-05, v0.58.
+
+     Added handling of hash-like arg list to class ctor.
+
+     Changed to two-argument blessing in ctor to support
+     derivation from created classes.
+
+     Added classname prefixes to keys in hash-based classes
+     (refer to "Perl Cookbook", Recipe 13.12 for rationale).
+
+     Corrected behaviour of accessors for '*@' and '*%' struct
+     elements.  Package now implements documented behaviour when
+     returning a reference to an entire hash or array element.
+     Previously these were returned as a reference to a reference
+     to the element.
+
+   Renamed to Class::Struct and modified by Jim Miner, 1997-04-02.
+
+     members() function removed.
+     Documentation corrected and extended.
+     Use of struct() in a subclass prohibited.
+     User definition of accessor allowed.
+     Treatment of '*' in element types corrected.
+     Treatment of classes as element types corrected.
+     Class name to struct() made optional.
+     Diagnostic checks added.
+
+   Originally `Class::Template' by Dean Roehrich.
+
+     # Template.pm   --- struct/member template builder
+     #   12mar95
+     #   Dean Roehrich
+     #
+     # changes/bugs fixed since 28nov94 version:
+     #  - podified
+     # changes/bugs fixed since 21nov94 version:
+     #  - Fixed examples.
+     # changes/bugs fixed since 02sep94 version:
+     #  - Moved to Class::Template.
+     # changes/bugs fixed since 20feb94 version:
+     #  - Updated to be a more proper module.
+     #  - Added "use strict".
+     #  - Bug in build_methods, was using @var when @$var needed.
+     #  - Now using my() rather than local().
+     #
+     # Uses perl5 classes to create nested data types.
+     # This is offered as one implementation of Tom Christiansen's "structs.pl"
+     # idea.
+
+
+File: pm.info,  Node: Class/Struct/FIELDS,  Next: Class/Tom,  Prev: Class/Struct,  Up: Module List
+
+Combine Class::Struct, base and fields
+**************************************
+
+NAME
+====
+
+   Class::Struct::FIELDS - Combine Class::Struct, base and fields
+
+SYNOPSIS
+========
+
+   (This page documents `Class::Struct::FIELDS' v.1.0.)
+
+     use Class::Struct::FIELDS;
+             # declare struct, based on fields, explicit class name:
+     struct (CLASS_NAME => { ELEMENT_NAME => ELEMENT_TYPE, ... });
+
+     use Class::Struct::FIELDS;
+             # declare struct, based on fields, explicit class name
+             # with inheritance:
+     struct (CLASS_NAME => [qw(BASE_CLASSES ...)],
+     	    { ELEMENT_NAME => ELEMENT_TYPE, ... });
+
+     package CLASS_NAME;
+     use Class::Struct::FIELDS;
+             # declare struct, based on fields, implicit class name:
+     struct (ELEMENT_NAME => ELEMENT_TYPE, ...);
+
+     package CLASS_NAME;
+     use Class::Struct::FIELDS;
+             # declare struct, based on fields, implicit class name
+             # with inheritance:
+     struct ([qw(BASE_CLASSES ...)], ELEMENT_NAME => ELEMENT_TYPE, ...);
+
+     package MyObj;
+     use Class::Struct::FIELDS;
+             # declare struct with four types of elements:
+     struct (s => '$', a => '@', h => '%', x => '&', c => 'My_Other_Class');
+
+     $obj = new MyObj;               # constructor
+
+     # scalar type accessor:
+         $element_value = $obj->s;           # element value
+         $obj->s ('new value');              # assign to element
+
+     # array type accessor:
+         $ary_ref = $obj->a;                 # reference to whole array
+         $ary_element_value = $obj->a->[2];  # array element value
+         $ary_element_value = $obj->a (2);   # same thing
+         $obj->a->[2] = 'new value';         # assign to array element
+         $obj->a (2, 'newer value');         # same thing
+
+     # hash type accessor:
+         $hash_ref = $obj->h;                # reference to whole hash
+         $hash_element_value = $obj->h->{x}; # hash element value
+         $hash_element_value = $obj->h (x);  # same thing
+         $obj->h->{x} = 'new value';         # assign to hash element
+         $obj->h (x, 'newer value');         # same thing
+
+     # code type accessor:
+         $code_ref = $obj->x;                # reference to code
+         $obj->x->(...);                     # call code
+         $obj->x (sub {...});                # assign to element
+
+     # regexp type accessor:
+         $regexp = $obj->r;                  # reference to code
+         $string =~ m/$obj->r/;              # match regexp
+         $obj->r (qr/ ... /);                # assign to element
+
+     # class type accessor:
+         $element_value = $obj->c;            # object reference
+         $obj->c->method (...);               # call method of object
+         $obj->c (My_Other_Class::->new);     # assign a new object
+
+DESCRIPTION
+===========
+
+   `Class::Struct::FIELDS' exports a single function, `struct'.  Given a
+list of element names and types, and optionally a class name and/or an
+array reference of base classes, `struct' creates a Perl 5 class that
+implements a "struct-like" data structure with inheritance.
+
+   The new class is given a constructor method, new, for creating struct
+objects.
+
+   Each element in the struct data has an accessor method, which is used
+to assign to the element and to fetch its value.  The default accessor can
+be overridden by declaring a sub of the same name in the package.  (See
+Example 2.)
+
+   Each element's type can be scalar, array, hash, code or class.
+
+Differences from Class::Struct base and fields
+----------------------------------------------
+
+   `Class::Struct::FIELDS' is a combination of Class::Struct, base and
+fields.
+
+   Unlike Class::Struct, inheritance is explicitly supported, and there is
+better support for user overrides of constructed accessor methods.  One
+result is that you may no longer use the array ([]) notation for
+indicating internal representation.  Also, `Class::Struct::FIELDS' relies
+on fields for internal representation.
+
+   Also, `Class::Struct::FIELDS' supports code and regular expression
+elements.  (Class::Struct handles code and regular expressions as scalars.)
+
+   Lastly, `Class::Struct::FIELDS' passes it's import list, if any, from
+the call to `use Class::Struct::FIELDS ...' to `struct' so that you may
+create new packages at compile-time.
+
+   Unlike fields, each element has a data type, and is automatically
+created at first access.
+
+Calling `use Class::Struct::FIELDS'
+-----------------------------------
+
+   You may call `use Class::Struct::FIELDS' just as with any module
+library:
+
+     use Class::Struct::FIELDS;
+     struct Bob => [];
+
+   However, if you try `my Dog $spot' syntax with this example:
+
+     use Class::Struct::FIELDS;
+     struct Bob => [];
+     my Bob $bob = Bob::->new;
+
+   you will get a compile-time error:
+
+     No such class Bob at <filename> line <number>, near "my Bob"
+     Bareword "Bob::" refers to nonexistent package at <filename> line
+     <number>.
+
+   since the compiler has not seen your class declarations yet until after
+the call to `struct', by which time it has already seen your my
+declarations.  Oops, too late.  Instead, create the package for `Bob'
+during compilation:
+
+     use Class::Struct::FIELDS qw(Bob);
+     my Bob $bob = Bob::->new;
+
+   This compiles without error as import for `Class::Struct::FIELDS' calls
+`struct' for you if you have any arguments in the use statement.  A more
+interesting example is:
+
+     use Class::Struct::FIELDS Bob => { a => '$' };
+     use Class::Struct::FIELDS Fred => [qw(Bob)];
+     my Bob $bob = Bob::->new;
+     my Fred $fred = Fred::->new;
+
+The `struct' subroutine
+-----------------------
+
+   The `struct' subroutine has three forms of parameter-list:
+
+     struct (CLASS_NAME => { ELEMENT_LIST });
+     struct (CLASS_NAME, ELEMENT_LIST);
+     struct (ELEMENT_LIST);
+
+   The first form explicitly identifies the name of the class being
+created.  The second form is equivalent.  The second form assumes the
+current package name as the class name.  The second and third forms are
+distinguished by the parity of the argument list: an odd number of
+arguments is taken to be of the second form.
+
+   Optionally, you may specify base classes with an array reference as the
+first non-class-name argument:
+
+     struct (CLASS_NAME => [qw(BASE_CLASSES ...)], { ELEMENT_LIST });
+     struct (CLASS_NAME => [qw(BASE_CLASSES ...)], ELEMENT_LIST);
+     struct ([qw(BASE_CLASSES ...)], { ELEMENT_LIST });
+     struct ([qw(BASE_CLASSES ...)], ELEMENT_LIST);
+
+   (Since there is no ambiguity between CLASS_NAME and ELEMENT_LIST with
+the interposing array reference, you may always make ELEMENT_LIST a list
+or a hash reference with this form.)
+
+   The class created by `struct' may be either a subclass or superclass of
+other classes.  See *Note Base: base, and *Note Fields: fields, for
+details.
+
+   The *ELEMENT_LIST* has the form
+
+     NAME => TYPE, ...
+
+   Each name-type pair declares one element of the struct. Each element
+name will be usually be defined as an accessor method of the same name as
+the field, unless a method by that name is explicitly defined (called a
+"user override") by the caller prior to the use statement for
+`Class::Struct::FIELDS'.  (See `' in this node.)
+
+   `struct' returns the name of the newly-constructed package.
+
+Element Types and Accessor Methods
+----------------------------------
+
+   The five element types - scalar, array, hash, code and class - are
+represented by strings - `$', `@', %, &, / and a class name.
+
+   The accessor method provided by `struct' for an element depends on the
+declared type of the element.
+
+Scalar (`$', `\$' or `*$')
+     The element is a scalar, and by default is initialized to undef (but
+     see `Initializing with new' in this node).
+
+     The accessor's argument, if any, is assigned to the element.
+
+     If the element type is `$', the value of the element (after
+     assignment) is returned. If the element type is `\$' or `*$', a
+     reference to the element is returned.
+
+Array (`@', `\@' or `*@')
+     The element is an array, initialized by default to `()'.
+
+     With no argument, the accessor returns a reference to the element's
+     whole array (whether or not the element was specified as `@', `\@' or
+     `*@').
+
+     With one or two arguments, the first argument is an index specifying
+     one element of the array; the second argument, if present, is assigned
+     to the array element.  If the element type is `@', the accessor
+     returns the array element value.  If the element type is `\@' or
+     `*@', a reference to the array element is returned.
+
+Hash (%, `\%' or `*%')
+     The element is a hash, initialized by default to `()'.
+
+     With no argument, the accessor returns a reference to the element's
+     whole hash (whether or not the element was specified as %, `\%' or
+     `*%').
+
+     With one or two arguments, the first argument is a key specifying one
+     element of the hash; the second argument, if present, is assigned to
+     the hash element.  If the element type is %, the accessor returns the
+     hash element value.  If the element type is `\%' or `*%', a reference
+     to the hash element is returned.
+
+Code (&, `\&' or `*&')
+     The element is code, and by default is initialized to undef (but see
+     `Initializing with new' in this node).
+
+     The accessor's argument, if any, is assigned to the element.
+
+     If the element type is &, the value of the element (after assignment)
+     is returned.  If the element type is `\&' or `*&', a reference to the
+     element is returned.  (It is unclear of what value this facility is.
+     XXX)
+
+Regexp (/, `\/' or `*/')
+     If the element type is /, the value of the element (after assignment)
+     is returned.  If the element type is `\/' or `*/', a reference to the
+     element is returned.  (It is unclear of what value this facility is.
+     XXX)
+
+     Regular expressions really are special in that you create them with
+     special syntax, not with a call to a constructor:
+
+          $obj->r (qr/^$/); # fine
+          $obj->r (Regexp->new); # WRONG
+
+Class (`Class_Name', `\Class_Name' or `*Class_Name')
+     The element's value must be a reference blessed to the named class or
+     to one of its subclasses. The element is initialized to the result of
+     calling the new constructor of the named class.
+
+     The accessor's argument, if any, is assigned to the element. The
+     accessor will croak if this is not an appropriate object reference.
+
+     If the element type does not start with a \ or *, the accessor
+     returns the element value (after assignment). If the element type
+     starts with a \ or *, a reference to the element itself is returned.
+
+     The class is automatically required for you so that, for example, you
+     can safely write:
+
+          struct MyObj {io => 'IO::Scalar'};
+
+     and access io immediately.  The same applies for nested structs:
+
+          BEGIN {
+            struct Alice { when => '$' };
+            struct Bob { who => 'Alice' };
+          }
+
+          my Bob $b = Bob::->new;
+          $b->who->when ('what');
+
+     Note, however, the BEGIN block so that this example can use the `my
+     Dog $spot' syntax for `my Bob $b'.  Also, no actual import happens
+     for the caller - the automatic use is only for convenience in
+     auto-constructing members, not magic.  Another way to do this is:
+
+          { package Bob; use Class::Struct::FIELDS; struct }
+          my Bob $b = Bob::->new;
+
+     And of course the best way to do this is simply:
+
+          use Class::Struct::FIELDS qw(Bob);
+          my Bob $b = Bob::->new;
+
+What about globs (*) and other funny types?
+     At present, `Class::Struct::FIELDS' does not support special notation
+     for other intrinsic types.  Use a scalar to hold a reference to globs
+     and other unusual specimens, or wrap them in a class such as
+     IO::Handle (globs).  XXX
+
+Initializing with new
+---------------------
+
+   `struct' always creates a constructor called new. That constructor may
+take a list of initializers for the various elements of the new struct.
+
+   Each initializer is a pair of values: *element name*` => 'value.  The
+initializer value for a scalar element is just a scalar value.  The
+initializer for an array element is an array reference.  The initializer
+for a hash is a hash reference.  The initializer for code is a code
+reference.
+
+   The initializer for a class element is also a hash reference, and the
+contents of that hash are passed to the element's own constructor.
+
+   new tries to be as clever as possible in deducing what type of object
+to construct.  All of these are valid:
+
+     use Class::Struct::FIELDS qw(Bob);
+     my Bob $b = Bob::->new; # good style
+     my Bob $b2 = $b->new; # works fine
+     my Bob $b3 = &Bob::new; # if you insist
+     my Bob $b4 = Bob::new (apple => 3, banana => 'four'); # WRONG!
+
+   The last case doesn't behave as hoped for: new tries to construct an
+object of package `apple' (and hopefully fails, unless you actually have a
+package named `apple'), not an object of package `Bob'.
+
+   See Example 3 below for an example of initialization.
+
+Initializing with init
+----------------------
+
+   You may also use init as a constructor to assign initial values to new
+objects.  (In fact, this is the preferred method.)  `struct' will see to
+it that you have a ready object to work with, and pass you any arguments
+used in the call to new:
+
+     sub init {
+       my MyObj $self = shift;
+
+     @self->a->[0..3] = (a..d);
+
+     return $self;
+       }
+
+   It is essential that you return an object from init, as this is
+returned to the caller of new.  You may return a different object if you
+wish, but this would be rather uncommon.
+
+   First, new arranges for any constructor argument list to be processed
+first before calling init.
+
+   Second, new arranges to call init for base classes, calling them in
+bottom-up order, before calling init.  This is so that ancestors may
+construct an object before descendents.
+
+   There is no corresponding facility for DESTROY.  XXX
+
+Replacing member access methods with user overrides
+---------------------------------------------------
+
+   You might want to create custom access methods, or user overrides.  The
+most straight forward way to do this and still retain string and warnings
+is:
+
+     use strict;
+     use warnings;
+
+     sub Bob::ff ($;$$); # declare sub so Class::Struct::FIELDS can see
+
+     use Class::Struct::FIELDS Bob => { ff => '$' };
+
+     sub Bob::ff ($;$$) {
+       my Bob $self = shift;
+
+     &some_other_sub (@_);
+         }
+
+   If you do not declare the user override prior to the use statement, a
+warning is issued if the warning flag (-w) is set.
+
+   Notice that we changed the default sub signature for ff from `($;$)' to
+`($;$$)'.  Normally, this might generate a warning if we redefine the sub,
+but declaring the sub ahead of time keeps strict and warnings happy.  You
+might prefer this construction:
+
+     { package Bob; }
+
+     sub Bob::ff ($;$$) {
+       my Bob $self = shift;
+
+     &some_other_sub (@_);
+         }
+
+     use Class::Struct::FIELDS Bob => { ff => '$' };
+
+   You might still want the advantages of the the constructed accessor
+methods, even with user overrides (for example, checking that an assigned
+value is the right type or package). `Class::Struct::FIELDS' constructs
+the accessor with a special name, so that you may use it yourself in the
+user override.  That special name is the regular field name prepended by a
+double underscore, `__'.  You can access these so:
+
+     use strict;
+     use warnings;
+
+     sub Bob::ff ($;$); # declare sub so Class::Struct::FIELDS can see
+     sub Bob::gg ($;$); # declare sub so Class::Struct::FIELDS can see
+
+     use Class::Struct::FIELDS Bob => { ff => '$', gg => '$' };
+
+     # This example is identical to having no user override.
+     sub Bob::ff ($;$) {
+       my Bob $self = shift;
+       $self->__ff (@_);
+     }
+
+     # This example illustrates a workaround for v5.6.0.
+     sub Bob::gg ($;$) {
+       # This silliness is due to a bug in 5.6.0: it thinks you can't
+       # fiddle with @_ if you've given it a prototype.  XXX
+       my @args = @_;
+       $args[1] *= 2 if @args == 2 and defined $args[1];
+       @_ = @args;
+       goto &Bob::__gg;
+     }
+
+Private fields
+--------------
+
+   Fields starting with a leading underscore, _, are private: they are
+still valid fields, but `Class::Struct::FIELDS' does not create
+subroutines to access them.  Instead, you should access them the usual way
+for hash members:
+
+     $self->{_private_key}; # ok
+     $self->_private_key; # Compilation error
+
+   See *Note Fields: fields, for more details.
+
+EXAMPLES
+========
+
+Example 1
+     Giving a struct element a class type that is also a struct is how
+     structs are nested.  Here, `timeval' represents a time (seconds and
+     microseconds), and `rusage' has two elements, each of which is of
+     type `timeval'.
+
+          use Class::Struct::FIELDS;
+
+          struct (rusage => {
+            ru_utime => timeval,  # seconds
+            ru_stime => timeval,  # microseconds
+          });
+
+          struct (timeval => {
+            tv_secs  => '$',
+            tv_usecs => '$',
+          });
+
+          # create an object:
+              my $t = new rusage;
+
+          # $t->ru_utime and $t->ru_stime are objects of type timeval.
+          # set $t->ru_utime to 100.0 sec and $t->ru_stime to 5.0 sec.
+              $t->ru_utime->tv_secs (100);
+              $t->ru_utime->tv_usecs (0);
+              $t->ru_stime->tv_secs (5);
+              $t->ru_stime->tv_usecs (0);
+
+Example 2
+     An accessor function can be redefined in order to provide additional
+     checking of values, etc.  Here, we want the count element always to
+     be nonnegative, so we redefine the count accessor accordingly.
+
+          package MyObj;
+          use Class::Struct::FIELDS;
+
+          # declare the struct
+          struct (MyObj => {count => '$', stuff => '%'});
+
+          # override the default accessor method for 'count'
+          sub count {
+            my MyObj $self = shift;
+
+          if (@_) {
+            die 'count must be nonnegative' if $_[0] < 0;
+            $self->{count} = shift;
+            warn "Too many args to count" if @_;
+          }
+
+          return $self->{count};
+              }
+
+          package main;
+          $x = new MyObj;
+          print "\$x->count (5) = ", $x->count (5), "\n";
+                                  # prints '$x->count (5) = 5'
+
+          print "\$x->count = ", $x->count, "\n";
+                                  # prints '$x->count = 5'
+
+          print "\$x->count (-5) = ", $x->count (-5), "\n";
+                                  # dies due to negative argument!
+
+Example 3
+     The constructor of a generated class can be passed a list of
+     *element*=>value pairs, with which to initialize the struct.  If no
+     initializer is specified for a particular element, its default
+     initialization is performed instead. Initializers for non-existent
+     elements are silently ignored.
+
+     Note that the initializer for a nested struct is specified as an
+     anonymous hash of initializers, which is passed on to the nested
+     struct's constructor.
+
+          use Class::Struct::FIELDS;
+
+          struct Breed =>
+          {
+            name  => '$',
+            cross => '$',
+          };
+
+          struct Cat =>
+          {
+            name     => '$',
+            kittens  => '@',
+            markings => '%',
+            breed    => 'Breed',
+          };
+
+          my $cat = Cat->new
+            (name     => 'Socks',
+             kittens  => ['Monica', 'Kenneth'],
+             markings => { socks => 1, blaze => "white" },
+             breed    => { name => 'short-hair', cross => 1 });
+
+          print "Once a cat called ", $cat->name, "\n";
+          print "(which was a ", $cat->breed->name, ")\n";
+          print "had two kittens: ", join(' and ', @{$cat->kittens}), "\n";
+
+Example 4
+     `Class::Struct::FIELDS' has a very elegant idiom for creating
+     inheritance trees:
+
+          use Class::Struct::FIELDS Fred => [];
+          use Class::Struct::FIELDS Barney => [qw(Fred)];
+          use Class::Struct::FIELDS Wilma => [qw(Barney)],
+            { aa => '@',
+              bb => 'IO::Scalar' };
+
+     That's all the code it takes!
+
+EXPORTS
+=======
+
+   `Class::Struct::FIELDS' export `struct' for backwards-compatibility
+with Class::Struct.
+
+DIAGNOSTICS
+===========
+
+   The following are diagnostics generated by *Class::Struct::Fields*.
+Items marked "(W)" are non-fatal (invoke `Carp::carp'); those marked "(F)"
+are fatal (invoke `Carp::croak').
+
+'struct' usage error
+     (F) The caller failed to read the documentation for
+     `Class::Struct::FIELDS' and follow the advice therein.
+
+Accessor '%s' exists in package '%s' hides method in base class
+     (W) There is already a subroutine, with the name of one of the
+     accessors, located in a base class of the given package.  You should
+     consider renaming the field with the given name.
+
+Method '%s' exists in package '%s' overrides accessor
+     (W) There is already a subroutine, with the name of one of the
+     accessors, located in the given package.  You may have intended this,
+     however, if defining your own custom accessors.
+
+Method 'new' already exists in package '%s'
+     (W) There is already a 'new' subroutine located in the given package.
+     As long as the caveats for defining your own new are followed, this
+     warning is harmless; otherwise your objects may not be properly
+     initialized.
+
+Initializer for '%s' must be %s reference
+     (F) At runtime, the caller tried to assign the wrong type of argument
+     to the element.  An example which triggers this message:
+
+          use Class::Struct::FIELDS Bob => { ary => '@' };
+          my $b = Bob::->new;
+          $b->ary ({hash => 'reference'}); # croaks
+
+     The last statement will croak with the message, "Initializer for 'ary'
+     must be ARRAY reference".
+
+Initializer for '%s' must be %s object
+     (F) At runtime, the caller tried to assign the wrong class of argument
+     to the element.  An example which triggers this message:
+
+          use Class::Struct::FIELDS Bob => { mary => 'Mary' };
+          use Class::Struct::FIELDS qw(Fred); # NOT inherit from Mary
+          my $b = Bob::->new;
+          $b->ary (Fred::->new); # croaks
+
+     The last statement will croak with the message, "Initializer for 'aa'
+     must be Mary object".
+
+BUGS AND CAVEATS
+================
+
+   Please see the TODO list.
+
+CREDITS
+=======
+
+   This documentation is amazingly like that of Class::Struct.  I wonder
+why.  Credit to Dr. Damian Conway <damian@conway.org>.
+
+AUTHOR
+======
+
+   B. K. Oxley (binkley) <binkley@bigfoot.com>
+
+   Copyright (c) 2000 B. K. Oxley (binkley). All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+SEE ALSO
+========
+
+*Note Class/Contract: Class/Contract,
+     `Class::Contract' is an extension module by Damian Conway for writing
+     in a design-by-contract object-oriented style.  It has many of the
+     features of `Class::Struct::FIELDS', and many more besides.
+
+*Note Class/Struct: Class/Struct,
+     Class::Struct is a standard module for creating simple, uninherited
+     data structures.
+
+*Note Base: base,
+     base is a standard module for establishing IS-A relationships with
+     base classes at compile time.
+
+*Note Fields: fields,
+     fields is a standard module for imbuing your class with efficient
+     pseudo-hashes for data members.
+
+
+File: pm.info,  Node: Class/Tom,  Next: Class/Translucent,  Prev: Class/Struct/FIELDS,  Up: Module List
+
+The Transportable Object Model for Perl
+***************************************
+
+NAME
+====
+
+   Class::Tom - The Transportable Object Model for Perl
+
+SYNOPSIS
+========
+
+   use Class::Tom qw ( restore );
+
+   my $tom = new Class::Tom;
+
+   $tom->insert(<OBJECT>);
+
+   $tom->insert(<ANONYMOUS SUB>);
+
+   $tom->insert(<PACKAGE NAME>);
+
+   my $flat = $tom->store();
+
+   my $newtom = restore( $flat );
+
+DESCRIPTION
+===========
+
+   `Class::Tom' allows you to transport objects from one system to another
+without requiring that the packages the object relies on actually exist on
+the other machine.
+
+METHODS
+=======
+
+new
+     new is the objects constructor.  It can optionally take the Encoder
+     argument if you've created a new encoding scheme.
+
+insert
+     The insert method accepts one of three things as an argument, a) an
+     CODE reference (such as an anonymous subroutine or a reference to a
+     subroutine), b) an Object or c) a string that contains the package
+     name.  If you insert an Object then insert returns the id of that
+     object in the internal object list.
+
+extract
+     The extract method returns an object that has been insert'ed.  The
+     argument is the Id of the object you insert.
+
+store
+     The store method returns the flattened container ready for shipping.
+
+register
+     The register method evals each of the methods stored inside the TOM
+     compartment
+
+restore
+     restore is optionally exported, and is used to turn a flattened TOM
+     object into a real perl object.
+
+BUGS
+====
+
+   There are probably loads.  I've not had time to test this on any machine
+other than my own,  so your milage may vary.  Remember, this is a beta
+version.  3.02 will be the full bugfixed release.
+
+AUTHOR
+======
+
+   James A. Duncan <j@mesduncan.co.uk>
+
+SEE ALSO
+========
+
+   perl(1)
+
+
+File: pm.info,  Node: Class/Translucent,  Next: Class/Tree,  Prev: Class/Tom,  Up: Module List
+
+A base class for translucency
+*****************************
+
+NAME
+====
+
+   Class::Translucent - A base class for translucency
+
+SYNOPSIS
+========
+
+     package My::Class;
+     BEGIN {
+         use Class::Translucent  ({
+             name    => 'sparrow',
+             item2   => 'else',
+             attr    => { one => 'two', two => 'three', three => 'one' },
+             events  => [ 'buy', 'grow', 'sell', 'eat', 'sleep' ],
+         });
+
+     use base qw{Class::Translucent};
+         }
+
+     sub new {
+         my $self = shift;
+
+     return $self->SUPER::new( @_ );
+         }
+
+     package main;
+
+     my $o = new My::Class;
+     print $o->name;             # Prints 'sparrow'
+     $o->name( 'robin' );        # Set the per-object value
+     print $o->name;             # Prints 'robin'
+     print My::Class->name;      # Prints 'sparrow'
+
+EXPORTS
+=======
+
+   Nothing by default.
+
+REQUIRES
+========
+
+   *Note Carp: Carp,, *Note Data/Dumper: Data/Dumper,
+
+   Actually, Data::Dumper is only required for debugging, so this module
+will eventually only need Carp.
+
+DESCRIPTION
+===========
+
+   This is an abstract base class that provides functionality for
+translucent attributes in its derivatives. A translucent attribute is an
+attribute which has a class-wide default. A class's attributes are set in
+a template, from which all class and instance method calls initially
+get/set their data. However, once an object has stored a value, it loses
+its translucency, and thereafter returns its own distinct value. For more
+information about translucency, see Tom Christiansen's excellent *OO
+Tutorial for Class Data in Perl*, which can be found at
+<http://language.perl.com/misc/perltootc.html>.
+
+   In order for your class to usefully inherit from Class::Translucent, it
+needs to tell Class::Translucent about itself via a template. This
+template should be a hash or hash reference containing keys for all the
+translucent attributes of your class, along with default values for each
+one.
+
+   There are several methods for defining this template. If you have class
+data that needs to be accessed before any instances of your class are
+created, you can pass the template as the argument to the 'use' statement,
+like so:
+
+     use Class::Translucent ({ attribute => 'defaultValue' });
+
+   You can also define a package global named the same thing as the last
+part of your package (eg., if you class is called
+`HTML::Graphics::Vector', the hash should be
+`%HTML::Graphics::Vector::Vector'). When Class::Translucent's constructor
+is called as a superclass constructor from your class (or one of its
+parent classes) and it doesn't already have a template registered for your
+class, it will look for such a hash, and if it is found, use it as the
+class's template.
+
+   You can also pass a hash reference as the first argument (well, second
+if you're counting the method invocation argument), which will then be
+used as the class template instead.
+
+   In any case, as soon as the template is defined, Class::Translucent
+auto-generates translucent accessor methods for the attributes you've
+specified in the template, skipping any that may already be defined.
+
+   The constructor returns an empty hashref blessed into the calling class.
+
+   *TODO: More docs*
+
+AUTHOR / PERSON TO BLAME
+========================
+
+   Michael Granger <ged@FaerieMUD.org> based on ideas from *Tom's OO
+Tutorial for Class Data in Perl* (*Note Perltootc: (perl.info)perltootc,)
+by Tom Christiansen.
+
+   Copyright (c) 1999, 2000, The FaerieMUD Consortium. All rights reserved.
+
+   This module is free software. You may use, modify, and/or redistribute
+this software under the terms of the Perl Artistic License. (See
+http://language.perl.com/misc/Artistic.html)
+
+TO DO
+=====
+
+   * Do template interpolation in the method template accessor methods
+     instead of in the code generation itself. This would mean that
+     subclassing would not obligate one to returning templates.
+
+   * Add per-class translucent data so that derivative class B's
+     attributes are inherited from superclass A, but remain distinct for
+     each class. Can probably accomplish this by iterating over
+     @{"${class}::ISA"}, and fetching the parent class's hash and merging
+     it with our own.
+
+   * Package-qualify object data members ala Damian Conway's
+     `Tie::SecureHash'.
+
+   * Better documentation
+
+   * Better test suite (or any test suite?)
+
+BUGS
+====
+
+Unintuitive translucency with complex datatypes
+     Operations other than a simple set() are ambiguous for complex
+     datatypes. For example, push adds an element to an array - so if an
+     array attribute is translucent, should `pushAttribute()' called as an
+     object method push the given value onto a new empty array, or should
+     it make a copy of the class data first, and push the new element onto
+     it?
+
+     THe copy-on-write behaviour is the current behaviour, but will need
+     some rigorous testing to make sure it conforms to Perl's
+     do-what-I-mean.
+
+Cluttered BEGIN blocks
+     In order for class methods to be callable immediately after the `use
+     Class::Translucent', the import() function must do the method
+     generation. This requires that the class template be mangled into the
+     argument to use, which is perhaps ugly and unintuitive to some. I
+     can't see any way around it, though, as it has to occur in a BEGIN
+     block in order to guarantee that the generated methods exist before
+     the constructor is called. Otherwise, setting class-wide data must
+     wait until the first instance is created.
+
+"Subroutine 'sub' redefined..." warnings with overridden methods
+     Accessor methods for translucent attributes are generated at load
+     time, and overriding subs are defined after that. This can cause
+     warnings to be issued when the methods are encountered in the derived
+     class. This problem doesn't exist when the methods are created during
+     the call to the constructor, as the method-generation code won't
+     clobber a method which is already defined, but then you have to
+     guarantee that no method will be called as a class method before the
+     first object is constructed. You could resort to calling the
+     constructor from within the package itself, but ACK! =:) Things will
+     still work as is, but spurious warnings can be confusing for those
+     who don't RTFM.
+
+     You can also cause the warnings to disappear by prototyping the
+     methods you wish to override before the `use Class::Translucent'
+     call, but that's unintuitive.
+
+Reload problems
+     When redefining a class during a reload, there is no current
+     mechanism for re-generating the accessor methods. There should be
+     some method that can be called which will clear at least the
+     `%Classes' hash in the closure so a class's template can be reloaded.
+     Perhaps some mechanism for clobbering existing accessors would also
+     be desirable.
+
+     Another related problem - do Perl internals care if a method gets
+     clobbered?  Does Perl do caching of method lookups, and, if so, what
+     will happen if the cached method is undefined during the life of the
+     program? Randal Schwartz suggests modifying the @ISA, which will
+     cause cached methods to be discarded, but I haven't yet tested this.
+
+GLOBALS
+=======
+
+Configuration Globals
+---------------------
+
+%AccessCheck
+     Method generation templates for the access-check part of each method.
+     Attributes which are prefixed with a single underscore ('_') are
+     considered 'protected', and the accessor methods generated for it may
+     only be called from within the defining class or one of its
+     derivatives. Attributes which are prefixed with two or more
+     underscores are considered 'private', and may only be accessed from
+     within the defining class itself. All other attributes are considered
+     public, and may be accessed from any package.
+
+     The code contained in these templates contain special tokens '`%%
+     ATTRIBUTE %%'', and '`%% CLASS %%'', which will be replaced,
+     respectively, with the attribute name and the name of the class for
+     which they are being generated.
+
+%AccessorCode
+     Method generation templates for the scoping part of the generated
+     methods. Attributes with a leading capital are considered to be of
+     class scope only, and calls to its accessors always modify and/or
+     return the class data. All other attributes are considered
+     translucent, and reference the class data if no specific value has
+     been set for the object in which the accessor was called, or if the
+     accessor method is called as a class rather than an instance method.
+
+     The code in these templates can contain the same tokens as the
+     %AccessCheck global, and they are subject to the same substitution at
+     method-generation.
+
+     Note that the attribute passed to later chunks of the method will
+     always be a reference to the needed attribute, even if the attribute
+     is already a reference. This is to make it easier later on to modify
+     the attribute without knowing exactly where the thing being modified
+     lives.
+
+%MethodTemplates
+     Method generation templates for various datatypes, keyed by type.
+     These templates are used to create the meat of the generated accessor
+     methods. The code they contain will be passed a reference to the
+     attribute to operate on in a scalar called $attribute, and the rest
+     of the argument list will be untouched.
+
+     The word 'attribute' in the key is replaced in the generated method
+     with the name of the attribute. For example, if you had a key named
+     'bargleAttribute', an attribute called 'name' would result in a
+     generated method called 'bargleName'. Leading underscores in an
+     attribute name are always translated to the beginning of the method
+     name, so if the attribute above was instead called '__name', then the
+     generated method would be '__bargleName'. Attributes with leading
+     capitalization result in leading capitalization in the generated
+     method name as well. Eg., an attribute called 'Name' would result in
+     a method named 'BargleName', and an attribute called '_Name' would
+     generate a method called '_BargleName'.
+
+     The methods in the 'default' key/value pair are given to every
+     datatype, and can be overidden by the more specific datatype
+     key/value pair. This can be used to establish some default behaviour
+     for an accessor, and then override it for specific datatypes.
+
+METHODS
+=======
+
+*import( \%template )*
+     Autogenerates methods for the calling class. This method can either
+     be called automatically from a use statement, or can be called
+     explicitly. Note that overriding one of the methods provided by this
+     function may result in a 'subroutine redefined' warning, as they
+     won't yet exist when import() is called, typically. This is probably
+     harmless.
+
+*importToLevel( $level, \%template )*
+     Autogenerates methods for the class indicated by the stackframe
+     specified by level. This can be useful when you want to override the
+     import() method, but still use Class::Translucent's method
+     generation. Idea borrowed from Exporter's export_to_level().
+
+Constructor Methods
+-------------------
+
+*new( @args )*
+     Create and return a new hash reference blessed into your class. If
+     accessors have not already been generated for your class, they will
+     be generated from the constructor. Existing (overridden) methods will
+     be preserved.
+
+Protected Methods
+-----------------
+
+*_buildAccessors( $class[, \%template] )*
+     Build translucent data accessor methods for the specified class
+     (package), using the template specified either by the optional second
+     argument, or if the second argument is not passed, the template as
+     defined in the class itself. This template should be synonymous with
+     the last part of the package name, so that the template for
+     `My::Derived::Class' will be called `%My::Derived::Class::Class'.
+     This function
+
+*_buildMethodCode( $attributeName, $codeTemplate, $package )*
+     Build code for a method specified by the attribute name, with the
+     specified code template and bound for the specified package.
+
+*_makeMethodName( $attribute, $methodPrototype )*
+     Make and return a method name for the specified attribute with the
+     specified method name prototype.
+
+Static Methods
+--------------
+
+*AccessCheck( $accessorType )*
+     Return a method generation template for the access-check part of a
+     generated method based on the accessor type specified. The type can
+     be one of 'public', 'protected', or 'private'. See the configuration
+     global of the same name for more information.
+
+*AccessorCode( $accessorType )*
+     Return a method generation template for the scoping part of a
+     generated method based on the accessor type specified. If the
+     accessor type is 'class', a template appropriate for static methods
+     is returned. If the specified type is 'instance', then a template
+     appropriate for instance methods is returned. See the configuration
+     global of the same name for more information.
+
+*MethodTemplates( $dataType )*
+     Return a hashref of method generation templates for the specified
+     datatype. See the documentation for the MethodTemplate configuration
+     hash for more information.
+
+

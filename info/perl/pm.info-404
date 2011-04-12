@@ -1,0 +1,2249 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Tk/pack,  Next: Tk/palette,  Prev: Tk/pTk,  Up: Module List
+
+Geometry manager that packs around edges of cavity
+**************************************************
+
+NAME
+====
+
+   Tk::pack - Geometry manager that packs around edges of cavity
+
+       $widget->pack?(args)?
+
+       $widget->packOption?(args)?
+
+DESCRIPTION
+===========
+
+   The pack method is used to communicate with the packer, a geometry
+manager that arranges the children of a parent by packing them in order
+around the edges of the parent.
+
+   In this *perl* port of Tk it is normal to pack widgets one-at-a-time
+using the widget object to be packed to invoke a method call.  This is a
+slight distortion of underlying Tk interface (which can handle lists of
+windows to one pack method call) but has proven effective in practice.
+
+   The pack method can have any of several forms, depending on Option:
+
+*$slave*->pack?(options)?
+     The options consist of pairs of arguments that specify how to manage
+     the slave.  See `"THE PACKER ALGORITHM"' in this node below for
+     details on how the options are used by the packer.  The following
+     options are supported:
+
+    *-after* => *$other*
+          *$other* must be another window.  Use its master as the master
+          for the slave, and insert the slave just after *$other* in the
+          packing order.
+
+    *-anchor* => anchor
+          Anchor must be a valid anchor position such as n or sw; it
+          specifies where to position each slave in its parcel.  Defaults
+          to center.
+
+    *-before* => *$other*
+          *$other* must be another window.  Use its master as the master
+          for the slave, and insert the slave just before *$other* in the
+          packing order.
+
+    *-expand* => boolean
+          Specifies whether the slave should be expanded to consume extra
+          space in their master.  Boolean may have any proper boolean
+          value, such as 1 or no.  Defaults to 0.
+
+    *-fill* => style
+          If a slave's parcel is larger than its requested dimensions, this
+          option may be used to stretch the slave.  Style must have one of
+          the following values:
+
+         none
+               Give the slave its requested dimensions plus any internal
+               padding requested with *-ipadx* or *-ipady*.  This is the
+               default.
+
+         x
+               Stretch the slave horizontally to fill the entire width of
+               its parcel (except leave external padding as specified by
+               *-padx*).
+
+         y
+               Stretch the slave vertically to fill the entire height of
+               its parcel (except leave external padding as specified by
+               *-pady*).
+
+         both
+               Stretch the slave both horizontally and vertically.
+
+    *-in* => *$master*
+          Insert the slave(s) at the end of the packing order for the
+          master window given by *$master*.
+
+    *-ipadx* => *amount*
+          *Amount* specifies how much horizontal internal padding to leave
+          on each side of the slave(s).  *Amount* must be a valid screen
+          distance, such as 2 or *.5c*.  It defaults to 0.
+
+    *-ipady* => *amount*
+          *Amount* specifies how much vertical internal padding to leave
+          on each side of the slave(s).  *Amount*  defaults to 0.
+
+    *-padx* => *amount*
+          *Amount* specifies how much horizontal external padding to leave
+          on each side of the slave(s).  *Amount* defaults to 0.
+
+    *-pady* => *amount*
+          *Amount* specifies how much vertical external padding to leave
+          on each side of the slave(s).  *Amount* defaults to 0.
+
+    *-side* => *side*
+          Specifies which side of the master the slave(s) will be packed
+          against.  Must be left, right, top, or *bottom*.  Defaults to
+          top.
+
+   If no *-in*, *-after* or *-before* option is specified then slave will
+be inserted at the end of the packing list for its parent unless it is
+already managed by the packer (in which case it will be left where it is).
+If one of these options is specified then slave will be inserted at the
+specified point.  If the slave are already managed by the geometry manager
+then any unspecified options for them retain their previous values rather
+than receiving default values.
+
+*$slave*->*packForget*
+     Removes slave from the packing order for its master and unmaps its
+     window.  The slave will no longer be managed by the packer.
+
+*$slave*->*packInfo*
+     Returns a list whose elements are the current configuration state of
+     the slave given by *$slave* in the same option-value form that might
+     be specified to *packConfigure*.  The first two elements of the list
+     are "*-in*=>*$master*" where *$master* is the slave's master.
+
+*$master*->*packPropagate*?(boolean)?
+     If boolean has a true boolean value such as 1 or *on* then
+     propagation is enabled for *$master*, (see `"GEOMETRY PROPAGATION"'
+     in this node below).  If boolean has a false boolean value then
+     propagation is disabled for *$master*.  In either of these cases an
+     empty string is returned.  If boolean is omitted then the method
+     returns 0 or 1 to indicate whether propagation is currently enabled
+     for *$master*.  Propagation is enabled by default.
+
+*$master*->*packSlaves*
+     Returns a list of all of the slaves in the packing order for
+     *$master*.  The order of the slaves in the list is the same as their
+     order in the packing order.  If *$master* has no slaves then an empty
+     list/string is returned in array/scalar context, respectively
+
+THE PACKER ALGORITHM
+====================
+
+   For each master the packer maintains an ordered list of slaves called
+the *packing list*.  The *-in*, *-after*, and *-before* configuration
+options are used to specify the master for each slave and the slave's
+position in the packing list.  If none of these options is given for a
+slave then the slave is added to the end of the packing list for its
+parent.
+
+   The packer arranges the slaves for a master by scanning the packing
+list in order.  At the time it processes each slave, a rectangular area
+within the master is still unallocated.  This area is called the *cavity*;
+for the first slave it is the entire area of the master.
+
+   For each slave the packer carries out the following steps:
+
+[1]
+     The packer allocates a rectangular *parcel* for the slave along the
+     side of the cavity given by the slave's *-side* option.  If the side
+     is top or bottom then the width of the parcel is the width of the
+     cavity and its height is the requested height of the slave plus the
+     *-ipady* and *-pady* options.  For the left or right side the height
+     of the parcel is the height of the cavity and the width is the
+     requested width of the slave plus the *-ipadx* and *-padx* options.
+     The parcel may be enlarged further because of the *-expand* option
+     (see `"EXPANSION"' in this node below)
+
+[2]
+     The packer chooses the dimensions of the slave.  The width will
+     normally be the slave's requested width plus twice its *-ipadx*
+     option and the height will normally be the slave's requested height
+     plus twice its *-ipady* option.  However, if the *-fill* option is x
+     or both then the width of the slave is expanded to fill the width of
+     the parcel, minus twice the *-padx* option.  If the *-fill* option is
+     y or both then the height of the slave is expanded to fill the width
+     of the parcel, minus twice the *-pady* option.
+
+[3]
+     The packer positions the slave over its parcel.  If the slave is
+     smaller than the parcel then the *-anchor* option determines where in
+     the parcel the slave will be placed.  If *-padx* or *-pady* is
+     non-zero, then the given amount of external padding will always be
+     left between the slave and the edges of the parcel.
+
+     Once a given slave has been packed, the area of its parcel is
+     subtracted from the cavity, leaving a smaller rectangular cavity for
+     the next slave.  If a slave doesn't use all of its parcel, the unused
+     space in the parcel will not be used by subsequent slaves.  If the
+     cavity should become too small to meet the needs of a slave then the
+     slave will be given whatever space is left in the cavity.  If the
+     cavity shrinks to zero size, then all remaining slaves on the packing
+     list will be unmapped from the screen until the master window becomes
+     large enough to hold them again.
+
+EXPANSION
+=========
+
+   If a master window is so large that there will be extra space left over
+after all of its slaves have been packed, then the extra space is
+distributed uniformly among all of the slaves for which the *-expand*
+option is set.  Extra horizontal space is distributed among the expandable
+slaves whose *-side* is left or right, and extra vertical space is
+distributed among the expandable slaves whose *-side* is top or *bottom*.
+
+GEOMETRY PROPAGATION
+====================
+
+   The packer normally computes how large a master must be to just exactly
+meet the needs of its slaves, and it sets the requested width and height
+of the master to these dimensions.  This causes geometry information to
+propagate up through a window hierarchy to a top-level window so that the
+entire sub-tree sizes itself to fit the needs of the leaf windows.
+However, the *packPropagate* method may be used to turn off propagation
+for one or more masters.  If propagation is disabled then the packer will
+not set the requested width and height of the packer.  This may be useful
+if, for example, you wish for a master window to have a fixed size that
+you specify.
+
+RESTRICTIONS ON MASTER WINDOWS
+==============================
+
+   The master for each slave must either be the slave's parent (the
+default) or a descendant of the slave's parent.  This restriction is
+necessary to guarantee that the slave can be placed over any part of its
+master that is visible without danger of the slave being clipped by its
+parent.
+
+PACKING ORDER
+=============
+
+   If the master for a slave is not its parent then you must make sure
+that the slave is higher in the stacking order than the master.  Otherwise
+the master will obscure the slave and it will appear as if the slave
+hasn't been packed correctly.  The easiest way to make sure the slave is
+higher than the master is to create the master window first:  the most
+recently created window will be highest in the stacking order.  Or, you
+can use the raise and *lower* methods to change the stacking order of
+either the master or the slave.
+
+SEE ALSO
+========
+
+   `Tk::form|Tk::form' in this node `Tk::grid|Tk::grid' in this node
+`Tk::place|Tk::place' in this node
+
+KEYWORDS
+========
+
+   geometry manager, location, packer, parcel, propagation, size
+
+
+File: pm.info,  Node: Tk/palette,  Next: Tk/place,  Prev: Tk/pack,  Up: Module List
+
+Modify the Tk color palette
+***************************
+
+NAME
+====
+
+   setPalette, bisque - Modify the Tk color palette
+
+   $widget->*setPalette*(background)
+
+   $widget->*setPalette(*name=>value?,name=>*value ...*?)
+
+   $widget->*bisque*
+
+DESCRIPTION
+===========
+
+   The *setPalette* method changes the color scheme for Tk.  It does this
+by modifying the colors of existing widgets and by changing the option
+database so that future widgets will use the new color scheme.  If
+*setPalette* is invoked with a single argument, the argument is the name
+of a color to use as the normal background color;  *setPalette* will
+compute a complete color palette from this background color.
+Alternatively, the arguments to *setPalette* may consist of any number of
+name-value pairs, where the first argument of the pair is the name of an
+option in the Tk option database and the second argument is the new value
+to use for that option.  The following database names are currently
+supported:
+
+     activeBackground	foreground	selectColor
+     activeForeground	highlightBackground	selectBackground
+     background	highlightColor	selectForeground
+     disabledForeground	insertBackground	troughColor
+
+   *setPalette* tries to compute reasonable defaults for any options that
+you don't specify.  You can specify options other than the above ones and
+Tk will change those options on widgets as well.  This feature may be
+useful if you are using custom widgets with additional color options.
+
+   Once it has computed the new value to use for each of the color options,
+*setPalette* scans the widget hierarchy to modify the options of all
+existing widgets.  For each widget, it checks to see if any of the above
+options is defined for the widget.  If so, and if the option's current
+value is the default, then the value is changed;  if the option has a
+value other than the default, *setPalette* will not change it.  The
+default for an option is the one provided by the widget
+(*($w->configure('option'))[3]*) unless *setPalette* has been run
+previously, in which case it is the value specified in the previous
+invocation of *setPalette*.
+
+   After modifying all the widgets in the application, *setPalette* adds
+options to the option database to change the defaults for widgets created
+in the future.  The new options are added at priority widgetDefault, so
+they will be overridden by options from the .Xdefaults file or options
+specified on the command-line that creates a widget.
+
+   The method *bisque* is provided for backward compatibility: it restores
+the application's colors to the light brown ("bisque") color scheme used
+in Tk 3.6 and earlier versions.
+
+BUGS
+====
+
+   The use of option database names rather than the configure names is
+understandable given the mechanism (copied from Tcl/Tk), but is
+potentially confusing.
+
+   The interpolation of different 'shades' of color used for 3D effects in
+'RGB' space can lead to undesirable changes in 'hue'.  Interpolation in
+'HSV' (as used in *Tk::ColorEditor*) would be more robust and X11R5's
+color support probably even more so.
+
+SEE ALSO
+========
+
+   `Tk::options|Tk::options' in this node
+
+KEYWORDS
+========
+
+   bisque, color, palette
+
+
+File: pm.info,  Node: Tk/place,  Next: Tk/selection,  Prev: Tk/palette,  Up: Module List
+
+Geometry manager for fixed or rubber-sheet placement
+****************************************************
+
+NAME
+====
+
+   Tk::place - Geometry manager for fixed or rubber-sheet placement
+
+      $widget->*place*?(*-option*=>value?, *-option*=>value, ...)?
+
+      $widget->*placeForget*
+
+      $widget->*placeInfo*
+
+      *$master*->*placeSlaves*
+
+DESCRIPTION
+===========
+
+   The placer is a geometry manager for Tk.  It provides simple fixed
+placement of windows, where you specify the exact size and location of one
+window, called the slave, within another window, called the *$master*.
+The placer also provides rubber-sheet placement, where you specify the
+size and location of the slave in terms of the dimensions of the master,
+so that the slave changes size and location in response to changes in the
+size of the master.  Lastly, the placer allows you to mix these styles of
+placement so that, for example, the slave has a fixed width and height but
+is centered inside the master.
+
+*$slave*->*place*?(*-option*=>value?, *-option*=>value, ...?)?
+     The *place* method arranges for the placer to manage the geometry of
+     *$slave*.  The remaining arguments consist of one or more
+     *-option*=>value pairs that specify the way in which *$slave*'s
+     geometry is managed.  If the placer is already managing *$slave*,
+     then the *-option*=>value pairs modify the configuration for *$slave*.
+     The *place* method returns an empty string as result.  The following
+     *-option*=>value pairs are supported:
+
+    *-in* => *$master*
+          *$master* is the reference to the window relative to which
+          *$slave* is to be placed.  *$master* must either be *$slave*'s
+          parent or a descendant of *$slave*'s parent.  In addition,
+          *$master* and *$slave* must both be descendants of the same
+          top-level window.  These restrictions are necessary to guarantee
+          that *$slave* is visible whenever *$master* is visible.  If this
+          option isn't specified then the master defaults to *$slave*'s
+          parent.
+
+    -x => location
+          Location specifies the x-coordinate within the master window of
+          the anchor point for *$slave* widget.  The location is specified
+          in screen units (i.e. any of the forms accepted by
+          *Tk_GetPixels*) and need not lie within the bounds of the master
+          window.
+
+    *-relx* => location
+          Location specifies the x-coordinate within the master window of
+          the anchor point for *$slave* widget.  In this case the location
+          is specified in a relative fashion as a floating-point number:
+          0.0 corresponds to the left edge of the master and 1.0
+          corresponds to the right edge of the master.  Location need not
+          be in the range 0.0-1.0.  If both -x and *-relx* are specified
+          for a slave then their values are summed.  For example,
+          "*-relx*=>0.5, -x=-2" positions the left edge of the slave 2
+          pixels to the left of the center of its master.
+
+    -y => location
+          Location specifies the y-coordinate within the master window of
+          the anchor point for *$slave* widget.  The location is specified
+          in screen units (i.e. any of the forms accepted by
+          *Tk_GetPixels*) and need not lie within the bounds of the master
+          window.
+
+    *-rely* => location
+          Location specifies the y-coordinate within the master window of
+          the anchor point for *$slave* widget.  In this case the value is
+          specified in a relative fashion as a floating-point number:  0.0
+          corresponds to the top edge of the master and 1.0 corresponds to
+          the bottom edge of the master.  Location need not be in the
+          range 0.0-1.0.  If both -y and *-rely* are specified for a slave
+          then their values are summed.  For example, *-rely*=>0.5, -x=>3
+          positions the top edge of the slave 3 pixels below the center of
+          its master.
+
+    *-anchor* => where
+          Where specifies which point of *$slave* is to be positioned at
+          the (x,y) location selected by the -x, -y, *-relx*, and *-rely*
+          options.  The anchor point is in terms of the outer area of
+          *$slave* including its border, if any.  Thus if where is *se*
+          then the lower-right corner of *$slave*'s border will appear at
+          the given (x,y) location in the master.  The anchor position
+          defaults to *nw*.
+
+    *-width* => size
+          Size specifies the width for *$slave* in screen units (i.e. any
+          of the forms accepted by *Tk_GetPixels*).  The width will be the
+          outer width of *$slave* including its border, if any.  If size
+          is an empty string, or if no *-width* or *-relwidth* option is
+          specified, then the width requested internally by the window
+          will be used.
+
+    *-relwidth* => size
+          Size specifies the width for *$slave*.  In this case the width
+          is specified as a floating-point number relative to the width of
+          the master: 0.5 means *$slave* will be half as wide as the
+          master, 1.0 means *$slave* will have the same width as the
+          master, and so on.  If both *-width* and *-relwidth* are
+          specified for a slave, their values are summed.  For example,
+          *-relwidth*=>1.0, *-width*=>5 makes the slave 5 pixels wider
+          than the master.
+
+    *-height* => size
+          Size specifies the height for *$slave* in screen units (i.e. any
+          of the forms accepted by *Tk_GetPixels*).  The height will be
+          the outer dimension of *$slave* including its border, if any.
+          If size is an empty string, or if no *-height* or *-relheight*
+          option is specified, then the height requested internally by the
+          window will be used.
+
+    *-relheight* => size
+          Size specifies the height for *$slave*.  In this case the height
+          is specified as a floating-point number relative to the height
+          of the master: 0.5 means *$slave* will be half as high as the
+          master, 1.0 means *$slave* will have the same height as the
+          master, and so on.  If both *-height* and *-relheight* are
+          specified for a slave, their values are summed.  For example,
+          *-relheight*=>1.0, *-height*=>-2 makes the slave 2 pixels
+          shorter than the master.
+
+    *-bordermode* => mode
+          Mode determines the degree to which borders within the master
+          are used in determining the placement of the slave.  The default
+          and most common value is *inside*.  In this case the placer
+          considers the area of the master to be the innermost area of the
+          master, inside any border: an option of -x=>0 corresponds to an
+          x-coordinate just inside the border and an option of
+          *-relwidth*=>1.0 means *$slave* will fill the area inside the
+          master's border.  If mode is *outside* then the placer considers
+          the area of the master to include its border; this mode is
+          typically used when placing *$slave* outside its master, as with
+          the options -x=>0, -y=>0, *-anchor*=>ne.  Lastly, mode may be
+          specified as *ignore*, in which case borders are ignored:  the
+          area of the master is considered to be its official X area,
+          which includes any internal border but no external border.  A
+          bordermode of *ignore* is probably not very useful.
+
+          If the same value is specified separately with two different
+          options, such as -x and *-relx*, then the most recent option is
+          used and the older one is ignored.
+
+*$slave*->*placeSlaves*
+     The *placeSlaves* method returns a list of all the slave windows for
+     which *$master* is the master.  If there are no slaves for *$master*
+     then an empty list is returned.
+
+*$slave*->*placeForget*
+     The *placeForget* method causes the placer to stop managing the
+     geometry of *$slave*.  As a side effect of this method call *$slave*
+     will be unmapped so that it doesn't appear on the screen.  If
+     *$slave* isn't currently managed by the placer then the method call
+     has no effect.  *placeForget* returns an empty string as result.
+
+*$slave*->*placeInfo*
+     The *placeInfo* method returns a list giving the current
+     configuration of *$slave*.  The list consists of *-option*=>value
+     pairs in exactly the same form as might be specified to the *place*
+     method.  If the configuration of a window has been retrieved with
+     *placeInfo*, that configuration can be restored later by first using
+     *placeForget* to erase any existing information for the window and
+     then invoking *place* with the saved information.
+
+FINE POINTS
+===========
+
+   It is not necessary for the master window to be the parent of the slave
+window.  This feature is useful in at least two situations.  First, for
+complex window layouts it means you can create a hierarchy of subwindows
+whose only purpose is to assist in the layout of the parent.  The "*real
+children*" of the parent (i.e. the windows that are significant for the
+application's user interface) can be children of the parent yet be placed
+inside the windows of the geometry-management hierarchy.  This means that
+the path names of the "*real children*" don't reflect the
+geometry-management hierarchy and users can specify options for the real
+children without being aware of the structure of the geometry-management
+hierarchy.
+
+   A second reason for having a master different than the slave's parent
+is to tie two siblings together.  For example, the placer can be used to
+force a window always to be positioned centered just below one of its
+siblings by specifying the configuration
+
+       *-in*=>*$sibling*, *-relx*=>0.5, *-rely*=>1.0, *-anchor*=>'n',
+*-bordermode*=>'outside'
+
+   Whenever the *$sibling* widget is repositioned in the future, the slave
+will be repositioned as well.
+
+   Unlike many other geometry managers (such as the packer) the placer
+does not make any attempt to manipulate the geometry of the master windows
+or the parents of slave windows (i.e. it doesn't set their requested
+sizes).  To control the sizes of these windows, make them windows like
+frames and canvases that provide configuration options for this purpose.
+
+SEE ALSO
+========
+
+   `Tk::form|Tk::form' in this node `Tk::grid|Tk::grid' in this node
+`Tk::pack|Tk::pack' in this node
+
+KEYWORDS
+========
+
+   geometry manager, height, location, master, place, rubber sheet, slave,
+width
+
+
+File: pm.info,  Node: Tk/selection,  Next: Tk/send,  Prev: Tk/place,  Up: Module List
+
+Manipulate the X selection
+**************************
+
+NAME
+====
+
+   Tk::Selection - Manipulate the X selection
+
+   $widget->SelectionOption?(args)?
+
+DESCRIPTION
+===========
+
+   This command provides an interface to the X selection mechanism and
+implements the full selection functionality described in the X
+Inter-Client Communication Conventions Manual (ICCCM).
+
+   The widget object used to invoke the methods below determines which
+display is used to access the selection.  In order to avoid conflicts with
+selection methods of widget classes (e.g. Text) this set of methods uses
+the prefix Selection.  The following methods are currently supported:
+
+$widget->*SelectionClear*?(*-selection*=>selection)?
+     If selection exists anywhere on $widget's display, clear it so that
+     no window owns the selection anymore.  Selection specifies the X
+     selection that should be cleared, and should be an atom name such as
+     PRIMARY or CLIPBOARD; see the Inter-Client Communication Conventions
+     Manual for complete details.  Selection defaults to PRIMARY.  Returns
+     an empty string.
+
+$widget->*SelectionGet*?(?*-selection*=>selection?,?*-type*=>type?)?
+     Retrieves the value of selection from $widget's display and returns
+     it as a result.  Selection defaults to PRIMARY.
+
+     Type specifies the form in which the selection is to be returned (the
+     desired "target" for conversion, in ICCCM terminology), and should be
+     an atom name such as STRING or FILE_NAME; see the Inter-Client
+     Communication Conventions Manual for complete details.  Type defaults
+     to STRING.  The selection owner may choose to return the selection in
+     any of several different representation formats, such as STRING,
+     ATOM, INTEGER, etc. (this format is different than the selection
+     type; see the ICCCM for all the confusing details).
+
+     If format is not STRING then things get messy, the following
+     description is from the Tcl/Tk man page as yet incompetely translated
+     for the perl version - it is misleading at best.
+
+     If the selection is returned in a non-string format, such as INTEGER
+     or ATOM, the *SelectionGet* converts it to a list of perl values:
+     atoms are converted to their textual names, and anything else is
+     converted integers.
+
+     A goal of the perl port is to provide better handling of different
+     formats than Tcl/Tk does, which should be possible given perl's wider
+     range of "types". Although some thought went into this in very early
+     days of perl/Tk what exactly happens is still "not quite right" and
+     subject to change.
+
+$widget->*SelectionHandle*(?*-selection*=>selection?,?*-type*=>type?,?*-format*=>format? callback)
+     Creates a handler for selection requests, such that callback will be
+     executed whenever selection is owned by $widget and someone attempts
+     to retrieve it in the form given by type (e.g. type is specified in
+     the *selection get* command).  Selection defaults to PRIMARY, type
+     defaults to STRING, and format defaults to STRING.  If callback is an
+     empty string then any existing handler for $widget, type, and
+     selection is removed.
+
+     When selection is requested, $widget is the selection owner, and type
+     is the requested type, callback will be executed with two additional
+     arguments.  The two additional arguments are offset and *maxBytes*:
+     offset specifies a starting character position in the selection and
+     *maxBytes* gives the maximum number of bytes to retrieve.  The
+     command should return a value consisting of at most *maxBytes* of the
+     selection, starting at position offset.  For very large selections
+     (larger than *maxBytes*) the selection will be retrieved using
+     several invocations of callback with increasing offset values.  If
+     callback returns a string whose length is less than *maxBytes*, the
+     return value is assumed to include all of the remainder of the
+     selection;  if the length of callback's result is equal to *maxBytes*
+     then callback will be invoked again, until it eventually returns a
+     result shorter than *maxBytes*.  The value of *maxBytes* will always
+     be relatively large (thousands of bytes).
+
+     If callback returns an error (e.g. via die) then the selection
+     retrieval is rejected just as if the selection didn't exist at all.
+
+     The format argument specifies the representation that should be used
+     to transmit the selection to the requester (the second column of
+     Table 2 of the ICCCM), and defaults to STRING.  If format is STRING,
+     the selection is transmitted as 8-bit ASCII characters (i.e.  just in
+     the form returned by command).
+
+     If format is not STRING then things get messy, the following
+     description is from the Tcl/Tk man page as yet untranslated for the
+     perl version - it is misleading at best.
+
+     If format is ATOM, then the return value from command is divided into
+     fields separated by white space;  each field is converted to its atom
+     value, and the 32-bit atom value is transmitted instead of the atom
+     name.  For any other format, the return value from command is divided
+     into fields separated by white space and each field is converted to a
+     32-bit integer;  an array of integers is transmitted to the selection
+     requester.
+
+     The format argument is needed only for compatibility with many
+     selection requesters, except Tcl/Tk.  If Tcl/Tk is being used to
+     retrieve the selection then the value is converted back to a string
+     at the requesting end, so format is irrelevant.
+
+     A goal of the perl port is to provide better handling of different
+     formats than Tcl/Tk does, which should be possible given perl's wider
+     range of "types". Although some thought went into this in very early
+     days of perl/Tk what exactly happens is still "not quite right" and
+     subject to change.
+
+    $widget->*SelectionOwner*?(*-selection*=>selection)?
+          *SelectionOwner* returns the window in this application that
+          owns selection on the display containing $widget, or an empty
+          string if no window in this application owns the selection.
+          Selection defaults to PRIMARY.
+
+    $widget->*SelectionOwn*?(?*-command*=>callback?,?*-selection*=>selection?)?
+          *SelectionOwn* causes $widget to become the new owner of
+          selection on $widget's display, returning an empty string as
+          result. The existing owner, if any, is notified that it has lost
+          the selection.  If callback is specified, it will be executed
+          when some other window claims ownership of the selection away
+          from $widget.  Selection defaults to PRIMARY.
+
+KEYWORDS
+========
+
+   clear, format, handler, ICCCM, own, selection, target, type
+
+
+File: pm.info,  Node: Tk/send,  Next: Tk/tixWm,  Prev: Tk/selection,  Up: Module List
+
+Execute a command in a different application
+********************************************
+
+NAME
+====
+
+   send - Execute a command in a different application
+
+       $result = $widget->send(?options,?app=>cmd?*arg arg ...*?)
+
+DESCRIPTION
+===========
+
+   This method arranges for cmd (and *arg*s) to be 'sent' to the
+application named by app.  It returns the result or an error (hence above
+should probably be 'wrapped' in *eval{}* and $@ tested).  *App* may be the
+name of any application whose main window is on the display containing the
+sender's main window;  it need not be within the same process.  If no
+*arg* arguments are present, then the string to be sent is contained
+entirely within the cmd argument.  If one or more *arg*s are present, they
+are concatenated separated by white space to form the string to be sent.
+
+   If the initial arguments of the call begin with "-" they are treated as
+options.  The following options are currently defined:
+
+*-async*
+     Requests asynchronous invocation.  In this case the send command will
+     complete immediately without waiting for cmd to complete in the
+     target application;  no result will be available and errors in the
+     sent command will be ignored.  If the target application is in the
+     same process as the sending application then the *-async* option is
+     ignored.
+
+-
+     Serves no purpose except to terminate the list of options.  This
+     option is needed only if app could contain a leading "-" character.
+
+APPLICATION NAMES
+=================
+
+   The name of an application is set initially from the name of the
+program or script that created the application.  You can query and change
+the name of an application with the *appname* method.
+
+WHAT IS A SEND
+==============
+
+   The send mechanism was designed to allow Tcl/Tk applications to send
+Tcl Scripts to each other. This does not map very well onto perl/Tk.
+Perl/Tk "sends" a string to app, what happens as a result of this depends
+on the receiving application. If the other application is a Tcl/Tk4.*
+application it will be treated as a Tcl Script. If the "other" application
+is perl/Tk application (including sends to self) then the string is passed
+as an argument to a method call of the following form:
+
+   *$mainwindow*->*Receive(*string);
+
+   There is a default (AutoLoaded) *Tk::Receive* which returns an error to
+the sending application. A particular application may define its own
+*Receive* method in any class in *MainWindow*'s inheritance tree to do
+whatever it sees fit. For example it could eval the string, possibly in a
+Safe "compartment".
+
+   If a Tcl/Tk application "sends" anything to a perl/Tk application then
+the perl/Tk application would have to attempt to interpret the incoming
+string as a Tcl Script. Simple cases are should not be too hard to emulate
+(split on white space and treat first element as "command" and other
+elements as arguments).
+
+SECURITY
+========
+
+   The send command is potentially a serious security loophole, since any
+application that can connect to your X server can send scripts to your
+applications. Hence the default behaviour outlined above.  (With the
+availability of Safe it may make sense to relax default behaviour a
+little.)
+
+   Unmonitored eval'ing of these incoming "scripts" can cause perl to read
+and write files and invoke subprocesses under your name.  Host-based
+access control such as that provided by *xhost* is particularly insecure,
+since it allows anyone with an account on particular hosts to connect to
+your server, and if disabled it allows anyone anywhere to connect to your
+server.  In order to provide at least a small amount of security, core Tk
+checks the access control being used by the server and rejects incoming
+sends unless (a) *xhost*-style access control is enabled (i.e. only
+certain hosts can establish connections) and (b) the list of enabled hosts
+is empty.  This means that applications cannot connect to your server
+unless they use some other form of authorization such as that provide by
+*xauth*.
+
+SEE ALSO
+========
+
+   Perl's eval perl's Safe Module system's administrator/corporate
+security guidelines etc.
+
+KEYWORDS
+========
+
+   application, name, remote execution, security, send
+
+
+File: pm.info,  Node: Tk/tixWm,  Next: Tk/tkvars,  Prev: Tk/send,  Up: Module List
+
+Tix's addition to the standard TK wm command.
+*********************************************
+
+NAME
+====
+
+   Tk::tixWm - Tix's addition to the standard TK wm command.
+
+       $widget->*wmCapture*
+
+       $widget->*wmRelease*
+
+DESCRIPTION
+===========
+
+   The *wmCapture* and the *wmRelease* methods change the toplevel
+attribute of Tk widgets.
+
+METHODS
+=======
+
+$widget->*wmCapture*
+     Converts the toplevel window specified by $widget into a non-toplevel
+     widget. Normally this command is called to convert a
+     `Toplevel|Tk::Toplevel' in this node widget into a `Frame|Tk::Frame'
+     in this node widget. The newly-converted frame widget is un-mapped
+     from the screen. To make it appear inside its parent, you must call a
+     geometry manager (e.g. grid or pack) explictly.
+
+$widget->*wmRelease*
+     Makes the non-toplevel window specified by $widget into a toplevel
+     widget. Normally this command is called to convert a
+     `Frame|Tk::Frame' in this node widget into a `Toplevel|Tk::Toplevel'
+     in this node widget, but it can also be used on any non-toplevel
+     widget (e.g, label). The newly-converted toplevel window is in a
+     *withdrawn* state. To make it appear on the screen, you must call
+     *deiconify* after calling *wmRelease*.
+
+     Any data associated with $widget via *wm* methods (icon, protocol,
+     command etc.) are released, and must be re-established if window is
+     later re-captured.
+
+BUGS
+====
+
+   *wmCapture* does not exist in the Win32 window manager code.
+
+   How these methods interact with perl/Tk's class hierarchy is not yet
+clear.  In particular a *wmRelease*d window will not automatically
+"*inherit*" the *Tk::Wm* methods, however a *wmCapture*d window still will.
+(A released Label might make a good candidate for an Icon.)
+
+AUTHORS
+=======
+
+   Ioi Kim Lam - ioi@graphics.cis.upenn.edu wrote original Tix version.
+Updated for tk8.0, Win32 and perl by Nick Ing-Simmons.
+
+SEE ALSO
+========
+
+   `Tk::Wm|Tk::Wm' in this node `Tk::Mwm|Tk::Mwm' in this node
+`Tk::Frame|Tk::Frame' in this node `Tk::Toplevel|Tk::Toplevel' in this node
+
+KEYWORDS
+========
+
+   window manager, wm, TIX
+
+
+File: pm.info,  Node: Tk/tkvars,  Next: Tk/widgets,  Prev: Tk/tixWm,  Up: Module List
+
+Variables used or set by Tk
+***************************
+
+NAME
+====
+
+   tkvars - Variables used or set by Tk
+
+   The following perl variables are either set or used by Tk at various
+times in its execution. (For a list of variables used by perl see *Note
+Perlvar: (perl.info)perlvar,.)
+
+$Tk::library
+     This variable holds the file name for a directory containing the
+     modules related to Tk.  These modules include an initialization file
+     that is normally processed whenever a Tk application starts up, plus
+     other files containing procedures that implement default behaviors
+     for widgets.  The initial value of $Tk::library is set when Tk is
+     added to an interpreter;  this is done by searching searching for a
+     directory named Tk in the directory where the file `Tk.pm', or the
+     first directory Tk in `@INC'.
+
+     The *TK_LIBRARY* environment variable used by Tcl/Tk is not supported
+     by perl/Tk.  Please use `@INC|perlvar' in this node to change where
+     modules are searched.
+
+     Note: This is Tcl remnant. With perl it makes more sense to use
+     `@INC' and %INC).
+
+$Tk::patchLevel
+     Contains a decimal integer giving the current patch level for Tk.
+     The patch level is incremented for each new release or patch, and it
+     uniquely identifies an official version of Tk.
+
+     Note: this is Tcl remnant. With perl it makes more sense to use
+     $Tk::VERSION described below.
+
+$Tk::strictMotif
+     This variable is set to zero by default.  If an application sets it
+     to one, then Tk attempts to adhere as closely as possible to Motif
+     look-and-feel standards.  For example, active elements such as
+     buttons and scrollbar sliders will not change color when the pointer
+     passes over them.
+
+$Tk::VERSION
+     The variable holds the current version number of the perl/Tk release
+     in the form *major*.*minor*.  *Major* and *minor* are integers.
+
+     The *major* version number shows on which Tcl/Tk release perl/Tk is
+     based.  E.g., *402* means based on Tcls Tk 4.2.  (Patchlevel of Tcls
+     Tk are not incorporated because perl/Tk tended  to be "*ahead*" of
+     them on some fixes and behind on others.  The first digest of the
+     major version number increases in any Tk release that includes
+     changes that are not backward compatible (i.e. whenever existing
+     perl/Tk applications and scripts may have to change to work with the
+     new release).
+
+     The *minor* version depends on perl/Tk only. It uses the
+     'even'='stable', 'odd'='experimental' scheme that linux uses:
+
+          .0xx  - inherently 'alpha'
+          .1xx  - experimental 'beta'
+          .2xx  - stable
+          .3xx  - experimental
+          .4xx  - stable
+          ...
+
+     The minor version number increases with each new release of Tk,
+     except that it resets to zero whenever the major version number
+     changes.
+
+$Tk::version
+     The variable holds the current version number of the Tk library in
+     the form *major*.*minor*.  *Major* and *minor* are integers.  The
+     major version number increases in any Tk release that includes
+     changes that are not backward compatible (i.e. whenever existing Tk
+     applications and scripts may have to change to work with the new
+     release).  The minor version number increases with each new release
+     of Tk, except that it resets to zero whenever the major version
+     number changes.
+
+     Note: this is Tcl remnant.  With perl it makes more sense to use
+     $Tk::VERSION described above.
+
+KEYWORDS
+========
+
+   variables, version
+
+
+File: pm.info,  Node: Tk/widgets,  Next: Tree/DAG_Node,  Prev: Tk/tkvars,  Up: Module List
+
+preload widget classes
+**********************
+
+NAME
+====
+
+   Tk::widgets - preload widget classes
+
+SYNOPSIS
+========
+
+     use Tk::widgets qw(Button Label Frame);
+
+DESCRIPTION
+===========
+
+   Does a 'require Tk::Foo' for each 'Foo' in the list.  May speed startup
+by avoiding AUTOLOADs.
+
+
+File: pm.info,  Node: Tree/DAG_Node,  Next: Tree/Fat,  Prev: Tk/widgets,  Up: Module List
+
+(super)class for representing nodes in a tree
+*********************************************
+
+NAME
+====
+
+   Tree::DAG_Node - (super)class for representing nodes in a tree
+
+SYNOPSIS
+========
+
+   Using as a base class:
+
+     package Game::Tree::Node; # or whatever you're doing
+     use Tree::DAG_Node;
+     @ISA = qw(Tree::DAG_Node);
+     ...your own methods overriding/extending
+       the methods in Tree::DAG_Node...
+
+   Using as a class of its own:
+
+     use Tree::DAG_Node;
+     my $root = Tree::DAG_Node->new();
+     $root->name("I'm the tops");
+     my $new_daughter = $root->new_daughter;
+     $new_daughter->name("More");
+     ...
+
+DESCRIPTION
+===========
+
+   This class encapsulates/makes/manipulates objects that represent nodes
+in a tree structure. The tree structure is not an object itself, but is
+emergent from the linkages you create between nodes.  This class provides
+the methods for making linkages that can be used to build up a tree, while
+preventing you from ever making any kinds of linkages which are not
+allowed in a tree (such as having a node be its own mother or ancestor, or
+having a node have two mothers).
+
+   This is what I mean by a "tree structure", a bit redundantly stated:
+
+   * A tree is a special case of an acyclic directed graph.
+
+   * A tree is a network of nodes where there's exactly one root node
+(i.e., 'the top'), and the only primary relationship between nodes is the
+mother-daugher relationship.
+
+   * No node can be its own mother, or its mother's mother, etc.
+
+   * Each node in the tree has exactly one "parent" (node in the "up"
+direction) - except the root, which is parentless.
+
+   * Each node can have any number (0 to any finite number) of daughter
+nodes.  A given node's daughter nodes constitute an ordered list.
+(However, you are free to consider this ordering irrelevant.  Some
+applications do need daughters to be ordered, so I chose to consider this
+the general case.)
+
+   * A node can appear in only one tree, and only once in that tree.
+Notably (notable because it doesn't follow from the two above points), a
+node cannot appear twice in its mother's daughter list.
+
+   * In other words, there's an idea of up (toward the root) versus down
+(away from the root), and left (i.e., toward the start (index 0) of a
+given node's daughter list) versus right (toward the end of a given node's
+daughter list).
+
+   Trees as described above have various applications, among them:
+representing syntactic constituency, in formal linguistics; representing
+contingencies in a game tree; representing abstract syntax in the parsing
+of any computer language - whether in expression trees for programming
+languages, or constituency in the parse of a markup language document.
+(Some of these might not use the fact that daughters are ordered.)
+
+   (Note: B-Trees are a very special case of the above kinds of trees, and
+are best treated with their own class.  Check CPAN for modules
+encapsulating B-Trees; or if you actually want a database, and for some
+reason ended up looking here, go look at *Note AnyDBM_File: AnyDBM_File,.)
+
+   Many base classes are not usable except as such - but Tree::DAG_Node
+can be used as a normal class.  You can go ahead and say:
+
+     use Tree::DAG_Node;
+     my $root = Tree::DAG_Node->new();
+     $root->name("I'm the tops");
+     $new_daughter = Tree::DAG_Node->new();
+     $new_daughter->name("More");
+     $root->add_daughter($new_daughter);
+
+   and so on, constructing and linking objects from Tree::DAG_Node and
+making useful tree structures out of them.
+
+A NOTE TO THE READER
+====================
+
+   This class is big and provides lots of methods.  If your problem is
+simple (say, just representing a simple parse tree), this class might seem
+like using an atomic sledgehammer to swat a fly.  But the complexity of
+this module's bells and whistles shouldn't detract from the efficiency of
+using this class for a simple purpose.  In fact, I'd be very surprised if
+any one user ever had use for more that even a third of the methods in
+this class.  And remember: an atomic sledgehammer *will* kill that fly.
+
+OBJECT CONTENTS
+===============
+
+   Implementationally, each node in a tree is an object, in the sense of
+being an arbitrarily complex data structure that belongs to a class
+(presumably Tree::DAG_Node, or ones derived from it) that provides methods.
+
+   The attributes of a node-object are:
+
+mother - this node's mother.  undef if this is a root.
+daughters - the (possibly empty) list of daughters of this node.
+name - the name for this node.
+     Need not be unique, or even printable.  This is printed in some of the
+     various dumper methods, but it's up to you if you don't put anything
+     meaningful or printable here.
+
+attributes - whatever the user wants to use it for.
+     Presumably a hashref to whatever other attributes the user wants to
+     store without risk of colliding with the object's real attributes.
+     (Example usage: attributes to an SGML tag - you definitely wouldn't
+     want the existence of a "mother=foo" pair in such a tag to collide
+     with a node object's 'mother' attribute.)
+
+     Aside from (by default) initializing it to {}, and having the access
+     method called "attributes" (described a ways below), I don't do
+     anything with the "attributes" in this module.  I basically intended
+     this so that users who don't want/need to bother deriving a class
+     from Tree::DAG_Node, could still attach whatever data they wanted in a
+     node.
+
+   "mother" and "daughters" are attributes that relate to linkage - they
+are never written to directly, but are changed as appropriate by the
+"linkage methods", discussed below.
+
+   The other two (and whatever others you may add in derived classes) are
+simply accessed thru the same-named methods, discussed further below.
+
+ABOUT THE DOCUMENTED INTERFACE
+------------------------------
+
+   Stick to the documented interface (and comments in the source -
+especially ones saying "undocumented!" and/or "disfavored!" - do not count
+as documentation!), and don't rely on any behavior that's not in the
+documented interface.
+
+   Specifically, unless the documentation for a particular method says
+"this method returns thus-and-such a value", then you should not rely on
+it returning anything meaningful.
+
+   A *passing* acquintance with at least the broader details of the source
+code for this class is assumed for anyone using this class as a base class
+- especially if you're overriding existing methods, and *definitely* if
+you're overriding linkage methods.
+
+MAIN CONSTRUCTOR, AND INITIALIZER
+=================================
+
+the constructor CLASS->new() or CLASS->new({...options...})
+     This creates a new node object, calls $object->_init({...options...})
+     to provide it sane defaults (like: undef name, undef mother, no
+     daughters, 'attributes' setting of a new empty hashref), and returns
+     the object created.  (If you just said "CLASS->new()" or "CLASS->new",
+     then it pretends you called "CLASS->new({})".)
+
+     Currently no options for putting in {...options...} are part of the
+     documented interface, but the options is here in case you want to add
+     such behavior in a derived class.
+
+     Read on if you plan on using Tree::DAG_New as a base class.
+     (Otherwise feel free to skip to the description of _init.)
+
+     There are, in my mind, two ways to do object construction:
+
+     Way 1: create an object, knowing that it'll have certain uninteresting
+     sane default values, and then call methods to change those values to
+     what you want.  Example:
+
+          $node = Tree::DAG_Node->new;
+          $node->name('Supahnode!');
+          $root->add_daughter($node);
+          $node->add_daughters(@some_others)
+
+     Way 2: be able to specify some/most/all the object's attributes in
+     the call to the constructor.  Something like:
+
+          $node = Tree::DAG_Node->new({
+            name => 'Supahnode!',
+            mother => $root,
+            daughters => \@some_others
+          });
+
+     After some deliberation, I've decided that the second way is a Bad
+     Thing.  First off, it is not markedly more concise than the first
+     way.  Second off, it often requires subtly different syntax (e.g.,
+     \@some_others vs @some_others).  It just complicates things for the
+     programmer and the user, without making either appreciably happier.
+
+     (This is not to say that options in general for a constructor are bad
+     - `random_network', discussed far below, necessarily takes options.
+     But note that those are not options for the default values of
+     attributes.)
+
+     Anyway, if you use Tree::DAG_Node as a superclass, and you add
+     attributes that need to be initialized, what you need to do is provide
+     an _init method that calls $this->SUPER::_init($options) to use its
+     superclass's _init method, and then initializes the new attributes:
+
+          sub _init {
+            my($this, $options) = @_[0,1];
+            $this->SUPER::_init($options); # call my superclass's _init to
+              # init all the attributes I'm inheriting
+          
+            # Now init /my/ new attributes:
+            $this->{'amigos'} = []; # for example
+          }
+
+     ...or, as I prefer when I'm being a neat freak:
+
+          sub _init {
+            my($this, $options) = @_[0,1];
+            $this->SUPER::_init($options);
+          
+            $this->_init_amigos($options);
+          }
+          
+          sub _init_amigos {
+            my $this = $_[0];
+            # Or my($this,$options) = @_[0,1]; if I'm using $options
+            $this->{'amigos'} = [];
+          }
+
+     In other words, I like to have each attribute initialized thru a
+     method named _init_[attribute], which should expect the object as
+     $_[0] and the the options hashref (or {} if none was given) as $_[1].
+     If you insist on having your _init recognize options for setting
+     attributes, you might as well have them dealt with by the appropriate
+     _init_[attribute] method, like this:
+
+          sub _init {
+            my($this, $options) = @_[0,1];
+            $this->SUPER::_init($options);
+          
+            $this->_init_amigos($options);
+          }
+          
+          sub _init_amigos {
+            my($this,$options) = @_[0,1]; # I need options this time
+            $this->{'amigos'} = [];
+            $this->amigos(@{$options->{'amigos'}}) if $options->{'amigos'};
+          }
+
+     All this bookkeeping looks silly with just one new attribute in a
+     class derived straight from Tree::DAG_Node, but if there's lots of new
+     attributes running around, and if you're deriving from a class derived
+     from a class derived from Tree::DAG_Node, then tidy
+     stratification/modularization like this can keep you sane.
+
+the constructor $obj->new() or $obj->new({...options...})
+     Just another way to get at the new method. This *does not copy* $obj,
+     but merely constructs a new object of the same class as it.  Saves
+     you the bother of going $class = ref $obj; $obj2 = $class->new;
+
+the method $node->_init({...options...})
+     Initialize the object's attribute values.  See the discussion above.
+     Presumably this should be called only by the guts of the new
+     constructor - never by the end user.
+
+     Currently there are no documented options for putting in
+     {...options...}, but (in case you want to disregard the above rant)
+     the option exists for you to use {...options...} for something useful
+     in a derived class.
+
+     Please see the source for more information.
+
+see also (below) the constructors "new_daughter" and "new_daughter_left"
+LINKAGE-RELATED METHODS
+=======================
+
+$node->daughters
+     This returns the (possibly empty) list of daughters for $node.
+
+$node->mother
+     This returns what node is $node's mother.  This is undef if $node has
+     no mother - i.e., if it is a root.
+
+$mother->add_daughters( LIST )
+     This method adds the node objects in LIST to the (right) end of
+     $mother's `daughter' list.  Making a node N1 the daughter of another
+     node N2 also means that N1's mother attribute is "automatically" set
+     to N2; it also means that N1 stops being anything else's daughter as
+     it becomes N2's daughter.
+
+     If you try to make a node its own mother, a fatal error results.  If
+     you try to take one of a a node N1's ancestors and make it also a
+     daughter of N1, a fatal error results.  A fatal error results if
+     anything in LIST isn't a node object.
+
+     If you try to make N1 a daughter of N2, but it's *already* a daughter
+     of N2, then this is a no-operation - it won't move such nodes to the
+     end of the list or anything; it just skips doing anything with them.
+
+$node->add_daughter( LIST )
+     An exact synonym for $node->add_daughters(LIST)
+
+$mother->add_daughters_left( LIST )
+     This method is just like `add_daughters', except that it adds the
+     node objects in LIST to the (left) beginning of $mother's daughter
+     list, instead of the (right) end of it.
+
+$node->add_daughter_left( LIST )
+     An exact synonym for $node->add_daughters_left( LIST )
+
+Note:
+     The above link-making methods perform basically an unshift or push on
+     the mother node's daughter list.  To get the full range of
+     list-handling functionality, copy the daughter list, and change it,
+     and then call `set_daughters' on the result:
+
+          @them = $mother->daughters;
+          @removed = splice(@them, 0,2, @new_nodes);
+          $mother->set_daughters(@them);
+
+     Or consider a structure like:
+
+          $mother->set_daughters(
+                                 grep($_->name =~ /NP/ ,
+                                      $mother->daughters
+                                     )
+                                );
+
+the constructor $daughter = $mother->new_daughter, or
+the constructor $daughter = $mother->new_daughter({...options...})
+     This *constructs* a new node (of the same class as $mother), and adds
+     it to the (right) end of the daughter list of $mother. This is
+     essentially the same as going
+
+          $daughter = $mother->new;
+          $mother->add_daughter($daughter);
+
+     but is rather more efficient because (since $daughter is guaranteed
+     new and isn't linked to/from anything), it doesn't have to check that
+     $daughter isn't an ancestor of $mother, isn't already daughter to a
+     mother it needs to be unlinked from, isn't already in $mother's
+     daughter list, etc.
+
+     As you'd expect for a constructor, it returns the node-object created.
+
+the constructor $mother->new_daughter_left, or
+$mother->new_daughter_left({...options...})
+     This is just like $mother->new_daughter, but adds the new daughter to
+     the left (start) of $mother's daughter list.
+
+$mother->remove_daughters( LIST )
+     This removes the nodes listed in LIST from $mother's daughter list.
+     This is a no-operation if LIST is empty.  If there are things in LIST
+     that aren't a current daughter of $mother, they are ignored.
+
+     Not to be confused with $mother->clear_daughters.
+
+$node->remove_daughter( LIST )
+     An exact synonym for $node->remove_daughters( LIST )
+
+$node->unlink_from_mother
+     This removes node from the daughter list of its mother.  If it has no
+     mother, this is a no-operation.
+
+     Returns the mother unlinked from (if any).
+
+$mother->clear_daughters
+     This unlinks all $mother's daughters.  Returns the the list of what
+     used to be $mother's daughters.
+
+     Not to be confused with $mother->remove_daughters( LIST ).
+
+$mother->set_daughters( LIST )
+     This unlinks all $mother's daughters, and replaces them with the
+     daughters in LIST.
+
+     Currently implemented as just $mother->clear_daughters followed by
+     $mother->add_daughters( LIST ).
+
+$node->replace_with( LIST )
+     This replaces $node in its mother's daughter list, by unlinking $node
+     and replacing it with the items in LIST.  This returns a list
+     consisting of $node followed by LIST, i.e., the nodes that replaced
+     it.
+
+     LIST can include $node itself (presumably at most once).  LIST can
+     also be empty-list.  However, if any items in LIST are sisters to
+     $node, they are ignored, and are not in the copy of LIST passed as the
+     return value.
+
+     As you might expect for any linking operation, the items in LIST
+     cannot be $node's mother, or any ancestor to it; and items in LIST
+     are, of course, unlinked from their mothers (if they have any) as
+     they're linked to $node's mother.
+
+     (In the special (and bizarre) case where $node is root, this simply
+     calls $this->unlink_from_mother on all the items in LIST, making them
+     roots of their own trees.)
+
+     Note that the daughter-list of $node is not necessarily affected; nor
+     are the daughter-lists of the items in LIST.  I mention this in case
+     you think replace_with switches one node for another, with respect to
+     its mother list and its daughter list, leaving the rest of the tree
+     unchanged. If that's what you want, replacing $Old with $New, then you
+     want:
+
+          $New->set_daughters($Old->clear_daughters);
+          $Old->replace_with($New);
+
+     (I can't say $node's and LIST-items' daughter lists are never
+     affected my replace_with - they can be affected in this case:
+
+          $N1 = ($node->daughters)[0]; # first daughter of $node
+          $N2 = ($N1->daughters)[0];   # first daughter of $N1;
+          $N3 = Tree::DAG_Node->random_network; # or whatever
+          $node->replace_with($N1, $N2, $N3);
+
+     As a side affect of attaching $N1 and $N2 to $node's mother, they're
+     unlinked from their parents ($node, and $N1, replectively).  But N3's
+     daughter list is unaffected.
+
+     In other words, this method does what it has to, as you'd expect it
+     to.
+
+$node->replace_with_daughters
+     This replaces $node in its mother's daughter list, by unlinking $node
+     and replacing it with its daughters.  In other words, $node becomes
+     motherless and daughterless as its daughters move up and take its
+     place.  This returns a list consisting of $node followed by the nodes
+     that were its daughters.
+
+     In the special (and bizarre) case where $node is root, this simply
+     unlinks its daughters from it, making them roots of their own trees.
+
+     Effectively the same as $node->replace_with($node->daughters), but
+     more efficient, since less checking has to be done.  (And I also think
+     $node->replace_with_daughters is a more common operation in
+     tree-wrangling than $node->replace_with(LIST), so deserves a named
+     method of its own, but that's just me.)
+
+$node->add_left_sisters( LIST )
+     This adds the elements in LIST (in that order) as immediate left
+     sisters of $node.  In other words, given that B's mother's
+     daughter-list is (A,B,C,D), calling B->add_left_sisters(X,Y) makes
+     B's mother's daughter-list (A,X,Y,B,C,D).
+
+     If LIST is empty, this is a no-op, and returns empty-list.
+
+     This is basically implemented as a call to $node->replace_with(LIST,
+     $node), and so all replace_with's limitations and caveats apply.
+
+     The return value of $node->add_left_sisters( LIST ) is the elements of
+     LIST that got added, as returned by replace_with - minus the copies
+     of $node you'd get from a straight call to $node->replace_with(LIST,
+     $node).
+
+$node->add_left_sister( LIST )
+     An exact synonym for $node->add_left_sisters(LIST)
+
+$node->add_right_sisters( LIST )
+     Just like add_left_sisters (which see), except that the the elements
+     in LIST (in that order) as immediate right sisters of $node;
+
+     In other words, given that B's mother's daughter-list is (A,B,C,D),
+     calling B->add_right_sisters(X,Y) makes B's mother's daughter-list
+     (A,B,X,Y,C,D).
+
+$node->add_right_sister( LIST )
+     An exact synonym for $node->add_right_sisters(LIST)
+
+OTHER ATTRIBUTE METHODS
+=======================
+
+$node->name or $node->name(SCALAR)
+     In the first form, returns the value of the node object's "name"
+     attribute.  In the second form, sets it to the value of SCALAR.
+
+$node->attributes or $node->attributes(SCALAR)
+     In the first form, returns the value of the node object's "attributes"
+     attribute.  In the second form, sets it to the value of SCALAR.  I
+     intend this to be used to store a reference to a (presumably
+     anonymous) hash the user can use to store whatever attributes he
+     doesn't want to have to store as object attributes.  In this case, you
+     needn't ever set the value of this.  (_init has already initialized it
+     to {}.)  Instead you can just do...
+
+          $node->attributes->{'foo'} = 'bar';
+
+     ...to write foo => bar.
+
+$node->attribute or $node->attribute(SCALAR)
+     An exact synonym for $node->attributes or $node->attributes(SCALAR)
+
+OTHER METHODS TO DO WITH RELATIONSHIPS
+======================================
+
+$node->is_node
+     This always returns true.  More pertinently, $object->can('is_node')
+     is true (regardless of what `is_node' would do if called) for objects
+     belonging to this class or for any class derived from it.
+
+$node->ancestors
+     Returns the list of this node's ancestors, starting with its mother,
+     then grandmother, and ending at the root.  It does this by simply
+     following the 'mother' attributes up as far as it can.  So if $item IS
+     the root, this returns an empty list.
+
+     Consider that scalar($node->ancestors) returns the ply of this node
+     within the tree - 2 for a granddaughter of the root, etc., and 0 for
+     root itself.
+
+$node->root
+     Returns the root of whatever tree $node is a member of.  If $node is
+     the root, then the result is $node itself.
+
+$node->is_daughter_of($node2)
+     Returns true iff $node is a daughter of $node2.  Currently
+     implemented as just a test of ($it->mother eq $node2).
+
+$node->self_and_descendants
+     Returns a list consisting of itself (as element 0) and all the
+     descendants of $node.  Returns just itself if $node is a
+     terminal_node.
+
+     (Note that it's spelled "descendants", not "descendents".)
+
+$node->descendants
+     Returns a list consisting of all the descendants of $node.  Returns
+     empty-list if $node is a terminal_node.
+
+     (Note that it's spelled "descendants", not "descendents".)
+
+$node->leaves_under
+     Returns a list (going left-to-right) of all the leaf nodes under
+     $node.  ("Leaf nodes" are also called "terminal nodes" - i.e., nodes
+     that have no daughters.)  Returns $node in the degenerate case of
+     $node being a leaf itself.
+
+$node->depth_under
+     Returns an integer representing the number of branches between this
+     $node and the most distant leaf under it.  (In other words, this
+     returns the ply of subtree starting of $node.  Consider
+     scalar($it->ancestors) if you want the ply of a node within the whole
+     tree.)
+
+$node->generation
+     Returns a list of all nodes (going left-to-right) that are in $node's
+     generation - i.e., that are the some number of nodes down from the
+     root.  $root->generation is just $root.
+
+     Of course, $node is always in its own generation.
+
+$node->generation_under(NODE2)
+     Like $node->generation, but returns only the nodes in $node's
+     generation that are also descendants of NODE2 - in other words,
+
+          @us = $node->generation_under( $node->mother->mother );
+
+     is all $node's first cousins (to borrow yet more kinship terminology)
+     - assuming $node does indeed have a grandmother.  Actually "cousins"
+     isn't quite an apt word, because `@us' ends up including $node's
+     siblings and $node.
+
+     Actually, `generation_under' is just an alias to `generation', but I
+     figure that this:
+
+          @us = $node->generation_under($way_upline);
+
+     is a bit more readable than this:
+
+          @us = $node->generation($way_upline);
+
+     But it's up to you.
+
+     $node->generation_under($node) returns just $node.
+
+     If you call $node->generation_under($node) but NODE2 is not $node or
+     an ancestor of $node, it behaves as if you called just
+     $node->generation().
+
+$node->self_and_sisters
+     Returns a list of all nodes (going left-to-right) that have the same
+     mother as $node - including $node itself. This is just like
+     $node->mother->daughters, except that that fails where $node is root,
+     whereas $root->self_and_siblings, as a special case, returns $root.
+
+     (Contrary to how you may interpret how this method is named, "self" is
+     not (necessarily) the first element of what's returned.)
+
+$node->sisters
+     Returns a list of all nodes (going left-to-right) that have the same
+     mother as $node - *not including* $node itself.  If $node is root,
+     this returns empty-list.
+
+$node->left_sister
+     Returns the node that's the immediate left sister of $node.  If $node
+     is the leftmost (or only) daughter of its mother (or has no mother),
+     then this returns undef.
+
+     (See also $node->add_left_sisters(LIST).)
+
+$node->left_sisters
+     Returns a list of nodes that're sisters to the left of $node.  If
+     $node is the leftmost (or only) daughter of its mother (or has no
+     mother), then this returns an empty list.
+
+     (See also $node->add_left_sisters(LIST).)
+
+$node->right_sister
+     Returns the node that's the immediate right sister of $node.  If $node
+     is the rightmost (or only) daughter of its mother (or has no mother),
+     then this returns undef.
+
+     (See also $node->add_right_sisters(LIST).)
+
+$node->right_sisters
+     Returns a list of nodes that're sisters to the right of $node. If
+     $node is the rightmost (or only) daughter of its mother (or has no
+     mother), then this returns an empty list.
+
+     (See also $node->add_right_sisters(LIST).)
+
+$node->my_daughter_index
+     Returns what index this daughter is, in its mother's `daughter' list.
+     In other words, if $node is ($node->mother->daughters)[3], then
+     $node->my_daughter_index returns 3.
+
+     As a special case, returns 0 if $node has no mother.
+
+$node->address or $anynode->address(ADDRESS)
+     With the first syntax, returns the address of $node within its tree,
+     based on its position within the tree.  An address is formed by noting
+     the path between the root and $node, and concatenating the
+     daughter-indices of the nodes this passes thru (starting with 0 for
+     the root, and ending with $node).
+
+     For example, if to get from node ROOT to node $node, you pass thru
+     ROOT, A, B, and $node, then the address is determined as:
+
+     * ROOT's my_daughter_index is 0.
+
+     * A's my_daughter_index is, suppose, 2. (A is index 2 in ROOT's
+     daughter list.)
+
+     * B's my_daughter_index is, suppose, 0. (B is index 0 in A's daughter
+     list.)
+
+     * $node's my_daughter_index is, suppose, 4. ($node is index 4 in B's
+     daughter list.)
+
+     The address of the above-described $node is, therefore, "0:2:0:4".
+
+     (As a somewhat special case, the address of the root is always "0";
+     and since addresses start from the root, all addresses start with a
+     "0".)
+
+     The second syntax, where you provide an address, starts from the root
+     of the tree $anynode belongs to, and returns the node corresponding to
+     that address.  Returns undef if no node corresponds to that address.
+     Note that this routine may be somewhat liberal in its interpretation
+     of what can constitute an address; i.e., it accepts "0.2.0.4", besides
+     "0:2:0:4".
+
+     Also note that the address of a node in a tree is meaningful only in
+     that tree as currently structured.
+
+     (Consider how ($address1 cmp $address2) may be magically meaningful
+     to you, if you mant to figure out what nodes are to the right of what
+     other nodes.)
+
+$node->common(LIST)
+     Returns the lowest node in the tree that is ancestor-or-self to the
+     nodes $node and LIST.
+
+     If the nodes are far enough apart in the tree, the answer is just the
+     root.
+
+     If the nodes aren't all in the same tree, the answer is undef.
+
+     As a degenerate case, if LIST is empty, returns $node.
+
+$node->common_ancestor(LIST)
+     Returns the lowest node that is ancestor to all the nodes given (in
+     nodes $node and LIST).  In other words, it answers the question: "What
+     node in the tree, as low as possible, is ancestor to the nodes given
+     ($node and LIST)?"
+
+     If the nodes are far enough apart, the answer is just the root -
+     except if any of the nodes are the root itself, in which case the
+     answer is undef (since the root has no ancestor).
+
+     If the nodes aren't all in the same tree, the answer is undef.
+
+     As a degenerate case, if LIST is empty, returns $node's mother;
+     that'll be undef if $node is root.
+
+YET MORE METHODS
+================
+
+$node->walk_down({ callback => \&foo, callbackback => \&foo, ... })
+     Performs a depth-first traversal of the structure at and under $node.
+     What it does at each node depends on the value of the options hashref,
+     which you must provide.  There are three options, "callback" and
+     "callbackback" (at least one of which must be defined, as a sub
+     reference), and "_depth".  This is what `walk_down' does, in
+     pseudocode form:
+
+     * Start at the $node given.
+
+     * If there's a callback, call it with $node as the first argument,
+     and the options hashref as the second argument (which contains the
+     potentially useful `_depth', remember).  This function must return
+     true or false - if false, it will block the next step:
+
+     * If $node has any daughter nodes, increment `_depth', and call
+     $daughter->walk_down(options_hashref) for each daughter (in order, of
+     course), where options_hashref is the same hashref it was called with.
+     When this returns, decrements `_depth'.
+
+     * If there's a `callbackback', call just it as with callback (but
+     tossing out the return value).  Note that callback returning false
+     blocks traversal below $node, but doesn't block calling callbackback
+     for $node.  (Incidentally, in the unlikely case that $node has stopped
+     being a node object, `callbackback' won't get called.)
+
+     * Return.
+
+     $node->walk_down is the way to recursively do things to a tree (if you
+     start at the root) or part of a tree; if what you're doing is best
+     done via pre-pre order traversal, use callback; if what you're doing
+     is best done with post-order traversal, use `callbackback'.
+     `walk_down' is even the basis for plenty of the methods in this
+     class.  See the source code for examples both simple and horrific.
+
+     Note that if you don't specify `_depth', it effectively defaults to
+     0.  You should set it to scalar($node->ancestors) if you want
+     `_depth' to reflect the true depth-in-the-tree for the nodes called,
+     instead of just the depth below $node.  (If $node is the root, there's
+     difference, of course.)
+
+     And *by the way*, it's a bad idea to modify the tree from the
+     callback.  Unpredictable things may happen.  I instead suggest having
+     your callback add to a stack of things that need changing, and then,
+     once `walk_down' is all finished, changing those nodes from that
+     stack.
+
+     Note that the existence of `walk_down' doesn't mean you can't write
+     you own special-use traversers.
+
+@lines = $node->dump_names({ ...options... });
+     Dumps, as an indented list, the names of the nodes starting at $node,
+     and continuing under it.  Options are:
+
+     * _depth - A nonnegative number.  Indicating the depth to consider
+     $node as being at (and so the generation under that is that plus one,
+     etc.).  Defaults to 0.  You may choose to use set _depth =>
+     scalar($node->ancestors).
+
+     * tick - a string to preface each entry with, between the
+     indenting-spacing and the node's name.  Defaults to empty-string.  You
+     may prefer "*" or "-> " or someting.
+
+     * indent - the string used to indent with.  Defaults to "  " (two
+     spaces).  Another sane value might be ". " (period, space).  Setting
+     it to empty-string suppresses indenting.
+
+     The dump is not printed, but is returned as a list, where each item
+     is a line, with a "\n" at the end.
+
+the constructor CLASS->random_network({...options...})
+the method $node->random_network({...options...})
+     In the first case, constructs a randomly arranged network under a new
+     node, and returns the root node of that tree.  In the latter case,
+     constructs the network under $node.
+
+     Currently, this is implemented a bit half-heartedly, and
+     half-wittedly.  I basically needed to make up random-looking networks
+     to stress-test the various tree-dumper methods, and so wrote this.  If
+     you actually want to rely on this for any application more serious
+     than that, I suggest examining the source code and seeing if this
+     does really what you need (say, in reliability of randomness); and
+     feel totally free to suggest changes to me (especially in the form of
+     "I rewrote `random_network', here's the code...")
+
+     It takes four options:
+
+     * max_node_count - maximum number of nodes this tree will be allowed
+     to have (counting the root).  Defaults to 25.
+
+     * min_depth - minimum depth for the tree.  Defaults to 2.  Leaves can
+     be generated only after this depth is reached, so the tree will be at
+     least this deep - unless max_node_count is hit first.
+
+     * max_depth - maximum depth for the tree.  Defaults to 3 plus
+     min_depth.  The tree will not be deeper than this.
+
+     * max_children - maximum number of children any mother in the tree
+     can have.  Defaults to 4.
+
+the constructor CLASS->lol_to_tree($lol);
+     Converts something like bracket-notation for "Chomsky trees" (or
+     rather, the closest you can come with Perl
+     list-of-lists(-of-lists(-of-lists))) into a tree structure.  Returns
+     the root of the tree converted.
+
+     The conversion rules are that:  1) if the last (possibly the only)
+     item in a given list is a scalar, then that is used as the "name"
+     attribute for the node based on this list.  2) All other items in the
+     list represent daughter nodes of the current node - recursively so, if
+     they are list references; otherwise, (non-terminal) scalars are
+     considered to denote nodes with that name.  So ['Foo', 'Bar', 'N'] is
+     an alternate way to represent [['Foo'], ['Bar'], 'N'].
+
+     An example will illustrate:
+
+          use Tree::DAG_Node;
+          $lol =
+            [
+              [
+                [ [ 'Det:The' ],
+                  [ [ 'dog' ], 'N'], 'NP'],
+                [ '/with rabies\\', 'PP'],
+                'NP'
+              ],
+              [ 'died', 'VP'],
+              'S'
+            ];
+           $tree = Tree::DAG_Node->lol_to_tree($lol);
+           $diagram = $tree->draw_ascii_tree;
+           print map "$_\n", @$diagram;
+
+     ...returns this tree:
+
+          |
+                            <S>
+          |
+                          /------------------\
+                          |                  |
+                        <NP>                <VP>
+                          |                  |
+                  /---------------\        <died>
+                  |               |
+                <NP>            <PP>
+                  |               |
+               /-------\   </with rabies\>
+               |       |
+           <Det:The>  <N>
+                       |
+                     <dog>
+
+     By the way (and this rather follows from the above rules), when
+     denoting a LoL tree consisting of just one node, this:
+
+          $tree = Tree::DAG_Node->lol_to_tree( 'Lonely' );
+
+     is okay, although it'd probably occur to you to denote it only as:
+
+          $tree = Tree::DAG_Node->lol_to_tree( ['Lonely'] );
+
+     which is of course fine, too.
+
+$node->tree_to_lol_notation({...options...})
+     Dumps a tree (starting at $node) as the sort of LoL-like bracket
+     notation you see in the above example code.  Returns just one big
+     block of text.  The only option is "multiline" - if true, it dumps
+     the text as the sort of indented structure as seen above; if false
+     (and it defaults to false), dumps it all on one line (with no
+     indenting, of course).
+
+     For example, starting with the tree from the above example, this:
+
+          print $tree->tree_to_lol_notation, "\n";
+
+     prints the following (which I've broken over two lines for sake of
+     printablitity of documentation):
+
+          [[[['Det:The'], [['dog'], 'N'], 'NP'], [["/with rabies\x5c"],
+          'PP'], 'NP'], [['died'], 'VP'], 'S'],
+
+     Doing this:
+
+          print $tree->tree_to_lol_notation({ multiline => 1 });
+
+     prints the same content, just spread over many lines, and prettily
+     indented.
+
+$node->tree_to_lol
+     Returns that tree (starting at $node) represented as a LoL, like what
+     $lol, above, holds.  (This is as opposed to `tree_to_lol_notation',
+     which returns the viewable code like what gets evaluated and stored in
+     $lol, above.)
+
+     Lord only knows what you use this for - maybe for feeding to
+     Data::Dumper, in case `tree_to_lol_notation' doesn't do just what you
+     want?
+
+the constructor CLASS->simple_lol_to_tree($simple_lol);
+     This is like lol_to_tree, except that rule 1 doesn't apply - i.e.,
+     all scalars (or really, anything not a listref) in the LoL-structure
+     end up as named terminal nodes, and only terminal nodes get names
+     (and, of course, that name comes from that scalar value).  This method
+     is useful for making things like expression trees, or at least
+     starting them off.  Consider that this:
+
+          $tree = Tree::DAG_Node->simple_lol_to_tree(
+            [ 'foo', ['bar', ['baz'], 'quux'], 'zaz', 'pati' ]
+          );
+
+     converts from something like a Lispish or Iconish tree, if you pretend
+     the brackets are parentheses.
+
+     Note that there is a (possibly surprising) degenerate case of what I'm
+     calling a "simple-LoL", and it's like this:
+
+          $tree = Tree::DAG_Node->simple_lol_to_tree('Lonely');
+
+     This is the (only) way you can specify a tree consisting of only a
+     single node, which here gets the name 'Lonely'.
+
+$node->tree_to_simple_lol
+     Returns that tree (starting at $node) represented as a simple-LoL -
+     i.e., one where non-terminal nodes are represented as listrefs, and
+     terminal nodes are gotten from the contents of those nodes' "name'
+     attributes.
+
+     Note that in the case of $node being terminal, what you get back is
+     the same as $node->name.
+
+     Compare to tree_to_simple_lol_notation.
+
+$node->tree_to_simple_lol_notation({...options...})
+     A simple-LoL version of tree_to_lol_notation (which see); takes the
+     same options.
+
+$list_r = $node->draw_ascii_tree({ ... options ... })
+     Draws a nice ASCII-art representation of the tree structure
+     at-and-under $node, with $node at the top.  Returns a reference to the
+     list of lines (with no "\n"s or anything at the end of them) that make
+     up the picture.
+
+     Example usage:
+
+          print map("$_\n", @{$tree->draw_ascii_tree});
+
+     draw_ascii_tree takes parameters you set in the options hashref:
+
+     * "no_name" - if true, `draw_ascii_tree' doesn't print the name of
+     the node; simply prints a "*".  Defaults to 0 (i.e., print the node
+     name.)
+
+     * "h_spacing" - number 0 or greater.  Sets the number of spaces
+     inserted horizontally between nodes (and groups of nodes) in a tree.
+     Defaults to 1.
+
+     * "h_compact" - number 0 or 1.  Sets the extent to which
+     `draw_ascii_tree' tries to save horizontal space.  Defaults to 1.  If
+     I think of a better scrunching algorithm, there'll be a "2" setting
+     for this.
+
+     * "v_compact" - number 0, 1, or 2.  Sets the degree to which
+     `draw_ascii_tree' tries to save vertical space.  Defaults to 1.
+
+     This occasionally returns trees that are a bit cock-eyed in parts; if
+     anyone can suggest a better drawing algorithm, I'd be appreciative.
+
+$node->copy_tree or $node->copy_tree({...options...})
+     This returns the root of a copy of the tree that $node is a member of.
+     If you pass no options, copy_tree pretends you've passed {}.
+
+     This method is currently implemented as just a call to
+     $this->root->copy_at_and_under({...options...}), but magic may be
+     added in the future.
+
+     Options you specify are passed down to calls to $node->copy.
+
+$node->copy_at_and_under or $node->copy_at_and_under({...options...})
+     This returns a copy of the subtree consisting of $node and everything
+     under it.
+
+     If you pass no options, copy_at_and_under pretends you've passed {}.
+
+     This works by recursively building up the new tree from the leaves,
+     duplicating nodes using $orig_node->copy($options_ref) and then
+     linking them up into a new tree of the same shape.
+
+     Options you specify are passed down to calls to $node->copy.
+
+the constructor $node->copy or $node->copy({...options...})
+     Returns a copy of $node, minus its daughter or mother attributes
+     (which are set back to default values).
+
+     If you pass no options, copy pretends you've passed {}.
+
+     Magic happens with the 'attributes' attribute: if it's a hashref (and
+     it usually is), the new node doesn't end up with the same hashref, but
+     with ref to a hash with the content duplicated from the original's
+     hashref.  If 'attributes' is not a hashref, but instead an object that
+     belongs to a class that provides a method called "copy", then that
+     method is called, and the result saved in the clone's 'attribute'
+     attribute.  Both of these kinds of magic are disabled if the options
+     you pass to copy (maybe via `copy_tree', or `copy_at_and_under')
+     includes (`no_attribute_copy' => 1).
+
+     The options hashref you pass to copy (derictly or indirectly) gets
+     changed slightly after you call copy - it gets an entry called
+     "from_to" added to it.  Chances are you would never know nor care, but
+     this is reserved for possible future use.  See the source if you are
+     wildly curious.
+
+     Note that if you are using $node->copy (whether directly or via
+     $node->copy_tree or $node->copy_at_or_under), and it's not properly
+     copying object attributes containing references, you probably
+     shouldn't fight it or try to fix it - simply override copy_tree with:
+
+          sub copy_tree {
+            use Storable qw(dclone);
+            my $this = $_[0];
+            return dclone($this->root);
+             # d for "deep"
+          }
+
+     or
+
+          sub copy_tree {
+            use Data::Dumper;
+            my $this = $_[0];
+            $Data::Dumper::Purity = 1;
+            return eval(Dumper($this->root));
+          }
+
+     Both of these avoid you having to reinvent the wheel.
+
+     How to override copy_at_or_under with something that uses Storable or
+     Data::Dumper is left as an exercise to the reader.
+
+     Consider that if in a derived class, you add attributes with really
+     bizarre contents (like a unique-for-all-time-ID), you may need to
+     override copy.  Consider:
+
+          sub copy {
+            my($it, @etc) = @_;
+            $it->SUPER::copy(@etc);
+            $it->{'UID'} = &get_new_UID;
+          }
+
+     ...or the like.  See the source of Tree::DAG_Node::copy for
+     inspiration.
+
+$node->delete_tree
+     Destroys the entire tree that $node is a member of (starting at the
+     root), by nulling out each node-object's attributes (including, most
+     importantly, its linkage attributes - hopefully this is more than
+     sufficient to eliminate all circularity in the data structure), and
+     then moving it into the class DEADNODE.
+
+     Use this when you're finished with the tree in question, and want to
+     free up its memory.  (If you don't do this, it'll get freed up anyway
+     when your program ends.)
+
+     If you try calling any methods on any of the node objects in the tree
+     you've destroyed, you'll get an error like:
+
+          Can't locate object method "leaves_under"
+            via package "DEADNODE".
+
+     So if you see that, that's what you've done wrong.  (Actually, the
+     class DEADNODE does provide one method: a no-op method "delete_tree".
+     So if you want to delete a tree, but think you may have deleted it
+     already, it's safe to call $node->delete_tree on it (again).)
+
+     The `delete_tree' method is needed because Perl's garbage collector
+     would never (as currently implemented) see that it was time to
+     de-allocate the memory the tree uses - until either you call
+     $node->delete_tree, or until the program stops (at "global
+     destruction" time, when *everything* is unallocated).
+
+     Incidentally, there are better ways to do garbage-collecting on a
+     tree, ways which don't require the user to explicitly call a method
+     like `delete_tree' - they involve dummy classes, as explained at
+     `http://mox.perl.com/misc/circle-destroy.pod'
+
+     However, introducing a dummy class concept into Tree::DAG_Node would
+     be rather a distraction.  If you want to do this with your derived
+     classes, via a DESTROY in a dummy class (or in a tree-metainformation
+     class, maybe), then feel free to.
+
+     The only case where I can imagine `delete_tree' failing to totally
+     void the tree, is if you use the hashref in the "attributes" attribute
+     to store (presumably among other things) references to other nodes'
+     "attributes" hashrefs - which 1) is maybe a bit odd, and 2) is your
+     problem, because it's your hash structure that's circular, not the
+     tree's.  Anyway, consider:
+
+          # null out all my "attributes" hashes
+          $anywhere->root->walk_down({
+            'callback' => sub {
+              $hr = $_[0]->attributes; %$hr = (); return 1;
+            }
+          });
+          # And then:
+          $anywhere->delete_tree;
+
+     (I suppose `delete_tree' is a "destructor", or as close as you can
+     meaningfully come for a circularity-rich data structure in Perl.)
+
+When and How to Destroy
+-----------------------
+
+   It should be clear to you that if you've built a big parse tree or
+something, and then you're finished with it, you should call
+$some_node->delete_tree on it if you want the memory back.
+
+   But consider this case:  you've got this tree:
+
+     A
+         / | \
+        B  C  D
+        |     | \
+        E     X  Y
+
+   Let's say you decide you don't want D or any of its descendants in the
+tree, so you call D->unlink_from_mother.  This does NOT automagically
+destroy the tree D-X-Y.  Instead it merely splits the tree into two:
+
+     A                        D
+         / \                      / \
+        B   C                    X   Y
+        |
+        E
+
+   To destroy D and its little tree, you have to explicitly call
+delete_tree on it.
+
+   Note, however, that if you call C->unlink_from_mother, and if you don't
+have a link to C anywhere, then it *does* magically go away.  This is
+because nothing links to C - whereas with the D-X-Y tree, D links to X and
+Y, and X and Y each link back to D. Note that calling C->delete_tree is
+harmless - after all, a tree of only one node is still a tree.
+
+   So, this is a surefire way of getting rid of all $node's children and
+freeing up the memory associated with them and their descendants:
+
+     foreach my $it ($node->clear_daughters) { $it->delete_tree }
+
+   Just be sure not to do this:
+
+     foreach my $it ($node->daughters) { $it->delete_tree }
+     $node->clear_daughters;
+
+   That's bad; the first call to $_->delete_tree will climb to the root of
+$node's tree, and nuke the whole tree, not just the bits under $node.  You
+might as well have just called $node->delete_tree.  (Moreavor, once $node
+is dead, you can't call clear_daughters on it, so you'll get an error
+there.)
+
+BUG REPORTS
+===========
+
+   If you find a bug in this library, report it to me as soon as possible,
+at the address listed in the AUTHOR section, below.  Please try to be as
+specific as possible about how you got the bug to occur.
+
+HELP!
+=====
+
+   If you develop a given routine for dealing with trees in some way, and
+use it a lot, then if you think it'd be of use to anyone else, do email me
+about it; it might be helpful to others to include that routine, or
+something based on it, in a later version of this module.
+
+   It's occurred to me that you might like to (and might yourself develop
+routines to) draw trees in something other than ASCII art.  If you do so -
+say, for PostScript output, or for output interpretable by some external
+plotting program -  I'd be most interested in the results.
+
+RAMBLINGS
+=========
+
+   This module uses "strict", but I never wrote it with -w warnings in
+mind - so if you use -w, do not be surprised if you see complaints from
+the guts of DAG_Node.  As long as there is no way to turn off -w for a
+given module (instead of having to do it in every single subroutine with a
+"local $^W"), I'm not going to change this. However, I do, at points, get
+bursts of ambition, and I try to fix code in DAG_Node that generates
+warnings, *as I come across them* - which is only occasionally.  Feel free
+to email me any patches for any such fixes you come up with, tho.
+
+   Currently I don't assume (or enforce) anything about the class
+membership of nodes being manipulated, other than by testing whether each
+one provides a method `is_node', a la:
+
+     die "Not a node!!!" unless UNIVERSAL::can($node, "is_node");
+
+   So, as far as I'm concerned, a given tree's nodes are free to belong to
+different classes, just so long as they provide/inherit `is_node', the few
+methods that this class relies on to navigate the tree, and have the same
+internal object structure, or a superset of it. Presumably this would be
+the case for any object belonging to a class derived from
+`Tree::DAG_Node', or belonging to `Tree::DAG_Node' itself.
+
+   When routines in this class access a node's "mother" attribute, or its
+"daughters" attribute, they (generally) do so directly (via
+$node->{'mother'}, etc.), for sake of efficiency.  But classes derived
+from this class should probably do this instead thru a method (via
+$node->mother, etc.), for sake of portability, abstraction, and general
+goodness.
+
+   However, no routines in this class (aside from, necessarily, _init,
+`_init_name', and name) access the "name" attribute directly; routines
+(like the various tree draw/dump methods) get the "name" value thru a call
+to $obj->name().  So if you want the object's name to not be a real
+attribute, but instead have it derived dynamically from some feature of
+the object (say, based on some of its other attributes, or based on its
+address), you can to override the name method, without causing problems.
+(Be sure to consider the case of $obj->name as a write method, as it's
+used in `lol_to_tree' and `random_network'.)
+
+SEE ALSO
+========
+
+   *Note HTML/Element: HTML/Element,
+
+   Wirth, Niklaus.  1976.  *Algorithms + Data Structures = Programs*
+Prentice-Hall, Englewood Cliffs, NJ.
+
+   Knuth, Donald Ervin.  1997.  *Art of Computer Programming, Volume 1,
+Third Edition: Fundamental Algorithms*.  Addison-Wesley,  Reading, MA.
+
+   Wirth's classic, currently and lamentably out of print, has a good
+section on trees.  I find it clearer than Knuth's (if not quite as
+encyclopedic), probably because Wirth's example code is in a
+block-structured high-level language (basically Pascal), instead of in
+assembler (MIX).
+
+   Until some kind publisher brings out a new printing of Wirth's book,
+try poking around used bookstores (or `www.abebooks.com') for a copy.  I
+think it was also republished in the 1980s under the title *Algorithms and
+Data Structures*, and in a German edition called *Algorithmen und
+Datenstrukturen*.  (That is, I'm sure books by Knuth were published under
+those titles, but I'm *assuming* that they're just later
+printings/editions of *Algorithms + Data Structures = Programs*.)
+
+COPYRIGHT AND DISCLAIMER
+========================
+
+   Copyright 1998,1999,2000,2001 by Sean M. Burke `sburke@cpan.org', all
+rights reserved.  This program is free software; you can redistribute it
+and/or modify it under the same terms as Perl itself.
+
+   This program is distributed in the hope that it will be useful, but
+without any warranty; without even the implied warranty of merchantability
+or fitness for a particular purpose.
+
+AUTHOR
+======
+
+   Sean M. Burke `sburke@cpan.org'
+
+

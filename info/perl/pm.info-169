@@ -1,0 +1,1836 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: HTML/EP/CGIEncryptForm,  Next: HTML/EP/EditTable,  Prev: HTML/EP,  Up: Module List
+
+An EP interface to the CGI::EncryptForm module
+**********************************************
+
+NAME
+====
+
+   HTML::EP::CGIEncryptForm - An EP interface to the CGI::EncryptForm
+module
+
+SYNOPSIS
+========
+
+     <!--
+       This is the first page. We receive some complex data
+       here from an HTML form and want to pass it to nextpage.ep.
+       Start with loading the package.
+     -->
+     <ep-package name="HTML::EP::CGIEncryptForm">
+
+     <ep-perl>
+       # Process some CGI input and store the results in the
+       # hash ref $_->{'form'}, aka EP variable "form".
+       ...
+     </ep-perl>
+     <form action=nextpage.ep method=post>
+       <ep-cef-encrypt source=form dest=enc_form>
+       <input type=hidden name=myform value="$@enc_form$">
+       ...
+     </form>
+
+     <!--
+       This is the second page. We want to get the data from
+       the first page, in other words, restore the variable
+       "form" and its contents. That's easy.
+     -->
+     <ep-package name="HTML::EP::CGIEncryptForm">
+     <ep-cef-decrypt source="cgi->myform" dest=form>
+
+DESCRIPTION
+===========
+
+   This package is rather similar to the HTML::EP::Session module. In fact,
+so similar, that they may be merged in the future. It was contributed by
+Peter Marelas <maral@phase-one.com.au>, the author of the CGI::Encryptform
+module.
+
+   The modules idea is as follows: Suggest you are building a wizard.  In
+other words, an application gathering information on several HTML forms.
+As HTTP is a stateless protocol, the burden of moving the collected
+information from page to page is up to you. The HTML::EP::CGIEncryptForm
+module will greatly help you in this.
+
+   The idea is as follows: The collected information is stored in a
+single, structured variable, for example a hash ref. For example, you
+could have three pages for configuring an hosts network settings: The
+first page contains a form where the user enters IP address and network
+mask. The second page allows to add the DNS servers and the third page the
+routes. With HTML::EP::CGIEncryptForm, these pages could look like this
+(most details omitted):
+
+     <!-- This is the first page  -->
+     <!-- No EP here, just simple HTML -->
+     <form action=page2.ep method=post>
+       <table><tr><th>IP address</th>
+                  <td><input name="ipaddress" size=15></td></tr>
+              <tr><th>Network mask</th>
+                  <td><input name="netmask" size=15></td></tr>
+       </table>
+     </form>
+
+     <!-- This is the second page, page2.ep. We start with
+          loading the package:
+     -->
+     <ep-package name="HTML::EP::CGIEncryptForm">
+     <!-- Now, collect the information in $self->{settings}: -->
+     <ep-perl>
+       my $self = $_;
+       my $cgi = $self->{cgi};
+       $self->{settings}->{ipaddress} = $cgi->param('ipaddress');
+       $self->{settings}->{netmask} = $cgi->param('netmask');
+       ''
+     </ep-perl>
+     <!-- Encode the settings into a string: -->
+     <ep-cef-encrypt source=settings dest=enc_settings
+                     secret_key="Whatakey?">
+     <!-- Finally, pass the settings variable to the next page
+          by using a hidden field:
+     -->
+     <form action=page3.ep method=post>
+       <table><tr><th>DNS Server 1:</th>
+                  <td><input name="dns1" size=15></td></tr>
+              <tr><th>DNS Server 2:</th>
+                  <td><input name="dns2" size=15></td></tr>
+       </table>
+       <input type=hidden name=settings value="$@enc_settings$">
+     </form>
+     <p>So far, you have created the following settings:</p>
+     <table>
+       <tr><th>IP address:</th><td>$settings->ipaddress$</td></tr>
+       <tr><th>Netmask:</th><td>$settings->netmask$</td></tr>
+     </table>
+
+     <!-- And, finally, this is page3.ep. We start with retrieving
+          the collected data:
+     -->
+     <ep-package name="HTML::EP::CGIEncryptForm">
+     <ep-cef-decrypt source="cgi->settings" dest="settings"
+                     secret_key="Whatakey?">
+     <!-- Add the DNS servers to the settings variable:  -->
+     <ep-perl>
+       my $self = $_;
+       my $cgi = $self->{cgi};
+       $self->{settings}->{dns1} = $cgi->param('dns1');
+       $self->{settings}->{dns2} = $cgi->param('dns2');
+       ''
+     </ep-perl>
+     <p>So far, you have created the following settings:</p>
+     <table>
+       <tr><th>IP address:</th><td>$settings->ipaddress$</td></tr>
+       <tr><th>Netmask:</th><td>$settings->netmask$</td></tr>
+       <tr><th>DNS Server 1:</th><td>$settings->dns1$</td></tr>
+       <tr><th>DNS Server 2:</th><td>$settings->dns1$</td></tr>
+     </table>
+
+   The main advantage of CGI::EncryptForm is that it is not only
+serializing data, but encrypting and decrypting as well.
+
+METHOD INTERFACE
+================
+
+   These are the methods offered by the HTML::EP::CGIEncryptForm class:
+
+Encrypting a structured variable into a string
+----------------------------------------------
+
+     <ep-cef-encrypt source="source_var" dest="dest_var"
+                     secret_key="somekey" usecharset=1>
+
+   or, from within ep-perl:
+
+     $self->_ep_cef_encrypt({'source' => 'source_var',
+     			  'dest' => 'dest_var',
+     			  'secret_key' => 'some_key',
+     			  'usecharset' => 1});
+
+   (Instance method) Takes the complex EP variable $source_var$ (aka
+$self->{'source_var'}) and encrypts it into a string. The *secret_key*
+attribute is used for encrypting the string. The optional attributes
+*usecharset* and charset are passed to the corresponding methods of
+CGI::EncryptForm.
+
+   If the dest attribute is present, the string is stored in the EP
+variable $dest_var$. If not, the output is returned and possibly inserted
+into the HTML stream.
+
+Decrypting a structured variable from a string
+----------------------------------------------
+
+     <ep-cef-decrypt source="source_var" dest="dest_var"
+                     secret_key="somekey" usecharset=1>
+
+   or, from within ep-perl:
+
+     $self->_ep_cef_decrypt({'source' => 'source_var',
+     			  'dest' => 'dest_var',
+     			  'secret_key' => 'some_key',
+     			  'usecharset' => 1});
+
+   (Instance method) Takes the EP variable $source_var$ (aka
+$self->{'source_var'}) and decrypts it into a complex Perl object.  The
+*secret_key* attribute is used for decrypting the string. The optional
+attributes *usecharset* and charset are passed to the corresponding
+methods of CGI::EncryptForm.
+
+   If the dest attribute is present, the Perl object is stored in the EP
+variable $dest_var$. If not, the output is returned and possibly inserted
+into the HTML stream.
+
+SEE ALSO
+========
+
+     L<CGI::EncryptForm>, L<HTML::EP>, L<HTML::EP::Session>
+
+
+File: pm.info,  Node: HTML/EP/EditTable,  Next: HTML/EP/Explorer,  Prev: HTML/EP/CGIEncryptForm,  Up: Module List
+
+An HTML::EP extension for editing a table via WWW
+*************************************************
+
+NAME
+====
+
+   HTML::EP::EditTable - An HTML::EP extension for editing a table via WWW
+
+SYNOPSIS
+========
+
+     <!-- Connect to the database --!>
+     <ep-database dsn="DBI:mysql:test">
+     <!-- Make HTML::EP edit your table: --!>
+     <ep-edittable-edit table=MyTable>
+
+DESCRIPTION
+===========
+
+   It is quite usual that you make your database tables editable via a WWW
+frontend. Writing such a frontend should be fast and simple for both the
+database administrator and the web designer.
+
+   HTML::EP::EditTable comes with a set of ready-to-use HTML files,
+suitable for an example table called *Termine* and an example subclass.
+Usually the Web designer just picks off the HTML files and modifies them
+until they fit his design wishes. Then the database administrator takes
+the files and usually just modifies the column names. If he wishes to add
+some private data checking or similar things, he can do so by subclassing
+the HTML::EP::Edittable class.
+
+AVAILABLE METHODS
+=================
+
+     <ep-edittable-edit table=MyTable id=ID what-to-do=insert>
+
+   This method combines the following possibilities:
+
+   * Selecting a record out of the table *MyTable*.
+
+   * Inserting a new record into the table *MyTable*.
+
+   * Updating a record in the table *MyTable*.
+
+   * Deleting a record from the table *MyTable*.
+
+   What the method exactly does, depends on the value of the CGI variable
+*what-to-do*: This can be either empty, insert, update or delete.
+
+   If *what-to-do* is insert or update, then the method will first call
+the HTML::EP method *ep-input*. If the attributes dest, prefix and
+*sqlquery*, which this method expects, are not set, then they will by
+default be set to *MyTable*, *MyTable_* and 1, respectively.
+
+   If *what-to-do* is insert, then the query
+
+     INSERT INTO MyTable ($@MyTable->names$) VALUES ($@MyTable->values$)
+
+   will be executed. Likewise, the query
+
+     UPDATE MyTable SET $@MyTable->update WHERE ID = $cgi->ID$
+
+   will be executed for the value update.
+
+   If *what-to-do* is insert or delete, then the method will attempt to
+retrieve a row from the table *MyTable*. It does so, by looking at the
+column ID (default, you can overwrite this by setting the attribute id
+when calling the method) and the CGI variable of the same name, which
+contains the column ID, usually the primary key of the table.
+
+   The fetched row will be converted into the same format returned by
+*ep-input*: Thus you can always work with the same data format in all HTML
+pages.
+
+SEE ALSO
+========
+
+   `HTML::EP(3)' in this node, `DBIx::RecordSet(3)' in this node
+
+
+File: pm.info,  Node: HTML/EP/Explorer,  Next: HTML/EP/Glimpse,  Prev: HTML/EP/EditTable,  Up: Module List
+
+Web driven browsing of a filesystem
+***********************************
+
+NAME
+====
+
+     HTML::EP::Explorer - Web driven browsing of a filesystem
+
+SYNOPSIS
+========
+
+     <ep-explorer-browse>
+
+DESCRIPTION
+===========
+
+   This application was developed for DHW, a german company that wanted to
+give its users access to files stored on a file server via certain
+applications defined by an administrator. (See
+
+     http://www.dhw.de/
+
+   if you are interested in the sponsor.) The rough idea is as follows:
+
+   The users are presented a view similar to that of the Windows Explorer
+or an FTP servers directory listing. On the top they have a list of
+so-called actions. The users may select one or more files and then execute
+an action on them.
+
+INSTALLATION
+============
+
+   The system is based on my embedded HTML system HTML::EP. It should be
+available at the same place where you found this file, or at any CPAN
+mirror, in particular
+
+     ftp://ftp.funet.fi/pub/languages/perl/CPAN/authors/id/JWIED/
+
+   The installation of HTML::EP is described in detail in the README, I
+won't explain it here. However, in short it is just as installing
+HTML::EP::Explorer: Assumed you have a file
+
+     HTML-EP-Explorer-0.1003.tar.gz
+
+   then you have to execute the following steps:
+
+     gzip -cd HTML-EP-Explorer-0.1003.tar.gz | tar xf -
+     perl Makefile.PL
+     make		# You will be prompted some questions here
+     make test
+     make install
+
+   Installation will in particular create a file
+
+     lib/HTML/EP/Explorer/Config.pm
+
+   which will contain your answers to the following questions:
+
+   *      Install HTML files?
+
+     If you say y here (the default), the installation script will install
+     some HTML files at a location choosed by you. Usually you will say
+     yes, because the system is pretty useless without it's associated
+     HTML files. However, if you already did install the system and
+     modified the HTML files you probably want to avoid overriding them.
+     In that case say n.
+
+   *      Directory for installing HTML files?
+
+     If you requested installing the HTML files, you have to choose a
+     location. By default the program suggests
+
+          F</home/httpd/html/explorer>
+
+     which is fine on a Red Hat Linux box. Users of other systems will
+     modify this to some path below your your web servers root directory.
+
+   *      Directory for installing CGI binaries?
+
+     If HTML files are installed, you must install some CGI binaries too.
+     This question allows you to select an installation path, by default
+     the subdirectory cgi within the directory for installing HTML files.
+
+     Note that you need to configure the httpd so that it treats this
+     directory as a CGI directory. For example Apache users may add the
+     following to `srm.conf':
+
+          ScriptAlias /home/httpd/html/explorer/cgi
+
+   *      UID the httpd is running as?
+
+     The explorer scripts need write access to some files, in particular
+     the configuration created by the site administrator. To enable write
+     access, these files are owned by the Unix user you enter here, by
+     default the user *nobody*.
+
+     In most cases this will be the same user that your httpd is running
+     as, but it might be different, for example if your Apache is using the
+     suexec feature. Contact your webmaster for details.
+
+   If you didn't already do so, configure your web server for feeding
+files with extension *.ep* into the CGI binary *ep.cgi* or into the
+mod_perl module *Apache::EP*. The README of HTML::EP tells you how. See
+`HTML::EP(3)' in this node.
+
+   That's it! Assuming the directory `/home/httpd/html/explorer' is
+reachable as `/explorer' in your browser, point it to
+
+     http://localhost/explorer/
+
+   You should now see a directory listing. If so, proceed to
+`CONFIGURATION' in this node.
+
+CONFIGURATION
+=============
+
+   Besides the questions you already answered when installing the explorer,
+the system is configurable via any Web browser. Assuming the Explorer is
+reachable below http://localhost/explorer/, Point your browser to
+
+     http://localhost/explorer/admin/prefs.ep
+
+Security considerations
+-----------------------
+
+   The first thing you probably notice is that you need not supply a
+password for accessing this page. This should be changed. A typical
+configuration requests that only the user root can visit this page. For
+example, with Apache, you could insert the following into your httpd.conf:
+
+     <Location /explorer/admin>
+       AuthUserFile /etc/passwd
+       AuthName "Explorer Administration"
+       AuthTyoe basic
+       require user root
+     </Location>
+
+   (Of course one can discuss whether this is a secure thing, as it could
+allow deducing the root password by using some sort of crack mechanism.
+On the systems where I use it there ary typically lots of other
+possibilities for doing the same ... :-)
+
+E-Mail address of the administrator
+-----------------------------------
+
+   From time to time the system will use this address for sending emails
+to you.
+
+Actions
+-------
+
+   This is the explorers heart. Actions are merely shell scripts, to which
+the files will be fed, that your users have selected.
+
+   To create an action, fill out the following fields:
+
+Name
+     This is some short text that your users will see on the web frontend.
+     For example, it could be *Printing on the LaserJet*.
+
+Icon
+     This (optional) entry means that the explorer will use the named image
+     file to display it instead of the name above. For example, this could
+     be a small gif with the word *LaserJet* on it.
+
+     You must supply an URL here. If you are using Apache, then a lot of
+     nice icons are accessible in your httpd's icons directory. See the
+     README file.
+
+Script
+     This is a shell command that the explorer will execute for performing
+     the action. The command may use the variables file (the filename) or
+     user (the users name). For example, one could use
+
+          lpr -Plaserjet -U $user $file
+
+     The user name is deduced by looking at the environment variable
+     REMOTE_USER: If your directory */explorer* is password protected,
+     then this variable will contain the users name as set by the web
+     server. If the variable is empty, then the user name anonymous is
+     used.
+
+     Don't try to protect the user or file name with quotes: The Explorer
+     will use Perl's quotemeta function to secure these variables. For
+     example, if your tricky users supply a file name
+
+          `rm -rf /`
+
+     then the Explorer will run the command
+
+          lpr -Plaserjet -U anonymous \`rm\ -rf \/\`
+
+     which is safe. See *Note Perlsec: (perl.info)perlsec, for more
+     details on security considerations with Perl.
+
+     If your script command is able to process multiple files with one
+     command, then you may prefer
+
+          lpr -Plaserjet -U $user $files
+
+     The Explorer will detect that you are using *$files* and not $file
+     and will run a single command.
+
+Status script
+     Similar to the action script, this one will try to guess the current
+     status.  A typical command might be
+
+          lpq -Plaserjet -U $user
+
+     The status script is suggested to produce output looking like that of
+     lpq.
+
+Logfile
+     Path of a logfile to view
+
+   Note that you see only one (empty) action at the start: If you fill it
+out and hit *Save settings*, then a second (empty) row will appear
+automatically. To be precise, you will always have one empty row at the
+bottom.
+
+   Actions can be removed by just blanking out the name and hitting *Save
+settings*.
+
+Status cache
+------------
+
+   To save CPU time, you might like to make use of the Status cache.  By
+setting this variable to a certain number of seconds, say 300, the
+Explorer will not always run the status script. Instead it will create a
+cache file in the subdirectory status and save the status script's output
+there. When the status is queried the next time, this cache file will be
+used, unless the cache file's modification time is more that the given
+number of seconds in the past. In that case a new cache file will be
+created by running the status script again.
+
+Initial directories
+-------------------
+
+   In most cases you are not interested in giving your users access to the
+whole directory tree. For example, if your users use a Samba server to
+place files on your machine, than the Explorer should probably restrict
+your users to the Samba servers files.
+
+   To create an initial directory, fill out the following fields:
+
+Name
+     This is a verbose name that your users will see instead of the
+     directory path. For example, it could be a Samba share name.
+
+Directory
+     The real directory path.
+
+   By default your users will still be able to access files outside of the
+initial directories and these paths are only suggestions. This can be
+changed by disabling *Allow access to other directories*.
+
+   Again, you will always see one empty directory at the bottom of the
+list. To create a new directory just fill this out and hit *Save
+Settings*. Wipe out the name for removing an existing directory.
+
+File types
+----------
+
+   People are used to see only certain files when selecting them for
+actions. For example, when opening an existing document in Microsoft Word,
+then you will by default see only files with extension *.doc*.
+
+   A file type can be created by filling out the following fields:
+
+Name
+     This is a description of the file type, that your users will see. For
+     example, it could be
+
+          PostScript files (*.ps)
+
+     or
+
+          All Files (*)
+
+Icon
+     This is an (optional) icon to use for showing the file type. For
+     example, it could be
+
+          /icons/ps.gif
+
+     or
+
+          /icons/unknown.gif
+
+     (Note that these are indeed meaningful settings with any default
+     Apache installation, because Apache has a lot of icons included.  See
+     the file icons/README from the Apache distribution.)
+
+Regular Expression
+     This is a Perl Regular Expression which files must match in order to
+     be of this type. For example it could be
+
+          \.ps$
+          \.pdf$
+          \.(?:ps|pdf)$
+          .*
+
+     for PostScript files, PDF files, PostScript or PDF files or all files.
+     See `perlre(3)' in this node for details on Perl's regular
+     expressions.
+
+MODIFYING THE EXPLORER
+======================
+
+   When modifying the explorer, you should know about the following
+methods:
+
+Initializing the Explorer
+-------------------------
+
+   Probably any HTML page using the explorer system should contain the
+following:
+
+     <ep-package name=HTML::EP::Explorer accept="de,en">
+     <ep-explorer-init noprefs=0>
+
+   The *_ep_explorer_init* method is initializing the users cookie.  First
+it verifies, whether the user already has an explorer cookie set. If not,
+the user will be redirected to the *prefs.ep* page, unless the attribute
+*noprefs* is set. This page will allow him to fix his personal settings
+and return to the calling page.
+
+   The explorer class is a subclass of both *HTML::EP::Locale* and
+*HTML::EP::Session*. That means that the locale settings are still valid
+in the *ep-package* call (in particular the accept attribute that tells
+this page is ready for either german, aka de, or english). Likewise the
+attributes of *ep-session* are valid in the *ep-explorer-init* call.
+`HTML::EP(3)' in this node.  `HTML::EP::Session(3)' in this node.
+
+Reading and/or writing the admin settings
+-----------------------------------------
+
+   Within `admin/prefs.ep' and some other pages, you find the following
+call:
+
+     <ep-explorer-config file="config.pm" maysafe=0>
+
+   which read the admin settings from an external file, by default
+`config.pm'. The settings will instead be read from the CGI input and
+saved into the same file, if the CGI variable save and the attribute
+*maysafe* are true. (The latter should happen within the `amdin' dirctory
+only.)
+
+   The method will set the following EP variables:
+
+$config$
+     The config hash ref, as read from the file `config.pm'.
+
+$actions$
+     The list of actions. Shortcut for $config->actions$.  An action looks
+     like
+
+          { 'name' => 'Print to lp',
+            'icon' => '/icons/lp.gif', # May be undef
+            'script' => 'lpr -Plp -U $user $file'
+          }
+
+$directories$
+     The list of directories. Shortcut for
+     *$self->{'config'}->{'directories'}*. A directory looks like
+
+          { 'name' => 'Root directory',
+            'dir' => '/'
+          }
+
+$filetypes$
+     The list of file types. Shortcut for
+     *$self->{'config'}->{'filetypes'}*. A file type looks like
+
+          { 'name' => 'PostScript files (*.ps)'
+            'icon' => '/icons/ps.gif', # May be undef
+            're' => '\.ps$'
+          }
+
+$num_directories$
+     The number of elements in *$self->{'directories'}*. May be 0.
+
+Reading and/or writing the users settings
+-----------------------------------------
+
+   The users settings can be read and/or written by calling
+
+     <ep-explorer-prefs>
+
+   This will call *_ep_explorer_init* internally, by setting the *noprefs*
+attribute to true. If either of the CGI variables save or
+*save_and_return* is set, it will read the users new settings from the CGI
+environment by running *$self->ReadPrefs* and store the session (that is,
+return a cookie) by calling *ep-session-store*.
+
+   If the current oage is called from another page (that is, the CGI
+variable *return_to* is set to the calling page) and the CGI variable
+*save_and_return* is set, then the calling page is included with
+*ep-include*.
+
+Setting the Explorers current directory
+---------------------------------------
+
+   The method
+
+     <ep-explorer-basedir>
+
+   will read the users current directory from the session or CGI variable
+*basedir*. The current directory will be compared against the list of
+initial directories and the following EP variables will be set:
+
+$basedir$
+     The selected current directory. If this is different from
+     *$session-*basedir> then the latter will be modified and *$modified$*
+     will be set.
+
+$in_top_dir$
+     True, if the current directory is one of the initial directories or
+     in /, False otherwise.
+
+$in_base_dir$
+     If the current directory is below one of the initial directories,
+     then this variable will contain the associated element from the
+     directory list. That is $in_base_dir->name$ is set to the name of
+     this initial directory and $in_base_dir->dir$ the path.
+
+     Otherwise the variable is set to undef. If this is the case and the
+     administrator has set "Allow access outside initial directories" to
+     True, then a system error is triggered.
+
+$display_dir$
+     If $in_base_dir$ is set, then this variable is set to the current
+     directories path, relative to the directory from $in_base_dir$.  For
+     example, if you are in `/usr/local/bin' and the initial directory is
+     `/usr/local', then the display directory is `/bin'.
+
+Setting the sorting mode
+------------------------
+
+   The method
+
+     <ep-explorer-sortby>
+
+   attempts to guess the requested sorting mode from the CGI or session
+variable sortby. The guessed mode (by default name) will be stored in
+$sortby$. If this is different from $session->sortby$, then the latter
+becomes set to the new value and $modified$ is set.
+
+Setting the file type
+---------------------
+
+   The method
+
+     <ep-explorer-filetype>
+
+   attempts to guess the file type that the user requests (That is,
+whether the user wants to see only certain files.) by looking at the CGI
+or session variable filetype. By default the first file type from the list
+$filetypes$ is choosen. If no list is set, then all files become selected.
+
+   If a file type was choosen, the file type is stored in $filetype$.  and
+$filetype->selected$ is set to true. (Note, you must not call
+*ep-explorer-config* later!) If $filetype->name$ is different from
+$session->filetype$, then the latter is modified and $modified$ is set to
+true.
+
+Creating the directory listing
+------------------------------
+
+   The listing becomes created with
+
+     <ep-set var=dir_template>
+       <tr><td><!-- HTML code for listing a directory
+       		 You may assume that $l$ is an instance of
+                    HTML::EP::Explorer::Dir.
+                 -->
+           </td></tr>
+     </ep-set>
+     <ep-set var=file_template>
+       <tr><td><!-- HTML code for listing a file
+       		 You may assume that $l$ is an instance of
+                    HTML::EP::Explorer::File.
+                 -->
+           </td></tr>
+     </ep-set>
+     <ep-explorer-browse basedir="$env->DOCUMENT_ROOT$" item=l>
+
+   The method is calling *ep-explorer-basedir*, *ep-explorer-filetype* and
+*ep-explorer-sortby* internally. Then a directory listing is created and
+sorted, according to these methods results.
+
+   Finally, HTML code is generated for any item in the list by using the
+templates $dir_template$ or $file_template$, depending on the items type.
+
+Performing an action
+--------------------
+
+   The method
+
+     <p>I will execute the following command:</p>
+     <pre>
+       <ep-explorer-action action="myaction" file="myfile" execute=0>
+     </pre>
+     Here you can see the output:
+     <pre>
+       <ep-explorer-action action="myaction" file="myfile" execute=1>
+     </pre>
+
+   performs an action, as requested by the user. The method is reading an
+action name from the CGI variable *faction* or the attribute *faction*.
+The corresponding action, if any, is stored in $action$.  If no action is
+found, a system error is triggered.
+
+   Then the method is looking for either of the CGI variable files or the
+attribute files. If this is set, it is treated as a blank separated list
+of file names. (Tab, Carriage return etc. are counting as blanks.)
+
+   Otherwise the method expects a single file name in the CGI variable
+file or the attribute file. If neither is set, a system error is triggered.
+
+   If the attribute execute is set to false, then no commands are
+executed. Instead the method returns the commands being executed.
+Otherwise the command is executed and the output returned.
+
+AUTHOR AND COPYRIGHT
+====================
+
+   This module is
+
+     Copyright (C) 1998-1999	Jochen Wiedmann
+                           	Am Eisteich 9
+                           	72555 Metzingen
+                           	Germany
+
+     Phone: +49 7123 14887
+     Email: joe@ispsoft.de
+
+   All rights reserved.
+
+   You may distribute this module under the terms of either the GNU
+General Public License or the Artistic License, as specified in the Perl
+README file.
+
+SEE ALSO
+========
+
+   `HTML::EP(3)' in this node, `HTML::EP::Session(3)' in this node
+
+
+File: pm.info,  Node: HTML/EP/Glimpse,  Next: HTML/EP/Session,  Prev: HTML/EP/Explorer,  Up: Module List
+
+A simple search engine using Glimpse
+************************************
+
+NAME
+====
+
+   HTML::EP::Glimpse - A simple search engine using Glimpse
+
+SYNOPSIS
+========
+
+     <!-- Put the following in your EP page: -->
+     <!-- Load the Glimpse package: -->
+     <ep-package name="HTML::EP::Glimpse">
+     <!-- Run glimpse: -->
+     <ep-glimpse-search>
+     <!-- List the hits: -->
+       <ep-list items=files item=f>
+         <tr><td><a href="$f->url$">$f->title$</a></td>
+       </ep-list>
+
+DESCRIPTION
+===========
+
+   This is a simple search engine I wrote for the movie pages of a friend,
+Anne Haasis.
+
+   It is based on HTML::EP, my embedded Perl system and Glimpse, the well
+known indexing system, as a backend.
+
+INSTALLATION
+============
+
+   First of all, you have to install the latest version of HTML::EP, 0.20
+or later, and it's prerequisites. Next you have to install this package,
+HTML::EP::Glimpse. If you don't know how to install Perl packages, it's
+fairly simple: Fetch the required archives from any CPAN mirror, for
+example
+
+     ftp://ftp.funet.fi/pub/languages/perl/CPAN/modules/by-module/HTML
+
+   and then do, for example
+
+     gzip -cd HTML-EP-0.20.tar.gz | tar xf -
+     perl Makefile.PL
+     make
+     make test
+     make install
+
+   It's even more simple, if you have the CPAN module available:
+
+     perl -MCPAN -e shell
+     install HTML::EP
+     install HTML::EP::Glimpse
+
+   While running *perl Makefile.PL* in the HTML::EP::Glimpse directory,
+you'll be prompted some questions. These are explained in the
+CONFIGURATION section below. See `CONFIGURATION' in this node.
+
+   Your web server must be ready for serving EP pages. See the HTML::EP
+docs for details of the web server configuration. `HTML::EP(3)' in this
+node.
+
+CONFIGURATION
+=============
+
+   The module is configured at installation time when running *perl
+Makefile.PL*. However, you can repeat the configuration at any later time
+by running *perl -MHTML::EP::Glimpse::Install -e Config*.
+
+   Configuration will create a module *HTML::EP::Glimpse::Config*, which
+holds a single hash ref with the following keys:
+
+install_html_files
+     A TRUE (yes) value means, that the HTML examples will be copied to
+     your web servers document root. This is recommended, unless you have
+     an existing installation with own modifications in the HTML files.
+     Of course you wouln't want to overwrite your own files.
+
+html_base_dir
+     Base directory, where you put your HTML files to. The default is
+     `/home/httpd/html/Glimpse', which is fine on a Red Hat Linux box.
+
+vardir
+     A directory, where the web server is allowed to create files, in
+     particular your preferences and the Glimpse index. By default the
+     subdirectory `admin/var' of the base directory is choosen.
+
+httpd_user
+     The UID under which your web server is running CGI binaries. The
+     vardir must have read, execute and write permissions for this user.
+     The default is *nobody*, which is fine on a Red Hat Linux box again.
+
+glimpse_path
+glimpseindex_path
+     Path of the *glimpse* and *glimpseindex* binaries.
+
+The Preferences
+---------------
+
+   All other settings are fixed via the Web browser. Assuming your base
+directory is accessible via
+
+     http://localhost/Glimpse/
+
+   point your browser to
+
+     http://localhost/Glimpse/admin/index.ep
+
+   and enter the preferences page. The following items must be entered
+here:
+
+Web servers root directory
+     This is your web servers home directory, for example
+
+          /home/httpd/html
+
+     on a Red Hat Linux box.
+
+Directories being indexed
+     Usually you just put the value / here, because you want your whole
+     web server being indexed. However, if you want restrict the index to
+     some directories, enter them here. For example, if you have a manual
+     in `/manual' and want to index the manual directory only, then enter
+
+          /manual
+
+     The directory names are relative to the servers root directory.
+
+Directories being excluded
+     If you don't want your whole directory tree being indexed, you can
+     also exclude some directories. For example, there's not much sense in
+     indexing the Glimpse directory, so I usually enter
+
+          /Glimpse
+
+     here.
+
+Suffixes of files being indexed
+     Of course you don't want all files being indexed. For example,
+     there's not much sense in indexing GIF's or JPEG's. By default only
+     files with the extensions *.htm* and *.html* are indexed. If you want
+     your EP files being indexed as well, add a *.ep*. Likewise you might
+     want to add *.php* for PHP3 files or *.txt* for text files.
+
+Running glimpseindex
+--------------------
+
+   As soon as you modified your preferences, you should create an index.
+This is done by returning to the admin menu and calling the index page.
+
+   The same procedure should be repeated each time you modify your HTML
+files. If this is happening frequently, you might prefer using a cron job,
+for example
+
+     su - nobody -c "/usr/bin/glimpseindex -b -H $vardir -X"
+
+   with *$vardir* being the vardir from above. Note that your job shouln't
+run as root, unless you want to disable a manual recreation via the web
+browser.
+
+Configuring for multiple virtual servers or multiple directories
+----------------------------------------------------------------
+
+   So far configuration is fine, but can you use multiple instances of
+HTML::EP::Glimpse on one machine? Of course you can!
+
+   It is quite simple: Just copy the base directory to another location.
+Then create a subdirectory `admin/lib/HTML/EP/Glimpse' of the new base
+directory. Create a new configuration by running
+
+     cd $basedir/admin/lib/HTML/EP/Glimpse
+     perl -MHTML::EP::Glimpse::Install -e Config Config.pm
+
+   That's it!
+
+AUTHOR AND COPYRIGHT
+====================
+
+   This module is
+
+     Copyright (C) 1998-1999	Jochen Wiedmann
+                           	Am Eisteich 9
+                           	72555 Metzingen
+                           	Germany
+
+     Phone: +49 7123 14887
+     Email: joe@ispsoft.de
+
+   All rights reserved.
+
+   You may distribute this module under the terms of either the GNU
+General Public License or the Artistic License, as specified in the Perl
+README file.
+
+SEE ALSO
+========
+
+   `DBI(3)' in this node, `CGI(3)' in this node, `HTML::Parser(3)' in this
+node
+
+
+File: pm.info,  Node: HTML/EP/Session,  Next: HTML/EP/Shop,  Prev: HTML/EP/Glimpse,  Up: Module List
+
+Session management for the HTML::EP package
+*******************************************
+
+NAME
+====
+
+     HTML::EP::Session - Session management for the HTML::EP package
+
+SYNOPSIS
+========
+
+     <ep-comment>
+       Create a new session or open an existing session
+     </ep-comment>
+     <ep-session id="$cgi->id$" var="cart">
+
+     <ep-comment>
+       Modify the session by putting an item into the shopping cart
+     </ep-comment>
+     <ep-perl>
+       my $_ = $self; my $cart = $self->{'cart'};
+       my $items = $cart->{'items'} || {};
+       my $cgi = $self->{'cgi'};
+       $items->{$cgi->param('item_id')} = $cgi->param('num_items');
+     </ep-perl>
+
+     <ep-comment>
+       Same thing by using the ep-item command
+     </ep-comment>
+     <ep-session-item item="$cgi->item_id"
+      num="$cgi->num_items">
+
+     <ep-comment>
+       Store the session
+     </ep-comment>
+     <ep-session-store>
+
+DESCRIPTION
+===========
+
+   The HTML::EP::Session package is something like a little brother of
+Apache::Session: Given an ID and a structured Perl variable called the
+session, it stores the session into a DBI database, an external file or
+whatever you prefer. For example you like to use this in shopping carts:
+The shopping cart could look like this
+
+     $session = {
+       'id' => '21A32DE61A092DA1',
+       'items' => { '10043-A' => 1, # 1 item of article '10043-A'
+                    '10211-C' => 2  # 2 items of article '10211-C'
+                  }
+     }
+
+   The package takes the session, converts it into a string representation
+by using the Storable or *FreezeThaw* module and saves it into some
+non-volatile storage space. The storage method is choosen by selecting an
+appropriate subclass of HTML::EP::Session, for example
+HTML::EP::Session::DBI, the default class using DBI, the database
+independent Perl interface or HTML::EP::Session::File for using flat files.
+
+Creating or opening a session
+-----------------------------
+
+     <ep-session class="HTML::EP::Session::DBI" table="sessions"
+                 var=session id="$@cgi->id$" hex=0>
+
+   If the attribute id is empty or not set, this will create a new and
+empty session for you. Otherwise the existing session with the given id
+will be opened.
+
+   By default the session will have class *HTML::EP::Session::DBI* and
+data will be stored in the table *sessions*, but you can choose another
+subclass of *HTML::EP::Session* for saving data.  The session is stored in
+the session variable of the object, but that is overridable with the var
+attribute.
+
+   Some storage systems don't support NUL bytes. The hex attribute forces
+conversion of session strings into hex strings, if set to on.  The default
+is off.
+
+   Some session classes, in particular the DBI session class, will
+generate an ID for you, if required. That ID can by retrieved by looking at
+
+     $self->{'_ep_session_id'}
+
+   or, within an HTML page with
+
+     $_ep_session_id$
+
+Storing the session
+-------------------
+
+     <ep-session-store locked=0>
+
+   This stores the session back into the non-volatile storage. By default
+the session is unlocked at the same time and must not be modified in what
+follows, unless you set the optional locked attribute to a true value.
+
+Managing a shopping cart
+------------------------
+
+   As a helper for shopping carts you might use the following command:
+
+     <ep-session-item item="$cgi->item$" num="$cgi->num$">
+
+   This command uses a hash ref items in the shopping cart, the hash will
+be created automatically. The value num is stored in the hashs key item.
+Alternatively you might use
+
+     <ep-session-item item="$cgi->item$" add="$cgi->num$">
+
+   which is very much the same, but the item is incremented by add.
+
+Deleting a session
+------------------
+
+   You can delete an existing session with
+
+     <ep-session-delete>
+
+LOCKING CONSIDERATIONS
+======================
+
+   All subclasses have to implement a locking scheme. To keep this scheme
+clean and simple, the following rules must be applied:
+
+  1. First of all, acquire the resources that the respective subclass
+     needs.  In the case of the DBI subclass this means that you have to
+     execute the *ep-database* command.
+
+  2. Next you create or open the session.
+
+  3. If required, do any modifications and call *ep-session-store* or
+     *ep-session-delete*.
+
+  4. Once you have called *ep-session-store* or *ep-session-delete*, you
+     most not use any more ep-session commands.
+
+
+SUBCLASS INTERFACE
+==================
+
+   Subclasses of HTML::EP::Session must implement the following methods:
+
+new($ep, $id, \%attr)
+     (Class method) This constructor creates a new session with id $id.
+     The constructor should configure itself by using the EP object *$ep*
+     and the attribute hash ref \%attr.
+
+Open($ep, $id, \%attr)
+     (Class method) This constructor must open an existing session.
+
+Store($ep, $id, $locked)
+     (Instance method) Stores the session. The *$locked* argument advices
+     to keep the session locked (TRUE) or unlocked (FALSE).
+
+Delete($ep, $id)
+   Error handling in subclasses is simple: All you need to do is throwing
+a Perl exception. If subclasses need to maintain own data, they should
+store it in $ep->{'_ep_session_data'}. The id is stored in
+$ep->{'_ep_session_id'}.
+
+The DBI subclass
+----------------
+
+   This class is using the DBI (Database independent Perl interface),
+sessions are stored in a table. The table name is given by the table
+attribute and defaults to *sessions*. The table structure is like
+
+     CREATE TABLE SESSIONS (
+         ID INTEGER NOT NULL PRIMARY KEY,
+         SESSION LONGVARCHAR,
+         ACCESSED TIMESTAMP,
+         LOCKED INTEGER
+     )
+
+   in particular the SESSION column must be sufficiently large. I suggest
+using something like up to 65535, for example I am using *SHORT BLOB* with
+MySQL.
+
+   The SESSION column must accept binary characters, in particular NUL
+bytes.  If it doesn't, you need to replace the Storable package with
+*FreezeThaw*.  `Storable(3)' in this node. `FreezeThaw(3)' in this node.
+
+   Ilya Ketris (ilya@gde.to) has pointed out, that these column names are
+causing problems from time to time. He suggested to use queries like
+
+     INSERT INTO $table ("ID", "SESSION", ...
+
+   instead. This is of course higly incompatible to other engines. To fix
+that problem, I have added a subclass of *HTML::EP::Session::DBI*, called
+*HTML::EP::Session::DBIq* (quoted). You use it by just replacing the class
+name in the ep-session statement.
+
+The Cookie subclass
+-------------------
+
+   This class is using Cookies, as introduced by Netscape 2. When using
+Cookies for the session, you have to use a slightly different syntax:
+
+     <ep-session class="HTML::EP::Session::Cookie" id="sessions"
+                 var=session id="$@cgi->id$" expires="+1h"
+                 domain="www.company.com" path="/"
+                 zlib=0 base64=0>
+
+   The attribute id is the cookie's name. (Cookies are name/value pairs.)
+The optional attributes expires, domain and path are referring to the
+respective attributes of CG::Cookie->new().  `CGI::Cookie(3)' in this node.
+
+   Cookies are unfortunately restricted to a certain size, about 4096
+bytes. If your session is getting too large, you might try to reduce the
+cookie size by using the Compress::Zlib and/or MIME::Base64 module. This
+is enabled by adding the parameters *zlib=1* and/or *base64=1*.
+
+The Dumper subclass
+-------------------
+
+   This is, in some sense, an unusual class for sessions: All users are
+sharing a single session, unlike the DBI and Cookie subclasses, which
+implement one session per user. I enjoy using the Dumper subclass anyways,
+for example to implement site wide preferences.
+
+   What the class does is creating a file which holds a single hash ref.
+This hash ref is created using the Data::Dumper package. `Data::Dumper(3)'
+in this node.
+
+   You create a Dumper session like this:
+
+     <ep-session class="HTML::EP::Session::Dumper"
+     	      id="/var/tmp/my.session" var="prefs">
+
+   In other words, the session ID is just the name of the file.
+
+MULTIPLE SESSION
+================
+
+   When looking at the Cookie and Dumper subclass, the question arises:
+Can I use multiple sessions within a single HTML page? Of course you can!
+
+   However, there are a few drawbacks:
+
+  1. The variable $_ep_session_id$ always contains the ID of the last
+     created session. After you have created the first session, it will
+     contains this sessions ID. If you create another session, the
+     variable will change to the new ID.
+
+  2. You must use the attributes *var=something* and *id=something* with
+     any call to *ep-session*, *ep-session-store*, *ep-session-delete* and
+     *ep-session-item*.
+
+
+AUTHOR AND COPYRIGHT
+====================
+
+   This module is
+
+     Copyright (C) 1998    Jochen Wiedmann
+                           Am Eisteich 9
+                           72555 Metzingen
+                           Germany
+
+     Phone: +49 7123 14887
+     Email: joe@ispsoft.de
+
+   All rights reserved.
+
+   You may distribute this module under the terms of either the GNU
+General Public License or the Artistic License, as specified in the Perl
+README file.
+
+SEE ALSO
+========
+
+   `HTML::EP(3)' in this node, `Apache::Session(3)' in this node, `DBI(3)'
+in this node, `Storable(3)' in this node, `FreezeThaw(3)' in this node,
+`CGI::Cookie(3)' in this node
+
+
+File: pm.info,  Node: HTML/EP/Shop,  Next: HTML/EasyTags,  Prev: HTML/EP/Session,  Up: Module List
+
+An E-Commerce solution, based on HTML::EP
+*****************************************
+
+NAME
+====
+
+     HTML::EP::Shop - An E-Commerce solution, based on HTML::EP
+
+SYNOPSIS
+========
+
+DESCRIPTION
+===========
+
+AUTHOR AND COPYRIGHT
+====================
+
+   This module is
+
+     Copyright (C) 1998    Jochen Wiedmann
+                           Am Eisteich 9
+                           72555 Metzingen
+                           Germany
+
+     Phone: +49 7123 14887
+     Email: joe@ispsoft.de
+
+   All rights reserved.
+
+   You may distribute this module under the terms of either the GNU
+General Public License or the Artistic License, as specified in the Perl
+README file.
+
+SEE ALSO
+========
+
+   `HTML::EP(3)' in this node, *Note HTML/EP/Session: HTML/EP/Session,
+`HTML::EP::Locale' in this node
+
+
+File: pm.info,  Node: HTML/EasyTags,  Next: HTML/Element,  Prev: HTML/EP/Shop,  Up: Module List
+
+Make proper HTML 4 tags/lists/parts
+***********************************
+
+NAME
+====
+
+   HTML::EasyTags - Make proper HTML 4 tags/lists/parts
+
+DEPENDENCIES
+============
+
+Perl Version
+------------
+
+     5.004
+
+Standard Modules
+----------------
+
+     I<none>
+
+Nonstandard Modules
+-------------------
+
+     Class::ParamParser 1.03
+
+SYNOPSIS
+========
+
+     use HTML::EasyTags;
+
+     my $html = HTML::EasyTags->new();
+     $html->groups_by_default( 1 );
+
+     print
+     	$html->start_html(
+     		-title => 'This Is My Page',
+     		-head => $html->style( $html->comment_tag( <<__endquote ) ),
+     \nBODY {
+     	background-color: #ffffff;
+     	background-image: none;
+     }
+     __endquote
+     	),
+     	$html->h1( 'A Simple Example' ),
+     	$html->p(
+     		"Click " .
+     		$html->a( href => 'http://search.cpan.org', text => 'here' ) .
+     		" for more."
+     	),
+     	$html->hr,
+     	$html->table(
+     		$html->tr( [
+     			$html->th( [ 'Name', 'Count', 'URL', 'First Access' ] ),
+     			$html->td( [ 'Old Page', 33, 'http://www.domain.com',
+     				'1999/04/23 13:55:02' ] )
+     		] )
+     	),
+     	$html->hr,
+     	$html->form_start( method => 'post', action => 'http://localhost' ),
+     	$html->p(
+     		"What's your name? " .
+     		$html->input( type => 'text', name => 'name' )
+     	),
+     	$html->p(
+     		"What's the combination?" .
+     		$html->input_group(
+     			-type => 'checkbox',
+     			-name => 'words',
+     			-value => ['eenie', 'meenie', 'minie', 'moe'],
+     			-checked => [1, 0, 1, 0],
+     			-text => ['Eenie', 'Meenie', 'Minie', 'Moe'] ),
+     	),
+     	$html->p(
+     		"What's your favorite colour? " .
+     		$html->select_start( -size => 1, -name => 'color' ) .
+     		$html->option_group(
+     			-value => ['red', 'green', 'blue', 'chartreuse'],
+     			-text => ['Red', 'Green', 'Blue', 'Chartreuse'] ) .
+     		$html->select_end
+     	),
+     	$html->input( type => 'submit' ),
+     	$html->form_end,
+     	$html->end_html;
+
+DESCRIPTION
+===========
+
+   This Perl 5 object class can be used to generate any HTML tags in a
+format that is consistent with the W3C HTML 4.0 standard.  There are no
+restrictions on what tags are named, however; you can ask for any new or
+unsupported tag that comes along from Netscape or Microsoft, and it will
+be made.  Additionally, you can generate lists of said tags with one
+method call, or just parts of said tags (but not both at once).
+
+   This module's purpose is to be lightweight, easy to use, and whose
+results are syntactically correct and nicely formatted (should humans wish
+to read or debug it).  At the same time, it is supportive of your existing
+knowledge of HTML and as such its interface closely mirrors the actual
+appearance of the resulting tags.  This means that methods have the same
+name as the actual tags, and named parameters that you pass correspond
+directly to  the tag attributes produced.  This module saves you having to
+remember the little details on formatting.  For your convenience, a
+majority of the methods and their arguments are backwards-compatible with
+those in CGI.pm, but you are saved 200K of code size.
+
+   As a reference, I strongly recommend that you check out *Kevin
+Werbach's* excellent "The Bare Bones Guide to HTML", which is available at
+*http://werbach.com/barebones/*. I found this document invaluable when
+making this module, as it provides a comprehensive list of all the HTML
+tags along with their formatting and extensions.
+
+   In this implementation, "standard format" means that tags are made as
+pairs (<TAG></TAG>) by default, unless they are known to be "no pair"
+tags.  Tags that I know to be "no pair" are [basefont, img, area, param,
+br, hr, input, option, tbody, frame, comment, isindex, base, link, meta].
+However, you can force any tag to be "pair" or "start only" or "end only"
+by appropriately modifying your call to the tag making method.
+
+   Also, "standard format" means that tag modifiers are formatted as
+"key=value" by default, unless they are known to be "no value" modifiers.
+Modifiers that I know to be "no value" are [ismap, noshade, compact,
+checked, multiple, selected, nowrap, noresize, param].  These are
+formatted simply as "key" because their very presence indicates positive
+assertion, while their absense means otherwise.  For modifiers with
+values, the values will always become bounded by quotes, which ensures
+they work with both string and numerical quantities (eg: key="value").
+
+   Convenience methods start_html() and end_html() are provided to
+generate the required HTML that appears above and below your content;
+however, you can still make said HTML one tag at a time if you wish.
+
+   Note that this class is a subclass of Class::ParamParser, and inherits
+all of its methods, "params_to_hash()" and "params_to_array()".
+
+HTML CODE FROM SYNOPSIS PROGRAM
+===============================
+
+     <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN">
+     <HTML>
+     <HEAD>
+     <TITLE>This Is My Page</TITLE>
+     <STYLE>
+     <!--
+     BODY {
+     	background-color: #ffffff;
+     	background-image: none;
+     }
+      --></STYLE>
+     </HEAD>
+     <BODY>
+     <H1>A Simple Example</H1>
+     <P>Click
+     <A HREF="http://search.cpan.org">here</A> for more.</P>
+     <HR>
+     <TABLE>
+     <TR>
+     <TH>Name</TH>
+     <TH>Count</TH>
+     <TH>URL</TH>
+     <TH>First Access</TH></TR>
+     <TR>
+     <TD>Old Page</TD>
+     <TD>33</TD>
+     <TD>http://www.domain.com</TD>
+     <TD>1999/04/23 13:55:02</TD></TR></TABLE>
+     <HR>
+     <FORM METHOD="post" ACTION="http://localhost">
+     <P>What's your name?
+     <INPUT TYPE="text" NAME="name"></P>
+     <P>What's the combination?
+     <INPUT TYPE="checkbox" NAME="words" CHECKED VALUE="eenie">Eenie
+     <INPUT TYPE="checkbox" NAME="words" VALUE="meenie">Meenie
+     <INPUT TYPE="checkbox" NAME="words" CHECKED VALUE="minie">Minie
+     <INPUT TYPE="checkbox" NAME="words" VALUE="moe">Moe</P>
+     <P>What's your favorite colour?
+     <SELECT NAME="color" SIZE="1">
+     <OPTION VALUE="red">Red
+     <OPTION VALUE="green">Green
+     <OPTION VALUE="blue">Blue
+     <OPTION VALUE="chartreuse">Chartreuse
+     </SELECT></P>
+     <INPUT TYPE="submit">
+     </FORM>
+     </BODY>
+     </HTML>
+
+SYNTAX
+======
+
+   This class does not export any functions or methods, so you need to
+call them using object notation.  This means using *Class->function()* for
+functions and *$object->method()* for methods.  If you are inheriting this
+class for your own modules, then that often means something like
+*$self->method()*.
+
+   Methods of this class always "return" their results, rather than
+printing them out to a file or the screen.  Not only is this simpler, but
+it gives the calling code the maximum amount of control over what happens
+in the program.  They may wish to do post-processing with the generated
+HTML, or want to output it in a different order than it is generated.  By
+default, all results are returned as a scalar, but methods which generate
+a list of tags can optionally return an ARRAY ref, with each element
+containing a single tag.  This can aid in post-processing and possibly
+speed up the program because there is less copying done.
+
+   Through the magic of autoloading, this class can make any html tag by
+calling a class method with the same name as the tag you want.  For
+examples, use "hr()" to make a "<HR>" tag, or "p('text')" to make
+"<P>text</P>".  This also means that if you mis-spell any method name, it
+will still make a new tag with the mis-spelled name.  For autoloaded
+methods only, the method names are case-insensitive.
+
+   If you call a class method whose name ends in either of ['_start',
+'_end', '_pair'], this will be interpreted as an instruction to make just
+part of one tag whose name are the part of the method name preceeding that
+suffix.  For example, calling "p_start( 'text' )" results in "<P>text"
+rather than "<P>text</P>".  Similarly, calling "p_end()" will generate a
+"</P>" only.  Using the '_pair' suffix will force tags to be made as a
+pair, whether or not they would do so naturally.  For example, calling
+"br_pair" would produce a "<BR></BR>" rather than the normal "<BR>".  When
+using either of ['_start','_pair'], the arguments you pass the method are
+exactly the same as the unmodified method would use, and there are no
+other symantec differences.  However, when using the '_end' suffix, any
+arguments are ignored, as the latter member of a tag pair never carries any
+attributes anyway.
+
+   If you call a class method whose name ends in "_group", this will be
+interpreted as an instruction to make a list of tags whose name are the
+part of the method name preceeding the "_group".  For example, calling
+"td_group( ['here','we','are'] )" results in
+"<TD>here</TD><TD>we</TD><TD>are</TD>" being generated.  The arguments
+that you call this method are exactly the same as for calling a method to
+make a single tag of the same name, except that the extra optional
+parameter "list" can be used to force an ARRAY ref of the new tags to be
+returned instead of a scalar.  The symantec difference is that any
+arguments whose values are ARRAY refs are interpreted as a list of values
+where each one is used in a separate tag; for a single tag, the literal
+ARRAY ref itself would be used.  The number of tags produced is equal to
+the length of the longest ARRAY ref passed as an argument.  For any other
+arguments who have fewer than this count, their last value is replicated
+and appended enough times as necessary to make them the same length.  The
+value of a scalar argument is used for all the tags.  For example, calling
+"input_group( type => checkbox, name => 'letters', value => ['a','b','c']
+)" produces '<INPUT TYPE="checkbox" NAME="letters" VALUE="a"><INPUT
+TYPE="checkbox" NAME="letters" VALUE="b"><INPUT TYPE="checkbox"
+NAME="letters" VALUE="c">'.
+
+   All autoloaded methods require their parameters to be in named format.
+These names and values correspond to attribute names and values for the
+new tags.  Since "no value" attributes are essentially booleans, they can
+have any true or false value associated with them in the parameter list,
+which won't be printed.  If an autoloaded method is passed exactly one
+parameter, it will be interpreted as the "text" that goes between the tag
+pair (<TAG>text</TAG>) or after "start tags" (<TAG>text).  The same result
+can be had explicitely by passing the named parameter "text".  The names
+of any named parameters can upper or lower or mixed case, as is your
+preference, and optionally start with a "-".
+
+   All static (non-autoloaded) methods require positional parameters.
+
+FUNCTIONS AND METHODS
+=====================
+
+   Note that all the methods defined below are static, so information
+specific to autoloaded methods won't likely apply to them.  All of these
+methods take positional arguments.
+
+new()
+-----
+
+   This function creates a new HTML::EasyTags object (or subclass thereof)
+and returns it.
+
+initialize()
+------------
+
+   This method is used by new() to set the initial properties of an object,
+that it creates.  All page attributes are wiped clean, resulting in an
+empty page.
+
+clone([ CLONE ])
+----------------
+
+   This method initializes a new object to have all of the same properties
+of the current object and returns it.  This new object can be provided in
+the optional argument CLONE (if CLONE is an object of the same class as
+the current object); otherwise, a brand new object of the current class is
+used.  Only object properties recognized by HTML::EasyTags are set in the
+clone; other properties are not changed.
+
+groups_by_default([ VALUE ])
+----------------------------
+
+   This method is an accessor for the boolean "automatic grouping"
+property of this object, which it returns.  If VALUE is defined, this
+property is set to it.  In cases where we aren't told explicitely that
+autoloaded methods are making a single or multiple tags (using ['_start',
+'_end', '_pair'] and '_group' respectively), we look to this property to
+determine what operation we guess.  The default is "single".  When this
+property is true, we can make both single and groups of tags by using a
+suffix-less method name; however, making single tags this way is slower
+than when this property is false.  Also, be aware that when we are making
+a "group", arguments that are ARRAY refs are always flattened, and when we
+are making a "single", ARRAY ref arguments are always used literally.
+
+prologue_tag()
+--------------
+
+   This method returns a prologue tag, which is meant to be the very first
+thing in an HTML document.  It tells the web browser such things as what
+version of the HTML standard we are adhering to, version 4.0 in this case.
+The prologue tag we make looks like '<!DOCTYPE HTML PUBLIC "-//W3C//DTD
+HTML 4.0//EN">'.
+
+comment_tag( TEXT )
+-------------------
+
+   This method returns a comment tag, which is only visible to people
+viewing the HTML source of a document, and not otherwise.  It can take
+either a scalar or a list or an Array ref as its TEXT argument.  If a
+single item of text is passed, then a comment tag that looks like "<!-
+text ->" is made.  If more than one item of text is passed, then a
+multi-line comment is made, which has each item of text on its own line
+and indented with a single tab.  The latter is suitable for displaying CSS
+or JavaScript code in an elegant manner.
+
+make_html_tag( NAME[, PARAMS[, TEXT[, PART]]] )
+-----------------------------------------------
+
+   This method is used internally to do the actual construction of single
+html tags.   You can call it directly when you want faster code and/or
+more control over how tags are made.  The first argument, NAME, is a
+scalar that defines the actual name of the tag we are making (eg: 'br');
+it is case-insensitive.  The optional second argument, PARAMS, is a HASH
+ref containing attribute names and values for the new tag; the names
+(keys) are case-insensitive.  The attribute values are all printed
+literally, so they should be scalars.  The optional third argument, TEXT,
+is a scalar containing the text that goes between the tag pairs; it is not
+a tag attribute.  The optional fourth argument, PART, is a scalar which
+indicates we should make just a certain part of the tag; acceptable values
+are ['pair', 'start', 'end'], and it is case-insensitive.  This method
+knows which HTML tags are normally paired or not, which tag attributes
+take specified values or not, and acts accordingly.
+
+make_html_tag_group( NAME[, PARAMS[, TEXT[, LIST]]] )
+-----------------------------------------------------
+
+   This method is used internally to do the actual construction of html
+tag groups.  You can call it directly when you want faster code and/or
+more control over how tags are made.  The first argument, NAME, is a
+scalar that defines the actual name of the tag we are making (eg: 'br');
+it is case-insensitive.  The optional second argument, PARAMS, is a HASH
+ref containing attribute names and values for the new tag; the names
+(keys) are case-insensitive.  Any attribute values which are ARRAY refs
+are flattened, and the number of tags made is determined by the length of
+the longest one.  The optional third argument, TEXT, is a HASH ref (or
+scalar) containing the text that goes between the tag pairs; it is not a
+tag attribute, but if its an ARRAY ref then its length will influence the
+number of tags that are made as the length of tag attribute arrays do.
+The optional fourth argument, LIST, is a boolean/scalar which indicates
+whether this method returns the new tags in an ARRAY ref (one tag per
+element) or as a scalar (tags are concatenated together); a true value
+forces an ARRAY ref, scalar is the default.  This method knows which HTML
+tags are normally paired or not, which tag attributes take specified
+values or not, and acts accordingly.
+
+start_html([ TITLE[, HEAD[, BODY]] ])
+-------------------------------------
+
+   This method returns a canned HTML template that is suitable for use as
+the top of an HTML page.  It consists of the prologue tag (<!DOCTYPE...),
+the opening 'html' tag, the entire 'head' section, and the opening 'body'
+tag.  The prologue tag looks the same as that generated by the class
+method prologue_tag().  The first optional argument, TITLE, is a scalar
+which defines the title for the document, and its default value is
+'Untitled Document'.  The second argument, HEAD, is an ARRAY ref (or
+scalar) containing anything else you would like to appear in the 'head'
+section; it is flattened and the elements used as-is.  The third argument,
+BODY, is a HASH ref containing attributes and values for the opening
+'body' tag.
+
+end_html()
+----------
+
+   This method returns a canned HTML template that is suitable for use as
+the bottom of an HTML page.  It consists of the closing 'body' and 'html'
+tags.
+
+COMPARISONS WITH CGI.PM
+=======================
+
+   The methods of this class and their parameters are designed to be
+compatible with any same-named methods in the popular CGI.pm class. This
+class will produce browser-compatible (and often identical) HTML from such
+methods, and this class can accept all the same argument formats.
+Exceptions to this include:
+
+  1. None of our methods are exported and must be called using object
+     notation, whereas CGI.pm can export any of it's methods.
+
+  2. Autoloaded methods do not use the presence or absence of arguments to
+     decide whether to make the new tag as a pair or as "start only".
+     Also, CGI.pm does not do end-only tags.
+
+  3. Autoloaded methods that make html tags won't concatenate their
+     arguments into a single argument under any circumstances, but in some
+     cases the "shortcuts" of CGI.pm will do so.
+
+  4. Currently we don't html-escape any argument values passed to our tag
+     making functions, whereas CGI.pm sometimes does.  While we expect our
+     caller to do the escaping themselves where necessary, perhaps using a
+     CPAN module especially designed for HTML escaping, we may do it later
+     in an update.
+
+  5. We go further to make the generated HTML human-readable by: 1. having
+     each new tag start on a new line; 2. making all tag and attribute
+     names uppercase; 3.  ensuring that about 20 often-used tag attributes
+     always appear in the same order (eg: 'type' is before 'name' is
+     before 'value'), and before any others.
+
+  6. Our textarea() method is autoloaded, and doesn't have the special
+     symantecs that CGI.pm's textarea() does.
+
+  7. Our convenience method start_html() is very simple and only accepts
+     the three positional arguments ['title', 'head', 'body'].  Title is
+     the most commonly used argument by far, and you can easily replicate
+     the effects of missing arguments by making appropriate tags
+     explicitely and passing them with the "head" argument.
+
+
+AUTHOR
+======
+
+   Copyright (c) 1999-2001, Darren R. Duncan. All rights reserved. This
+module is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.  However, I do request that this copyright
+information remain attached to the file.  If you modify this module and
+redistribute a changed version then please attach a note listing the
+modifications.
+
+   I am always interested in knowing how my work helps others, so if you
+put this module to use in any of your own code then please send me the
+URL.  Also, if you make modifications to the module because it doesn't
+work the way you need, please send me a copy so that I can roll desirable
+changes into the main release.
+
+   Address comments, suggestions, and bug reports to
+*perl@DarrenDuncan.net*.
+
+CREDITS
+=======
+
+   Thanks very much to *Kevin Werbach* for publishing "The Bare Bones
+Guide to HTML", which I found to be an invaluable resource when writing
+this module (and at other times as well).  The latest version of the
+document is available at *http://werbach.com/barebones/*.
+
+   This quick reference lists all the HTML tags that current browsers are
+likely to recognize, including all the elements of the official HTML 4.0
+recommendation, and some Netscape and Microsoft extensions as well.
+Common attributes for these tags are also included in context, giving a
+good idea on how they are used.
+
+   When writing this module, I used the Bare Bones reference to verify the
+consistant formatting used by all HTML tags, including how tag attributes
+are formatted.  I could see the proper formatting for prologue and comment
+tags as well; their formats are unique compared to all the other tags.
+The other main uses I had for the document was in determining all the HTML
+tags which were not used as a pair (most use pairs, few don't), and for
+determining which tag attributes made a positive assertion just by their
+presence, without need for any associated values (most have values, few
+don't).
+
+   Thanks to *Lincoln D. Stein* for setting a good interface standard in
+the HTML-related methods of his CGI.pm module.  I was heavily influenced
+by his interfaces when designing my own.  Thanks also because I borrowed
+ideas for my Synopsis program from his aforementioned module.
+
+SEE ALSO
+========
+
+   perl(1), Class::ParamParser, HTML::FormTemplate, CGI.
+
+

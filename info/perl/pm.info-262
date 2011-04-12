@@ -1,0 +1,1570 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Net/NISPlus/Table,  Next: Net/NISTable,  Prev: Net/NIS,  Up: Module List
+
+colnames
+--------
+
+   colnames returns the column headings for the NIS+ table.  If called in
+an array context, it returns an array containing the column names in the
+order in which they appear in the table.  If called in a scalar context,
+it returns a reference to a hash with keys being column names, and values
+being an integer representing the column's position.
+
+   e.g.
+
+   $table = Net::NISPlus::Table('hosts.org_dir'); $cols = $table->colnames;
+
+   will end up with $cols being:
+
+   $cols->{'cname'} = 0; $cols->{'name'} = 1; $cols->{'addr'} = 2;
+$cols->{'comment'} = 3;
+
+   and
+
+   $table = Net::NISPlus::Table('hosts.org_dir');  @cols =
+$table->colnames;
+
+   will end up with @cols being:
+
+   @cols = ('cname', 'name', 'addr', 'comment')
+
+   NOTE: as the colnames method behaves differently depending on what
+context it is called in, it may not always behave as you expect.  For
+example, the following two code fragments are not equivalent:
+
+   my($colnames) = $table->colnames;
+
+   and
+
+   my($colnames); $colnames = $table->colnames;
+
+   The first calls colnames in an array context, and the second in a
+scalar context.
+
+add
+---
+
+   Add an entry to the table.  Any columns not specified will be set to
+null strings.
+
+   $table->add('key1' => 'value1', 'key2' => 'value2');
+
+   or
+
+   $table->add(['key1' => 'key1', 'key2' => 'value2'], 	['key1' => 'key3',
+'key2' => 'value4'])
+
+addinfo
+-------
+
+   Add an entry to the table, setting the info variable as we go.  Any
+columns not specified will be set to null strings.
+
+   $table->addinfo([key1, key2],   ['values' => [ 'value1', 'value2' ],
+'access' => access,    'domain' => domain,    'owner' => owner,    'group'
+=> group],   [...])
+
+remove
+------
+
+   Remove a single entry from the table.  If the key/value pairs match
+more that one entry, an error occurs, and no entries are removed.  Use
+removem to remove multiple entries with a single command.
+
+   $table->remove({'key1' => 'value1', 'key2' => 'value2'});
+
+   or
+
+   $table->remove("[key1=value1,key2=value2]");
+
+   If you specify the table name in the indexed name form, it will be
+removed and replaced with the full name determined when the table object
+was created (and accessible with $table->fullName);
+
+removem
+-------
+
+   Remove one or more entries from the table. All entries which match the
+key/value pairs will be removed. Use remove to remove a single entry.
+
+   $table->removem({'key1' => 'value1', 'key2' => 'value2'});
+
+   or
+
+   $table->removem("[key1=value1,key2=value2]");
+
+   If you specify the table name in the indexed name form, it will be
+removed and replaced with the full name determined when the table object
+was created (and accessible with $table->fullName);
+
+clear
+-----
+
+   Remove all entries from the table
+
+   $table->clear();
+
+modify
+------
+
+   Change fields in a table entry.
+
+   $table->modify({'key1' => 'value1', 'key2' => 'value2'}, {'key3' =>
+'newvalue3'});
+
+   or
+
+   $table->modify("[key1=value1,key2=value2]", {'key3' => 'newvalue3'});
+
+   If you specify the table name in the indexed name form, it will be
+removed and replaced with the full name determined when the table object
+was created (and accessible with $table->fullName);
+
+first_entry
+-----------
+
+   first_entry retrieves the first entry in the table.  Data is returned
+in an array.
+
+   @fields = $table->first_entry();
+
+next_entry
+----------
+
+   next_entry successively returns the next entry in the table.
+first_entry should be called before next_entry.  Data is returned in an
+array.
+
+   @fields = $table->next_entry();
+
+isColname
+---------
+
+   returns TRUE if the given argument is a valid column name for the table
+
+   $table->isColname("name");
+
+
+File: pm.info,  Node: Net/NISTable,  Next: Net/NISplusTied,  Prev: Net/NISPlus/Table,  Up: Module List
+
+Object Interface to Sun's Network Information Service
+*****************************************************
+
+NAME
+====
+
+   Net::NIS::Table - Object Interface to Sun's Network Information Service
+
+DESCRIPTION
+===========
+
+   The NIS interface comes in two parts.  The first part is the raw
+implementation of the NIS API, described in *Note Net/NIS: Net/NIS,.  The
+second is the object interface.  This document describes the object
+interface implementation.
+
+   The Table object represents an individual NIS map.  A NIS map is bound
+to a Table object with the new method:
+
+     $obj = Net::NIS::Table->new($map, [ $domain ]);
+
+   For example,
+
+     $hostsmap = Net::NIS::Table->new("hosts.byname");
+
+   This will create a Table object bound to the `hosts.byname' NIS map in
+the default NIS domain.  All operations on the $hostsmap object will
+relate to the `hosts.byname' map.
+
+   You can also specify a non-default domain:
+
+     $hostsmap = Net::NIS::Table->new("hosts.byname", "my.domain.com.au");
+
+   Once a Table object has been bound to a NIS map, the following methods
+are available:
+
+$value = $obj->match($key)
+     Returns the value for a given key.  If you only wish to look up one or
+     two values, this function is more efficient, as it retrieves the items
+     one at a time.  If you wish to retrieve many items (where many is
+     dependent on the size of the map, and probably what sort of machine
+     you are on), it is better to use the `list' in this node interface,
+     which uses just one RPC call to retreive the entire map.
+
+\%data = $obj->list()
+     Return a reference to an associative array which contains the entire
+     NIS map.  The keys in the %data array correspond to the keys in the
+     NIS map.  If any error occurs that prevents the retrieval of the map,
+     then the undefined value is returned.  In this case, your program can
+     use the status method to determine the cause of the error.
+
+\%data = $obj->search($srchkey)
+     Return a reference to an associative array which contains all entries
+     that have keys that contain the $srchkey.  If any error occurs that
+     prevents the retrieval of the map, then the undefined value is
+     returned.  In this case, your program can use the status method to
+     determine the cause of the error.
+
+$status = $obj->status()
+     Returns the status code for the last operation.  If the last operation
+     succeeded, then the status code is 0.  The status codes returned by
+     this method are described below in the ERROR CODES section.
+
+$status = $obj->status_string()
+     Returns the character representation of the status code for the last
+     operation.  If the last operation succeeded, then the status code is
+     something like "operation succeeded".  The exact strings returned by
+     this function are implementation dependent, and should not be used
+     for comparison purposes.  Use the status call, as described above.
+
+ERROR CODES
+===========
+
+   The status method described above can return one of the following
+values:
+
+     $Net::NIS::ERR_ACCESS		Access violation
+     $Net::NIS::ERR_BADARGS	Args to function are bad
+     $Net::NIS::ERR_BADDB		yp data base is bad
+     $Net::NIS::ERR_BUSY		Database is busy
+     $Net::NIS::ERR_DOMAIN		Can't bind to a server which serves this domain
+     $Net::NIS::ERR_KEY		No such key in map
+     $Net::NIS::ERR_MAP		No such map in server's domain
+     $Net::NIS::ERR_NODOM		Local domain name not set
+     $Net::NIS::ERR_PMAP		Can't communicate with portmapper
+     $Net::NIS::ERR_NOMORE		No more records in map database
+     $Net::NIS::ERR_RESRC		Local resource allocation failure
+     $Net::NIS::ERR_RPC		RPC failure
+     $Net::NIS::ERR_YPBIND		Can't communicate with ypbind
+     $Net::NIS::ERR_YPERR		Internal yp server or client interface error
+     $Net::NIS::ERR_YPSERV		Can't communicate with ypserv
+     $Net::NIS::ERR_VERS		YP version mismatch
+
+AUTHOR
+======
+
+   Copyright (c) 1995 Rik Harris (*rik.harris@fulcrum.com.au*). All rights
+reserved.  This program is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.
+
+   The Network Information Service (NIS) was formerly known as Sun Yellow
+Pages (YP). The functionality of the two remains the same; only the name
+has changed.  The name Yellow Pages is a registered trademark in the
+United Kingdom of British Telecommunications plc, and may not be used
+without permission.
+
+
+File: pm.info,  Node: Net/NISplusTied,  Next: Net/NNTP,  Prev: Net/NISTable,  Up: Module List
+
+TIEHASH() interface to NIS+ tables
+**********************************
+
+NAME
+====
+
+   Net::NISplusTied - TIEHASH() interface to NIS+ tables
+
+SYNOPSIS
+========
+
+     use Net::NISplusTied;
+     
+     tie (%hash, Net::NISplusTied, 'your.table.domain.');
+     
+     ### lookups
+     $arrayref = $hash {'field=key'};
+     $arrayref = $hash {'field1=key1,field2=key2'};
+     $arrayref = $hash {{field => $key}};
+     $arrayref = $hash {{field1 => $key1, field2 => $key2}};
+
+     $hashref = $hash {'field1=key'} [0];
+     $value = $hash {'field1=key'} [0] {field2};
+     
+     ### modify value
+     $hash {'field1=key'} = {field2 => $newvalue2, field3 => $newvalue3};
+     $hash {{field1 => $key}} = {field2 => $newvalue2, field3 => $newvalue3};
+     
+     ### delete entry
+     delete $hash {'field1=key'};
+     delete $hash {{field => $key}};
+     
+     ### iterate through table
+     # not implemented #
+
+DESCRIPTION
+===========
+
+   The *Net::NISplusTied* allows you to treat NIS+ tables as if they were
+perl hashes, using tie() semantics.  It has cultural links to Rick Harris
+(Rik.Harris@fulcrum.com.au) NISperl module, although the design goals were
+different.  All you can do with *Net::NISplusTied* is to manipulate NIS+
+tables.  If you need faithful NIS+ API implementation, consider using
+NISperl instead.  The assumption was that one would rarely need to create
+and delete NIS+ tables and groups from perl, at least not often enough to
+be seriously inconvenienced by `system 'nistbladm' ...' etc.
+
+tie()
+-----
+
+   The third argument to tie() is the fully qualified name of the table
+you wish to tie.  The module disregards NIS_PATH settings.
+
+FETCH()
+-------
+
+   Hash lookups should have NIS+ indexes as the keys, with no square
+brackets.  The following are shell and perl eqivavlents:
+
+   *shell:*
+
+     nismatch [name=bob,age=33],users.my.domain.
+
+   perl:
+
+     tie (%users, Net::NISplusTied, 'users.my.domain.');
+     $results = $users {'name=bob,age=33'};
+
+   The value returned from a lookup is an array ref.  Array elements are
+hash refs representing the individual entries.  Hashes are keyed by the
+table columns.  The following would print user bob's login shell setting
+from the stock passwd.org_dir file:
+
+     tie (%passwd, Net::NISplusTied, 'passwd.org_dir.your.domain.');
+     print $passwd {'name=bob'} [0] {shell};
+
+STORE()
+-------
+
+   The STORE() method need some explanations.  It takes  scalar as a key
+and hash ref as a value. If the result of key lookup returns exactly one
+entry, this entry is replaced. If there is none or more than one, entry is
+added to the table. It is up to you to ensure that the indexes stay unique,
+since the module will not do this.  Consider the following table:
+
+     field1		field2		field3
+     ---------------------------------------------
+     apple		cat		...
+     apple		dog		...
+     orange		cat		...
+
+     tie (%table, Net::NISplusTied, ...);
+
+   The following piece of code
+
+     $table {'field1=apple,field2=cat'} = {field3 => 'whatever'};
+
+   will chnage entry [1], but
+
+     $table {'field1=apple'} = {field2 => 'cat', field3 => 'whatever'};
+
+   will add a new entry to the table, since field1=apple is not unique.
+
+DELETE()
+--------
+
+     delete $passwd {'name=bob'}
+
+   does what you think it does.  Be careful however, REM_MULTIPLE flag is
+set, and running
+
+     delete $passwd {''}
+
+   will remove ALL ENTRIES from the table.
+
+DESTROY()
+---------
+
+   `destroy $passwd;' frees up the memory taken by the hash.  You should
+not normally need this.
+
+NOTE
+====
+
+   Copyright (c) 1998 Ilya Ketris. All rights reserved.  This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+AUTHOR
+======
+
+   Ilya Ketris, ilya@gde.to
+
+SEE ALSO
+========
+
+   perl(1), perlguts(1), nis(1)
+
+
+File: pm.info,  Node: Net/NNTP,  Next: Net/Netmask,  Prev: Net/NISplusTied,  Up: Module List
+
+NNTP Client class
+*****************
+
+NAME
+====
+
+   Net::NNTP - NNTP Client class
+
+SYNOPSIS
+========
+
+     use Net::NNTP;
+     
+     $nntp = Net::NNTP->new("some.host.name");
+     $nntp->quit;
+
+DESCRIPTION
+===========
+
+   `Net::NNTP' is a class implementing a simple NNTP client in Perl as
+described in RFC977. `Net::NNTP' inherits its communication methods from
+`Net::Cmd'
+
+CONSTRUCTOR
+===========
+
+new ( [ HOST ] [, OPTIONS ])
+     This is the constructor for a new Net::NNTP object. `HOST' is the
+     name of the remote host to which a NNTP connection is required. If not
+     given two environment variables are checked, first `NNTPSERVER' then
+     `NEWSHOST', then `Net::Config' is checked, and if a host is not found
+     then news is used.
+
+     OPTIONS are passed in a hash like fashion, using key and value pairs.
+     Possible options are:
+
+     Timeout - Maximum time, in seconds, to wait for a response from the
+     NNTP server, a value of zero will cause all IO operations to block.
+     (default: 120)
+
+     Debug - Enable the printing of debugging information to STDERR
+
+     *Reader* - If the remote server is INN then initially the connection
+     will be to nnrpd, by default `Net::NNTP' will issue a `MODE READER'
+     command so that the remote server becomes innd. If the `Reader'
+     option is given with a value of zero, then this command will not be
+     sent and the connection will be left talking to nnrpd.
+
+METHODS
+=======
+
+   Unless otherwise stated all methods return either a *true* or false
+value, with *true* meaning that the operation was a success. When a method
+states that it returns a value, failure will be returned as undef or an
+empty list.
+
+article ( [ MSGID|MSGNUM ], [FH] )
+     Retrieve the header, a blank line, then the body (text) of the
+     specified article.
+
+     If FH is specified then it is expected to be a valid filehandle and
+     the result will be printed to it, on sucess a true value will be
+     returned. If FH is not specified then the return value, on sucess,
+     will be a reference to an array containg the article requested, each
+     entry in the array will contain one line of the article.
+
+     If no arguments are passed then the current article in the currently
+     selected newsgroup is fetched.
+
+     `MSGNUM' is a numeric id of an article in the current newsgroup, and
+     will change the current article pointer.  `MSGID' is the message id of
+     an article as shown in that article's header.  It is anticipated that
+     the client will obtain the `MSGID' from a list provided by the newnews
+     command, from references contained within another article, or from the
+     message-id provided in the response to some other commands.
+
+     If there is an error then undef will be returned.
+
+body ( [ MSGID|MSGNUM ], [FH] )
+     Like article but only fetches the body of the article.
+
+head ( [ MSGID|MSGNUM ], [FH] )
+     Like article but only fetches the headers for the article.
+
+nntpstat ( [ MSGID|MSGNUM ] )
+     The nntpstat command is similar to the article command except that no
+     text is returned.  When selecting by message number within a group,
+     the nntpstat command serves to set the "current article pointer"
+     without sending text.
+
+     Using the nntpstat command to select by message-id is valid but of
+     questionable value, since a selection by message-id does not alter
+     the "current article pointer".
+
+     Returns the message-id of the "current article".
+
+group ( [ GROUP ] )
+     Set and/or get the current group. If `GROUP' is not given then
+     information is returned on the current group.
+
+     In a scalar context it returns the group name.
+
+     In an array context the return value is a list containing, the number
+     of articles in the group, the number of the first article, the number
+     of the last article and the group name.
+
+ihave ( MSGID [, MESSAGE ])
+     The ihave command informs the server that the client has an article
+     whose id is `MSGID'.  If the server desires a copy of that article,
+     and `MESSAGE' has been given the it will be sent.
+
+     Returns *true* if the server desires the article and `MESSAGE' was
+     successfully sent,if specified.
+
+     If `MESSAGE' is not specified then the message must be sent using the
+     datasend and dataend methods from *Note Net/Cmd: Net/Cmd,
+
+     `MESSAGE' can be either an array of lines or a reference to an array.
+
+last ()
+     Set the "current article pointer" to the previous article in the
+     current newsgroup.
+
+     Returns the message-id of the article.
+
+date ()
+     Returns the date on the remote server. This date will be in a UNIX
+     time format (seconds since 1970)
+
+postok ()
+     postok will return *true* if the servers initial response indicated
+     that it will allow posting.
+
+authinfo ( USER, PASS )
+list ()
+     Obtain information about all the active newsgroups. The results is a
+     reference to a hash where the key is a group name and each value is a
+     reference to an array. The elements in this array are:- the first
+     article number in the group, the last article number in the group and
+     any information flags about the group.
+
+newgroups ( SINCE [, DISTRIBUTIONS ])
+     `SINCE' is a time value and `DISTRIBUTIONS' is either a distribution
+     pattern or a reference to a list of distribution patterns.  The
+     result is the same as list, but the groups return will be limited to
+     those created after `SINCE' and, if specified, in one of the
+     distribution areas in `DISTRIBUTIONS'.
+
+newnews ( SINCE [, GROUPS [, DISTRIBUTIONS ]])
+     `SINCE' is a time value. `GROUPS' is either a group pattern or a
+     reference to a list of group patterns. `DISTRIBUTIONS' is either a
+     distribution pattern or a reference to a list of distribution
+     patterns.
+
+     Returns a reference to a list which contains the message-ids of all
+     news posted after `SINCE', that are in a groups which matched
+     `GROUPS' and a distribution which matches `DISTRIBUTIONS'.
+
+next ()
+     Set the "current article pointer" to the next article in the current
+     newsgroup.
+
+     Returns the message-id of the article.
+
+post ( [ MESSAGE ] )
+     Post a new article to the news server. If `MESSAGE' is specified and
+     posting is allowed then the message will be sent.
+
+     If `MESSAGE' is not specified then the message must be sent using the
+     datasend and dataend methods from *Note Net/Cmd: Net/Cmd,
+
+     `MESSAGE' can be either an array of lines or a reference to an array.
+
+slave ()
+     Tell the remote server that I am not a user client, but probably
+     another news server.
+
+quit ()
+     Quit the remote server and close the socket connection.
+
+Extension methods
+-----------------
+
+   These methods use commands that are not part of the RFC977
+documentation. Some servers may not support all of them.
+
+newsgroups ( [ PATTERN ] )
+     Returns a reference to a hash where the keys are all the group names
+     which match PATTERN, or all of the groups if no pattern is specified,
+     and each value contains the description text for the group.
+
+distributions ()
+     Returns a reference to a hash where the keys are all the possible
+     distribution names and the values are the distribution descriptions.
+
+subscriptions ()
+     Returns a reference to a list which contains a list of groups which
+     are recommended for a new user to subscribe to.
+
+overview_fmt ()
+     Returns a reference to an array which contain the names of the fields
+     returned by xover.
+
+active_times ()
+     Returns a reference to a hash where the keys are the group names and
+     each value is a reference to an array containing the time the groups
+     was created and an identifier, possibly an Email address, of the
+     creator.
+
+active ( [ PATTERN ] )
+     Similar to list but only active groups that match the pattern are
+     returned.  PATTERN can be a group pattern.
+
+xgtitle ( PATTERN )
+     Returns a reference to a hash where the keys are all the group names
+     which match PATTERN and each value is the description text for the
+     group.
+
+xhdr ( HEADER, MESSAGE-SPEC )
+     Obtain the header field `HEADER' for all the messages specified.
+
+     The return value will be a reference to a hash where the keys are the
+     message numbers and each value contains the text of the requested
+     header for that message.
+
+xover ( MESSAGE-SPEC )
+     The return value will be a reference to a hash where the keys are the
+     message numbers and each value contains a reference to an array which
+     contains the overview fields for that message.
+
+     The names of the fields can be obtained by calling overview_fmt.
+
+xpath ( MESSAGE-ID )
+     Returns the path name to the file on the server which contains the
+     specified message.
+
+xpat ( HEADER, PATTERN, MESSAGE-SPEC)
+     The result is the same as xhdr except the is will be restricted to
+     headers where the text of the header matches PATTERN
+
+xrover
+     The XROVER command returns reference information for the article(s)
+     specified.
+
+     Returns a reference to a HASH where the keys are the message numbers
+     and the values are the References: lines from the articles
+
+listgroup ( [ GROUP ] )
+     Returns a reference to a list of all the active messages in `GROUP',
+     or the current group if `GROUP' is not specified.
+
+reader
+     Tell the server that you are a reader and not another server.
+
+     This is required by some servers. For example if you are connecting to
+     an INN server and you have transfer permission your connection will
+     be connected to the transfer daemon, not the NNTP daemon. Issuing
+     this command will cause the transfer daemon to hand over control to
+     the NNTP daemon.
+
+     Some servers do not understand this command, but issuing it and
+     ignoring the response is harmless.
+
+UNSUPPORTED
+===========
+
+   The following NNTP command are unsupported by the package, and there are
+no plans to do so.
+
+     AUTHINFO GENERIC
+     XTHREAD
+     XSEARCH
+     XINDEX
+
+DEFINITIONS
+===========
+
+MESSAGE-SPEC
+     `MESSAGE-SPEC' is either a single message-id, a single message
+     number, or a reference to a list of two message numbers.
+
+     If `MESSAGE-SPEC' is a reference to a list of two message numbers and
+     the second number in a range is less than or equal to the first then
+     the range represents all messages in the group after the first
+     message number.
+
+     NOTE For compatibility reasons only with earlier versions of Net::NNTP
+     a message spec can be passed as a list of two numbers, this is
+     deprecated and a reference to the list should now be passed
+
+PATTERN
+     The `NNTP' protocol uses the `WILDMAT' format for patterns.  The
+     WILDMAT format was first developed by Rich Salz based on the format
+     used in the UNIX "find" command to articulate file names. It was
+     developed to provide a uniform mechanism for matching patterns in the
+     same manner that the UNIX shell matches filenames.
+
+     Patterns are implicitly anchored at the beginning and end of each
+     string when testing for a match.
+
+     There are five pattern matching operations other than a strict
+     one-to-one match between the pattern and the source to be checked for
+     a match.
+
+     The first is an asterisk * to match any sequence of zero or more
+     characters.
+
+     The second is a question mark ? to match any single character. The
+     third specifies a specific set of characters.
+
+     The set is specified as a list of characters, or as a range of
+     characters where the beginning and end of the range are separated by
+     a minus (or dash) character, or as any combination of lists and
+     ranges. The dash can also be included in the set as a character it if
+     is the beginning or end of the set. This set is enclosed in square
+     brackets. The close square bracket ] may be used in a set if it is
+     the first character in the set.
+
+     The fourth operation is the same as the logical not of the third
+     operation and is specified the same way as the third with the
+     addition of a caret character ^ at the beginning of the test string
+     just inside the open square bracket.
+
+     The final operation uses the backslash character to invalidate the
+     special meaning of the a open square bracket [, the asterisk,
+     backslash or the question mark. Two backslashes in sequence will
+     result in the evaluation of the backslash as a character with no
+     special meaning.
+
+    Examples
+    `[^]-]'
+          matches any single character other than a close square bracket
+          or a minus sign/dash.
+
+
+          matches any string that ends with the string "bdc" including the
+          string "bdc" (without quotes).
+
+    `[0-9a-zA-Z]'
+          matches any single printable alphanumeric ASCII character.
+
+    `a??d'
+          matches any four character string which begins with a and ends
+          with d.
+
+SEE ALSO
+========
+
+   *Note Net/Cmd: Net/Cmd,
+
+AUTHOR
+======
+
+   Graham Barr <gbarr@pobox.com>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1995-1997 Graham Barr. All rights reserved.  This program
+is free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+
+File: pm.info,  Node: Net/Netmask,  Next: Net/Netrc,  Prev: Net/NNTP,  Up: Module List
+
+parse, manipulate and lookup IP network blocks
+**********************************************
+
+NAME
+====
+
+   Net::Netmask - parse, manipulate and lookup IP network blocks
+
+SYNOPSIS
+========
+
+     use Net::Netmask;
+
+     $block = new Net::Netmask (network block)
+     $block = new Net::Netmask (network block, netmask)
+
+     print $block->desc() 		# a.b.c.d/bits
+     print $block->base()
+     print $block->mask()
+     print $block->hostmask()
+     print $block->bits()
+     print $block->size()
+     print $block->maxblock()
+     print $block->broadcast()
+     print $block->next()
+     print $block->match($ip);
+     print $block->nth(1);
+
+     for $ip ($block->enumerate()) { }
+
+     for $zone ($block->inaddr()) { }
+
+     my $table = {};
+     $block->storeNetblock()
+     $block->storeNetblock($table)
+
+     $block = findNetblock(ip)
+     $block = findNetblock(ip, $table)
+
+DESCRIPTION
+===========
+
+   Net::Netblock parses and understand IPv4 CIDR blocks.  It's built with
+an object-oriented interface.  Nearly all functions are methods that
+operate on a Net::Netblock object.
+
+   There are methods that provide the nearly all bits of information about
+a network block that you might want.
+
+CONSTRUCTING
+============
+
+   Net::Netmask objects are created with an IP address and optionally a
+mask.  There are many forms that are recognized:
+
+'140.174.82.0/24'
+     The preferred form.
+
+'140.174.82.0:255.255.255.0'
+
+'140.174.82.0', '255.255.255.0'
+
+'140.174.82.0', '0xffffff00'
+
+'140.174.82.4'
+     A /32 block.
+
+'140.174.82'
+     Always a /24 block.
+
+'140.174'
+     Always a /16 block.
+
+'140'
+     Always a /8 block.
+
+'140.174.82/24'
+
+'140.174/16'
+'default'
+     0.0.0.0/0 (the default route)
+
+METHODS
+=======
+
+base()
+     Returns base address of the network block as a string.  Eg:
+     140.174.82.0.  Base does not give an indication of the size of the
+     network block.
+
+mask()
+     Returns the netmask as a string. Eg: 255.255.255.0.
+
+*hostmask*()
+     Returns the host mask which is the oposite of the netmask.  Eg:
+     0.0.0.255.
+
+bits()
+     Returns the netmask as a number of bits in the network portion of the
+     address for this block.  Eg: 24.
+
+size()
+     Returns the number of IP addresses in a block.  Eg: 256.
+
+*broadcast*()
+     The blocks broadcast address. (The last IP address inside the block.)
+     Eg: 192.168.1.0/24 => 192.168.1.255
+
+next()
+     The first IP address following the block. (The IP address following
+     the broadcase address.) Eg: 192.168.1.0/24 => 192.168.2.0
+
+match($ip)
+     Returns a true if the IP number $ip matches the given network. That
+     is, a true value is returned if $ip is between base() amd broadcast().
+     For example, if we have the network 192.168.1.0/24, then
+
+          192.168.0.255 => 0
+          192.168.1.0   => "0 "
+          192.168.1.1   => 1
+          ...
+          192.168.1.255 => 255
+
+     $ip should be a dotted-quad (eg: "192.168.66.3")
+
+     It just happens that the return value is the position within the
+     block.  Since zero is a legal position, the true string "0 " is
+     returned in it's place.  "0 " is numerically zero though.  When
+     wanting to know the position inside the block, a good idiom is:
+
+          $pos = $block->match($ip) || die;
+          $pos += 0;
+
+*maxblock*()
+     Much of the time, it is not possible to determine the size of a
+     network block just from it's base address.  For example, with the
+     network block '140.174.82.0/27', if you only had the '140.174.82.0'
+     portion you wouldn't be able to tell for certain the size of the
+     block.  '140.174.82.0' could be anything from a '/23' to a '/32'.
+     The *maxblock*() method gives the size of the larges block that the
+     current block's address would allow it to be.  The size is given in
+     bits.  Eg: 23.
+
+*enumerate*()
+     Returns a list of all the IP addresses in the block.  Be very careful
+     not to use this function of large blocks.  The IP addresses are
+     returned as strings.  Eg: '140.174.82.0', '140.174.82.1', ...
+     '140.174.82.255'.
+
+*nth*($index)
+     Returns the nth element of the array that *enumerate* would return if
+     it were called.  So, to get the first usable address in a block, use
+     *nth*(1).  To get the broadcast address, use *nth*(-1).  To get the
+     last usable adress, use *nth*(-2).
+
+*inaddr*()
+     Returns an inline list of tuples.  There is a tuple for each DNS zone
+     name in the block.  If the block is smaller than a /24, then the zone
+     of the enclosing /24 is returned.
+
+     Each tuple contains: the DNS zone name, the last component of the
+     first IP address in the block in that zone, the last component of the
+     last IP address in the block in that zone.
+
+     Examples: the list returned for the block '140.174.82.0/23' would be:
+     '82.174.140.in-addr.arpa', 0, 255, '83.174.140.in-addr.arpa', 0, 255.
+     The list returned for the block '140.174.82.64/27' would be:
+     '82.174.140.in-addr.arpa', 64, 95.
+
+*storeNetblock*([$t])
+     Adds the current block to an table of network blocks.  The table can
+     be used to query which network block a given IP address is in.
+
+     The optional argument allows there to be more than one table.  By
+     default, an internal table is used.   If more than one table is
+     needed, then supply a reference to a HASH to store the data in.
+
+FUNCTIONS
+=========
+
+*findNetblock*(ip, [$t])
+     Search the table of network blocks (created with *storeNetBlock*) to
+     find if any of them contain the given IP address.  The IP address is
+     expected to be a string.
+
+     The return value is either a Net::Netblock object or undef.
+
+COPYRIGHT
+=========
+
+   Copyright (C) 1998, David Muir Sharnoff.   All rights reserved.
+License hearby granted for anyone to use this module at their own risk.
+Please feed useful changes back to muir@idiom.com.
+
+
+File: pm.info,  Node: Net/Netrc,  Next: Net/PH,  Prev: Net/Netmask,  Up: Module List
+
+OO interface to users netrc file
+********************************
+
+NAME
+====
+
+   Net::Netrc - OO interface to users netrc file
+
+SYNOPSIS
+========
+
+     use Net::Netrc;
+     
+     $mach = Net::Netrc->lookup('some.machine');
+     $login = $mach->login;
+     ($login, $password, $account) = $mach->lpa;
+
+DESCRIPTION
+===========
+
+   `Net::Netrc' is a class implementing a simple interface to the .netrc
+file used as by the ftp program.
+
+   `Net::Netrc' also implements security checks just like the ftp program,
+these checks are, first that the .netrc file must be owned by the user and
+second the ownership permissions should be such that only the owner has
+read and write access. If these conditions are not met then a warning is
+output and the .netrc file is not read.
+
+THE .netrc FILE
+===============
+
+   The .netrc file contains login and initialization information used by
+the auto-login process.  It resides in the user's home directory.  The
+following tokens are recognized; they may be separated by spaces, tabs, or
+new-lines:
+
+machine name
+     Identify a remote machine name. The auto-login process searches the
+     .netrc file for a machine token that matches the remote machine
+     specified.  Once a match is made, the subsequent .netrc tokens are
+     processed, stopping when the end of file is reached or an- other
+     machine or a default token is encountered.
+
+default
+     This is the same as machine name except that default matches any
+     name.  There can be only one default token, and it must be after all
+     machine tokens.  This is normally used as:
+
+          default login anonymous password user@site
+
+     thereby giving the user automatic anonymous login to machines not
+     specified in .netrc.
+
+login name
+     Identify a user on the remote machine.  If this token is present, the
+     auto-login process will initiate a login using the specified name.
+
+password string
+     Supply a password.  If this token is present, the auto-login process
+     will supply the specified string if the remote server requires a
+     password as part of the login process.
+
+account string
+     Supply an additional account password.  If this token is present, the
+     auto-login process will supply the specified string if the remote
+     server requires an additional account password.
+
+macdef name
+     Define a macro. `Net::Netrc' only parses this field to be compatible
+     with ftp.
+
+CONSTRUCTOR
+===========
+
+   The constructor for a `Net::Netrc' object is not called new as it does
+not really create a new object. But instead is called lookup as this is
+essentially what it does.
+
+lookup ( MACHINE [, LOGIN ])
+     Lookup and return a reference to the entry for MACHINE. If LOGIN is
+     given then the entry returned will have the given login. If LOGIN is
+     not given then the first entry in the .netrc file for MACHINE will be
+     returned.
+
+     If a matching entry cannot be found, and a default entry exists, then
+     a reference to the default entry is returned.
+
+METHODS
+=======
+
+login ()
+     Return the login id for the netrc entry
+
+password ()
+     Return the password for the netrc entry
+
+account ()
+     Return the account information for the netrc entry
+
+lpa ()
+     Return a list of login, password and account information fir the
+     netrc entry
+
+AUTHOR
+======
+
+   Graham Barr <gbarr@pobox.com>
+
+SEE ALSO
+========
+
+   *Note Net/Netrc: Net/Netrc, *Note Net/Cmd: Net/Cmd,
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1995-1998 Graham Barr. All rights reserved.  This program
+is free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+
+File: pm.info,  Node: Net/PH,  Next: Net/POP3,  Prev: Net/Netrc,  Up: Module List
+
+CCSO Nameserver Client class
+****************************
+
+NAME
+====
+
+   Net::PH - CCSO Nameserver Client class
+
+SYNOPSIS
+========
+
+     use Net::PH;
+     
+     $ph = Net::PH->new("some.host.name",
+                        Port    => 105,
+                        Timeout => 120,
+                        Debug   => 0);
+
+     if($ph) {
+         $q = $ph->query({ field1 => "value1" },
+                         [qw(name address pobox)]);
+     
+         if($q) {
+         }
+     }
+     
+     # Alternative syntax
+     
+     if($ph) {
+         $q = $ph->query('field1=value1',
+                         'name address pobox');
+     
+         if($q) {
+         }
+     }
+
+DESCRIPTION
+===========
+
+   `Net::PH' is a class implementing a simple Nameserver/PH client in Perl
+as described in the CCSO Nameserver - Server-Client Protocol. Like other
+modules in the Net:: family the `Net::PH' object inherits methods from
+`Net::Cmd'.
+
+CONSTRUCTOR
+===========
+
+new ( [ HOST ] [, OPTIONS ])
+          $ph = Net::PH->new("some.host.name",
+                             Port    => 105,
+                             Timeout => 120,
+                             Debug   => 0
+                            );
+
+     This is the constructor for a new Net::PH object. `HOST' is the name
+     of the remote host to which a PH connection is required.
+
+     If `HOST' is not given, then the `SNPP_Host' specified in
+     `Net::Config' will be used.
+
+     OPTIONS is an optional list of named options which are passed in a
+     hash like fashion, using key and value pairs. Possible options are:-
+
+     Port - Port number to connect to on remote host.
+
+     Timeout - Maximum time, in seconds, to wait for a response from the
+     Nameserver, a value of zero will cause all IO operations to block.
+     (default: 120)
+
+     Debug - Enable the printing of debugging information to STDERR
+
+METHODS
+=======
+
+   Unless otherwise stated all methods return either a *true* or false
+value, with *true* meaning that the operation was a success. When a method
+states that it returns a value, failure will be returned as undef or an
+empty list.
+
+query( SEARCH [, RETURN ] )
+          $q = $ph->query({ name => $myname },
+          		    [qw(name email schedule)]);
+          
+          foreach $handle (@{$q}) {
+          	foreach $field (keys %{$handle}) {
+                  $c = ${$handle}{$field}->code;
+                  $v = ${$handle}{$field}->value;
+                  $f = ${$handle}{$field}->field;
+                  $t = ${$handle}{$field}->text;
+                  print "field:[$field] [$c][$v][$f][$t]\n" ;
+          	}
+          }
+
+
+     Search the database and return fields from all matching entries.
+
+     The SEARCH argument is a reference to a HASH which contains
+     field/value pairs which will be passed to the Nameserver as the
+     search criteria.
+
+     RETURN is optional, but if given it should be a reference to a list
+     which contains field names to be returned.
+
+     The alternative syntax is to pass strings instead of references, for
+     example
+
+          $q = $ph->query('name=myname',
+          		    'name email schedule');
+
+     The SEARCH argument is a string that is passed to the Nameserver as
+     the search criteria. The strings being passed should not contain any
+     carriage returns, or else the query command might fail or return
+     invalid data.
+
+     RETURN is optional, but if given it should be a string which will
+     contain field names to be returned.
+
+     Each match from the server will be returned as a HASH where the keys
+     are the field names and the values are `Net::PH:Result' objects
+     (code, value, field, text).
+
+     Returns a reference to an ARRAY which contains references to HASHs,
+     one per match from the server.
+
+change( SEARCH , MAKE )
+          $r = $ph->change({ email => "*.domain.name" },
+                           { schedule => "busy");
+
+     Change field values for matching entries.
+
+     The SEARCH argument is a reference to a HASH which contains
+     field/value pairs which will be passed to the Nameserver as the
+     search criteria.
+
+     The MAKE argument is a reference to a HASH which contains field/value
+     pairs which will be passed to the Nameserver that will set new values
+     to designated fields.
+
+     The alternative syntax is to pass strings instead of references, for
+     example
+
+          $r = $ph->change('email="*.domain.name"',
+                           'schedule="busy"');
+
+     The SEARCH argument is a string to be passed to the Nameserver as the
+     search criteria. The strings being passed should not contain any
+     carriage returns, or else the query command might fail or return
+     invalid data.
+
+     The MAKE argument is a string to be passed to the Nameserver that
+     will set new values to designated fields.
+
+     Upon success all entries that match the search criteria will have the
+     field values, given in the Make argument, changed.
+
+login( USER, PASS [, ENCRYPT ])
+          $r = $ph->login('username','password',1);
+
+     Enter login mode using USER and PASS. If `ENCRYPT' is given and is
+     *true* then the password will be used to encrypt a challenge text
+     string provided by the server, and the encrypted string will be sent
+     back to the server. If `ENCRYPT' is not given, or false then the
+     password will be sent in clear text (*this is not recommended*)
+
+logout()
+          $r = $ph->logout();
+
+     Exit login mode and return to anonymous mode.
+
+fields( [ FIELD_LIST ] )
+          $fields = $ph->fields();
+          foreach $field (keys %{$fields}) {
+              $c = ${$fields}{$field}->code;
+              $v = ${$fields}{$field}->value;
+              $f = ${$fields}{$field}->field;
+              $t = ${$fields}{$field}->text;
+              print "field:[$field] [$c][$v][$f][$t]\n";
+          }
+
+     In a scalar context, returns a reference to a HASH. The keys of the
+     HASH are the field names and the values are `Net::PH:Result' objects
+     (code, value, field, text).
+
+     In an array context, returns a two element array. The first element
+     is a reference to a HASH as above, the second element is a reference
+     to an array which contains the tag names in the order that they were
+     returned from the server.
+
+     `FIELD_LIST' is a string that lists the fields for which info will be
+     returned.
+
+add( FIELD_VALUES )
+          $r = $ph->add( { name => $name, phone => $phone });
+
+     This method is used to add new entries to the Nameserver database. You
+     must successfully call `login' in this node before this method can be
+     used.
+
+     Note that this method adds new entries to the database. To modify an
+     existing entry use `change' in this node.
+
+     `FIELD_VALUES' is a reference to a HASH which contains field/value
+     pairs which will be passed to the Nameserver and will be used to
+     initialize the new entry.
+
+     The alternative syntax is to pass a string instead of a reference,
+     for example
+
+          $r = $ph->add('name=myname phone=myphone');
+
+     `FIELD_VALUES' is a string that consists of field/value pairs which
+     the new entry will contain. The strings being passed should not
+     contain any carriage returns, or else the query command might fail or
+     return invalid data.
+
+delete( FIELD_VALUES )
+          $r = $ph->delete('name=myname phone=myphone');
+
+     This method is used to delete existing entries from the Nameserver
+     database.  You must successfully call `login' in this node before
+     this method can be used.
+
+     Note that this method deletes entries to the database. To modify an
+     existing entry use `change' in this node.
+
+     `FIELD_VALUES' is a string that serves as the search criteria for the
+     records to be deleted. Any entry in the database which matches this
+     search criteria will be deleted.
+
+id( [ ID ] )
+          $r = $ph->id('709');
+
+     Sends ID to the Nameserver, which will enter this into its logs. If
+     ID is not given then the UID of the user running the process will be
+     sent.
+
+status()
+     Returns the current status of the Nameserver.
+
+siteinfo()
+          $siteinfo = $ph->siteinfo();
+          foreach $field (keys %{$siteinfo}) {
+              $c = ${$siteinfo}{$field}->code;
+              $v = ${$siteinfo}{$field}->value;
+              $f = ${$siteinfo}{$field}->field;
+              $t = ${$siteinfo}{$field}->text;
+              print "field:[$field] [$c][$v][$f][$t]\n";
+          }
+
+     Returns a reference to a HASH containing information about the
+     server's site. The keys of the HASH are the field names and values are
+     `Net::PH:Result' objects (code, value, field, text).
+
+quit()
+          $r = $ph->quit();
+
+     Quit the connection
+
+Q&A
+===
+
+   How do I get the values of a Net::PH::Result object?
+
+     foreach $handle (@{$q}) {
+         foreach $field (keys %{$handle}) {
+             $my_code  = ${$q}{$field}->code;
+             $my_value = ${$q}{$field}->value;
+             $my_field = ${$q}{$field}->field;
+             $my_text  = ${$q}{$field}->text;
+         }
+     }
+
+   How do I get a count of the returned matches to my query?
+
+     $my_count = scalar(@{$query_result});
+
+   How do I get the status code and message of the last `$ph' command?
+
+     $status_code    = $ph->code;
+     $status_message = $ph->message;
+
+SEE ALSO
+========
+
+   *Note Net/Cmd: Net/Cmd,
+
+AUTHORS
+=======
+
+   Graham Barr <gbarr@pobox.com> Alex Hristov <hristov@slb.com>
+
+ACKNOWLEDGMENTS
+===============
+
+   Password encryption code ported to perl by Broc Seib <bseib@purdue.edu>,
+Purdue University Computing Center.
+
+   Otis Gospodnetic <otisg@panther.middlebury.edu> suggested passing
+parameters as string constants. Some queries cannot be executed when
+passing parameters as string references.
+
+     Example: query first_name last_name email="*.domain"
+
+COPYRIGHT
+=========
+
+   The encryption code is based upon cryptit.c, Copyright (C) 1988 by
+Steven Dorner, and Paul Pomes, and the University of Illinois Board of
+Trustees, and by CSNET.
+
+   All other code is Copyright (c) 1996-1997 Graham Barr <gbarr@pobox.com>
+and Alex Hristov <hristov@slb.com>. All rights reserved. This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+
+File: pm.info,  Node: Net/POP3,  Next: Net/Pager,  Prev: Net/PH,  Up: Module List
+
+Post Office Protocol 3 Client class (RFC1081)
+*********************************************
+
+NAME
+====
+
+   Net::POP3 - Post Office Protocol 3 Client class (RFC1081)
+
+SYNOPSIS
+========
+
+     use Net::POP3;
+     
+     # Constructors
+     $pop = Net::POP3->new('pop3host');
+     $pop = Net::POP3->new('pop3host', Timeout => 60);
+
+DESCRIPTION
+===========
+
+   This module implements a client interface to the POP3 protocol, enabling
+a perl5 application to talk to POP3 servers. This documentation assumes
+that you are familiar with the POP3 protocol described in RFC1081.
+
+   A new Net::POP3 object must be created with the new method. Once this
+has been done, all POP3 commands are accessed via method calls on the
+object.
+
+EXAMPLES
+========
+
+     Need some small examples in here :-)
+
+CONSTRUCTOR
+===========
+
+new ( [ HOST, ] [ OPTIONS ] )
+     This is the constructor for a new Net::POP3 object. `HOST' is the
+     name of the remote host to which a POP3 connection is required.
+
+     If `HOST' is not given, then the `POP3_Host' specified in
+     `Net::Config' will be used.
+
+     OPTIONS are passed in a hash like fashion, using key and value pairs.
+     Possible options are:
+
+     *ResvPort* - If given then the socket for the `Net::POP3' object will
+     be bound to the local port given using bind when the socket is
+     created.
+
+     Timeout - Maximum time, in seconds, to wait for a response from the
+     POP3 server (default: 120)
+
+     Debug - Enable debugging information
+
+METHODS
+=======
+
+   Unless otherwise stated all methods return either a *true* or false
+value, with *true* meaning that the operation was a success. When a method
+states that it returns a value, failure will be returned as undef or an
+empty list.
+
+user ( USER )
+     Send the USER command.
+
+pass ( PASS )
+     Send the PASS command. Returns the number of messages in the mailbox.
+
+login ( [ USER [, PASS ]] )
+     Send both the the USER and PASS commands. If PASS is not given the
+     `Net::POP3' uses `Net::Netrc' to lookup the password using the host
+     and username. If the username is not specified then the current user
+     name will be used.
+
+     Returns the number of messages in the mailbox. However if there are no
+     messages on the server the string `"0E0"' will be returned. This is
+     will give a true value in a boolean context, but zero in a numeric
+     context.
+
+     If there was an error authenticating the user then undef will be
+     returned.
+
+apop ( USER, PASS )
+     Authenticate with the server identifying as USER with password PASS.
+     Similar ti `login' in this node, but the password is not sent in
+     clear text.
+
+     To use this method you must have the MD5 package installed, if you do
+     not this method will return undef
+
+top ( MSGNUM [, NUMLINES ] )
+     Get the header and the first `NUMLINES' of the body for the message
+     `MSGNUM'. Returns a reference to an array which contains the lines of
+     text read from the server.
+
+list ( [ MSGNUM ] )
+     If called with an argument the list returns the size of the message
+     in octets.
+
+     If called without arguments a reference to a hash is returned. The
+     keys will be the `MSGNUM''s of all undeleted messages and the values
+     will be their size in octets.
+
+get ( MSGNUM [, FH ] )
+     Get the message `MSGNUM' from the remote mailbox. If FH is not given
+     then get returns a reference to an array which contains the lines of
+     text read from the server. If FH is given then the lines returned
+     from the server are printed to the filehandle FH.
+
+last ()
+     Returns the highest `MSGNUM' of all the messages accessed.
+
+popstat ()
+     Returns a list of two elements. These are the number of undeleted
+     elements and the size of the mbox in octets.
+
+ping ( USER )
+     Returns a list of two elements. These are the number of new messages
+     and the total number of messages for USER.
+
+uidl ( [ MSGNUM ] )
+     Returns a unique identifier for `MSGNUM' if given. If `MSGNUM' is not
+     given uidl returns a reference to a hash where the keys are the
+     message numbers and the values are the unique identifiers.
+
+delete ( MSGNUM )
+     Mark message `MSGNUM' to be deleted from the remote mailbox. All
+     messages that are marked to be deleted will be removed from the
+     remote mailbox when the server connection closed.
+
+reset ()
+     Reset the status of the remote POP3 server. This includes reseting the
+     status of all messages to not be deleted.
+
+quit ()
+     Quit and close the connection to the remote POP3 server. Any messages
+     marked as deleted will be deleted from the remote mailbox.
+
+NOTES
+=====
+
+   If a `Net::POP3' object goes out of scope before quit method is called
+then the reset method will called before the connection is closed. This
+means that any messages marked to be deleted will not be.
+
+SEE ALSO
+========
+
+   *Note Net/Netrc: Net/Netrc, *Note Net/Cmd: Net/Cmd,
+
+AUTHOR
+======
+
+   Graham Barr <gbarr@pobox.com>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1995-1997 Graham Barr. All rights reserved.  This program
+is free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+

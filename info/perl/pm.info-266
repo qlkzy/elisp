@@ -1,0 +1,1406 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Net/RawIP,  Next: Net/RawIP/libpcap,  Prev: Net/Radius/Packet,  Up: Module List
+
+Perl extension for manipulate raw ip packets with interface to *libpcap*
+************************************************************************
+
+NAME
+====
+
+   Net::RawIP - Perl extension for manipulate raw ip packets with
+interface to *libpcap*
+
+SYNOPSIS
+========
+
+     use Net::RawIP;
+     $a = new Net::RawIP;
+     $a->set({ip => {saddr => 'my.target.lan',daddr => 'my.target.lan'},
+              tcp => {source => 139,dest => 139,psh => 1, syn => 1}});
+     $a->send;
+     $a->ethnew("eth0");
+     $a->ethset(source => 'my.target.lan',dest =>'my.target.lan');
+     $a->ethsend;
+     $p = $a->pcapinit("eth0","dst port 21",1500,30);
+     $f = dump_open($p,"/my/home/log");
+     loop $p,10,\&dump,$f;
+
+DESCRIPTION
+===========
+
+   This package provides a class object which can be used for creating,
+manipulating and sending a raw ip packets with optional feature for
+manipulating ethernet headers.
+
+   NOTE: Ethernet related methods are implemented on Linux and *BSD only
+
+Exported constants
+==================
+
+     PCAP_ERRBUF_SIZE
+     PCAP_VERSION_MAJOR
+     PCAP_VERSION_MINOR
+     lib_pcap_h
+
+Exported functions
+==================
+
+   open_live open_offline dump_open lookupdev lookupnet dispatch loop dump
+compile setfilter next datalink snapshot is_swapped major_version
+minor_version stats file fileno perror geterr strerror close dump_close
+timem linkoffset
+
+   By default exported functions are the loop,dispatch,*dump_open*,dump,
+open_live,*timem*,*linkoffset*,*ifaddrlist*,*rdev*. You have to use the
+export tag *pcap* for export all of the pcap functions.  Please read the
+docs for the libpcap and look at `Net::RawIP::libpcap(3pm)' in this node.
+The exported functions the loop and the dispatch can run a perl code refs
+as a callbacks for packet analyzing and printing.  If *dump_open* opens
+and returns a valid file descriptor,this descriptor can be used in the
+perl callback as a perl filehandle.Also fourth parameter for loop and
+dispatch can be an array or a hash reference and it can be unreferensed in
+a perl callback. The function next returns a string scalar (next
+packet).Function *timem()* returns a string scalar which looking like
+sec.*microsec*, where the sec and the *microsec* are the values which
+returned by gettimeofday(3) , if *microsec* is less than 100000 then zeros
+will be added to the left side of *microsec* for adjusting to six digits.
+The function which called *linkoffset* returns a number of the bytes in
+the link protocol header e.g. 14 for a Ethernet or 4 for a Point-to-Point
+protocol.This function has one input parameter (pcap_t* which is returned
+by open_live).
+
+   The *ifaddrlist* function returns a hash reference,in this hash keys are
+all running network devices,values are ip addresses of those devices in an
+internet address format.
+
+   The *rdev* function returns a name of the outgoing device for given
+destination address.  It has one input parameter (destination address in
+an internet address or a domain name or a host byteorder int formats).
+
+
+   Please look at the examples.
+
+CONSTRUCTOR
+===========
+
+   new   ({               ip       => {IPKEY => IPVALUE,...},
+ARGPROTO => {PROTOKEY => PROTOVALUE,...} 	  })
+
+   The ip is the key of the hash which value is a reference of the hash
+with parameters of the iphdr in the current IP packet.
+
+   The *`IPKEY'* is one of they (version *ihl* tos *tot_len* id *frag_off*
+ttl protocol check *saddr* *daddr*).  You can to specify all
+parameters,even check.If you do not specify parameter, then value by
+default will be used.  Of course the checksum will be calculated if you do
+not specify non-zero value for it.  The values of the *saddr* and the
+*daddr* can be like www.oracle.com or 205.227.44.16, even they can be an
+integer  if you know what is 205.227.44.16 as an unsigned int in the host
+format ;).
+
+   The *`ARGPROTO'* is one of they (*tcp* *udp* *icmp* generic), this key
+has used for DEFINE subclass of the Net::RawIP. *If you not specify a
+ARGPROTO then by default value is the tcp*.
+
+   You *HAVE TO* initialize the subclass of the Net::RawIP object before
+use.
+
+   Here is a code for initializing the udp subclass in the Net::RawIP
+object.
+
+   $a = new Net::RawIP({udp =>{}});
+
+   or
+
+   $a = new Net::RawIP({ip => { tos => 22 }, udp => { source => 22,dest
+=>23 } });
+
+   You could *NOT* change the subclass in the object after.
+
+   The default values of the ip hash are (4,5,16,0,0,0x4000,64,6,0,0,0)
+for the *tcp* or (4,5,16,0,0,0x4000,64,17,0,0,0) for the *udp* or
+(4,5,16,0,0,0x4000,64,1,0,0,0) for the *icmp* or
+(4,5,16,0,0,0x4000,64,0,0,0,0) for the generic.
+
+   The *`PROTOKEY'* is one of (source dest seq *ack_seq* *doff* *res1*
+*res2* urg ack *psh* *rst* *syn* *fin* window check *urg_ptr* data) for
+the tcp or
+
+   one of (type code check *gateway* id sequence *unused* mtu data) for
+the icmp or
+
+   one of (source dest len check data) for the udp or just
+
+   data for the generic.
+
+   You have to specify just *gateway* - (int) or (id and sequence) -
+(short and short) or (mtu and *unused*) - (short and short) for the icmp
+because in the real icmp packet it's the C union.
+
+   The default values are (0,0,0,0,5,0,0,0,0,0,0,0,0,0xffff,0,0,") for the
+tcp and                   (0,0,0,0,0,0,0,0,") for the icmp and
+     (0,0,0,0,") for the udp and                   (") for the generic.
+
+   The valid values for urg ack *psh* *rst* *syn* *fin* are 0 or 1.  The
+value of data is a string. Length of the result packet will be calculated
+if you do not specify non-zero value for *tot_len*.
+
+METHODS
+=======
+
+proto
+     returns the name of the subclass current object e.g. *tcp*.  No input
+     parameters.
+
+packet
+     returns a scalar which contain the packed ip packet of the current
+     object.  No input parameters.
+
+set
+     is a method for set the parameters to the current object. The given
+     parameters must look like the parameters for the constructor.
+
+bset($packet,$eth)
+     is a method for set the parameters for the current object.  *$packet*
+     is a scalar which contain binary structure (an ip or an eth packet).
+     This scalar must match with the subclass of the current object.  If
+     *$eth* is given and it have a non-zero value then assumed that packet
+     is a ethernet packet,otherwise it is a ip packet.
+
+get
+     is a method for get the parameters from the current object. This
+     method returns the array which will be filled with an asked
+     parameters in order as they have ordered in packet if you'd call it
+     with an array context.  If this method is called with a scalar
+     context then it returns a hash reference.  In that hash will stored
+     an asked parameters as values,the keys are their names.
+
+     The input parameter is a hash reference. In this hash can be three
+     keys.  They are a ip and an one of the *ARGPROTO*s. The value must be
+     an array reference. This array contain asked parameters.  E.g. you
+     want to know current value of the tos from the iphdr and the flags of
+     the tcphdr.  Here is a code :
+
+          ($tos,$urg,$ack,$psh,$rst,$syn,$fin) = $packet->get({
+                    ip => [qw(tos)],
+          	    tcp => [qw(psh syn urg ack rst fin)]
+          	    });
+
+     The members in the array can be given in any order.
+
+     For get the ethernet parameters you have to use the key *eth* and the
+     values of the array (dest,source,proto). The values of the dest and
+     the source will look like the output of the ifconfig(8) e.g.
+     00:00:E8:43:0B:2A.
+
+send($delay,$times)
+     is a method which has used for send raw ip packet.  The input
+     parameters are the delay seconds and the times for repeating send.
+     If you do not specify parameters for the send,then packet will be
+     sent once without delay.  If you do specify for the times a negative
+     value then packet will be sent forever.  E.g. you want to send the
+     packet for ten times with delay equal to one second.  Here is a code :
+
+     $packet->send(1,10); The delay could be specified not only as integer
+     but and as 0.25 for sleep to 250 ms or 3.5 to sleep for 3 seconds and
+     500 ms.
+
+pcapinit($device,$filter,$psize,$timeout)
+     is a method for some a pcap init. The input parameters are a device,a
+     string with a program for a filter,a packet size,a timeout.  This
+     method will call the function open_live,then compile the filter
+     string by compile(), set the filter and returns the pointer (*pcap_t
+     **).
+
+pcapinit_offline($fname)
+     is a method for an offline pcap init.The input parameter is a name of
+     the file which contains raw output of the libpcap dump function.
+     Returns the pointer (*pcap_t **).
+
+*ethnew*(*$device*,dest => *ARGOFDEST*,source => *ARGOFSOURCE*)
+     is a method for init the ethernet subclass in the current object,
+     *$device* is a required parameter,dest and source are an optional,
+     *$device* is an ethernet device e.g. *eth0*, an *ARGOFDEST* and an
+     *ARGOFSOURCE* are a the ethernet addresses in the ethernet header of
+     the current object.
+
+     The *ARGOFDEST* and the *ARGOFSOURCE* can be given as a string which
+     contain just 6 bytes of the real ethernet address or like the output
+     of the ifconfig(8) e.g. 00:00:E8:43:0B:2A or just an ip address or a
+     hostname of a target, then a mac address will be discovered
+     automatically.
+
+     The ethernet frame will be sent with given addresses.  By default the
+     source and the dest will be filled with a hardware address of the
+     *$device*.
+
+     NOTE: For use methods which are related to the ethernet you have to
+     before initialize ethernet subclass by *ethnew*.
+
+ethset
+     is a method for set an ethernet parameters in the current object.
+     The given parameters must look like parameters for the *ethnew*
+     without a *$device*.
+
+ethsend
+     is a method for send an ethernet frame.  The given parameters must
+     look like a parameters for the send.
+
+*send_eth_frame*($frame,$times,$delay)
+     is a method for send any ethernet frame which you may construct by
+     hands.*$frame* is a packed ethernet frame exept destination and
+     source fields(these fields can be setting by ethset or *ethnew*).
+     Another parameters must look like the parameters for the send.
+
+*optset*(OPTPROTO => { type => [...],data => [...] },...)
+     is a method for set an IP and a TCP options.  The parameters for the
+     optset must be given as a key-value pairs.  The *OPTPROTO*,s are the
+     prototypes of the options(ip,*tcp*),values are the hashes
+     references.The keys in this hashes are type and data.  The value of
+     the type is an array reference.  This array must be filled with an
+     integers.Refer to a RFC for a valid types.The value of the data also
+     is an array reference. This array must be filled with strings which
+     must contain all bytes from a option except bytes with type and
+     length of an option.Of course indexes in those arrays must be equal
+     for the one option.If type is equal to 0 or 1 then there is no bytes
+     with a length and a data,but you have to specify zero data for
+     compability.
+
+*optget*(OPTPROTO => { type => [...] },...)
+     is a method for get an IP and a TCP options.  The parameters for the
+     optget must be given as key-value pairs.  The *OPTPROTO* is the
+     prototype of the options(ip,*tcp*),the values are the hashes
+     references.The key is the type.The value of the type is an array
+     reference.  The return value is an array which will be filled with
+     asked types,lengths,datas of the each type of the option in order as
+     you have asked.If you do not specify type then all
+     types,lengths,datas of an options will be returned.  E.g. you want to
+     know all the IP options from the current object.  Here is a code:
+
+     @opts = $a->optget(ip => {});
+
+     E.g. you want to know just the IP options with the type which equal
+     to 131 and 137.  Here is a code:
+
+     ($t131,$l131,$d131,$t137,$l137,$d137) = $a->optget(
+                     ip =>{ 				        type =>[(131,137)] 				        }
+          );
+
+optunset
+     is a method for unset a subclass of the IP or the TCP options from a
+     current object.It can be used if you  won't use options in the
+     current object later.  This method must be used only after the
+     *optset*.  The parameters for this method are the *OPTPROTO*'s.  E.g.
+     you want to unset an IP options.  Here is a code:
+
+     $a->optunset('ip');
+
+     E.g. you want to unset a TCP and an IP options.  Here is a code:
+
+     $a->optunset('ip','tcp');
+
+AUTHOR
+======
+
+   Sergey Kolychev <ksv@al.lg.ua>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1998,1999 Sergey Kolychev. All rights reserved. This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   perl(1),Net::RawIP::libpcap(3pm),tcpdump(1),RFC 791-793,RFC 768.
+
+
+File: pm.info,  Node: Net/RawIP/libpcap,  Next: Net/Rexec,  Prev: Net/RawIP,  Up: Module List
+
+An interface to *libpcap* in Net::RawIP(3pm)
+********************************************
+
+NAME
+====
+
+   Net::RawIP::libpcap - An interface to *libpcap* in Net::RawIP(3pm)
+
+DESCRIPTION
+===========
+
+     Function    The input parameters           The output parameters
+
+     open_live   a network                      Return value is a pcap_t*
+                 device(eth0,ppp0,...);         If retval less than zero
+                 a snap length;                 then $err filled with
+                 a promisc - boolean;           an error string.
+     	     a timeout in sec;
+     	     $err is an undef scalar;
+
+     open_offline   a filename which is filled  Return value is pcap_t*
+                    with a raw output of dump;  If retval less than zero
+                    $err is an unfef scalar;    then $err filled with
+     		                            an error string.
+
+     dump_open  pcap_t*;                        Return value is a FILE*
+                $err;
+
+     lookupdev  $err;			    Return value is a name
+                                                of first device which is
+     					    found by libpcap
+
+     lookupnet  a network device;               a netnumber;
+                a netnumer is undef;            a netmask;
+     	    a netmask is undef;             If retval less than zero
+     	    $err is undef;                  then $err filled with
+     				            an error string.
+     
+     dispatch   a scalar with pcap_t*;          No output parameters.
+                number of packets for proce-
+     	    ssing;
+     	    reference to the perl call-
+     	    back,this callback will be
+     	    called with 3 parameters:
+     	    $_[0] is fourth parameter
+     	    from dispatch,
+     	    $_[1] is a scalar with struc-
+     	    ture pcap_pkthdr for a current
+     	    packet,
+     	    $_[2] is a scalar with a current
+     	    packet;
+     	    fourth parameter could be
+     	    an array or a hash reference
+     	    or a pointer (FILE*) returned
+     	    by dump_open,it can be unre-
+     	    ferenced in the perl call-
+     	    back or be used as a perl
+     	    filehandle in that callback.
+     
+     loop 	    As for dispatch.                As for dispatch.
+     
+     dump       As for a perl callback          No output.
+                but $_[0] must be a pointer
+     	    (FILE*) only.
+
+     compile    a scalar with pcap_t*;        a scalar with bpf_program.
+                a bpf_program is undef;       If retval is less than zero
+     	    a scalar with filter string;  then there was a problem with
+     	    a boolean value (optimize or  filter grammar.
+     	    not);
+     	      a scalar with netmask;
+
+     setfilter  a scalar with pcap_t*;        If retval is less than zero
+     	    a scalar with bpf_program     then there was a problem while
+     	    returned by compile.          settting filter.
+     
+     next     a scalar with pcap_t*;          A scalar with next packet;
+              a scalar with with struc-       a scalar with with structure
+     	  ture pcap_pkthdr for a current  pcap_pkthdr also will be modi
+     	  packet,originally is undef.     filed for an every packet and
+     		                          it can be accessed but for read
+     					  only.
+     
+     datalink  a scalar with pcap_t*;         Retval is the link  layer type,
+                                              e.g. DLT_EN10MB.
+     
+     snapshot  a scalar with pcap_t*;         Retval is the snapshot length
+                                              specified when open_live was
+     					  called.
+     
+     is_swapped  a scalar with pcap_t*;       returns true if the current
+                                              savefile uses a different
+     					  byte order than the current
+     					  system.
+     
+     major_version  a scalar with pcap_t*;    returns the major number
+                                              of the version of the pcap
+     					  used to write the savefile.
+     
+     minor_version  a scalar with pcap_t*;    returns the minor number of the
+                                              version of the pcap used to
+     					  write the savefile.
+
+     file       a scalar with pcap_t*;        returns the name of the
+                                              savefile.
+     
+     stats      a scalar with pcap_t*;        If retval 0 then a scalar
+                a scalar with structure       with structure pcap_stat will
+     	    pcap_stat,originally undef    be filled with the
+                                              packet statistics.
+
+     fileno    a scalar with pcap_t*;        returns  the  file descriptor
+                                             number of the savefile.
+     					 A core perl function is
+     					 available as CORE::fileno.
+     
+     geterr   a scalar with pcap_t*;         returns  the  error  text
+                                             pertaining to the last pcap
+     				         library error.
+     
+     perror   a scalar with pcap_t*;         prints the text of the last
+              a scalar with prefix;          pcap  library error on stderr,
+     		                         prefixed by prefix.
+     
+     close    a scalar with pcap_t*;         closes the files associated with
+                                             pcap_t* and deallocates
+     					 resources.
+     	                                 A core perl function is
+     					 available as CORE::close.
+     
+     dump_close  a scalar with pcap_t*;      closes the savefile.
+
+AUTHOR
+======
+
+   Sergey Kolychev <ksv@al.lg.ua>
+
+SEE ALSO
+========
+
+   Net::RawIP(3pm),pcap(3).
+
+
+File: pm.info,  Node: Net/Rexec,  Next: Net/SCP,  Prev: Net/RawIP/libpcap,  Up: Module List
+
+Perl extension for the client side of the REXEC protocol.
+*********************************************************
+
+NAME
+====
+
+   Net::Rexec - Perl extension for the client side of the REXEC protocol.
+
+SYNOPSIS
+========
+
+     use Net::Rexec 'rexec';
+     ($rc, @output) = rexec(host, command, [userid, [password]]);
+
+DESCRIPTION
+===========
+
+   Invokes REXEC protocol to execute command on host using userid and
+password.  If userid or password are omitted then they are retrieved from
+the netrc file.  $rc is 0 if command was invoked on host, 1 otherwise
+unless the fork to invoke command fails in which case it is 2.  Output is
+put into @output.
+
+AUTHOR
+======
+
+   Fila Kolodny <fila@ibi.com>.
+
+SEE ALSO
+========
+
+   Net::Netrc(3pm).
+
+
+File: pm.info,  Node: Net/SCP,  Next: Net/SMS,  Prev: Net/Rexec,  Up: Module List
+
+Perl extension for secure copy protocol
+***************************************
+
+NAME
+====
+
+   Net::SCP - Perl extension for secure copy protocol
+
+SYNOPSIS
+========
+
+     #procedural interface
+     use Net::SCP qw(scp iscp);
+     scp($source, $destination);
+     iscp($source, $destination); #shows command, asks for confirmation, and
+                                  #allows user to type a password on tty
+
+     #OO interface
+     $scp = Net::SCP->new( "hostname", "username" );
+     #with named params
+     $scp = Net::SCP->new( { "host"=>$hostname, "user"=>$username } );
+     $scp->get("filename") or die $scp->{errstr};
+     $scp->put("filename") or die $scp->{errstr};
+     #tmtowtdi
+     $scp = new Net::SCP;
+     $scp->scp($source, $destination);
+
+     #Net::FTP-style
+     $scp = Net::SCP->new("hostname");
+     $scp->login("user");
+     $scp->cwd("/dir");
+     $scp->size("file");
+     $scp->get("file");
+     $scp->quit;
+
+DESCRIPTION
+===========
+
+   Simple wrappers around ssh and scp commands.
+
+SUBROUTINES
+===========
+
+scp SOURCE, DESTINATION
+     Can be called either as a subroutine or a method; however, the
+     subroutine interface is depriciated.
+
+     Calls scp in batch mode, with the -B -p -q and -r options.  Returns
+     false upon error, with a text error message accessable in
+     $scp->{errstr}.
+
+     Returns false and sets the *errstr* attribute if there is an error.
+
+iscp SOURCE, DESTINATION
+     Can be called either as a subroutine or a method; however, the
+     subroutine interface is depriciated.
+
+     Prints the scp command to be execute, waits for the user to confirm,
+     and (optionally) executes scp, with the -p and -r flags.
+
+     Returns false and sets the *errstr* attribute if there is an error.
+
+METHODS
+=======
+
+new HOSTNAME [ USER ] | HASHREF
+     This is the constructor for a new Net::SCP object.  You must specify a
+     hostname, and may optionally provide a user.  Alternatively, you may
+     pass a hashref of named params, with the following keys:
+
+          host - hostname
+          user - username
+          interactive - bool
+          cwd - current working directory on remote server
+
+login [USER]
+     Compatibility method.  Optionally sets the user.
+
+cwd CWD
+     Sets the cwd (used for a subsequent get or put request without a full
+     pathname).
+
+get REMOTE_FILE [, LOCAL_FILE]
+     Uses scp to transfer REMOTE_FILE from the remote host.  If a local
+     filename is omitted, uses the basename of the remote file.
+
+size FILE
+     Returns the size in bytes for the given file as stored on the remote
+     server.  Returns 0 on error, and sets the *errstr* attribute.  In the
+     case of an actual zero-length file on the remote server, the special
+     value '0e0' is returned, which evaluates to zero when used as a
+     number, but is true.
+
+     (Implementation note: An ssh connection is established to the remote
+     machine and wc is used to determine the file size.)
+
+put LOCAL_FILE [, REMOTE_FILE]
+     Uses scp to trasnfer LOCAL_FILE to the remote host.  If a remote
+     filename is omitted, uses the basename of the local file.
+
+binary
+     Compatibility method: does nothing; returns true.
+
+AUTHORS
+=======
+
+   Ivan Kohler <ivan-netscp_pod@420.am> Anthony Deaver
+<bishop@projectmagnus.org>
+
+   Thanks to Jon Gunnip <jon@soundbite.com> for fixing a bug with size().
+
+BUGS
+====
+
+   Still has no-OO cruft.
+
+   In order to work around some problems with commercial SSH2, if the
+source file is on the local system, and is not a directory, the -r flag is
+omitted.
+
+   It's probably better just to use SSH1 or OpenSSH
+<http://www.openssh.com/>
+
+   The Net::FTP-style OO stuff is kinda lame.  And incomplete.
+
+SEE ALSO
+========
+
+   scp(1), ssh(1)
+
+
+File: pm.info,  Node: Net/SMS,  Next: Net/SMS/Genie,  Prev: Net/SCP,  Up: Module List
+
+Send SMS messages to ANY device.
+********************************
+
+NAME
+====
+
+   Net::SMS - Send SMS messages to ANY device.
+
+SYNOPSIS
+========
+
+   Net::SMS is a global short text messaging service interface via the
+Internet.  It brings you the first and only way to send SMS messages
+through one easy interface.  SimpleWire has defined an XML SMS standard
+and will make numerous tools available for developer's use so that SMS
+technology can be better utilized.  Currently, this interface supports
+more than just SMS enabled devices and can send messages to ANY protocol.
+
+PREREQUISITES
+=============
+
+   The following packages are required in order to run or even install
+Net::SMS.
+
+     * LWP::UserAgent >= 5.47
+     * XML::DOM (libxml-enno) >= 1.02
+     * Net::Pager >= 2.00
+
+DESCRIPTION
+===========
+
+   Net::SMS is the perl interface to SimpleWire's expanding messaging
+network.  The module interacts with SimleWire's Remote Procedure Calls.
+The Remote Procedure Calls provide an XML API and the protocol is open to
+all developers.  For futher support or questions, you should visit
+SimpleWire's website at *www.simplewire.com*.  There you will find support
+and documentation including the white paper explaining the SimpleWire XML
+API.
+
+SMS OVERVIEW
+============
+
+   SMS stands for short-text messaging service.  The current version of
+this module takes a minimalist approach to SMS, but upcoming versions plan
+to take full advantage of SMS.
+
+   A SMS message will require a minimum of 3 to 5 properties to be set
+within a request object.  The first property, a PIN, is the Pager
+Identification Number.  This is typically the phone number of the device
+you are trying to message.  This number does not include a 1 before the
+area code and typically looks like 3135551212.  The second property, a
+*Service ID*, is a proprietary service number assigned by SimpleWire.  The
+Service ID tells SimpleWire where to route your message.  For example, a
+Service ID of 7 sends a message to AT&T.  The third property, the From
+field, is typically an optional field that is simply the sender's name.
+An example would be "Joe".  The fourth property, the Callback field, is
+typically an optional field that is simply the sender's callback number.
+An example would be "3135551212".   The fifth and last property is the
+Text field.  This is not optional and is the alphanumeric message you wish
+to send.  This just explains the basic properties, but be aware that MANY
+more properties and functions exist within the Net::SMS::Request and
+Net::SMS::Response objects.  More documentation is available via a perldoc
+commond on both of those objects.
+
+Net::SMS OVERVIEW
+=================
+
+   See EXAMPLES section below to see working code.
+
+   The first step to using the Net::SMS module is to make sure
+LWP:UserAgent and XML::DOM are fully and correctly installed. Net::SMS
+works in conjunction with Net::SMS::Request and Net::SMS::Response in
+order to create requests and receive responses from the SimpleWire network.
+
+   Basically, you instantiate a new Net::SMS object via $sms = new Net::SMS
+and this object handles communication with the simplewire servers.  The
+next step is to instantiate a new Net::SMS::Request object and then set
+its properties.  This means you set the PIN, callback number, from,
+message text, etc.  There are numerous properties and they are all
+explained in full via a perldoc on Net::SMS::Request.
+
+   Then pass in the new Net::SMS::Request object to the $sms->request()
+function and your message will be sent.  The $sms->request() function will
+return with a new Net::SMS::Response object.  Just like the
+Net::SMS::Request object, the Net::SMS::Response object has many
+properties and functions available.  They are fully explained via a
+perldoc on Net::SMS::Response.
+
+   That's all it takes to send a short-text message.  However, the Net::SMS
+package provides much more functionality then these basic features.  The
+perldoc for Net::SMS::Request and Net::SMS::Response will explain every
+feature available.
+
+EXAMPLES
+========
+
+   All perl scripts or modules that use Net::SMS must include these lines
+before the code attempts to access any functions in the Net::SMS package.
+
+     use Net::SMS
+     use Net::SMS::Request
+
+   After properly including these two modules above, your code is ready to
+begin sending a message.  The following code will construct a basic
+Net::SMS::Request object and send off a message.
+
+     use Net::SMS
+     use Net::SMS::Request
+
+     # Construct a new SMS object
+     my $sms = Net::SMS->new();
+     # Construct a new SMS::Request object
+     my $r = new Net::SMS::Request;
+     # Set the type of request to 'sendpage'
+     $r->set_sendpage;
+
+     # Set the service id.  Check www.simplewire.com for a full listing
+     # of the services that are supported.
+     $r->service_id(2);
+     $r->pin("1234567890");
+     $r->from("Joe Lauer");
+     $r->callback("9876543210");
+     $r->text("Hello World From Net::SMS 1.00");
+
+     # Send the request off and get a Net::SMS::Response object back.
+     $response = $sms->request($r);
+
+     # Check out what happened.
+     if ($response->is_success) {
+         print "Success!\n";
+         print "Error Code: " . $response->error_code . "\n";
+         print "Error Description: " . $response->error_description . "\n";
+         print "Your ticket number is: " . $response->ticket_id . "\n";
+     } else {
+         print "Error occurred!\n";
+         print "Error Code: " . $response->error_code . "\n";
+         print "Error Description: " . $response->error_description . "\n";
+     }
+
+   Besides being able to send a message to a PIN and Service ID, a message
+can be sent to an Alias if a device has been registered on
+www.simplewire.com.  Just replace the the these lines from above:
+
+     $r->service_id(2);
+     $r->pin("1234567890");
+
+   With this one line:
+
+     $r->alias('email@email.com');
+
+   *Again there are more features explained in a perldoc on
+Net::SMS::Request*.  These include features ranging from asynchronous
+sending of messages to setting the delimiter to seperate the from,
+callback, and text fields.
+
+   The second type of request supported in Net::SMS::Request is a
+'servicelist'.  This request will fetch the service list from SimpleWire
+and the associated service id's for each provider.  This is useful for
+populating a <select> box for websites.  The following code will grab the
+list and set two optional parameters so that only the information
+necessary for populating a <select> box is retrieved from SimpleWire.  The
+code will then print out some of the results in two different ways.
+
+     use Net::SMS;
+     use Net::SMS::Request;
+
+     my $sms = Net::SMS->new();
+     my $r = new Net::SMS::Request;
+
+     $r->set_servicelist;
+     $r->option_type("production");
+     # This could be "all" so that every field is retrieved
+     $r->option_fields("selectbox");
+
+     # Send the request now
+     $response = $sms->request($r);
+
+     if ($response->is_success) {
+         print "Success!\n";
+         print "Error Code: " . $response->error_code . "\n";
+         print "Error Description: " . $response->error_description . "\n";
+     } else {
+         print "Error occurred!\n";
+         print "Error Code: " . $response->error_code . "\n";
+         print "Error Description: " . $response->error_description . "\n";
+     }
+
+     # Grab all the services and plop them into an array of hashes
+     @services = $response->fetchall_services();
+
+     foreach $ser (@services) {
+         print $ser->{ID} . "\n";
+     }
+
+     # Grab a row at a time into a hash like DBI
+     while ($row = $response->fetchrow_service) {
+
+     foreach $var (keys %{ $row }) {
+         print $row->{$var} . "\t";
+     }
+
+     print "\n";
+
+     }
+
+   The third type of request supported in Net::SMS::Request is a
+'checkstatus'.  This request will fetch the status of a previously sent
+message.  Every 'sendpage' request that passes most error checking will be
+assigned a ticket.  It is this ticket that needs to be sent thru during a
+'checkstatus' request.  The following code example will check the status
+of a previously sent message.
+
+     use Net::SMS;
+     use Net::SMS::Request;
+
+     # Note that you will have had to do a sendpage and get a TICKET_ID
+     # back for you to check with.
+
+     my $sms = Net::SMS->new();
+     my $r = new Net::SMS::Request;
+
+     $r->set_checkstatus;
+
+     # Set the ticket id to check.
+     $r->ticket_id("D9VZ1-3MTWX-28UM0-8H1L7");
+
+     # Request it.
+     $response = $sms->request($r);
+
+     # Check the response that was returned
+     if ($response->is_success) {
+         print "Success!\n";
+         print "The status code: " . $response->status_code . "\n";
+         print "The status description: " . $response->status_description . "\n";
+     } else {
+         print "Error occurred!\n";
+         print "Error Code: " . $response->error_code . "\n";
+         print "Error Description: " . $response->error_description . "\n";
+     }
+
+   Any further code questions can either be answered via a perldoc on
+Net::SMS::Request or Net::SMS::Response.  Support can also be obtained by
+emailing techsupport@simplewire.com.
+
+SEE ALSO
+========
+
+   Net::SMS::Request, Net::SMS::Response, www.simplewire.com on the web.
+
+AUTHOR
+======
+
+   Joe Lauer <joelauer@simplewire.com> www.simplewire.com
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000 SimpleWire. All rights reserved. This program is free
+software; you can redistribute it and/or modify it under the same terms as
+Perl itself.
+
+
+File: pm.info,  Node: Net/SMS/Genie,  Next: Net/SMS/Request,  Prev: Net/SMS,  Up: Module List
+
+a module to send SMS messages using the Genie web2sms gateway (htto://www.genie.co.uk/).
+****************************************************************************************
+
+NAME
+====
+
+   Net::SMS::Genie - a module to send SMS messages using the Genie web2sms
+gateway (htto://www.genie.co.uk/).
+
+SYNOPSIS
+========
+
+     my $sms = Net::SMS->new(
+         username => 'yourname',
+         password => 'yourpassword',
+         recipient => 07713123456,
+         subject => 'a test',
+         message => 'a test message',
+     );
+
+     $sms->verbose( 1 );
+     $sms->message( 'a different message' );
+     print "sending message to mobile number ", $sms->recipient();
+
+     $sms->send();
+
+DESCRIPTION
+===========
+
+   A perl module to send SMS messages, using the Genie web2sms gateway.
+This module will only work with mobile phone numbers that have been
+registered with Genie (http://www.genie.co.uk/) and uses form submission
+to a URL that may be subject to change.
+
+AUTHOR
+======
+
+   Ave Wrigley <Ave.Wrigley@itn.co.uk>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2001 Ave Wrigley. All rights reserved. This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+
+File: pm.info,  Node: Net/SMS/Request,  Next: Net/SMS/Response,  Prev: Net/SMS/Genie,  Up: Module List
+
+Constructs a request object to be used in conjunction with Net::SMS.
+********************************************************************
+
+NAME
+====
+
+   Net::SMS::Request - Constructs a request object to be used in
+conjunction with Net::SMS.
+
+SYNOPSIS
+========
+
+   Net::SMS::Request is a helper object for Net::SMS.  It is the object
+that constructs the request to use with the Net::SMS object.
+
+PREREQUISITES
+=============
+
+   See the prerequisites for Net::SMS.
+
+DESCRIPTION
+===========
+
+   Net::SMS::Request generally requires you to set the request type, set a
+few requried parameters, and then pass it to the Net::SMS::request()
+method.  Each property and method is enumerated below.   Each property and
+method is sectioned off based on the type of request they fit under.
+Common methods and properties for each request type are listed first.
+
+GENERAL NOTE ABOUT PROPERTIES
+=============================
+
+   All properties are either set to their default or are null.  Once a
+property or method is called its state moves from undef to defined and
+whatever it was defined to.  This could cause problems if you are not
+careful.  A good example is the delimiter() property.  If you set it to an
+empty string then it will now be an empty string in the message you send
+off.  The only way to get rid of it so that it uses the default on the
+SimpleWire network is to make this call delimiter(undef) which will erase
+any call ever made to that function.  This same method can be applied to
+any function used within this module.  Passing undef to it will erase it.
+
+COMMON METHODS and PROPERTIES
+=============================
+
+   See below for more methods and properties available for each type of
+request that SimpleWire can currently handle.
+
+   *as_xml()*
+
+   Returns the current data structure of the Net::SMS::Request object in
+XML.  This is also the XML that will get sent to the SimpleWire API.
+
+   *is_checkstatus()*
+
+   Returns true or false based on whether or not the current object is set
+to a 'checkstatus' request.
+
+   *is_sendpage()*
+
+   Returns true or false based on whether or not the current object is set
+to a 'sendpage' request.
+
+   *is_servicelist()*
+
+   Returns true or false based on whether or not the current object is set
+to a 'servicelist' request.
+
+   *request_type($str)*
+
+   Sets the request type if $str is passed in, or gets the current request
+type if $str is omitted.
+
+   *subscriber_id($str)*
+
+   Sets the subscriber id if $str is passed in, or gets the current
+subscriber id if $str is omitted.  A subscriber id is assigned when a
+customer signs up on www.simplewire.com.  Developers and small volume
+users are allowed to use Net::SMS for free, but grabbing a free subscriber
+id will help us track the popularity of certain tools.  Please sign up for
+free if you are going to use this module to send any quantity of messages.
+
+   *timeout($str)*
+
+   Sets the client side timeout if $str is passed in, or gets the current
+client side timeout if $str is omitted.  The client side timeout controls
+how long a client will wait for client/simplewire server connections.  You
+might also want to check out the *option_timeout()* function for setting
+the timeout for the simplewire server/carrier connection.
+
+   *user_agent($str)*
+
+   Sets the user agent if $str is passed in, or gets the current user agent
+if $str is omitted.  The user agent is a string like "Perl/Net-SMS/1.00"
+and is strictly for statistics on the SimpleWire network.
+
+   *user_ip($str)*
+
+   Sets the user ip if $str is passed in, or gets the current user ip if
+$str is omitted.  The user ip is the IP Address of the computer or device
+that a request is on the behalf of.  An example would be a website sending
+a page off for a visiting websurfer.  The websurfer's IP would be set here.
+
+SENDPAGE REQUEST METHODS and PROPERTIES
+=======================================
+
+   These methods are available for sending a message thru SimpleWire.  A
+'sendpage' request basically requests SimpleWire to send a message.  A
+ticket id will be assigned on our network for messages that make it past
+our preliminary error checking.  This ticket id will eventually allow all
+sorts of fancy features including our support for two-way messaging fairly
+soon.
+
+   *set_sendpage()*
+
+   Sets the current request to a 'sendpage'.   This will allow a message
+to be sent thru the SimpleWire network.
+
+   *option_method($str)*
+
+   Sets the optional method parameter if $str is passed in, or gets the
+current method if $str is omitted.  This directs which method SimpleWire
+should use to send the message.  The current options are 'synch'
+(synchronous) or 'asynch' (asynchronous).  Synchronous is the default
+method and it means SimpleWire will attempt to immediately deliver your
+message to the carrier/provider.  Asynchronous is optional and it means we
+will put your message into a queue.  The status of that message can be
+checked later via the 'checkstatus' request.
+
+   *option_timeout($str)*
+
+   Sets the SimpleWire server timeout if $str is passed in, or gets the
+current timeout if $str is omitted.  This controls how long the SimpleWire
+server will wait during connections with the carrier/provider.  The
+default timeout is 30 seconds on the SimpleWire network.
+
+   *option_delimiter($str)*
+
+   Sets the delimiter if $str is passed in, or gets the current delimiter
+if $str is omitted.  This is undef by default, but this controls the
+characters that seperate the from, callback, and text fields in the final
+message.  The default delimiter on our network is " |" but it can be
+overridden here.
+
+   *alias($str)*
+
+   Sets the alias if $str is passed in, or gets the current alias if $str
+is omitted.  The alias is the SimpleWire alias if a device has been
+registered on SimpleWire.  Ability to register devices thru this client
+tool will be coming in later versions.  This property will override a pin
+and service_id setting.
+
+   *service_id($str)*
+
+   Sets the Service ID if $str is passed in, or gets the current Service ID
+if $str is omitted.  The service id is the propietary id assigned by
+SimpleWire to every carrier or provider that we support.  A service list
+can either be downloaded via a 'servicelist' request or browsed on the
+www.simplewire.com website.  An example would be '7' for AT&T.
+
+   *pin($str)*
+
+   Sets the pin if $str is passed in, or gets the current pin if $str is
+omitted.  The pin is the PIN or Pager Identification Number.  A PIN is
+typically the device's phone number without the 1 for the area code.
+However, the PIN is different for some carriers like PageNet.  Check the
+www.simplewire.com website for more help.
+
+   *from($str)*
+
+   Sets the from if $str is passed in, or gets the current from if $str is
+omitted.   The from is whoever is sending the message.  This field is
+optional in most cases.
+
+   *callback($str)*
+
+   Sets the callback if $str is passed in, or gets the current callback if
+$str is omitted.  The callback is the number that the user would like to
+be called back at.  This field is optional except for numeric paging
+services.
+
+   *text($str)*
+
+   Sets the text if $str is passed in, or gets the current text if $str is
+omitted.  The text is the message that will be sent to the device.  The
+maximum text length differs for each service and can only be obtained via
+a 'servicelist' request or on the www.simplewire.com website.
+
+CHECKSTATUS REQUEST METHODS and PROPERTIES
+==========================================
+
+   *set_checkstatus()*
+
+   Sets the current request to a 'checkstatus'.   This will allow a
+previously sent message to be checked on SimpleWire.  This request is
+useful if a message was sent asynchronously and the client would like to
+see if the page got delivered correctly.
+
+   *ticket_id($str)*
+
+   Sets the ticket id if $str is passed in, or gets the current ticket id
+if $str is omitted.  The ticket id is always 23 characters long and looks
+something like "D9VZ1-3MTWX-28UM0-8H1L7".  This ticket id is assigned by
+SimpleWire during a 'sendpage' request.
+
+SERVICELIST REQUEST METHODS and PROPERTIES
+==========================================
+
+   This allows the client tool to download our real time list of supported
+service providers/carriers and their associated service ids.  This request
+is useful for populating <select> boxes on websites.  This request also
+allows the client tool to get information like the maximum text length
+allowed for each service.
+
+   *set_servicelist()*
+
+   Sets the current request to a 'servicelist'.
+
+   *option_type($str)*
+
+   Sets the type if $str is passed in, or gets the current type if $str is
+omitted.  The type is the kind of service list that the client tool would
+like to download.  The default is "production" which is every service that
+SimpleWire currently supports and updates.  Other possible options include
+"development" and "all".  The names are intuitive and describe what type
+of service list you want to get.
+
+   *option_fields($str)*
+
+   Sets the fields if $str is passed in, or gets the current fields if
+$str is omitted.  The fields is what fields the client tool wants back
+about each service.  The default is "all" which will obviously get every
+available field.  However, the other option of "selectbox" will only get
+the fields necessary to populate a <select> box on a website.  Since the
+service list is so large this can help cut down on Internet lag.
+
+EXAMPLES
+========
+
+   All examples are in the perldoc for Net::SMS.
+
+   Any further code questions can either be answered via a perldoc on
+Net::SMS or Net::SMS::Response.  Support can also be obtained by emailing
+techsupport@simplewire.com.
+
+SEE ALSO
+========
+
+   Net::SMS, Net::SMS::Response, www.simplewire.com on the web.
+
+AUTHOR
+======
+
+   Joe Lauer <joelauer@simplewire.com> www.simplewire.com
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000 SimpleWire. All rights reserved. This program is free
+software; you can redistribute it and/or modify it under the same terms as
+Perl itself.
+
+
+File: pm.info,  Node: Net/SMS/Response,  Next: Net/SMTP,  Prev: Net/SMS/Request,  Up: Module List
+
+An object that represents the response back from a request sent to SimpleWire.  To be used in conjunction with Net::SMS and Net::SMS::Request.
+**********************************************************************************************************************************************
+
+NAME
+====
+
+   Net::SMS::Response - An object that represents the response back from a
+request sent to SimpleWire.  To be used in conjunction with Net::SMS and
+Net::SMS::Request.
+
+SYNOPSIS
+========
+
+   Net::SMS::Response is a helper object for Net::SMS.  It is the object
+that represents the response from the SimpleWire network after a call to
+the Net::SMS::request() function.
+
+PREREQUISITES
+=============
+
+   See the prerequisites for Net::SMS.
+
+DESCRIPTION
+===========
+
+   Net::SMS::Response provides all the functionality to analyze a response
+back from a request sent to SimpleWire.
+
+COMMON METHODS and PROPERTIES
+=============================
+
+   is_success()
+
+   Returns true or false and represents whether the request sent was
+considered a success or failure.  For example, the error code won't
+represent this correctly since error codes of 0 - 10 are considered
+successes.  Call this function to check whether the request was successful.
+
+   *error_code()*
+
+   Returns the error code in the response from SimpleWire.  Every single
+request will have an error code available.  Error codes can be obtained as
+a Word document or PDF from the www.simplewire.com website.
+
+   *error_description()*
+
+   Returns the error description in the response from SimpleWire.  Every
+single request will have an error description available.  Error
+descriptions can be obtained as a Word document or PDF from the
+www.simplewire.com website.
+
+   *as_xml()*
+
+   Returns the current data structure of the Net::SMS::Response object in
+XML.
+
+   *is_checkstatus()*
+
+   Returns true or false based on whether or not the current object is set
+to a 'checkstatus' request.
+
+   *is_sendpage()*
+
+   Returns true or false based on whether or not the current object is set
+to a 'sendpage' request.
+
+   *is_servicelist()*
+
+   Returns true or false based on whether or not the current object is set
+to a 'servicelist' request.
+
+   *request_type()*
+
+   Gets the current request type.  Will return a string like
+"servicelist", "sendpage", etc.
+
+SENDPAGE REQUEST METHODS and PROPERTIES
+=======================================
+
+   *ticket_id()*
+
+   Gets the ticket id from the 'sendpage' request.  Note that some
+sendpage requests might not generate a ticket id if they fail some
+preliminary error checking on our server.  Preliminary errors include
+things like badly formed XML posted to our API.
+
+SERVICELIST REQUEST METHODS and PROPERTIES
+==========================================
+
+   A 'servicelist' request will return a large list of services that
+SimpleWire currently supports.  Each service will be dumped into its own
+hash.  There are too many different keys that can be sent back to go thru
+them all here, so I suggest that you just loop thru each key in the hash
+to see how many different keys exist.  Another easy way to see what keys
+exist is to print out the response as XML with code like:
+
+     print $response->as_xml();
+
+   The key for each hash will be the exact same as whatever exists between
+each <service and /> tags.  For example if <service ID="18"/> exists then
+the hash key would be ID.
+
+   *fetchall_services()*
+
+   Returns the entire service list as an array of hashes.  The following
+code will access whatever is returned.
+
+     # Grab all the services and plop them into an array of hashes
+     @services = $response->fetchall_services();
+
+     foreach $ser (@services) {
+         print $ser->{ID} . "\n";
+     }
+
+   *fetchrow_service()*
+
+   This method is like the DBI package if you have ever used that.  It
+allows you to return one hash at a time and it will auto increment the
+placeholder.  So you can iterate over the entire list in this fashion:
+
+     # Grab a row at a time into a hash like DBI
+     while ($row = $response->fetchrow_service) {
+
+     foreach $var (keys %{ $row }) {
+         print $row->{$var} . "\t";
+     }
+
+     print "\n";
+
+     }
+
+   It will return a false when it reaches the end and it will exit the
+loop for you.
+
+   *fetchrow_rewind()*
+
+   This function resets the placeholder for the fetchrow_service()
+function and rewinds you back to the beginning of the list.  This is
+useful for needing the list in multiple areas but only downloading it one
+time.
+
+CHECKSTATUS REQUEST METHODS and PROPERTIES
+==========================================
+
+   The 'checkstatus' request will return a status code and a status
+description.  They both corrospond to the same meanings as the error code
+and description.  However, the error code and description strictly relate
+to the 'checkstatus' transaction, while the status code and description
+describe what happened to the previously sent message.  If the ticket id
+passed in during the 'checkstatus' request generates an error then its
+possible no status code or description will exist.
+
+   *status_code()*
+
+   Returns the status code associated with the ticket id.  The code
+corrosponds to the error codes in the error_code() function.
+
+   *status_description()*
+
+   Returns the status description associated with the ticket id.  The
+description corrosponds to the error descriptions in the
+error_description() function.
+
+EXAMPLES
+========
+
+   All examples are in the perldoc for Net::SMS.
+
+   Any further code questions can either be answered via a perldoc on
+Net::SMS or Net::SMS::Response.  Support can also be obtained by emailing
+techsupport@simplewire.com.
+
+SEE ALSO
+========
+
+   Net::SMS, Net::SMS::Response, www.simplewire.com on the web.
+
+AUTHOR
+======
+
+   Joe Lauer <joelauer@simplewire.com> www.simplewire.com
+
+COPYRIGHT
+=========
+
+   Copyright (c) 2000 SimpleWire. All rights reserved. This program is free
+software; you can redistribute it and/or modify it under the same terms as
+Perl itself
+
+

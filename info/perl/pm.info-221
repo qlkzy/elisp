@@ -1,0 +1,1549 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: MOP/Remote,  Next: MP3/Daemon,  Prev: MOP/MetaModule,  Up: Module List
+
+Perl meta-module for transparent distribution of object oriented modules.
+*************************************************************************
+
+NAME
+====
+
+   MOP::Remote - Perl meta-module for transparent distribution of object
+oriented modules.
+
+SYNOPSIS
+========
+
+     # A random package declaration
+     package MyModule;
+
+     # Activate the meta-object protocol for a few methods
+     use MOP::MOP qw(new method1 method3);
+     # Our meta-module is 'MOP::Remote'
+     MOP::MOP::register_meta('MOP::Remote','MyModule');
+
+     # Some functions
+     sub new { return bless { ... }; } # Constructor
+     sub method1 { ... }
+     sub method2 { ... }
+     sub method3 { ... }
+
+     ##### NOW USING MyModule ####
+     use MyModule;
+     
+     # Creates a remote server
+     my $REMOTE = 'host.name.fr'; my $PORT = 1234;
+     my $server = MOP::Remote::create_server('MyModule', $REMOTE, $PORT);
+
+     # Creates an object - additional argument is grabbed by meta-module
+     my $o = MyModule->new(..., $server);
+     # Now, simply use it: all methods are done remotely on $REMOTE_HOST
+     $o->method1();
+     my $var = $o->method3('a_value');
+     ...
+
+DESCRIPTION
+===========
+
+   This module provides two things:
+
+
+     An example of basic meta-module that demonstrates how it is possible
+     to design a meta-module, and use it to provide useful functionality
+     to third-party module writers.
+
+
+     A transparent way of adding remote processing capabilities to any
+     module with minimal modifications. This will probably work only on
+     Unix systems.
+
+   Using this module should be straightforward. In the definition of an
+object-oriented Perl module that you want to enhance by remote processing
+capabilities, you simply need to state that several methods should be
+reflective, with: `use MOP::MOP qw(method_name1 method_name2 ...)'.  This
+simply makes the MOP (Meta-Object Protocol) aware of the given methods.
+Then, you should probably define a static link between your module and the
+MOP::Remote meta-module with:
+`MOP::MOP::register_meta('MOP::Remote','MyModule')', at the beginning of
+`MyModule.pm'.  This magic formula indicates to the MOP that MOP::Remote
+is the meta-module to be used for MyModule. It is this meta-module that
+provides the magical remote processing capability.
+
+   Then, the user of MyModule creates a new server via the create_server()
+function of MOP::Remote, in order to create new objects on that server.
+All method calls on such an object will be performed on the remote server.
+If the user wants to create a local object (in-process), he simply passes
+the constant LOCAL instead of a server reference, as in:
+`MyModule->new(..., 'LOCAL')'. This creates an object normally.  But then,
+there is nothing funny anymore.
+
+Detailed operation
+------------------
+
+   At creation via `MyModule->new(...,$server)', the call will be trapped
+and redirected to the host associated with the given server.  The $server
+argument will be removed before calling the new() method on the server, of
+course.  The remote server will create a new object, and the local machine
+will simply return you an empty hashref that plays the role of a proxy.
+In fact, two additional meta-objects will be created: one locally that
+will hold some useful information (such as the remote object ID) and will
+control the future method calls made on the proxy, and one meta-object on
+the remote server that will perform the real base-level method call on the
+real (remote) object.
+
+   Afterwards, all method calls made on objects from MyModule will be
+trapped by the MOP and redirected to MOP::Remote. The (local) meta-object
+created after the call to new() will be used to find the remote processing
+server, and the call with all its arguments will be redirected to that
+server. On the remote host, the server will catch this request, perform
+the operation on the real object (via its own meta-object) and communicate
+the results back to your process. The returned value will be sent back to
+you.  Data::Dumper is used (in deep mode) to pass the arguments back and
+forth.  So, it is possible that some references be lost during the network
+exchange, depending on the base module operation.
+
+   The remote invocation is a blocking one. If you want to perform multiple
+concurrent remote invocations, you should handle that yourself.
+
+   Currently, you should consider MOP::Remote as a form of RPC.  It is
+also preferred to create different remote servers for different modules
+(ie: one for each class).  You can create several objects on one server,
+and you may also create them from different client machines. However, note
+that one remote server serializes the method calls (it does not do any
+fork()) and that you will need to find a way to exchange the server
+reference. This is not exactly the normal way of operation.
+
+Functions
+---------
+
+`$server = MOP::Remote::create_server($module_name[,$host,$port,$remote_perl])'
+     This function creates a new server on a remote machine. $module_name
+     should contain the name of the module that is operated by the server.
+     rsh is used to create a Perl process on the remote machine, so you
+     need to have rsh and an account on the remote machine (that does not
+     require a password).  The remaining arguments are optional. $host is
+     the name of a remote host on which you want to create the server. It
+     defaults to 'localhost', ie: the local host (in another Perl process
+     in fact - this is a behavior of rsh). However, you will probably want
+     to specify this one.  $port is the TCP port number used for the
+     communication between the client and the server.  It default to 2345
+     (an arbitrary value). You should adapt that to your application.
+     Finally, $remote_perl may indicate the name of the Perl executable to
+     use on the remote machine. MOP::Remote tries to be smart and to guess
+     that name, so usually you need not specify it. But in cross-platform
+     configurations, it may be useful to be able to specify it. (*Hint*:
+     if you configured your shell initializations correcty so that the
+     simple command *perl* works on the remote host, MOP::Remote will
+     surely find the name of a good Perl executable.)
+
+     This function will return you a hash reference that contains
+     server-related information. You may use that hashref to create
+     objects on the server via new().
+
+`MOP::Remote::exit_server($server)'
+     This function will send an exit message to the remote server that will
+     handshake and exit.
+
+Notes
+-----
+
+   MOP::Remote *closes* STDOUT and `STDERR' on the remote server by
+default.  It may be difficult to debug your module (that executes
+remotely).  You can set the debug flag `$MOP::Remote::DEBUG'. In that case,
+MOP::Remote will not close ouputs and will arrange to maintain a link
+between the standard outputs of remote processes and the local terminal.
+You can also set `$MOP::Remote::DEBUG2' if you want to see the messages
+exchanged between the client and the server.
+
+   I have successfully tested remote invocations between Solaris and Linux
+hosts.  However, cross-platform invocation, even though possible, still
+involves careful setup of both platforms Perl5 modules library.  (The same
+modules should be available on both hosts.  Versions should be similar.
+Previous note is really applicable.)
+
+   MOP::Remote depends on Data::Dumper.
+
+LIMITATIONS AND FUTURE EVOLUTIONS
+=================================
+
+   The client-server functionality implemented inside MOP::Remote is
+self-contained but rather basic. It would be desirable to use a more
+sophisticated set of functionalities for client-server operation (like in
+EventServer).  Only the true meta-level part of MOP::Remote should remain
+in that case.
+
+   As any magical device, MOP::Remote surely has a lot of shortcomings.
+In fact, it is not sure at all that a MOP::Remote-enhanced module will
+behave exactly like a normal module. For example, the inheritance
+semantics of a reflective module is not (yet) clear. If something inherits
+from MyModule, but overloads some methods, the remote processing
+capability may be broken for these methods.
+
+   Furthermore, if some public methods are not reflective, the MOP does
+not know them, so they will not be trapped to be sent to the remote
+server. Instead they will be executed locally by Perl itself: at once *on
+a proxy object*. So the result will surely be some bad thing. Private
+method calls need not be reflective, because the user should never call
+them (or they would not be private), but well... nothing really prevents
+them from doing so especially when inheritance is involved.
+
+   Finally, there may be meta-meta-objects on any side of the client-server
+communication, and at this point, my brain usually stops understanding the
+real path of the method call. Maybe Perl will figure out what to do...
+(Remember this is just an example.)
+
+BUGS
+====
+
+   Due to a limitation of the meta-object protocol of MOP::MOP, the
+destruction of objects is not handled. If you create a lot of objects on
+the remote server and do not use them, it may be a (remote) problem.
+
+   new() is the only class method name considered. If your module has
+other constructors that should execute remotely, you should modify the
+meta-module. Currently MOP::Remote will complain, but it will perform the
+class method call locally anyway.
+
+   The default TCP port number used for communication is arbitrary: it is
+2345.
+
+AUTHOR
+======
+
+   Rodolphe Ortalo, ortalo@laas.fr
+
+Acknowledgements
+----------------
+
+   This work has been performed with the support of LAAS-CNRS.
+
+SEE ALSO
+========
+
+   perl(1), MOP::MOP(3), MOP::MetaModule(3).
+
+
+File: pm.info,  Node: MP3/Daemon,  Next: MP3/Daemon/PIMP,  Prev: MOP/Remote,  Up: Module List
+
+a daemon that possesses mpg123
+******************************
+
+NAME
+====
+
+   MP3::Daemon - a daemon that possesses mpg123
+
+SYNOPSIS
+========
+
+   MP3::Daemon is meant to be subclassed - not used directly.
+
+     package MP3::Daemon::Simple;
+
+     use strict;
+     use vars qw(@ISA);
+     use MP3::Daemon;
+
+     @ISA = qw(MP3::Daemon);
+
+   Other perl scripts would use MP3::Daemon::Simple like this:
+
+     my $socket_path = "/tmp/mp3d_socket";
+
+     # start up a daemon
+     MP3::Daemon::Simple->spawn($socket_path);
+
+     # get a socket that's good for one request to the daemon
+     my $client = MP3::Daemon::Simple->client($socket_path);
+
+     print $client @command;
+
+REQUIRES
+========
+
+Audio::Play::MPG123
+     This is used to control mpg123 in remote-mode.
+
+IO::Socket::UNIX
+     This is for client/server communication.
+
+IO::Select
+     I like the OO interface.  I didn't feel like using normal select()
+     and messing with vec().
+
+MP3::Info
+     This is for getting information from mp3 files.
+
+Pod::Usage
+     This is an optional module that bin/mp3 uses to generate help
+     messages.
+
+POSIX
+     This is just for setsid.
+
+DESCRIPTION
+===========
+
+   MP3::Daemon provides a framework for daemonizing mpg123 and
+communicating with it using unix domain sockets.  It provides an event
+loop that listens for client requests and also polls the mpg123 player to
+monitor its state and change mp3s when one finishes.
+
+   The types of client requests available are not defined in MP3::Daemon.
+It is up to subclasses of MP3::Daemon to flesh out their own protocol for
+communicating with the daemon.  This was done to allow people freedom in
+defining their own mp3 player semantics.
+
+   The following is a short description of the subclasses of MP3::Daemon
+that are packaged with the MP3::Daemon distribution.
+
+MP3::Daemon::Simple => mp3
+--------------------------
+
+   This subclass of MP3::Daemon provides a very straightforward mp3
+player.  It comes with a client called *mp3* that you'll find in the bin/
+directory.  It implements a very simple playlist.  It also implements
+common commands one would expect from an player, and it feels very similar
+to cdcd(1).  It is touted as an mpg123 front-end for UNIX::Philosophers,
+because it does not have a Captive User Interface.
+
+   For more information, `perldoc mp3`;
+
+MP3::Daemon::PIMP => pimp
+-------------------------
+
+   This subclass of MP3::Daemon has yet to be written.  The significant
+difference between M:D:Simple and M:D:PIMP will be the *Plaqueluster*.  A
+Plaqueluster is a pseudorandom playlist that enforces a user-definable
+level of non-repetitiveness.  It is also capable of maintaining a median
+volume such that all mp3s are played at the same relative volume.  Never
+again will you be startled by having an mp3 recorded at a low volume being
+followed by an mp3 recorded *VERY LOUDLY*.
+
+   For more information, `perldoc pimp`;
+
+METHODS
+=======
+
+Server-related Methods
+----------------------
+
+   MP3::Daemon relies on unix domain sockets to communicate.  The socket
+requires a place in the file system which is referred to as `$socket_path'
+in the following descriptions.
+
+new $socket_path
+     This instantiates a new MP3::Daemon.
+
+          my $mp3d = MP3::Daemon->new("$ENV{HOME}/.mp3/mp3_socket");
+
+main
+     This starts the event loop.  This will be listening to the socket for
+     client requests while polling mpg123 in times of idleness.  This
+     method will never return.
+
+          $mp3d->main;
+
+spawn $socket_path
+     This combines new() and `main()' while also forking itself into the
+     background.  The spawn method will return immediately to the parent
+     process while the child process becomes an MP3::Daemon that is
+     waiting for client requests.
+
+          MP3::Daemon->spawn("$ENV{HOME}/.mp3/mp3_socket");
+
+client $socket_path
+     This is a factory method for use by clients who want a socket to
+     communicate with a previously instantiated MP3::Daemon.
+
+          my $client = MP3::Daemon->client("$ENV{HOME}/.mp3/mp3_socket");
+
+Client API
+----------
+
+   These methods are usually not invoked directly.  They are invoked when
+a client makes a request.  The protocol is very simple.  The first line is
+the name of the method.  Each argument to the method is specified on
+successive lines.  A final blank line signifies the end of the request.
+
+     0   method name
+     1   $arg[0]
+     .   ...
+     n-1 $arg[n-2]
+     n   /^$/
+
+   Example:
+
+     print $client <<REQUEST;
+     play
+     5
+
+     REQUEST
+
+   This plays $self->{playlist}[5].
+
+SUBCLASSES
+==========
+
+   When writing a subclass of MP3::Daemon keep the following in mind.
+
+Writing the constructor
+     The new() method provided by MP3::Daemon returns a blessed hash.
+     Feel free to add more attributes to the blessed hash as long as you
+     don't accidentally stomp on the following keys.
+
+    player
+          This is an instance of Audio::Play::MPG123.
+
+    server
+          This is an instance of IO::Socket::UNIX.
+
+    client
+          This is another instance of IO::Socket::UNIX that the daemon may
+          write to in order to reply to a client.
+
+    socket_path
+          This is where in the filesystem the unix domain socket is
+          sitting.
+
+You must implement a next() method.
+     The event loop in &MP3::Daemon::main relies on it.  When a song ends,
+     it will execute $self->next.
+
+Only methods prefixed with "_" will be available to clients.
+     This was to prevent mischievous clients from trying to execute methods
+     like new(), spawn() or main().  That would have been evil.  By only
+     allowing methods with names matching /^_/ to be executed, this allows
+     the author of a daemon to control what the client can and can't
+     request the daemon to do.
+
+     When a client makes a request, the following sequence happens in the
+     event loop.
+
+          my @args = $self->readCommand;
+          my $do_this = "_" . shift(@args);
+          if ($self->can($do_this)) { ... }
+
+     If a client requested the daemon to "play", the event loop will ask
+     itself `if ($self->can('_play'))' before taking any action.
+
+Letting us know
+     If you write a subclass of MP3::Daemon, we (pip and beppu) would be
+     happy to hear from you.
+
+DIAGNOSTICS
+===========
+
+   I need to be able to report errors in the daemon better.  They
+currently go to /dev/null.  I need to learn how to use syslog.
+
+COPYLEFT
+========
+
+   Copyleft (!c) 2001 John BEPPU.  All rights reversed.  This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+AUTHOR
+======
+
+   John BEPPU <beppu@binq.org>
+
+SEE ALSO
+========
+
+   mpg123(1), Audio::Play::MPG123(3pm), pimp(1p), mpg123sh(1p), mp3(1p)
+
+
+File: pm.info,  Node: MP3/Daemon/PIMP,  Next: MP3/Daemon/Simple,  Prev: MP3/Daemon,  Up: Module List
+
+the daemon for Pip's Intergallactive Moosex Plaquluster
+*******************************************************
+
+NAME
+====
+
+   MP3::Daemon::PIMP - the daemon for Pip's Intergallactive Moosex
+Plaquluster
+
+SYNOPSIS
+========
+
+   Fork a daemon
+
+     MP3::Daemon::PIMP->spawn($socket_path);
+
+   Start a server, but don't fork into background
+
+     my $mp3d = MP3::Daemon::PIMP->new($socket_path);
+     $mp3d->main;
+
+   You're a client wanting a socket to talk to the daemon
+
+     my $client = MP3::Daemon::PIMP->client($socket_path);
+     print $client @command;
+
+REQUIRES
+========
+
+MP3::Daemon
+     This is the base class.  It provides the daemonization and event loop.
+
+DESCRIPTION
+===========
+
+   MP3::Daemon::PIMP provides a server that controls mpg123.  Clients such
+as mp3(1p) may connect to it and request the server to manipulate its
+internal playlists.
+
+METHODS
+=======
+
+Server-related Methods
+----------------------
+
+   MP3::Daemon::PIMP relies on unix domain sockets to communicate.  The
+socket requires a place in the file system which is referred to as
+`$socket_path' in the following descriptions.
+
+new $socket_path
+     This instantiates a new MP3::Daemon::PIMP.
+
+          my $mp3d = MP3::Daemon::PIMP->new("$ENV{HOME}/.mp3/mp3_socket");
+
+main
+     This starts the event loop.  This will be listening to the socket for
+     client requests while polling mpg123 in times of idleness.  This
+     method will never return.
+
+          $mp3d->main;
+
+spawn $socket_path
+     This combines new() and `main()' while also forking itself into the
+     background.  The spawn method will return immediately to the parent
+     process while the child process becomes an MP3::Daemon::PIMP that is
+     waiting for client requests.
+
+          MP3::Daemon::PIMP->spawn("$ENV{HOME}/.mp3/mp3_socket");
+
+client $socket_path
+     This is a factory method for use by clients who want a socket to
+     communicate with a previously instantiated MP3::Daemon::PIMP.
+
+          my $client = MP3::Daemon::PIMP->client("$ENV{HOME}/.mp3/mp3_socket");
+
+Client API
+----------
+
+   These methods are usually not invoked directly.  They are invoked when
+a client makes a request.  The protocol is very simple.  The first line is
+the name of the method.  Each argument to the method is specified on
+successive lines.  A final blank line signifies the end of the request.
+
+     0   method name
+     1   $arg[0]
+     .   ...
+     n-1 $arg[n-2]
+     n   /^$/
+
+   Example:
+
+     print $client <<REQUEST;
+     play
+     5
+
+     REQUEST
+
+   This plays $self->{playlist}[5].
+
+command
+command
+COPYLEFT
+========
+
+   Copyleft (c) 2001 pip.  All rights reversed.  This program is free
+software; you can redistribute it and/or modify it under the same terms as
+Perl itself.
+
+AUTHOR
+======
+
+   pip <pip@binq.org>
+
+SEE ALSO
+========
+
+   mpg123(1), Audio::Play::MPG123(3pm), pimp(1p), mpg123sh(1p), mp3(1p)
+
+
+File: pm.info,  Node: MP3/Daemon/Simple,  Next: MP3/ID3v1Tag,  Prev: MP3/Daemon/PIMP,  Up: Module List
+
+the daemon for the mp3(1p) client
+*********************************
+
+NAME
+====
+
+   MP3::Daemon::Simple - the daemon for the mp3(1p) client
+
+SYNOPSIS
+========
+
+   Fork a daemon
+
+     MP3::Daemon::Simple->spawn($socket_path);
+
+   Start a server, but don't fork into background
+
+     my $mp3d = MP3::Daemon::Simple->new($socket_path);
+     $mp3d->main;
+
+   You're a client wanting a socket to talk to the daemon
+
+     my $client = MP3::Daemon::Simple->client($socket_path);
+     print $client @command;
+
+REQUIRES
+========
+
+File::Basename
+     This is used to give titles to songs when the mp3 leaves the title
+     undefined.
+
+Getopt::Std
+     Some methods need to pretend they're command line utilities.
+
+MP3::Daemon
+     This is the base class.  It provides the daemonization and event loop.
+
+MP3::Info
+     This is for getting information out of mp3s.
+
+DESCRIPTION
+===========
+
+   MP3::Daemon::Simple provides a server that controls mpg123.  Clients
+such as mp3(1p) may connect to it and request the server to manipulate its
+internal playlists.
+
+METHODS
+=======
+
+Server-related Methods
+----------------------
+
+   MP3::Daemon::Simple relies on unix domain sockets to communicate.  The
+socket requires a place in the file system which is referred to as
+`$socket_path' in the following descriptions.
+
+     $socket_path = "$ENV{HOME}/.mp3/mp3_socket";
+
+new $socket_path
+     This instantiates a new MP3::Daemon::Simple.
+
+          my $mp3d = MP3::Daemon::Simple->new($socket_path);
+
+main
+     This starts the event loop.  This will be listening to the socket for
+     client requests while polling mpg123 in times of idleness.  This
+     method will never return.
+
+          $mp3d->main;
+
+spawn $socket_path
+     This combines new() and `main()' while also forking itself into the
+     background.  The spawn method will return immediately to the parent
+     process while the child process becomes an MP3::Daemon::Simple that is
+     waiting for client requests.
+
+          MP3::Daemon::Simple->spawn($socket_path);
+
+client $socket_path
+     This is a factory method for use by clients who want a socket to
+     communicate with a previously instantiated MP3::Daemon::Simple.
+
+          my $client = MP3::Daemon::Simple->client($socket_path);
+
+Client API
+----------
+
+   These methods are usually not invoked directly.  They are invoked when
+a client makes a request.  The protocol is very simple.  The first line is
+the name of the method.  Each argument to the method is specified on
+successive lines.  A final blank line signifies the end of the request.
+
+     0   method name
+     1   $arg[0]
+     .   ...
+     n-1 $arg[n-2]
+     n   /^$/
+
+   Example:
+
+     print $client <<REQUEST;
+     play
+     5
+
+     REQUEST
+
+   This plays $self->{playlist}[5].
+
+add
+     This adds mp3s to the playlist.  Multiple files may be specified.
+
+del
+     This deletes items from the playlist by index.  More than one index
+     may be specified.  If no index is specified, the current mp3 in the
+     playlist is removed.  Indices may also be negative in which case they
+     count from the end of the playlist.
+
+play
+     This plays the current mp3 if no other parameters are given.  This
+     command also takes an optional parameter where the index of an mp3 in
+     the playlist may be given.
+
+next
+     This loads the next mp3 in the playlist.
+
+prev
+     This loads the previous mp3 in the playlist.
+
+pause
+     This pauses the currently playing mp3.  If the mp3 was already
+     paused, this will unpause it.  Note that using the play command on a
+     paused mp3 makes it start over from the beginning.
+
+rw
+     This rewinds an mp3 by the specified amount of seconds.
+
+ff
+     This fastforwards an mp3 by the specified amount of seconds.
+
+jump
+     This will go directly to a part of an mp3 specified by seconds from
+     the beginning of the track.  If the number of seconds is prefixed
+     with either a "-" or a "+", a relative jump will be made.  This is
+     another way to rewind or fastforward.
+
+stop
+     This stops the player.
+
+time
+     This sends back the index of the current track, the amount of time
+     that has elapsed, the amount of time that is left, and the total
+     amount of time.  All times are reported in seconds.
+
+info
+     This sends back information about the current track.
+
+ls [-fl] [REGEX]
+     First, a warning - I'm beginning to realize how GNU/ls became so
+     bloated.  The ls interface should not be considered stable.  I'm
+     still playing with it.
+
+     This sends back a list of the titles of all mp3s currently in the
+     playlist.  The current track is denoted by a line matching the regexp
+     /^>/.
+
+    -f
+          This makes ls return a listing with index and filename.
+
+    -l
+          This makes ls return a long listing that includes index, title,
+          and filename.
+
+    [REGEX]
+          This allows one to filter the playlist for only titles matching
+          this regex.  Of course, one may use grep, instead.
+
+quit
+     This unloads the MP3::Daemon::Simple that was automagically spawned
+     when you first invoked mp3.
+
+DIAGNOSTICS
+===========
+
+   I need to be able to report errors in the daemon better.  They
+currently go to /dev/null.  I need to learn how to use syslog.
+
+COPYLEFT
+========
+
+   Copyleft (c) 2001 John BEPPU.  All rights reversed.  This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+AUTHOR
+======
+
+   John BEPPU <beppu@binq.org>
+
+SEE ALSO
+========
+
+   mpg123(1), Audio::Play::MPG123(3pm), pimp(1p), mpg123sh(1p), mp3(1p)
+
+
+File: pm.info,  Node: MP3/ID3v1Tag,  Next: MP3/ID3v2-Data,  Prev: MP3/Daemon/Simple,  Up: Module List
+
+Edit ID3v1 Tags from an Audio MPEG Layer 3.
+*******************************************
+
+NAME
+====
+
+   MP3::ID3v1Tag - Edit ID3v1 Tags from an Audio MPEG Layer 3.
+
+SYNOPSIS
+========
+
+     use MP3::ID3v1Tag;
+
+     $mp3_file = new MP3::ID3v1Tag("filename.mp3");
+     $mp3_file->print_tag();
+
+     if($mp3_file->got_tag()) {
+        $mp3_file->set_title($title);
+        $save_status = $mp3_file->save();
+     }
+
+DESCRIPTION
+===========
+
+   The ID3v1Tag routines are useful for setting and reading ID3 MP3 Audio
+Tags.  Just create an MP3::ID3v1Tag Object with the path to the file of
+interest, and query any of the methods below.
+
+Print Full ID3 Tag
+------------------
+
+   To get a print out of all the header information (Default FileHandler),
+simply state the following
+
+   $mp3_file->print_tag();
+
+Print Genre Chart
+-----------------
+
+   With an optional number of columns argument (default is 3) this will
+return a list of genre numbers with their appropriate genre.
+
+   $mp3_file->print_genre_chart($COLUMNS);
+
+Checking for the Existance of ID3 Tags
+--------------------------------------
+
+   There is a handy method named got_tag() that can be easily used to
+determine if a particular MP3 file contains an ID3 Tag.
+
+     if $mp3_file->got_tag() {
+        $mp3_file->print_tag();
+     }
+
+Viewing Tag Compontents individually
+------------------------------------
+
+   There exist several methods that will return you the individual
+components of the ID3 Tag.
+
+     $title     = $mp3_file->get_title();
+     $artist    = $mp3_file->get_artist();
+     $album     = $mp3_file->get_album();
+     $year      = $mp3_file->get_year();
+     $genre     = $mp3_file->get_genre();
+     $genre_num = $mp3_file->get_genre_num();
+     $comment   = $mp3_file->get_comment();
+
+Editing and Removing Tags
+-------------------------
+
+   Similar methods exist to allow you to change the components of the Tag,
+but none of the changes will actually be changed in the file until you
+call the save() routine.
+
+     $mp3_file->set_title("New Title");
+     $mp3_file->set_artist("New Artist");
+     $mp3_file->set_album("New Album");
+     $mp3_file->set_year(1999);
+     $mp3_file->set_genre("Blues");
+     # Or use the genre numbers ->
+     $mp3_file->set_genre_num(0);
+
+   To remove an tag in its entirely just calling the remove_tag() method
+should work for you.
+
+     $mp3_file->remove_tag() if $mp3_file->got_tag();
+
+     You could access all the components directly for a read only loop such
+     as the following
+
+   foreach (sort $mp3_file->tag) {     print "$_: " . $mp3_file->tag($_) .
+"\n"; }
+
+AUTHOR
+======
+
+   Sander van Zoest <svanzoest@cpan.org>
+
+THANKS
+======
+
+   Matt Plummer <matt@mp3.com>, Mike Oliphant <oliphant@gtk.org>, Matt
+DiMeo <mattd@mp3.com>, Olaf Maetzner, Jason Bodnar and Peter Johansson
+
+COPYRIGHT
+=========
+
+   Copyright 2000, Alexander van Zoest. All rights reserved.  Copyright
+1999-2000, Alexander van Zoest, MP3.com, Inc. All rights reserved.
+
+   This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+REFERENCES
+==========
+
+   For general overview of MPEG 1.0, Layer 3 (MP3) Audio visit
+<http://help.mp3.com/help/gettingstarted/guide.html> or get the book,
+"MP3: The Definitive Guide" by O'Reilly and Associates
+<http://www.oreilly.com/catalog/mp3/>.
+
+   For technical details about MP3 Audio read the ISO/IEC 11172 and
+ISO/IEC 13818 specifications, obtained via <http://www.ANSI.org/> in the
+US or <http://www.ISO.ch/> elsewhere in the world. For more information
+also check out <http://www.mp3-tech.org/> compiled by Gabriel Bouvigne.
+
+   For more specific references to the MP3 Audio ID3 Tags visit
+<http://www.id3.org/>
+
+   For information about ID3v2 and a perl implementation see MPEG::ID3v2Tag
+written by Matt DiMeo <mattd@mp3.com>.
+
+
+File: pm.info,  Node: MP3/ID3v2-Data,  Next: MP3/Info,  Prev: MP3/ID3v1Tag,  Up: Module List
+
+Data - GetFrame() Data Format
+*****************************
+
+NAME
+====
+
+   MP3::Tag::ID3v2-Data - GetFrame() Data Format
+
+DESCRIPTION
+===========
+
+   This document describes how to use the results of the GetFrame function
+of MP3::Tag::ID3v2, thus the data format of frames retrieved with
+MP3::Tag::ID3v2::GetFrame().
+
+Calling GetFrame()
+------------------
+
+   You have to call GetFrame() like this:
+
+   ($info, $long) = GetFrame($id);    # or
+
+   ($info, $long) = GetFrame($id, 'raw');
+
+   $id has to be a name of a frame like "APIC". The names of all frames
+found in a tag can be retrieved with the `GetFrameIDs()|MP3::Tag::ID3v2'
+in this node function.
+
+Using the returned data
+-----------------------
+
+   In the ID3v2.3 specifications -1 frames are defined, which can contain
+very different information. That means also that GetFrame returns the
+information found in a frame in different ways.
+
+Simple Frames
+     A lot of the tags contain only a text string and encoding
+     information. If you call ($info, $long) = GetFrame($id) for such a
+     frame, $info will contain the text string and $long will contain the
+     english name of the frame.
+
+     Example:   getFrame("TIT2");     # returns
+
+          ("Birdhouse In Your Soul", "Title/songname/content description")
+
+Complex Frames
+     For more complex frames the returned $info is a reference to a hash,
+     where each entry of the hash decribes a part of the information found
+     in the frame. The key of a hash entry contains the name of this part,
+     the according value contains the information itself.
+
+     Example:   getFrame("APIC");     # returns
+
+     ( { "Description" => "Flood",       "MIME Type" => "/image/jpeg",
+      "Picture Type" => "Cover (front)",       "_Data" => "..data of jpeg
+     picture (binary).."       },    "Attached Picture");
+
+Other Frames
+     Some frames are not supported at the moment, ie the data found in the
+     frame is not returned in a descriptive way. But you can read the data
+     of this frames (and also of all other frames too) in raw mode. Then
+     the complete data field of the frame is returned, without any
+     modifications. This means that the returned data will be almost
+     binary data.
+
+     Example:   getFrame("TIT2", 'raw');    # returns
+
+          ("\x00Birdhouse In Your Soul", "Title/songname/content description")
+
+List of Simple Frames
+---------------------
+
+   Following Frames are supported and return a single string (text). In
+the List you can find the frame IDs and the long names of the frames as
+returned by GetFrame():
+
+IPLS : Involved people list
+MCDI : Music CD identifier
+PCNT : Play counter
+TALB : Album/Movie/Show title
+TBPM : BPM (beats per minute)
+TCOM : Composer
+TCON : Content type
+TCOP : Copyright message
+TDAT : Date
+TDLY : Playlist delay
+TENC : Encoded by
+TEXT : Lyricist/Text writer
+TFLT : File type
+TIME : Time
+
+TIT1 : Content group description
+
+TIT2 : Title/songname/content description
+
+TIT3 : Subtitle/Description refinement
+TKEY : Initial key
+TLAN : Language(s)
+TLEN : Length
+TMED : Media type
+TOAL : Original album/movie/show title
+TOFN : Original filename
+TOLY : Original lyricist(s)/text writer(s)
+TOPE : Original artist(s)/performer(s)
+TORY : Original release year
+TOWN : File owner/licensee
+
+TPE1 : Lead performer(s)/Soloist(s)
+
+TPE2 : Band/orchestra/accompaniment
+
+TPE3 : Conductor/performer refinement
+
+TPE4 : Interpreted, remixed, or otherwise modified by
+TPOS : Part of a set
+TPUB : Publisher
+TRCK : Track number/Position in set
+TRDA : Recording dates
+TRSN : Internet radio station name
+TRSO : Internet radio station owner
+TSIZ : Size
+TSRC : ISRC (international standard recording code)
+TSSE : Software/Hardware and settings used for encoding
+TYER : Year
+WCOM : Commercial information
+WCOP : Copyright/Legal information
+WOAF : Official audio file webpage
+WOAR : Official artist/performer webpage
+WOAS : Official audio source webpage
+WORS : Official internet radio station homepage
+WPAY : Payment
+WPUB : Publishers official webpage
+List of Complex Frames
+----------------------
+
+   Following frames are supported and return a reference to a hash. The
+list shows which keys can be found in the returned hash:
+
+AENC : Audio encryption
+          Keys: URL, Preview start, Preview length
+
+APIC : Attached picture
+          Keys: MIME type, Picture Type, Description, _Data
+
+COMM : Comments
+          Keys: Language, short, Text
+
+COMR : Commercial frame
+          Keys: Price, Valid until, URL, Received as, Name of Seller, Description, MIME type, _Logo
+
+ENCR : Encryption method registration
+          Keys: Owner ID, Method symbol, _Data
+
+GEOB : General encapsulated object
+          Keys: MIME type, Filename, Description, _Data
+
+GRID : Group identification registration
+          Keys: Owner, Symbol, _Data
+
+LINK : Linked information
+          Keys: _ID, URL, Text
+
+OWNE : Ownership frame
+          Keys: Price payed, Date of purchase, Text
+
+POPM : Popularimeter
+          Keys: URL, Rating, _Data
+
+PRIV : Private frame
+          Keys: Text, _Data
+
+RBUF : Recommended buffer size
+          Keys: Buffer size, Embedded info flag, Offset to next tag
+
+RVRB : Reverb
+          Keys: Reverb left (ms), Reverb right (ms), Reverb bounces (left), Reverb bounces (right), Reverb feedback (left to left), Reverb feedback (left to right), Reverb feedback (right to right), Reverb feedback (right to left), Premix left to right, Premix right to left
+
+SYTC : Synchronized tempo codes
+          Keys: Time Stamp Format, _Data
+
+TXXX : User defined text information frame
+          Keys: Description, Text
+
+UFID : Unique file identifier
+          Keys: Text, _Data
+
+USER : Terms of use
+          Keys: Language, Text
+
+USLT : Unsychronized lyric/text transcription
+          Keys: Language, Description, Text
+
+WXXX : User defined URL link frame
+          Keys: Description, URL
+
+List of Other Frames
+--------------------
+
+   Following frames are only supported in raw mode:
+
+EQUA : Equalization
+ETCO : Event timing codes
+MLLT : MPEG location lookup table
+POSS : Position synchronisation frame
+RVAD : Relative volume adjustment
+SYLT : Synchronized lyric/text
+SEE ALSO
+========
+
+   *Note MP3/Tag: MP3/Tag,, *Note MP3/Tag/ID3v2: MP3/Tag/ID3v2,
+
+
+File: pm.info,  Node: MP3/Info,  Next: MP3/Napster,  Prev: MP3/ID3v2-Data,  Up: Module List
+
+Manipulate / fetch info from MP3 audio files
+********************************************
+
+NAME
+====
+
+   MP3::Info - Manipulate / fetch info from MP3 audio files
+
+SYNOPSIS
+========
+
+     #!perl -w
+     use MP3::Info;
+     my $file = 'Pearls_Before_Swine.mp3';
+     set_mp3tag($file, 'Pearls Before Swine', q"77's",
+     	'Sticks and Stones', '1990',
+     	q"(c) 1990 77's LTD.", 'rock & roll');
+
+     my $tag = get_mp3tag($file) or die "No TAG info";
+     $tag->{GENRE} = 'rock';
+     set_mp3tag($file, $tag);
+
+     my $info = get_mp3info($file);
+     printf "$file length is %d:%d\n", $info->{MM}, $info->{SS};
+
+     my $mp3 = new MP3::Info $file;
+     printf "$file length is %s, title is %s\n",
+     	$mp3->time, $mp3->title;
+
+DESCRIPTION
+===========
+
+use_winamp_genres()
+     Puts WinAmp genres into `@mp3_genres' and `%mp3_genres' (adds 68
+     additional genres to the default list of 80).  This is a separate
+     function because these are non-standard genres, but they are included
+     because they are widely used.
+
+     You can import the data structures with one of:
+
+          use MP3::Info qw(:genres);
+          use MP3::Info qw(:DEFAULT :genres);
+          use MP3::Info qw(:all);
+
+remove_mp3tag (FILE [, VERSION, BUFFER])
+     Can remove ID3v1 or ID3v2 tags.  VERSION should be 1 for ID3v1, 2 for
+     ID3v2, and ALL for both.
+
+     For ID3v1, removes last 128 bytes from file if those last 128 bytes
+     begin with the text 'TAG'.  File will be 128 bytes shorter.
+
+     For ID3v2, removes ID3v2 tag.  Because an ID3v2 tag is at the
+     beginning of the file, we rewrite the file after removing the tag
+     data.  The buffer for rewriting the file is 4MB.  BUFFER (in bytes) ca
+     change the buffer size.
+
+     Returns the number of bytes removed, or -1 if no tag removed, or
+     undef if there is an error.
+
+set_mp3tag (FILE, TITLE, ARTIST, ALBUM, YEAR, COMMENT, GENRE [, TRACKNUM])
+
+set_mp3tag (FILE, $HASHREF)
+     Adds/changes tag information in an MP3 audio file.  Will clobber any
+     existing information in file.
+
+     Fields are TITLE, ARTIST, ALBUM, YEAR, COMMENT, GENRE.  All fields
+     have a 30-byte limit, except for YEAR, which has a four-byte limit,
+     and GENRE, which is one byte in the file.  The GENRE passed in the
+     function is a case-insensitive text string representing a genre found
+     in `@mp3_genres'.
+
+     Will accept either a list of values, or a hashref of the type
+     returned by get_mp3tag.
+
+     If TRACKNUM is present (for ID3v1.1), then the COMMENT field can only
+     be 28 bytes.
+
+     ID3v2 support may come eventually.
+
+get_mp3tag (FILE [, VERSION, RAW_V2])
+     Returns hash reference containing tag information in MP3 file.  Same
+     info as described in set_mp3tag.
+
+     If VERSION is 1, the information is taken from the ID3v1 tag (if
+     present).  If VERSION is 2, the information is taken from the ID3v2
+     tag (if present).  If VERSION is not supplied, the ID3v1 tag is read
+     if present, and then, if present, the ID3v2 tag information will
+     override any existing ID3v1 tag info.
+
+     If the ID3v2 version is older than ID3v2.2.0, it will not be read (and
+     a warning will be issued if -w is on).
+
+     If RAW_V2 is false or not supplied and VERSION is 2, only the tags
+     corresponding to ID3v1 tags are returned, with the same keys in the
+     returned hashref.
+
+     If RAW_V2 is true and VERSION is 2, get_mp3tag will return a hash of
+     tag four-character IDs and their data.  Tag IDs and their meanings
+     are in the global hash (not exported) `%v2_tag_names'.
+
+          my $tag = get_mp3tag('mysong.mp3', 2, 1);   # ID3v2, raw ID3v2 tags
+          for (keys %$tag) {
+          	printf "%s => %s\n", $MP3::Info::v2_tag_names{$_}, $tag->{$_};
+          }
+
+get_mp3info (FILE)
+     Returns hash reference containing file information for MP3 file.
+     This data cannot be changed.  Returned data:
+
+          VERSION		MPEG audio version (1, 2, 2.5)
+          LAYER		MPEG layer description (1, 2, 3)
+          STEREO		boolean for audio is in stereo
+
+          VBR		boolean for variable bitrate
+          BITRATE		bitrate in kbps (average for VBR files)
+          FREQUENCY	frequency in kHz
+          SIZE		bytes in audio stream
+
+          SECS		total seconds
+          MM		minutes
+          SS		leftover seconds
+          MS		leftover milliseconds
+          TIME		time in MM:SS
+
+          COPYRIGHT	boolean for audio is copyrighted
+          PADDING		boolean for MP3 frames are padded
+          MODE		channel mode (0 = stereo, 1 = joint stereo,
+          		2 = dual channel, 3 = single channel)
+          FRAMES		approximate number of frames
+          FRAME_LENGTH	approximate length of a frame
+          VBR_SCALE	VBR scale from VBR header
+
+TROUBLESHOOTING
+===============
+
+   If you find a bug, please send me a patch.  If you cannot figure out
+why it does not work for you, please put the MP3 file in a place where I
+can get it (preferably via FTP) and send me mail regarding where I can get
+the file, with a detailed description of the problem.
+
+   If I download the file, after debugging the problem I will not keep the
+MP3 file if it is not legal for me to have it.  Just let me know if it is
+legal for me ot keep it or not.
+
+TODO
+====
+
+ID3v2 Support
+     First go at adding support for reading ID3v2 tags.  Still need to do
+     more, such as using Compress::Zlib to decompress compressed tags.
+     But until I see this in use more, I won't bother.  I might not be able
+     to support Unicode at all, until Perl supports 16-bit Unicode.  If
+     something does not work properly with reading, follow the
+     instructions above for troubleshooting.
+
+     I think I might just use Matt DiMeo's MPEG::ID3v2Tag; the problem is
+     that right now it requires 5.005, and MacPerl uses 5.004 (for now).
+
+Get data from scalar
+     Instead of passing a file spec or filehandle, pass the data itself.
+     Would take some work, converting the seeks, etc.
+
+Padding bit ?
+     Do something with padding bit.
+
+ID3v2.4.0
+     It's the new standard.  There are no specific plans to update to
+     2.4.0.  I'd like it to be done, but there is no pressing need, and I
+     don't really have the time right now.  Patches welcome!  :-)
+
+Test suite
+     Test suite could use a bit of an overhaul and update.
+
+HISTORY
+=======
+
+v0.91, Saturday, February 10, 2001
+     Fix dumb bug with /o. (David Reuteler)
+
+     Fix bug where get_mp3tag would return an empty hashref instead of
+     undef if ID3v1 tag is asked for, and there is no ID3v1 tag, but there
+     is an ID3v2 tag.  (Stuart)
+
+v0.90, Sunday, January 14, 2001
+     Added experimental OOP support for getting and setting data; doesn't
+     work for removing tags.
+
+     Made all functions optionally accept filehandle in place of filename.
+
+     Remove all croaks/dies and replace with simple returns or carps/warns.
+     (Jeffrey Sumler)
+
+     Fix various input data problems, bad warnings, division by zero, etc.
+
+     Undef $/ in set_mp3tag() so caller can't mess up the print.
+
+     Fix bitrate if ID == 0 and VBR.  (Kyle Farrell, Per Bolmstedt)
+
+     Split off _get_info() from get_mp3info(), so, eventually, programmers
+     can access that functionality without passing in a file or filehandle.
+     Not supported yet, but available for playing.
+
+     Added total frames, leftover milliseconds, and formatted time.
+
+     Fixed sample frequency for MPEG 2.5 files (perhaps not including VBR,
+     though ... see bug above).
+
+     Add in some additional genres.  (Peter Marschall)
+
+     Added ID3v2 tag removal. (Ronan Waide)  NOTE: this is DANGEROUS.  It
+     is tested, but needs more testing.  The file is rewritten entirely.
+     Lots of data moving around.
+
+     Added ID3v2.2.0 tag reading. (Ronan Waide, Kee Hinckley)
+
+     Changed ID3v2 tag recognition to only match [A-Z0-9] instead of \w.
+     (Christoph Oberauer)
+
+v0.80, Monday, March 6, 2000
+     Better stripping of bad data (after nulls) in ID3 tags (Dave O'Neill)
+
+     Fixed VERSION in get_mp3info to properly return 2 when appropriate.
+     (Bogdan Surdu)
+
+     Added VBR support.  Average bitrate is returned as BITRATE, and
+     minutes and seconds (MM and SS) should be accurate.  (Andy Waite for
+     pointer to MP3Ext)
+
+     Made time calculation better overall.
+
+     Made MP3 header validation routines more comprehensive.  (Matthew
+     Sachs for pointer to xmms source)
+
+     Changed name to MP3::Info (with wrapper still named MP3::Info).
+
+v0.71, Thursday, July 8, 1999
+     Several fixes to ID3v2 support unpack unsigned instead of signed,
+     don't bail out after 4096-byte offsets on long ID3v2 headers.  Thanks
+     much to Matthew Sachs.
+
+v0.70, Saturday, July 3, 1999
+     Added preliminary ID3v2 reading support in get_mp3tag.  Thanks much
+     to Tom Brown.
+
+v0.64, Thursday, July 1, 1999
+     Found bug in checking TRACKNUM parameter, used \d instead of \d+.
+     Only gives spurious warnings, doesn't affect anything else.
+
+     Cleaned up a bit, prepare for impending ID3v2 support.
+
+     NOTE: truncate() broken in some builds of ActivePerl (517, maybe
+     others).  No changes to module to fix problem.  (Brian Goodwin)
+
+v0.63, Friday, April 30, 1999
+     Added ID3v1.1 support. (Trond Michelsen, Pass F. B. Travis)
+
+     Added 255 (\xFF) as default genre. (Andrew Phillips)
+
+     I think I fixed bug relating to spaces in ID3v2 headers. (Tom Brown)
+
+v0.62, Sunday, March 7, 1999
+     Doc updates.
+
+     Fix small unnoticable bug where ID3v2 offset is tag size plus 10, not
+     just tag size.
+
+     Not publickly released.
+
+v0.61, Monday, March 1, 1999
+     Fixed problem of not removing nulls on return from get_mp3tag (was
+     using spaces for padding before ... now trailing whitespace and all
+     nulls are removed before returning tag info).
+
+     Made tests more extensive (more for my own sanity when making all
+     these changes than to make sure it works on other platforms and
+     machines :).
+
+v0.60, Sunday, February 28, 1999
+     Cleaned up a lot of stuff, added more comments, made get_mp3info much
+     faster and much more reliable, and added recognition of ID3v2
+     headers.  (Tom Brown)
+
+v0.52, Sunday, February 21, 1999
+     Fixed problem in get_mp3tag that changed value of $_ in caller (Todd
+     Hanneken).
+
+v0.51, Saturday, February 20, 1999
+     Fixed problem with `%winamp_genres' having the wrong numbers (Matthew
+     Sachs).
+
+v0.50, Friday, February 19, 1999
+     Added remove_mp3tag.  Addeed VERSION to the hash returned by
+     get_mp3info, and fixed a bug where STEREO was not being set correctly.
+
+     Export all genre data structures on request.  Added
+     `use_winamp_genres' to use WinAmp genres. (Roland Steinbach)
+
+     Added a `$MPEG::MP3Info::try_harder' (`$MP3::Info::try_harder')
+     variable that will try harder to find the MP3 header in a file.
+     False by default.  Can take a long time to fail, but should find most
+     headers at any offsets if set to true.
+
+     Thanks to Matthew Sachs for his input and fixes, and for mp3tools.
+
+v0.20, Saturday, October 17, 1998
+     Changed name from `MPEG::MP3Tag' to `MPEG::MP3Info', because it does
+     more than just TAG stuff now.
+
+     Made header stuff even more reliable.  Lots of help and testing from
+     Meng Weng Wong again.  :-)
+
+v0.13, Thursday, October 8, 1998
+     Had some problems with header verification, got some code from
+     Predrag Supurovic with his mpgtools.  Great stuff.  Also did some
+     looping to find a header if it is not in the "right" place.  I did
+     what I think it is a smart way to do it, since some files have the
+     header as far down as 2 kbytes into the file.  First, I look at
+     position 0, then at position 36 (a position where I have found many
+     headers), then I start at 0 again and jump in 128-byte chunks.  Once
+     I do that a bunch of times, I go back at the beginning and try at 0
+     and go ahead in 1-byte chunks for a bunch more times.
+
+     If you have an MP3 that has the header begin at an odd place like byte
+     761, then I suggest you strip out the junk before the header begins.
+     :-)
+
+v0.12, Friday, October 2, 1998
+     Added get_mp3info.  Thanks again to mp3tool source from Johann
+     Lindvall, because I basically stole it straight (after converting it
+     from C to Perl, of course).
+
+     I did everything I could to find the header info, but if anyone has
+     valid MP3 files that are not recognized, or has suggestions for
+     improvement of the algorithms, let me know.
+
+v0.04, Tuesday, September 29, 1998
+     Changed a few things, replaced a regex with an unpack.  (Meng Weng
+     Wong)
+
+v0.03, Tuesday, September 8, 1998
+     First public release.
+
+THANKS
+======
+
+   Edward Allen <allenej@c51844-a.spokn1.wa.home.com>, Vittorio Bertola
+<v.bertola@vitaminic.com>, Michael Blakeley <mike@blakeley.com>, Per
+Bolmstedt <tomten@kol14.com>, Tony Bowden <tony@tmtm.com>, Tom Brown
+<thecap@usa.net>, Sergio Camarena <scamarena@users.sourceforge.net>, Chris
+Dawson <cdawson@webiphany.com>, Luke Drumm <lukedrumm@mypad.com>, Kyle
+Farrell <kyle@cantametrix.com>, Brian Goodwin <brian@fuddmain.com>, Todd
+Hanneken <thanneken@hds.harvard.edu>, Kee Hinckley <nazgul@somewhere.com>,
+Roman Hodek <Roman.Hodek@informatik.uni-erlangen.de>, Peter Kovacs
+<kovacsp@egr.uri.edu>, Johann Lindvall, Peter Marschall
+<peter.marschall@mayn.de>, Trond Michelsen <mike@crusaders.no>, Dave
+O'Neill <dave@nexus.carleton.ca>, Christoph Oberauer
+<christoph.oberauer@sbg.ac.at>, Andrew Phillips <asp@wasteland.org>, David
+Reuteler <reuteler@visi.com>, Matthew Sachs <matthewg@zevils.com>, Hermann
+Schwaerzler <Hermann.Schwaerzler@uibk.ac.at>, Chris Sidi
+<sidi@angband.org>, Roland Steinbach <roland@support-system.com>, Stuart
+<schneis@users.sourceforge.net>, Jeffery Sumler <jsumler@mediaone.net>,
+Predrag Supurovic <mpgtools@dv.co.yu>, Bogdan Surdu <tim@go.ro>, Pass F.
+B. Travis <pftravis@bellsouth.net>, Tobias Wagener <tobias@wagener.nu>,
+Ronan Waide <waider@stepstone.ie>, Andy Waite <andy@mailroute.com>, Ken
+Williams <ken@forum.swarthmore.edu>, Meng Weng Wong <mengwong@pobox.com>.
+
+AUTHOR AND COPYRIGHT
+====================
+
+   Chris Nandor <pudge@pobox.com>, http://pudge.net/
+
+   Copyright (c) 1998-2001 Chris Nandor.  All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the terms of the Artistic License, distributed with Perl.
+
+SEE ALSO
+========
+
+SourceForge Page
+          http://sourceforge.net/projects/mp3-info/
+
+mp3tools
+          http://www.zevils.com/linux/mp3tools/
+
+mpgtools
+          http://www.dv.co.yu/mpgscript/mpgtools.htm
+          http://www.dv.co.yu/mpgscript/mpeghdr.htm
+
+mp3tool
+          http://www.dtek.chalmers.se/~d2linjo/mp3/mp3tool.html
+
+ID3v2
+          http://www.id3.org/
+
+Xing Variable Bitrate
+          http://www.xingtech.com/support/partner_developer/mp3/vbr_sdk/
+
+MP3Ext
+          http://rupert.informatik.uni-stuttgart.de/~mutschml/MP3ext/
+
+Xmms
+          http://www.xmms.org/
+
+VERSION
+=======
+
+   v0.91, Saturday, February 10, 2001
+
+

@@ -1,0 +1,1898 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: IPC/Shareable/SharedMem,  Next: IPC/SharedCache,  Prev: IPC/Shareable,  Up: Module List
+
+Object oriented interface to shared memory
+******************************************
+
+NAME
+====
+
+   IPC::Shareable::SharedMem - Object oriented interface to shared memory
+
+SYNOPSIS
+========
+
+     *** No public interface ***
+
+WARNING
+=======
+
+   This module is not intended for public consumption.  It is used
+internally by IPC::Shareable to access shared memory.  It will probably be
+replaced soon by IPC::ShareLite or IPC::SharedMem (when someone writes it).
+
+DESCRIPTION
+===========
+
+   This module provides and object-oriented framework to access shared
+memory.  Its use is intended to be limited to IPC::Shareable.  Therefore I
+have not documented an interface.
+
+AUTHOR
+======
+
+   Ben Sugars (bsugars@canoe.ca)
+
+SEE ALSO
+========
+
+   IPC::Shareable, IPC::SharedLite
+
+
+File: pm.info,  Node: IPC/SharedCache,  Next: IPC/Signal,  Prev: IPC/Shareable/SharedMem,  Up: Module List
+
+a Perl module to manage a cache in SysV IPC shared memory.
+**********************************************************
+
+NAME
+====
+
+   IPC::SharedCache - a Perl module to manage a cache in SysV IPC shared
+memory.
+
+SYNOPSIS
+========
+
+     use IPC::SharedCache;
+
+     # the cache is accessed using a tied hash.
+     tie %cache, 'IPC::SharedCache', ipc_key => 'AKEY',
+                                     load_callback => \&load,
+                                     validate_callback => \&validate;
+
+     # get an item from the cache
+     $config_file = $cache{'/some/path/to/some.config'};
+
+DESCRIPTION
+===========
+
+   This module provides a shared memory cache accessed as a tied hash.
+
+   Shared memory is an area of memory that is available to all processes.
+It is accessed by choosing a key, the ipc_key arguement to tie.  Every
+process that accesses shared memory with the same key gets access to the
+same region of memory.  In some ways it resembles a file system, but it is
+not hierarchical and it is resident in memory.  This makes it harder to
+use than a filesystem but much faster.  The data in shared memory persists
+until the machine is rebooted or it is explicitely deleted.
+
+   This module attempts to make shared memory easy to use for one specific
+application - a shared memory cache.  For other uses of shared memory see
+the documentation to the excelent module I use, IPC::ShareLite (*Note
+IPC/ShareLite: IPC/ShareLite,).
+
+   A cache is a place where processes can store the results of their
+computations for use at a later time, possibly by other instances of the
+application.  A good example of the use of a cache is a web server.  When
+a web server receieves a request for an html page it goes to the file
+system to read it.  This is pretty slow, so the web server will probably
+save the file in memory and use the in memory copy the next time a request
+for that file comes in, as long as the file hasn't changed on disk.  This
+certainly speeds things up but web servers have to serve multiple clients
+at once, and that means multiple copies of the in-memory data.  If the web
+server uses a shared memory cache, like the one this module provides, then
+all the servers can use the same cache and much less memory is consumed.
+
+   This module handles all shared memory interaction using the
+IPC::ShareLite module (version 0.06 and higher) and all data serialization
+using Storable.  See *Note IPC/ShareLite: IPC/ShareLite, and *Note
+Storable: Storable, for details.
+
+MOTIVATION
+==========
+
+   This module began its life as an internal piece of HTML::Template (see
+*Note HTML/Template: HTML/Template,).  HTML::Template has the ability to
+maintain a cache of parsed template structures when running in a persistent
+environment like Apache/mod_perl.  Since parsing a template from disk
+takes a fair ammount of time this can provide a big performance gain.
+Unfortunately it can also consume large ammounts of memory since each web
+server maintains its own cache in its own memory space.
+
+   By using IPC::ShareLite and Storable (*Note IPC/ShareLite:
+IPC/ShareLite, and *Note Storable: Storable,), HTML::Template was able to
+maintain a single shared cache of templates.  The downside was that
+HTML::Template's cache routines became complicated by a lot of IPC code.
+My solution is to break out the IPC cache mechanisms into their own module,
+IPC::SharedCache.  Hopefully over time it can become general enough to be
+usable by more than just HTML::Template.
+
+USAGE
+=====
+
+   This module allows you to store data in shared memory and have it load
+automatically when needed.  You can also define a test to screen cached
+data for vailidty - if the test fails the data will be reloaded.  This is
+useful for defining a max-age for cached data or keeping cached data in
+sync with other resources.  In the web server example above the validation
+test would look to see wether the file had changed on disk.
+
+   To initialize this module you provide two callback subroutines.  The
+first is the "load_callback".  This gets called when a user of the cache
+requests an item from that is not yet present or is stale.  It must return
+a reference to the data structure that will be stored in the cache.  The
+second is the "validate_callback".  This gets called on every cache access
+- its job is to check the cached object for freshness (and/or some other
+validity, of course).  It must return true or false.  When it returns
+true, the cached object is valid and is retained in the cache.  When it
+returns false, the object is re-loaded using the "load_callback" and the
+result is stored in the cache.
+
+   To use the module you just request entries for the objects you need.
+If the object is present in the cache and the "validate_callback" returns
+true, then you get the object from the cache.  If not, the object is
+loaded into the cache with the "load_callback" and returned to you.
+
+   The cache can be used to store any perl data structures that can be
+serialized by the Storable module.  See *Note Storable: Storable, for
+details.
+
+EXAMPLE
+=======
+
+   In this example a shared cache of files is maintained.  The
+"load_callback" reads the file from disk into the cache and the
+"validate_callback" checks its modification time using stat().  Note that
+the "load_callback" stores information into the cached object that
+"validate_callback" uses to check the freshness of the cache.
+
+     # the "load_callback", loads the file from disk, storing its stat()
+     # information along with the file into the cache.  The key in this
+     # case is the filename to load.
+     sub load_file {
+       my $key = shift;
+
+     open(FILE, $key) or die "Unable to open file named $key : $!");
+
+     # note the modification time of this file - the 9th element of a
+     # stat() is the modification time of the file.
+     my $mtime = (stat($key))[9];
+
+     # read the file into the variable $contents in 1k chunks
+     my ($buffer, $contents);
+     while(read(FILE, $buffer, 1024)) { $contents .= $buffer }
+     close(FILE);
+
+     # prepare the record to store in the cache
+     my %record = ( mtime => $mtime, contents => $contents );
+     
+     # this record goes into the cache associated with $key, which is
+     # the filename.  Notice that we're returning a reference to the
+     # data structure here.
+     return \%record;
+       }
+
+     # the "validate" callback, checks the mtime of the file on disk and
+     # compares it to the cache value.  The $record is a reference to the
+     # cached values array returned from load_file above.
+     sub validate_file {
+       my ($key, $record) = @_;
+
+     # get the modification time out of the record
+     my $stored_mtime = $record->{mtime};
+
+     # get the current modification time from the filesystem - the 9th
+     # element of a stat() is the modification time of the file.
+     my $current_mtime = (stat($key))[9];
+
+     # compare and return the appropriate result.
+     if ($stored_mtime == $current_mtime) {
+       # the cached object is valid, return true
+       return 1;
+     } else {
+       # the cached object is stale, return false - load_callback will
+       # be called to load it afresh from disk.
+       return 0;
+     }
+       }
+
+     # now we can construct the IPC::SharedCache object, using as a root
+     # key 'SAMS'.
+
+     tie %cache 'IPC::SharedCache' ipc_key => 'SAMS',
+                                   load_callback => \&load_file,
+                                   validate_callback => \&validate_file;
+
+     # fetch an object from the cache - if it's already in the cache and
+     # validate_file() returns 1, then we'll get the cached file.  If it's
+     # not in the cache, or validate_file returns 0, then load_file is
+     # called to load the file into the cache.
+
+     $config_file = $cache{'/some/path/to/some.config'};
+
+DETAILS
+=======
+
+   The module implements a full tied hash interface, meaning that you can
+use exists(), delete(), keys() and each().  However, in normal usage all
+you'll need to do is to fetch values from the cache and possible delete
+keys.  Just in case you were wondering, exists() doesn't trigger a cache
+load - it returns 1 if the given key is already in the cache and 0 if it
+isn't.  Similarily, keys() and each() operate on key/value pairs already
+loaded into the cache.
+
+   The most important thing to realize is that there is no need to
+explicitely store into the cache since the load_callback is called
+automatically when it is necessary to load new data.  If you find yourself
+using more than just "`$data = $cache{'key'};'" you need to make sure you
+really know what you're doing!
+
+OPTIONS
+-------
+
+   There are a number parameters to tie that can be used to control the
+behavior of IPC::SharedCache.  Some of them are required, and some art
+optional. Here's a preview:
+
+     tie %cache, 'IPC::SharedCache',
+
+     # required parameters
+     ipc_key => 'MYKI',
+     load_callback => \&load,
+     validate_callback => \&validate,
+
+     # optional parameters
+     ipc_mode => 0666,
+     ipc_segment_size => 1_000_000,
+     max_size => 50_000_000,
+     debug => 1;
+
+ipc_key (required)
+------------------
+
+   This is the unique identifier for the particular cache.  It can be
+specified as either a four-character string or an integer value.  Any
+script that wishes to access the cache must use the same ipc_key value.
+You can use the ftok() function from IPC::SysV to generate this value, see
+*Note IPC/SysV: IPC/SysV, for details.  Using an ipc_key value that's
+already in use by a non-IPC::SharedCache application will cause an error.
+Many systems provide a utility called 'ipcs' to examine shared memory; you
+can use it to check for existing shared memory usage before choosing your
+ipc_key.
+
+load_callback and validate_callback (required)
+----------------------------------------------
+
+   These parameters both specify callbacks for IPC::SharedCache to use
+when the cache gets a request for a key.  When you access the cache
+(`$data = $cache{$key}'), the cache first looks to see if it already has
+an object for the given key.  If it doesn't, it calls the load_callback
+and returns the result which is also stored in the cache.  Alternately, if
+it does have the object in the cache it calls the validate_callback to
+check if the object is still good.  If the validate_callback returns true
+then object is good and is returned.  If the validate_callback returns
+false then the object is discarded and the load_callback is called.
+
+   The load_callback recieves a single parameter - the requested key.  It
+must return a reference to the data object be stored in the cache.
+Returning something that is not a reference results in an error.
+
+   The validate_callback recieves two parameters - the key and the
+reference to the stored object.  It must return true or false.
+
+   There are two ways to specify the callbacks.  The first is simply to
+specify a subroutine reference.  This can be an anonymous subroutine or a
+named one.  Example:
+
+     tie %cache, 'IPC::SharedCache',
+         ipc_key => 'TEST',
+         load_callback => sub { ... },
+         validate_callback => \&validate;
+
+   The second method allows parameters to be passed to the subroutine when
+it is called.  This is done by specifying a reference to an array of
+values, the first being the subroutine reference and the rest are
+parameters for the subroutine.  The extra parameters are passed in before
+the IPC::SharedCache provided parameters.  Example:
+
+     tie %cache, 'IPC::SharedCache',
+         ipc_key => 'TEST',
+         load_callback => [\&load, $arg1, $arg2, $arg3]
+         validate_callback => [\&validate, $self];
+
+ipc_mode (optional)
+-------------------
+
+   This option specifies the access mode of the IPC cache.  It defaults to
+0666.  See *Note IPC/ShareLite: IPC/ShareLite, for more information on IPC
+access modes.  The default should be fine for most applications.
+
+ipc_segment_size (optional)
+---------------------------
+
+   This option allows you to specify the "chunk size" of the IPC shared
+memory segments.  The default is 65,536, which is 64K.  This is a good
+default and is very portable.  If you know that your system supports
+larger IPC segment sizes and you know that your cache will be storing
+large data items you might get better performance by increasing this value.
+
+   This value places no limit on the size of an object stored in the cache
+- IPC::SharedCache automatically spreads large objects across multiple IPC
+segments.
+
+   WARNING: setting this value too low (below 1024 in my experience) can
+cause errors.
+
+max_size (optional)
+-------------------
+
+   By setting this parameter you are setting a logical maximum to the
+ammount of data stored in the cache.  When an item is stored in the cache
+and this limit is exceded the oldest item (or items, as necessary) in the
+cache will be deleted to make room.  This value is specified in bytes.  It
+defaults to 0, which specifies no limit on the size of the cache.
+
+   Turning this feature on costs a fair ammount of performance - how much
+depends largely on home much data is being stored into the cache versus
+the size of max_cache.  In the worst case (where the max_size is set much
+too low) this option can cause severe "thrashing" and negate the benefit
+of maintaining a cache entirely.
+
+   NOTE: The size of the cache may in fact exceed this value - the
+book-keeping data stored in the root segment is not counted towards the
+total.  Also, extra padding imposed by the ipc_segment_size is not
+counted.  This may change in the future if I learn that it would be
+appropriate to count this padding as used memory.  It is not clear to me
+that all IPC implementations will really waste this memory.
+
+debug (optional)
+----------------
+
+   Set this option to 1 to see a whole bunch of text on STDERR about what
+IPC::SharedCache is doing.
+
+UTILITIES
+=========
+
+   Two static functions are included in this package that are meant to be
+used from the command-line.
+
+walk
+----
+
+   Walk prints out a detailed listing of the contents of a shared cache at
+a given ipc_key.  It provides information the current keys stored and a
+dump of the objects stored in each key.  Be warned, this can be quite a
+lot of data!  Also, you'll need the Data::Dumper module installed to use
+'walk'.  You can get it on CPAN.
+
+   You can call walk like:
+
+     perl -MIPC::SharedCache -e 'IPC::SharedCache::walk AKEY'"
+
+   Example:
+
+     $ perl -MIPC::SharedCache -e 'IPC::SharedCache::walk MYKI'"
+     *===================*
+     IPC::SharedCache Root
+     *===================*
+     IPC_KEY: MYKI
+     ELEMENTS: 3
+     TOTAL SIZE: 99 bytes
+     KEYS: a, b, c
+
+     *=======*
+     Data List
+     *=======*
+
+     KEY: a
+     $CONTENTS = [
+                   950760892,
+                   950760892,
+                   950760892
+                 ];
+
+     KEY: b
+     $CONTENTS = [
+                   950760892,
+                   950760892,
+                   950760892
+                 ];
+
+     KEY: c
+     $CONTENTS = [
+                   950760892,
+                   950760892,
+                   950760892
+                 ];
+
+remove
+------
+
+   This function totally removes an entire cache given an ipc_key value.
+This should not be done to a running system!  Still, it's an invaluable
+tool during development when flawed data may become 'stuck' in the cache.
+
+     $ perl -MIPC::SharedCache -e 'IPC::SharedCache::remove MYKI'
+
+   This function is silent and thus may be usefully called from within a
+script if desired.
+
+BUGS
+====
+
+   I am aware of no bugs - if you find one please email me at
+sam@tregar.com.  When submitting bug reports, be sure to include full
+details, including the VERSION of the module and a test script
+demonstrating the problem.
+
+CREDITS
+=======
+
+   I would like to thank Maurice Aubrey for making this module possible by
+producing the excelent IPC::ShareLite.
+
+   The following people have contributed patches, ideas or new features:
+
+     Tim Bunce
+     Roland Mas
+     Drew Taylor
+     Ed Loehr
+     Maverick
+
+   Thanks everyone!
+
+AUTHOR
+======
+
+   Sam Tregar, sam@tregar.com (you can also find me on the mailing list
+for HTML::Template at htmltmpl@lists.vm.com - join it by sending a blank
+message to htmltmpl-subscribe@lists.vm.com).
+
+LICENSE
+=======
+
+   IPC::SharedCache - a Perl module to manage a SysV IPC shared cache.
+Copyright (C) 2000 Sam Tregar (sam@tregar.com)
+
+   This program is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2 of the License, or (at your option)
+any later version.
+
+   This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
+
+   You should have received a copy of the GNU General Public License along
+with this program; if not, write to the Free Software Foundation, Inc., 59
+Temple Place, Suite 330, Boston, MA 02111-1307 USA
+
+AUTHOR
+======
+
+   Sam Tregar, sam@tregar.com
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: IPC/Signal,  Next: IPC/SysV,  Prev: IPC/SharedCache,  Up: Module List
+
+Utility functions dealing with signals
+**************************************
+
+NAME
+====
+
+   IPC::Signal - Utility functions dealing with signals
+
+SYNOPSIS
+========
+
+     $number = sig_num $name;
+     $name   = sig_name $number;
+
+     sig_translate_setup;
+     $number = $Sig_num{$name};
+     $name   = $Sig_name[$number];
+
+DESCRIPTION
+===========
+
+   This module contains utility functions for dealing with signals.
+
+   Nothing is exported by default.
+
+sig_num *chopped-signal-name*
+     Returns the signal number of the signal whose name (sans `SIG') is
+     *chopped-signal-name*, or undef if there is no such signal.
+
+     This function is prototyped to take a single scalar argument.
+
+sig_name *signal-number*
+     Returns the chopped signal name (like `HUP') of signal number
+     *signal-number*, or undef if there is no such signal.
+
+     This function is prototyped to take a single scalar argument.
+
+sig_translate_setup
+     If you want to use the @Sig_name and %Sig_num variables directly you
+     must call sig_translate_setup to initialize them.  This isn't
+     necessary if you only use the function interfaces sig_name() and
+     sig_num().
+
+     This function is prototyped to take no arguments.
+
+%Sig_num
+     A hash with chopped signal name keys (like `HUP') and integer signal
+     number values.
+
+*@Sig_name*
+     An array mapping signal numbers to chopped signal names (like `HUP').
+
+AUTHOR
+======
+
+   Roderick Schertler <`roderick@argon.org'>
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: IPC/SysV,  Next: IPC/XPA,  Prev: IPC/Signal,  Up: Module List
+
+SysV IPC constants
+******************
+
+NAME
+====
+
+   IPC::SysV - SysV IPC constants
+
+SYNOPSIS
+========
+
+     use IPC::SysV qw(IPC_STAT IPC_PRIVATE);
+
+DESCRIPTION
+===========
+
+   IPC::SysV defines and conditionally exports all the constants defined
+in your system include files which are needed by the SysV IPC calls.
+
+ftok( PATH, ID )
+     Return a key based on PATH and ID, which can be used as a key for
+     msgget, semget and shmget. See `ftok' in this node
+
+SEE ALSO
+========
+
+   *Note IPC/Msg: IPC/Msg,, *Note IPC/Semaphore: IPC/Semaphore,, `ftok' in
+this node
+
+AUTHORS
+=======
+
+   Graham Barr <gbarr@pobox.com> Jarkko Hietaniemi <jhi@iki.fi>
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1997 Graham Barr. All rights reserved.  This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+
+File: pm.info,  Node: IPC/XPA,  Next: IPChains,  Prev: IPC/SysV,  Up: Module List
+
+Interface to the XPA messaging system
+*************************************
+
+NAME
+====
+
+   IPC::XPA - Interface to the XPA messaging system
+
+SYNOPSIS
+========
+
+     use IPC::XPA;
+
+     $xpa = IPC::XPA->Open();
+     $xpa = IPC::XPA->Open(\%mode);
+     $xpa = IPC::XPA->nullXPA;
+
+     %res = $xpa->Get( $template, $paramlist );
+     %res = $xpa->Get( $template, $paramlist, \%attrs );
+
+     %res = $xpa->Set( $template, $paramlist );
+     %res = $xpa->Set( $template, $paramlist, $buf );
+     %res = $xpa->Set( $template, $paramlist, $buf, \%attrs );
+     %res = $xpa->Set( $template, $paramlist, \%attrs );
+
+     %res = $xpa->Info( $template, $paramlist );
+     %res = $xpa->Info( $template, $paramlist, \%attrs );
+     
+     $nservers = IPC::XPA->Access( $name, $type );
+
+     @res = IPC::XPA->NSLookup( $template, $type );
+
+DESCRIPTION
+===========
+
+   This class provides access to the XPA messaging system library, `xpa',
+developed by the Smithsonian Astrophysical Observatory's High Energy
+Astrophysics R&D Group.  The library provides simple inter-process
+communication via calls to the `xpa' library as well as via supplied user
+land programs.
+
+   The method descriptions below do not duplicate the contents of the
+documentation provided with the `xpa' library.
+
+   Currently, only the client side routines are accessible.
+
+METHODS
+=======
+
+   Unless otherwise specified, the following methods are simple wrappers
+around the similarly named XPA routines (just prefix the Perl routines
+with `XPA').
+
+Class Methods
+-------------
+
+nullXPA
+          $xpa = XPA::IPC->nullXPA;
+
+     This creates an xpa object which is equivalent to a NULL XPA handle as
+     far as the underlying XPA routines are concerned.  It can be used to
+     create a default XPA object, as it it guaranteed to succeed (the
+     *Open()* method may fail).
+
+Open
+          $xpa = XPA::IPC->Open();
+          $xpa = XPA::IPC->Open( \%mode );
+
+     This creates an XPA object.  mode is a hash containing mode keywords
+     and values, which will be translated into the string form used by
+     *XPAOpen()*.  The object will be destroyed when it goes out of scope;
+     the *XPAClose()* routine will automatically be called.  It returns
+     undef upon failure.
+
+     For example,
+
+          $xpa = XPA::IPC->Open( { verify => 'true' } );
+
+Close
+          $xpa->Close;
+
+     Close the XPA object.  This is usually not necessary, as it will
+     automatically be closed upon destruction.
+
+Access
+          $ns = XPA::IPC->Access( $name, $type )
+
+     Returns the number of public access points that match the specified
+     name and access type.  See the XPA docs for more information.
+
+NSLookup
+          @res = XPA::IPC->NSLookup( $template, $type )
+
+     This calls the XPANSLookup routine.  It returns the results of the
+     lookup as a list of references to hashes, one per server. The hashes
+     have the keys name class, and method.  For example,
+
+          use Data::Dumper;
+          @res = XPA::IPC->NSLookup( 'ds9', 'ls' );
+          print Dumper(\@res);
+
+     results in
+
+          $VAR1 = [
+                    {
+                      'method' => '838e2ab4:46529',
+                      'name' => 'ds9',
+                      'class' => 'DS9'
+                    }
+                  ];
+
+     Note that names returned by NSLookup are different than those
+     returned by the Set and Get methods; the latter return names which
+     are essentially composites of the name and method keys.
+
+     See the XPA docs for more information the template and type
+     specification.
+
+Set
+     The Set instance method (see `Instance Methods' in this node) can
+     also be called as a class method, which is equivalent to calling
+     *XPASet()* with a NULL handle to the *xpa* object.
+
+     For example,
+
+          %res = IPC::XPA->Set( $template, $paramlist );
+
+Get
+     The Get instance method (see `Instance Methods' in this node) can
+     also be called as a class method, which is equivalent to calling
+     *XPAGet()* with a NULL handle to the *xpa* object.
+
+     For example,
+
+          %res = IPC::XPA->Get( $template, $paramlist );
+
+Info
+     The Info instance method (see `Instance Methods' in this node) can
+     also be called as a class method, which is equivalent to calling
+     *XPAInfo()* with a NULL handle to the *xpa* object.
+
+     For example,
+
+          %res = IPC::XPA->Info( $template, $paramlist );
+
+Instance Methods
+----------------
+
+Set
+          %res = $xpa->Set( $template, $paramlist );
+          %res = $xpa->Set( $template, $paramlist, $buf );
+          %res = $xpa->Set( $template, $paramlist, $buf, \%attrs );
+          %res = $xpa->Set( $template, $paramlist, \%attrs );
+
+     Send data to the XPA server(s) specified by $template.  *$xpa* is a
+     reference to an XPA object created by `Open()'. *$paramlist*
+     specifies the command to be performed.  If additional information is
+     to be sent, the *$buf* parameter should be specified.  The *%attrs*
+     hash specifies optional parameters and values to be sent.  The
+     following are available:
+
+    max_servers
+          The maximum number of servers to which the request should be
+          sent. This defaults to 1.
+
+    len
+          The number of bytes in the buffer to be sent.  If not set, the
+          entire contents will be sent.
+
+    mode
+          The value of this is a hash containing mode keywords and values,
+          which will be translated into the string form used by *XPASet()*.
+
+     It returns a hash keyed off of the server names.  The hash values are
+     references to hashes, which will contain the key name (duplicating the
+     server name), and if there was an error, the key message.  See the
+     *XPASet* documentation for more information on the name and message
+     values.
+
+     For example,
+
+          %res = $xpa->Set( 'ds9', 'mode crosshair' );
+
+          use Data::Dumper;
+          %res = $xpa->Set( 'ds9', 'array [dim=100,bitpix=-64]', $buf,
+          		  { mode => { ack => false } });
+          print Dumper \%res, "\n";
+
+     The latter might result in:
+
+          $VAR1 = {
+                    'DS9:ds9 838e2ab4:65223' => {
+                                                  'name' => 'DS9:ds9 838e2ab4:65223'
+                                                },
+                  };
+
+Get
+          %res = $xpa->Get( $template, $paramlist );
+          %res = $xpa->Get( $template, $paramlist, \%attrs );
+
+     Retrieve data from the servers specified by the $template parameter.
+     *$xpa* is a reference to an XPA object created by `Open()'.  The
+     *$paramlist* indicates which data to return.  The *%attrs* hash
+     specifies optional parameters and values to be sent.  The following
+     are available:
+
+    max_servers
+          The maximum number of servers to which the request should be
+          sent. This defaults to 1.
+
+    mode
+          The value of this is a hash containing mode keywords and values,
+          which will be translated into the string form used by *XPAGet()*
+
+     It returns a hash keyed off of the server names.  The hashe values are
+     references to hashes, which will have the keys name, indicating the
+     server's name, and `buf' which will contain the returned data.  If
+     there was an error, the hashes will also contain the key message.
+     See the *XPAGet* documentation for more information on the name and
+     message values.
+
+     For example,
+
+          use Data::Dumper;
+          %res = $xpa->Get( 'ds9', '-help quit' );
+          print Dumper(\%res);
+
+     might result in
+
+          $VAR1 = {
+                   'DS9:ds9 838e2ab4:46529' => {
+                      'name' => 'DS9:ds9 838e2ab4:46529',
+                      'buf' => 'quit:	-- exit application'
+                    }
+                  };
+
+Info
+          %res = $xpa->Info( $template, $paramlist);
+          %res = $xpa->Info( $template, $paramlist, \%attrs );
+
+     Send a short message (in *$paramlist*) to the servers specified in
+     the $template parameter.  *$xpa* is a reference to an XPA object
+     created by `Open()'. The *%attrs* hash specifies optional parameters
+     and values to be sent.  The following are available:
+
+    max_servers
+          The maximum number of servers to which the request should be
+          sent. This defaults to 1.
+
+    mode
+          The value of this is a hash containing mode keywords and values,
+          which will be translated into the string form used by *XPAGet()*
+
+     It returns a hash keyed off of the server names.  The hash values are
+     references to hashes, which will contain the the key name, indicating
+     the server's name.  If there was an error or the server replied with
+     a message, the hashes will also contain the key message.  See the
+     *XPAGet* documentation for more information on the name and message
+     values.
+
+The XPA Library
+===============
+
+   The XPA library is available at `http://hea-www.harvard.edu/RD/xpa/'.
+
+AUTHOR
+======
+
+   Diab Jerius ( djerius@cfa.harvard.edu )
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: IPChains,  Next: IPChains/PortFW,  Prev: IPC/XPA,  Up: Module List
+
+Create and Manipulate ipchains via Perl
+***************************************
+
+NAME
+====
+
+   IPChains - Create and Manipulate ipchains via Perl
+
+SYNOPSIS
+========
+
+   use IPChains;
+
+   $fw = IPChains->new(-option => value, ... ); $fw->append('chain');
+
+DESCRIPTION
+===========
+
+   This module acts as an interface to the ipchains(8) userspace utility by
+Paul "Rusty" Russell (http://www.rustcorp.com/linux/ipchains/). It attempts
+to include all the functionality of the original code with a simplified
+user interface via Perl. In addition, plans for log parsing facilities, an
+integrated interface to ipmasqadm, and possibly traffic shaping are slated
+for up and coming versions.
+
+   The new() and attribute() methods support the following options:
+
+Source
+     Specifies origination address of packet. Appending hostmask to this
+     address using a / is OK, as well as specifying it separately (see
+     SourceMask).
+
+SourceMask
+     Hostmask for origination address. Can either be in 24 or
+     255.255.255.0 style.
+
+SourcePort
+     Specific port or port range (use xxx:xxx to denote range), requires
+     specific protocol specification.
+
+Dest
+     Specifies destination address of packet. Appending hostmask to this
+     address using a / is OK, as well as specifying it separately (see
+     DestMask)
+
+DestMask
+     Destination address, (see SourceMask).
+
+DestPort
+     Destination Port, (see SourcePort).
+
+Prot
+     Protocol. Can be tcp, udp, icmp, or all. Required for specifying
+     specific port(s).
+
+ICMP
+     ICMP Name/Code (in place of port when ICMP is specified as protocol).
+
+     Here is a small table of some of the most common ICMP packets:
+
+          Number  Name                     Required by
+
+          0       echo-reply               ping
+          3       destination-unreachable  Any TCP/UDP traffic.
+          5       redirect                 routing if not running
+                                           routing daemon
+          8       echo-request             ping
+          11      time-exceeded            traceroute
+
+Rule
+     Target. Can be ACCEPT, DENY, REJECT, MASQ, REDIRECT, RETURN, or a
+     user-defined chain.  Note: This is case sensitive.
+
+Interface
+     Specify a specify interface as part of the criteria (ie, eth0, ppp0,
+     etc.).
+
+Fragment
+     Rule only refers to second and further fragments of fragmented
+     packets (1 or 0).
+
+Bidir
+     Makes criteria effective in both directions (1 or 0).
+
+Verbose
+     Set verbose option for setting rules or list() (1 or 0).
+
+Numeric
+     Show output from list() in numeric format. No DNS lookups, etc.. (1
+     or 0).
+
+Log
+     Enable kernel logging (via syslog, kern.info) of matched packets (1
+     or 0).
+
+Output
+     Copy matching packets to the userspace device (advanced).
+
+Mark
+     Mark matching packets with specified number (advanced).
+
+TOS
+     Used for modifying the TOS field in the IP header. Takes 2 args, AND
+     and XOR masks, (ie, (TOS => ["0x01", "0x10"])). This feature is
+     highly untested.
+
+     The first mask is ANDed with the packet's current TOS, and the second
+     mask is XORed with it. Use the following table for reference:
+
+          TOS Name                Value           Typical Uses
+
+          Minimum Delay           0x01 0x10       ftp, telnet
+          Maximum Throughput      0x01 0x08       ftp-data
+          Maximum Reliability     0x01 0x04       snmp
+          Minimum Cost            0x01 0x02       nntp
+
+Exact
+     Display exact numbers in byte counters instead of numbers rounded in
+     K's, M's, or G's (1 or 0).
+
+SYN
+     Only match TCP packets with the SYN bit set and the ACK and FIN bits
+     cleared (1 or 0).
+
+METHODS
+=======
+
+   The following methods are available to you:
+
+new()
+     $fw = IPChains->new(option => value, ...) create new fw object with
+     options
+
+attribute()
+     $fw->attribute(option, value) to set option to value, OR $value =
+     $obj->attribute(option) to get current value of option.
+
+clopts()
+     $fw->clopts() clears all option settings (do this before calling
+     methods like list(), flush(), delete(), etc. that take only a few
+     specific options).
+
+append()
+     $fw->append(chain) appends current rule to end of chain
+
+insert()
+     $fw->insert(chain, rulenum) inserts rule at position rulenum in
+     chain. If rulenum is omitted 1 is assumed.
+
+replace()
+     $fw->replace(chain, rulenum) replace rule at rulenum in chain with
+     current rule.
+
+delete()
+     $fw->delete(chain, rulenum) deletes rule rulenum from chain.
+
+check()
+     $fw->check(chain) check given packet against chain for testing.
+
+flush()
+     $fw->flush(chain) deletes all rules from chain.
+
+list()
+     $fw->list(chain) lists all rules defined for chain.
+
+list_chains()
+     $fw->list_chains() returns array with the names of all user-defined
+     chains or undef if none exist.
+
+zero()
+     $fw->zero(chain) zero's all packet counters for chain. Cannot zero
+     counters for chain policy.
+
+masq()
+     $fw->masq() lists current masqueraded connections.
+
+new_chain()
+     $fw->new_chain(chain) creates new user defined chain.
+
+del_chain()
+     $fw->del_chain(chain) delete user defined chain.
+
+set_policy()
+     $fw->set_policy(chain) set default policy for chain. Takes Rule
+     option only.
+
+EXAMPLES
+========
+
+   To set the default policy for the "forward" chain to DENY:
+
+     use IPChains;
+
+     $fw = IPChains->new(Rule => "DENY");
+     $fw->set_policy("forward");
+
+   To list current rules in "input" chain to stdout (without parsing
+through /proc/net/ip_fw*):
+
+     use IPChains;
+
+     $fw = IPChains->new(Verbose => 1);
+     $fw->list("input");
+
+   To create a rule that would allow all traffic on an internal lan, and
+deny all tcp traffic from external hosts on relevant ports, and log it,you
+could use something like:
+
+     use IPChains;
+
+     $internal = IPChains->new(Source    => "192.168.100.0/24",
+                               Rule      => "ACCEPT",
+                               Interface => "eth0");
+     $external = IPChains->new(Interface => "ppp0",
+                               Prot      => "tcp",
+                               DestPort  => "0:1024",
+                               Log       => 1);
+     $internal->append("input");
+     $external->append("input");
+
+   You could also create one object, set up the attributes, append() it,
+then use clopts() to clear it's options, then use attribute() to
+individually specify it's next set of options, then append() it again with
+the new rule.  See the examples/ subdirectory in the IPChains.pm source
+for more examples.
+
+BUGS
+====
+
+   Much of this is highly untested. Masquerading timeout setting and
+negative attributes (!) aren't yet implemented.  Much of what's planned to
+be done hasn't been yet. This is to be considered nothing more than an
+early beta to work out bugs in the basic code, and get feedback on
+usefulness and improvements that could be made.
+
+AUTHOR
+======
+
+   Jessica Quaintance (j@x25.org). Please feel free to email me with
+feedback, questions, or comments (or indeed patches/additions).
+
+COPYRIGHT
+=========
+
+   This package is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself, with the exception of the libipfwc.c,
+ipchains.c, and the files in include/ which have separate terms derived
+from those of the original ipchains sources. See COPYING for details of
+this license. Please see README.ipchains for the README that was included
+with the original source code for ipchains and contains copyrights and
+credits for such.
+
+
+File: pm.info,  Node: IPChains/PortFW,  Next: Ima/DBI,  Prev: IPChains,  Up: Module List
+
+Perl module to manipulate portfw masquerading table.
+****************************************************
+
+NAME
+====
+
+   IPChains::PortFW - Perl module to manipulate portfw masquerading table.
+
+SYNOPSIS
+========
+
+     my $masq = new IPChains::PortFW( option => value, ... );
+     $masq->append();
+
+DESCRIPTION
+===========
+
+   IPChains::PortFW is an perl interface to the linux kernel port
+forwarding facility. You must have ipmasqadm and the portfw module
+installed for this module to work. A kernel compiled with
+CONFIG_IP_MASQUERADE_IPPORTFW would also helps.
+
+   It has a similar interface than the IPChains(3) module. You create an
+IPChains::PortFW object with new(), you can query or set attributes with
+the attribute() method and you add or deletes the port forwarding rules
+using append() or delete().
+
+ATTRIBUTES
+----------
+
+   Here are the attributes valids for IPChains::PortFW.
+
+LocalAddr
+     This is the local address from which packets will be redirected.
+
+LocalPort
+     This is the port from which packets will be redirected.
+
+RemAddr
+     This is the address to which the packets will be forwarded to.
+
+RemPort
+     This is the port to which the packets will be forwarded to.
+
+Pref
+     This is a preferences value used for load balancing in the case when
+     there are many possible remote destinations.
+
+METHODS
+-------
+
+new( [options], ... )
+     Create a new IPChains::PortFW object and sets its attributes.
+
+attribute( attribute [, value] )
+     Get or sets an attribute. Use undef to delete a value.
+
+clopts()
+     Unset all attributes.
+
+append()
+     Append a rule to the port forwarding masquerade table as specified by
+     the attributes of the current objects.
+
+delete()
+     Deletes entries in the port forwarding masquerade table. The entries
+     matching the attributes will be deleted.
+
+flush()
+     Removes all entries from the port forwarding masquerade table.
+
+list()
+     Returns an array of IPChains::PortFW objects. One for each entries in
+     the port forwarding table.
+
+EXAMPLE
+=======
+
+   Redirecting http protocol to internal web server.
+
+   my $portfw = new IPChains::PortFW( Proto     => 'udp',
+LocalAddr => '199.168.1.10', 				   LocalPort => 80,
+RemAddr   => '10.0.0.1', 				   RemPort   => 80 );
+
+   $portfw->append;
+
+AUTHOR
+======
+
+   Francis J. Lacoste <francis.lacoste@insu.com>
+
+COPYRIGHT
+=========
+
+   Copyright (C) iNsu Innovations Inc.  All rights reserved.
+
+   This program is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2 of the License, or (at your option)
+any later version.
+
+SEE ALSO
+========
+
+   IPChains(3)
+
+
+File: pm.info,  Node: Ima/DBI,  Next: Image/Base,  Prev: IPChains/PortFW,  Up: Module List
+
+Database connection caching and organization
+********************************************
+
+NAME
+====
+
+   Ima::DBI - Database connection caching and organization
+
+SYNOPSIS
+========
+
+     # Class-wide methods.
+     __PACKAGE__->set_db($db_name, $data_source, $user, $password);
+     __PACKAGE__->set_db($db_name, $data_source, $user, $password, \%attr);
+     
+     __PACKAGE__->set_sql($sql_name, $statement, $db_name);
+     __PACKAGE__->set_sql($sql_name, $statement, $db_name, $cache);
+
+     # Object methods.
+         $dbh = $obj->db_*;      # Where * is the name of the db connection.
+         $sth = $obj->sql_*;     # Where * is the name of the sql statement.
+         $sth = $obj->sql_*(@sql_pieces);
+
+     $obj->DBIwarn($what, $doing);
+
+     # Modified statement handle methods.
+     $rv = $sth->execute;
+     $rv = $sth->execute(@bind_values);
+     $rv = $sth->execute(\@bind_values, \@bind_cols);
+
+     # In addition to the normal DBI sth methods...
+     $row_ref = $sth->fetch;
+     @row     = $sth->fetch;
+     
+     $row_ref = $sth->fetch_hash;
+     %row     = $sth->fetch_hash;
+     
+     $rows_ref = $sth->fetchall;
+     @rows     = $sth->fetchall;
+
+     $rows_ref = $sth->fetchall_hash;
+     @tbl      = $sth->fetchall_hash;
+
+     $rc = $obj->commit;             #UNIMPLEMENTED
+     $rc = $obj->commit(@db_names);  #UNIMPLEMENTED
+     
+     $rc = $obj->rollback;            #UNIMPLEMENTED
+     $rc = $obj->rollback(@db_names); #UNIMPLEMENTED
+
+     $sth->clear_cache;  #UNIMPLEMENTED
+     
+     $obj->clear_db_cache;            #UNIMPLEMENTED
+     $obj->clear_db_cache(@db_names); #UNIMPLEMENTED
+     
+     $obj->clear_sql_cache;             #UNIMPLMENTED
+     $obj->clear_sql_cache(@sql_names); #UNIMPLMENTED
+
+DESCRIPTION
+===========
+
+   Ima::DBI attempts to organize and facilitate caching and more efficient
+use of database connections and statement handles by storing DBI and SQL
+information with your class (instead of as seperate objects).  This allows
+you to pass around just one object without worrying about a trail of DBI
+handles behind it.
+
+   One of the things I always found annoying about writing large programs
+with DBI was making sure that I didn't have duplicate database handles
+open.  I was also annoyed by the somewhat wasteful nature of the
+prepare/execute/finish route I'd tend to go through in my subroutines.
+The new DBI->connect_cached and DBI->prepare_cached helped alot, but I
+still had to throw around global datasource, username and password
+information.
+
+   So, after a while I grew a small library of DBI helper routines and
+techniques.  Ima::DBI is the culmination of all this, put into a nice(?),
+clean(?) class to be inherited from.
+
+Why should I use this thing?
+----------------------------
+
+   Ima::DBI is a little odd, and it's kinda hard to explain.  So lemme
+explain why you'd want to use this thing...
+
+   * Consolidation of all SQL statements and database information
+
+     No matter what, embedding one language into another is messy.  DBI
+     alleviates this somewhat, but I've found a tendency to have that
+     scatter the SQL around inside the Perl code.  Ima::DBI allows you to
+     easily group the SQL statements in one place where they are easier to
+     maintain (especially if one developer is writing the SQL, another
+     writing the Perl).  Alternatively, you can place your SQL statement
+     alongside the code which uses it.  Whatever floats your boat.
+
+     Database connection information (data source, username, password,
+     atrributes, etc...) can also be consolidated together and tracked.
+
+     Both the SQL and the connection info are probably going to change
+     alot, so having them well organized and easy to find in the code is a
+     Big Help.
+
+   * Holds off opening a database connection until necessary.
+
+     While Ima::DBI is informed of all your database connections and SQL
+     statements at compile-time, it will not connect to the database until
+     you actually prepare a statement on that connection.
+
+     This is obviously very good for programs that sometimes never touch
+     the database.  It's also good for code that has lots of possible
+     connections and statements, but which typically only use a few.  Kinda
+     like an autoloader.
+
+   * Easy integration of the DBI handles into your class
+
+     Ima::DBI causes each database handle to be associated with your class,
+     allowing you to pull handles from an instance of your object, as well
+     as making many oft-used DBI methods available directly from your
+     instance.
+
+     This gives you a cleaner OO design, since you can now just throw
+     around the object as usual and it will carry its associated DBI
+     baggage with it.
+
+   * Honors taint mode
+
+     It always struck me as a design deficiency that tainted SQL statements
+     could be passed to $sth->prepare().  For example:
+
+          # $user is from an untrusted source and is tainted.
+          $user = get_user_data_from_the_outside_world;
+          $sth = $dbh->prepare('DELETE FROM Users WHERE User = $user');
+
+     Looks innocent enough... but what if $user was the string "1 OR User
+     LIKE %".  You just blew away all your users, hope you have backups.
+
+     Ima::DBI turns on the DBI->connect Taint attribute so that all DBI
+     methods (except execute()) will no longer accept tainted data.  `DBI'
+     in this node for details.
+
+   * Taints returned data
+
+     Databases should be like any other system call.  Its the scary Outside
+     World, thus it should be tainted.  Simp.  Ima::DBI turns on DBI's
+     Taint attribute on each connection.  This feature is overridable by
+     passing your own Taint attribute to set_db as normal for DBI.  `DBI'
+     in this node for details.
+
+   * Encapsulation of some of the more repetative bits of everyday DBI
+     usage
+
+     I get lazy alot and I forget to do things I really should, like using
+     bind_cols(), or rigorous error checking.  Ima::DBI does some of this
+     stuff automaticly, other times it just makes it more convenient.
+
+   * Encapsulation of DBI's cache system
+
+     DBI's automatic handle caching system is relatively new, some people
+     aren't aware of its use.  Ima::DBI uses it automatically, so you don't
+     have to worry your pretty little head about it.  (It even makes it a
+     bit more efficient)
+
+   * Sharing of database and sql information amongst inherited classes
+
+     Any SQL statements and connections created by a class is available to
+     its children via normal method inheritance.
+
+   * Convenience and orthoganality amongst statement handle methods
+
+     It always struck me odd that DBI didn't take much advantage of Perl's
+     context sensitivity.  Ima::DBI redefines some of the various fetch
+     methods to fix this oversight; it also adds a few new methods for
+     convenience (though not necessarily efficiency).
+
+   * Guarantees one connection per program.
+
+     One program, one database connection (per database user).  One
+     program, one prepared statement handle (per statement, per database
+     user).  That's what Ima::DBI enforces.  Extremely handy in persistant
+     environments (servers, daemons, mod_perl, FastCGI, etc...)
+
+   * Encourages use of bind parameters and columns
+
+     Bind parameters are safer and more efficient than embedding the column
+     information straight into the SQL statement.  Bind columns are more
+     efficient than normal fetching.  Ima::DBI pretty much requires the
+     usage of the former, and eases the use of the latter.
+
+Why shouldn't I use this thing.
+-------------------------------
+
+   * It's all about OO
+
+     Although it is possible to use Ima::DBI as a stand-alone module as
+     part of a function-oriented design, its generally not to be used
+     unless integrated into an object-oriented design.
+
+   * Overkill for small programs
+
+   * Overkill for programs with only one or two SQL statements
+
+     Its up to you whether the trouble of setting up a class and jumping
+     through the necessary Ima::DBI hoops is worth it for small programs.
+     To me, it takes just as much time to set up an Ima::DBI subclass as it
+     would to access DBI without it... but then again I wrote the module.
+     YMMV.
+
+   * Overkill for programs that only use their SQL statements once
+
+     Ima::DBI's caching might prove to be an unecessary performance hog if
+     you never use the same SQL statement twice (soon caching will become
+     optional).  Not sure, I haven't looked into it.
+
+USAGE
+=====
+
+   The basic steps to "DBIing" a class are:
+
+  1. Inherit from Ima::DBI
+
+  2. Set up and name all your database connections via set_db()
+
+  3. Set up and name all your SQL statements via set_sql()
+
+  4. Use sql_* to retrieve your statement handles ($sth) as needed and db_*
+     to retreive database handles ($dbh).
+
+        Have a look at the `EXAMPLE' in this node below.
+
+TAINTING
+========
+
+   Ima::DBI, by default, uses DBI's Taint flag on all connections.
+
+   This means that no Ima::DBI method will accept tainted data and all
+data fetched from the database will be tainted.  This may be different
+from the DBI behavior you're used to.  `DBI' in this node for details.
+
+METHODS
+=======
+
+Class methods
+-------------
+
+set_db
+          __PACKAGE__->set_db($db_name, $data_source, $user, $password);
+          __PACKAGE__->set_db($db_name, $data_source, $user, $password, \%attr);
+
+     This method is used in place of DBI->connect to create your database
+     handles.
+
+     Sets up a new DBI database handle associated to $db_name.  All other
+     arguments are passed through to DBI->connect_cached.
+
+     A new method is created for each db you setup.  This new method is
+     db_$db_name... so, for example, __PACKAGE__->set_db("foo", ...) will
+     create a method called db_foo().
+
+     If no %attr is supplied (RaiseError => 1, AutoCommit => 0, PrintError
+     => 0) is assumed.  This is a better default IMHO, however it does give
+     databases without transactions (such as MySQL) a hard time.  Be sure
+     to turn AutoCommit back on if your database does not support
+     transactions.
+
+     The actual database handle creation (and thus the database connection)
+     is held off until a prepare is attempted with this handle.
+
+     Spaces in $db_name will be translated into underscores ('_')
+
+set_sql
+          __PACKAGE__->set_sql($sql_name, $statement, $db_name);
+          __PACKAGE__->set_sql($sql_name, $statement, $db_name, $cache);
+
+     This method is used in place of DBI->prepare to create your statement
+     handles.
+
+     Sets up a new statement handle using associated to $sql_name using the
+     database connection associated with $db_name.  $statement is passed
+     through to either DBI->prepare or DBI->prepare_cached (depending on
+     $cache) to create the statement handle.
+
+     If $cache is true or isn't given then prepare_cached() will be used to
+     prepare the statement handle and it will be cached.  If $cache is
+     false then a normal prepare() will be used and the statement handle
+     will be recompiled on every sql_*() call.  If you have a statement
+     which changes alot or is used very infrequently you might not want it
+     cached.
+
+     A new method is created for each statement you set up.  This new
+     method is sql_$sql_name... so, as with set_db,
+     __PACKAGE__->set_sql("bar", ..., "foo"); will create a method called
+     sql_bar() which uses the database connection from db_foo().
+
+     The actual statement handle creation is held off until sql_* is first
+     called on this name.
+
+     Spaces in $sql_name will be translated into underscores ('_')
+
+     To make up for the limitations of bind parameters, $statement can
+     contain sprintf() style formatting (ie. %s and such) to allow
+     dynamically generated SQL statements.  See sql_* below for more
+     details.
+
+Object methods
+--------------
+
+   *      $dbh = $obj->db_*;
+          
+          This is how you directly access a database handle you set up with set_db.
+
+     The actual particular method name is derived from what you told
+     set_db.
+
+     db_* will handle all the issues of making sure you're already
+     connected to the database.
+
+   *      $sth = $obj->sql_*;
+          $sth = $obj->sql_*(@sql_pieces);
+
+     sql_*() is a catch-all name for the methods you set up with set_sql().
+     For instance, if you did:
+
+          __PACKAGE__->set_sql('GetAllFoo', 'Select * From Foo', 'SomeDb');
+
+     you'd run that statement with sql_GetAllFoo().
+
+     sql_* will handle all the issues of making sure the database is
+     already connected, and the statement handle is prepared.  It returns a
+     prepared statement handle for you to use.  (You're expected to
+     execute() it)
+
+     If sql_*() is given a list of @sql_pieces it will use them to fill in
+     your statement, assuming you have sprintf() formatting tags in your
+     statement.  For example:
+
+          __PACKAGE__->set_sql('GetTable', 'Select * From %s', 'Things');
+          
+          # Assuming we have created an object... this will prepare the
+          # statement 'Select * From Bar'
+          $sth = $obj->sql_Search('Bar');
+
+     Be *very careful* with what you feed this function.  It cannot do any
+     quoting or escaping for you, so it is totally up to you to take care
+     of that.  Fortunately if you have tainting on you will be spared the
+     worst.
+
+     It is recommended you only use this in cases where bind parameters
+     will not work.
+
+   * clear_db_cache     *UNIMPLEMENTED*
+          $obj->clear_db_cache;
+          $obj->clear_db_cache(@db_names);
+
+     Ima::DBI uses the DBI->connect_cached to cache open database handles.
+     For whatever reason you might want to clear this cache out and start
+     over again.
+
+     A call to clear_db_cache with no arguments deletes all database
+     handles out of the cache and all associated statement handles.
+     Otherwise it only deletes those handles listed in @db_names (and their
+     associated statement handles).
+
+     Note that clearing from the cache does not necessarily destroy the
+     database handle.  Something else might have a reference to it.
+
+     Alternatively, you may do:  $obj->db_Name->clear_cache;
+
+   * clear_sql_cache    *UNIMPLEMENTED*
+          $obj->clear_sql_cache;
+          $obj->clear_sql_cache(@sql_names);
+
+     Does the same thing as clear_db_cache, except it does it in relation
+     to statement handles.
+
+     Alternatively, you may do:  $obj->sql_Name->clear_cache;
+
+   * DBIwarn    *UNIMPLEMENTED*
+          $obj->DBIwarn($what, $doing);
+          
+          Produces a useful error for exceptions with DBI.
+
+     *I'm not particularly happy with this interface*
+
+     Most useful like this:
+
+          eval {
+              $self->sql_Something->execute($self->{ID}, @stuff);
+          };
+          if($@) {
+              $self->DBIwarn($self->{ID}, 'Something');
+                      return;
+          }
+
+Modified database handle methods
+--------------------------------
+
+   Ima::DBI makes some of the methods available to your object that are
+normally only available via the database handle.  In addition, it spices
+up the API a bit.
+
+   =over 4
+
+commit         *UNIMPLEMENTED*
+          $rc = $obj->commit;
+          $rc = $obj->commit(@db_names);
+
+     Derived from $dbh->commit() and basically does the same thing.
+
+     If called with no arguments, it causes commit() to be called on all
+     database handles associated with $obj.  Otherwise it commits all
+     database handles whose names are listed in @db_names.
+
+     Alternatively, you may like to do:  $rc = $obj->db_Name->commit;
+
+rollback       *UNIMPLEMENTED*
+          $rc = $obj->rollback;
+          $rc = $obj->rollback(@db_names);
+
+     Derived from $dbj->rollback, it acts just like Ima::DBI->commit,
+     except that it calls rollback().
+
+     Alternatively, you may like to do:  $rc = $obj->db_Name->rollback;
+
+clear_cache    *UNIMPLEMENTED*
+          $dbh->clear_cache;
+          
+          Provides a mechanism to clear a given database handle from the cache.
+
+Modified statement handle methods
+---------------------------------
+
+   Ima::DBI overrides the normal DBI statement handle with its own,
+slightly modified, version.  Don't worry, it inherits from DBI::st, so
+anything not explicitly mentioned here will work just like in normal DBI.
+
+execute
+          $rv = $sth->execute;
+          $rv = $sth->execute(@bind_values);
+          $rv = $sth->execute(\@bind_values, \@bind_cols);
+          
+          DBI::st->execute is overridden to enhance execute() a bit.
+
+     If called with no arguments, or with a simple list, execute() operates
+     normally.  When when called with two array references, it performs the
+     functions of bind_param, execute and bind_columns similar to the
+     following:
+
+          $sth->execute(@bind_values);
+          $sth->bind_columns(undef, @bind_cols);
+
+     In addition, execute *will accept tainted @bind_values*.  I
+     personally found it annoying to have to detaint everything I passed to
+     execute() and tended to shut off taint mode rather than go through the
+     trouble.  I also can't think of what a malicious user could do with a
+     tainted bind value (in the general case.  Your application may vary.)
+
+     Thus a typical idiom would be:
+
+          $sth->execute([$this, $that], [\($foo, $bar)]);
+
+     Of course, this method provides no way of passing bind attributes
+     through to bind_param or bind_columns.  If that is necessary, then you
+     must perform the bind_param, execute, bind_col sequence yourself.
+
+clear_cache    *UNIMPLEMENTED*
+          $sth->clear_cache;
+          
+          Provides a mechanism to clear a given statement handle from the cache.
+
+fetching
+--------
+
+   The following are modifications or expansions on DBI's various fetch
+methods.  Most are simply context sensitive implementations.  Some just
+have shorter names.
+
+   Remember that most of the list context versions of the fetch methods
+tend to use more memory and be slower.  Same with the fetchall methods.
+Use with care.
+
+fetch
+          $row_ref = $sth->fetch;
+          @row     = $sth->fetch;
+
+     A context sensitive version of fetch().  When in scalar context, it
+     will act as fetchrow_arrayref.  In list context it will use
+     fetchrow_array.
+
+fetch_hash
+          $row_ref = $sth->fetch_hash;
+          %row     = $sth->fetch_hash;
+
+     A modification on fetchrow_hashref.  When in scalar context, it acts
+     just as fetchrow_hashref() does.  In list context it returns the
+     complete hash.
+
+fetchall
+          $rows_ref = $sth->fetchall;
+          @rows     = $sth->fetchall;
+
+     A modification on fetchall_arrayref.  In scalar context it acts as
+     fetchall_arrayref.  In list it returns an array of references to rows
+     fetched.
+
+fetchall_hash
+          $rows_ref = $sth->fetchall_hash;
+          @rows     = $sth->fetchall_hash;
+
+     A mating of fetchall_arrayref() with fetchrow_hashref().  It gets all
+     rows from the hash, each as hash references.  In scalar context it
+     returns a reference to an array of hash references.  In list context
+     it returns a list of hash references.
+
+EXAMPLE
+=======
+
+     package Foo;
+     use base qw(Ima::DBI);
+     
+     # Set up database connections (but don't connect yet)
+     __PACKAGE__->set_db('Users', 'dbi:Oracle:Foo', 'admin', 'passwd');
+     __PACKAGE__->set_db('Customers', 'dbi:Oracle:Foo', 'Staff', 'passwd');
+     
+     # Set up SQL statements to be used through out the program.
+     __PACKAGE__->set_sql('FindUser', <<"SQL", 'Users');
+         SELECT  *
+         FROM    Users
+         WHERE   Name LIKE ?
+     SQL
+     
+     __PACKAGE__->set_sql('ChangeLanguage', <<"SQL", 'Customers');
+         UPDATE  Customers
+         SET     Language = ?
+         WHERE   Country = ?
+     SQL
+     
+     
+     # rest of the class as usual.
+     
+     
+     package main:
+     
+     $obj = Foo->new;
+     
+     eval {
+         # Does connect & prepare
+         my $sth = $obj->sql_FindUser;
+         # bind_params, execute & bind_columns
+         $sth->execute(['Likmi%'], [\($name)]);
+         while( $sth->fetch ) {
+             print $name;
+         }
+     
+         # Uses cached database and statement handles
+         $sth = $obj->sql_FindUser;
+         # bind_params & execute.
+         $sth->execute('%Hock');
+         @names = $sth->fetchall;
+     
+         # connects, prepares
+         $rows_altered = $obj->sql_ChangeLanguage->execute(qw(es_MX mx));
+     };
+     unless ($@) {
+         # Everything went okay, commit the changes to the customers.
+         $obj->commit('Customers');
+     }
+     else {
+         $obj->rollback('Customers');
+         warn "DBI failure:  $@";
+     }
+
+TODO, Caveat, BUGS, etc....
+===========================
+
+Using undocumented features of DBI
+     Using DBI->init_rootclass to pull of subclassing.  This is currently
+     an undocumented method (this should change soon).
+
+Unstable Interface
+     I haven't totally decided if I'm satisfied with the way this module
+     works, so expect the worst, the interface will change.
+
+execute() extensions questionable
+     I'm not really sure the additional functionality added to execute() is
+     all that useful.
+
+tainting may be too broad
+     Having Ima::DBI not accept any tainted data at all is probably too
+     general, but I'd rather be too strict to start than be too lax and try
+     to restrict later.  In the future, certain methods may accept tainted
+     data.
+
+     This is now a joint issue between DBI and Ima::DBI (well, more like a
+     master/slave issue.)
+
+should take arguments
+     But what?
+
+set_sql() and/or sql_* needs an optional caching flag.
+     Right now static SQL (those without sprintf flags) is always prepared
+     with prepare_cached() and dynamic with just prepare().  It would be
+     nice if there was a way to explicitly set the caching behavior.
+
+I seriously doubt its thread safe.
+     You can bet cupcackes to sno-cones that much havoc will be wrought if
+     Ima::DBI is used in a threaded Perl.  I don't think DBI is even
+     thread-safe.
+
+Should make use of private_* handle method to store information
+Having difficulty storing a list of dbh and sth names.
+     Storing the association between names and handles is fine, via the
+     closures (and thus, the symbol table), but trying to store a complete
+     list of all names available to a given object (and thus, inheritable)
+     is difficult.  Many minor methods are unimplemented until I figure out
+     this problem.
+
+The docs stink.
+     The docs were originally written when I didn't have a good handle on
+     the module and how it will be used in practical cases.  I need to
+     rewrite the docs from the ground up.
+
+AUTHOR
+======
+
+   Michael G Schwern <schwern@pobox.com>
+
+COPYRIGHT
+=========
+
+   This module is Copyright (c) 1998-2000 Michael G Schwern.  USA.  All
+rights reserved.
+
+   This module is free software.  You may distribute under the same terms
+as Perl itself.  IT COMES WITHOUT WARRANTY OF ANY KIND.
+
+THANKS MUCHLY
+=============
+
+     Tim Bunce, for enduring all my DBI questions and adding Taint,
+     prepare_cached and connect_cached methods to DBI.  It simplified
+     my job greatly!
+
+     Arena Networks, for effectively paying for me to finish writing
+     this module.
+
+SEE ALSO
+========
+
+   DBI
+
+

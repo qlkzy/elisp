@@ -1,0 +1,1388 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Taco/ServiceRegistry,  Next: Taco/Template,  Prev: Taco/Module,  Up: Module List
+
+Definitions of Taco services
+****************************
+
+NAME
+====
+
+   Taco::ServiceRegistry - Definitions of Taco services
+
+SYNOPSIS
+========
+
+     # In Taco/ServiceRegistry.pm:
+        $root_dir = "/wherever/you/want";
+
+     %registry = (
+       "your_service" => {
+         "Modules" => [ qw(Core TacoDB) ],  # The modules this service uses - required
+         "TemplatePath" => ["$root_dir/your_service/templates", "/etc/templates"],
+         "Taco::DB_config" => "$root_dir/your_service/config.pl",  # Add entries that your modules
+                                                                   # need to have
+       },
+       ...
+     );
+
+DESCRIPTION
+===========
+
+   The Taco::ServiceRegistry.pm file contains configuration information
+about the various Taco services you define.  Each key in the %registry hash
+is the name of a Taco service, and the value is an anonymous hash of
+various attributes of the service.
+
+   The "Modules" attribute is currently the only required attribute - it
+specifies which Taco modules the service uses.
+
+   The "ServiceDir" attribute will be used to fill in other default
+settings, such as "TemplatePath".  If you don't set it, it will be given a
+default value of `"$root_dir/$service"' (where $service is the name of the
+service being defined).
+
+   The "TemplatePath" attribute is not required, but if it is not given, a
+default value of `["$ServiceDir/templates"]' will be used (where
+$ServiceDir is the value of the "ServiceDir" attribute).
+
+   These three attributes are currently the only attributes known by Taco
+- all other attributes are the property of specific modules.  For
+instance, the Taco::DB module needs a "Taco::DB_config" attribute, a
+"Taco::DB_data_dir" attribute, and so on.  It can set default values for
+these attributes based on the values of the ServiceDir attributes, etc.
+Please read the documentation for the modules you want to use to see what
+information they require in the ServiceRegistry.
+
+AUTHOR
+======
+
+   Ken Williams (ken@forum.swarthmore.edu)
+
+SEE ALSO
+========
+
+   perl(1), Taco(3)
+
+
+File: pm.info,  Node: Taco/Template,  Next: Taint,  Prev: Taco/ServiceRegistry,  Up: Module List
+
+Taco templates
+**************
+
+NAME
+====
+
+   Taco::Template.pm - Taco templates
+
+SYNOPSIS
+========
+
+     use Taco::Template;
+     
+     $template = new Taco::Template( 'Howdy, [[$name]]!' );
+     $template->output($buffer);
+     $string = $template->interpret;
+     $string2 = &Taco::Template::interpret( 'And hello, [[$name2]]!' );
+     # ... etc.
+
+DESCRIPTION
+===========
+
+   This module is a class implementing fill-in templates for Taco.  It
+provides support for streaming the output of a filled-in template.  The
+specific syntaxes of the tags are not defined in this class, so it is
+extensible and flexible.
+
+Functions and Methods
+---------------------
+
+   * new Taco::Template($text);
+
+     Creates a new Template object whose content is the given text.
+
+   * find Taco::Template('name')
+
+     Searches $G::params for an entry called 'name_text' or
+     'name_template'.  Returns a template whose content is the value of
+     'name_text', or whose content is the contents of the file referred to
+     by 'name_template'.  If neither is found, returns the undefined value.
+
+     May be called with an optional second argument, which is a reference
+     to a scalar variable.  This scalar will be set to the string 'text'
+     if the 'name_text' parameter is found, or 'template' if the
+     'name_template' parameter is found, or the undefined value if neither
+     is found:
+
+          my $template = find Taco::Template('name', \$kind);
+          if ($kind eq 'text') ...
+
+     Note that if no suitable parameter is found in $G::params, no error
+     will be printed to STDERR.  This allows you the flexibility to write
+     code like this:
+
+          # Template is required:
+          my $template = find Taco::Template('display')
+             or die ("Couldn't find 'display_template' or 'display_text'");
+
+          # Template is optional:
+          my $template = find Taco::Template('wrapping');
+          if ($template) {
+             # ... do something with $template ...
+          }
+
+   * $template->get_text()
+
+     Returns the content of the template object.
+
+   * $template->set_text('text blah [[$blah]]')
+
+     Sets the content of the template to the given text.
+
+   * $template->get_file('filename')
+
+     Puts the contents of the file 'filename' into the template's content.
+     If the filename has a leading slash, it is treated as an absolute
+     filename.  If it does not, get_file will search the directories in
+     the template's path for the given file.
+
+     See also `set_path'.
+
+   * $template->set_path('dir1', 'dir2', ...);
+
+     Sets the path for the get_file method.  If called as an object
+     method, will set the path for just the given template.  If called as
+     a static class method, will set the default path for all templates:
+
+          Taco::Template->set_path('/etc/templates');   # sets default path
+          $my_templ->set_path('/etc/templates');  # only sets path for $my_templ
+
+   * $template->set_property( name => 'property')
+
+   * $template->get_property('name')
+
+     The user of a template may wish to set some attribute of a template,
+     and later retrieve that attribute.  These methods let you do so.
+     This is useful to achieve small extensions to the functionality of
+     the templates without having to derive a new class.
+
+   * $template->output($buffer)
+
+   * &Taco::Template::output($text, $buffer)
+
+     Interprets and outputs the contents of the template.  Checks a flag
+     to see whether printing is okay, or whether output should be added to
+     the end of the buffer.  Typically, output will be buffered in nested
+     tags:
+
+          ____________ outer.tmpl: ________________________________
+          [[ &list( key=[[&parse(parse_template=inner.tmpl)]] ) ]]
+          ____________ inner.tmpl: ________________________________
+          this is the key's value
+          _________________________________________________________
+
+     Since `&parse' is called inside `&list', it must not print its
+     output, it must return it.  The Template class keeps track of when
+     it's okay to print, and when a routine must return its output
+     instead.  In this way, output can be streamed as much as possible.
+
+     If the first argument to output is a reference, then this argument
+     will be treated as a template object.  Otherwise, it will be treated
+     as a string.
+
+     Here is a simple example of a routine that uses output:
+
+          sub do_something {
+          	my $template  = find Taco::Template('stuff') or die ("Can't find my stuff");
+          	my $buffer;
+          
+          	&Taco::Template::output('<ol start=[[$num]]>', $buffer);
+          	# Instead of: print &Taco::Template::interpret('<ol start=[[$num]]>');
+
+          $template->output($buffer);
+          # Will append text to $buffer if necessary
+          
+          &Taco::Template::straight_output('</ol>', $buffer);
+          
+          return $buffer;
+           }
+
+   * $template->straight_output($buffer)
+
+   * &Taco::Template::straight_output($text, $buffer)
+
+     Identical to output, except the text will not be interpreted as a
+     template, it will be output directly (or appended to $buffer).  This
+     is useful for outputting chunks of text quickly when you know there
+     are no tags in it:
+
+          &Taco::Template::straight_output("</ol>\n", $buffer);
+
+   * $template->interpret
+
+   * &Taco::Template::interpret( $text )
+
+     Returns the parsed contents of the template or text.  Will not print
+     anything (assuming the functions called in the template are
+     well-behaved and use `Taco::Template::output' and the like).
+
+Controlling template syntax and execution
+-----------------------------------------
+
+   * &Taco::Template::set_chunker( char, \&routine );
+
+     Sets the chunker for the given character.  The chunker will be called
+     when building the syntax tree for a template.  A chunker routine
+     takes two arguments: the character (such as $ or &) of the type of
+     template call, and the text of the template call, with leading and
+     trailing delimiters and whitespace removed.  For instance, with the
+     following in a template:
+
+          [[ &burp(because=have_gas) ]]
+
+     The chunker will receive '&' as its first argument, and
+     'burp(because=have_gas)' as its second argument.
+
+     A chunker function should parse the text into a hash reference, which
+     includes a 'type' field equal to the chunker's first argument.  The
+     rest of the hash can have whatever structure the executor of that
+     hook will need to execute it (see `set_executor').  The chunker
+     returns a single argument, the hash reference with the 'type' field.
+
+     Here is an example of a chunker which handles tags like `[[ $var ]]':
+
+          sub chunk_variable {
+            # returns {type=>'$', name=>'whatever'}
+
+          my $type = shift;
+          my $text = shift;
+          return {
+             type=>$type,
+             name=>&Taco::Template::interpret($text),
+                          # So we can handle things like [[ $var[[$two]] ]].
+                          # If we didn't need to, we could just do name=>$text.
+          };
+           }
+
+   * &Taco::Template::set_executor( char, \&routine );
+
+     Sets the executor function for the given character.  The executor
+     will be called to interpret the value of a template tag.  It takes
+     one argument, a hash reference created by a chunker.  The executor
+     should return a string which is the result of executing the given tag.
+
+SEE ALSO
+========
+
+   Have a look at `Taco::Dispatcher.pm' if you're want to see the chunker
+and executor functions.  They govern the syntax and execution of the
+individual tags.
+
+AUTHOR
+======
+
+   Ken Williams (ken@forum.swarthmore.edu)
+
+   Copyright (c) 1998 Swarthmore College. All rights reserved.
+
+
+File: pm.info,  Node: Taint,  Next: Tar,  Prev: Taco/Template,  Up: Module List
+
+Perl utility extensions for tainted data
+****************************************
+
+NAME
+====
+
+   Taint - Perl utility extensions for tainted data
+
+SYNOPSIS
+========
+
+     use Taint;
+     warn "Oops"
+       if tainted $num, @ids;	# Test for tainted data
+     kill $num, @ids;		# before using it
+
+     use Carp;
+     use Taint;
+     sub baz { croak "Insecure request" if tainted @_; ... }
+
+     use Taint qw(taint);
+     taint @list, $item;		# Intentionally taint data
+
+     use Taint qw(:ALL);
+     $pi = 3.14159 + tainted_zero;	# I don't trust irrational numbers
+
+DESCRIPTION
+===========
+
+   Perl has the ability to mark data as 'tainted', as described in
+`perlsec(1)' in this node. Perl will prevent tainted data from being used
+for some operations, and you may wish to add such caution to your own
+code. The routines in this module provide convenient ways to taint data
+and to check data for taint. To remove the taint from data, use the method
+described in `perlsec(1)' in this node, or use the make_extractor routine.
+
+   Please read `' in this node and `' in this node.
+
+ROUTINES
+========
+
+tainted LIST
+is_tainted EXPR
+any_tainted LIST
+all_tainted LIST
+     Test one or more items for taint. tainted is an alias for
+     any_tainted, provided for convenience. (Also, tainted is exported by
+     default.) is_tainted is prototyped to take a *single scalar*
+     argument, the others take lists. (If you're not sure which one to
+     use, use tainted.) When taint checks are off, these always return
+     false.
+
+taintedness LIST
+     This is a utility function, mostly useful for authors of subroutines
+     in modules. It is possible that an algorithm, by its nature, doesn't
+     propagate taintedness as it should. This routine returns the
+     taintedness of its parameters in the form of a null string which is
+     either tainted or not. (When taint checking is off, the return value
+     is always an untainted null string.) That string may be (for example)
+     appended to a return value to taint it if needed.
+
+          sub frobnicate {
+          	my($taintedness) = taintedness @_;	# save it
+          	# ...do some stuff which may or may not
+          	# properly propagate taint...
+          	return undef if $you_want_to;
+          	return $taintedness . $return_value;	# restore it
+          }
+
+taint LIST
+     If taint checks are turned on, marks each (apparently) taintable
+     argument in LIST as being tainted. (References and undef are never
+     taintable and are left unchanged. Some tied and magical variables may
+     fail to be tainted by this routine, try as it may.)
+
+     To taint (the values of) an entire hash, use this idiom.
+
+          taint @hash{ keys %hash };		# taint values of %hash
+
+tainted_null
+tainted_zero
+     If you'd rather taint your data yourself, these constants will let
+     you do it. tainted_null is a tainted null string, which may be
+     appended to any data to taint it. (Of course, that will also
+     stringify the data, if needed.) tainted_zero is (surprise) a tainted
+     zero, which may be added to any number to taint it. Note that when
+     taint checking is off, nothing can be tainted, so then these are
+     merely mundane " and 0 values.
+
+taint_checking
+     This constant tells whether taint checks are in use.  This is usually
+     only useful in connection with the allow_no_taint option (see `' in
+     this node).
+
+          print LOG "Warning: Taint checks not enabled\n"
+          	unless taint_checking;
+
+make_extractor EXPR
+     This routine returns a coderef for a subroutine which untaints its
+     arguments according to the pattern passed in the string EXPR.
+     Although the argument to this routine must be untainted, the
+     arguments to the generated code may be tainted or not. When taint
+     checking is off, this routine and its generated code behave in
+     essentially the same way, even though neither their parameters nor
+     return values are tainted.
+
+     Note: When untainting data, it's often easier to use the method
+     described in `perlsec(1)' in this node, especially if you're
+     unfamiliar with constructing strings to be used as regular
+     expressions.
+
+     Here's one way this routine might be used. This example is part of a
+     server (similar in some ways to *fingerd*; see `fingerd(8)' in this
+     node) which, when given a username, runs the Unix who command,
+     extracts and untaints some information about that user, and reports
+     it. Note that the regular expression is compiled just once, (within
+     the make_extractor routine) even though the username may change every
+     time through the main loop.
+
+          while () {	# The server runs in an infinite loop
+          	my $username = &get_next_request;
+          	# $username must already be untainted! (But let's not
+          	# assume it doesn't have metacharacters, even though
+          	# Unix usernames can't have any.)
+          	my $pattern =
+          	    '^' .
+          	    quotemeta($username) .
+          	    '\s+(\S+)\s+(.+)$';
+          	my $get_who = make_extractor $pattern;
+
+          my %info = ();
+          for (`who`) {
+              # $_ has lines of tainted information
+              my($tty, $date) = &$get_who($_);
+              # but $tty and $date are untainted
+              $info{$tty} = $date;
+          }
+          # %info now has untainted information
+          ...
+              }
+
+     Any items which need to be extracted should be within memory parens.
+     Because of that, the string should normally have at least one set of
+     memory parens. The pattern will be applied to each of the arguments
+     in turn, returning a list of all matched items in memory parens. Any
+     arguments which fail to match will add no items to the list. If
+     called in a scalar context, the generated sub will return just the
+     first untainted item in the list. No locale is used; see `SECURITY',
+     *Note Perllocale: (perl.info)perllocale,.
+
+     Note that the pattern may need to be written a little differently
+     than usual, since it's going to be passed as a string. For example,
+     it's not necessary to backwhack forward slashes in the pattern, since
+     those aren't regexp metacharacters. Also, if the pattern is built up
+     in an expression, it's important that the components all be
+     untainted! And, of course, it needs to be a valid regular expression;
+     otherwise, it causes an immediate error which may be trapped with
+     eval.
+
+     For a case-insensitive match, which would usually be indicated with
+     the `/i' modifier, use the embedded `(?i)' modifier, as described in
+     `perlre(1)' in this node. The other embeddable modifiers also work.
+
+     If the pattern contains backslashes, as many do, it is especially
+     problematic. For example, these attempts to make a pattern aren't
+     doing what they might look like.
+
+          $pattern1 = "(\w+)";	# effectively /(w+)/
+
+          $pattern2 = '\Q' . $foo;	# doesn't use quotemeta
+
+     Usually, though, single quotes will do what you expect (and double
+     quotes will confuse you). To help in debugging, you may set
+     `$Taint::DEBUGGING = 1' before calling make_extractor, which will
+     produce an allegedly-helpful debugging message as a warning. This
+     message will have a form of the regular expression passed, like
+     `/(w+)/' for `$pattern1' above.
+
+unconditional_untaint LIST
+     By unpopular request, this routine is included. Don't use it. Use the
+     method described in `perlsec(1)' in this node instead. You'd have to
+     be crazy to use this routine. (If you are, read the module itself to
+     see how to enable it. I'm not gonna tell you here.)
+
+     Given a list of possibly tainted *lvalues*, this untaints each of them
+     without any regard for whether they should be untainted or not.
+
+allow_no_taint
+     By default, importing symbols from this module requires taint checks
+     to be turned on. If you wish to use this module without requiring
+     taint checking (for example, if writing a module which may or may not
+     be run under -T) either import this pseudo-item...
+
+          use Taint qw(allow_no_taint);	# allow to run without -T
+          use Taint;				# default import list
+
+     or avoid importing any symbols by explicitly passing an empty import
+     list.
+
+          use Taint ();	# importing no symbols
+
+     If you use either of these methods to allow taint checks not to be
+     required, you may want to use the constant taint_checking (see `' in
+     this node) to determine whether checks are on.
+
+     It may be helpful to allow checks to be off during development, but
+     be sure to require them after release!
+
+Exports
+-------
+
+   The only routine exported by default is `tainted()'. Fortunately, this
+is the only one most folks need. Other routines may be imported by name,
+or with the pseudo-import tag :ALL, or the other pseudo-import tags
+defined in *Note Exporter: Exporter,.
+
+NOTES
+=====
+
+   Tainting may be explicitly turned on with the -T invocation option (see
+`-T', *Note Perlrun: (perl.info)perlrun,). Perl will force taint checking
+to be on if a process was started with setuid or setgid privileges.  By
+default, this module requires taint checking to be on (but see
+`allow_no_taint' in this node).
+
+   A set-id script may not necessarily run with privileges; that depends
+upon your system, the privileges of the user running the script, and
+possibly upon the configuration of perl. This means that if a set-id
+script is run by its own id(s), it won't have any taint checks - so your
+script may fail, but only when *you* run it!
+
+   If you're having trouble getting your script to work when taint checks
+are on, you should remember that Perl will automatically take some extra
+precautions. By default, Perl doesn't use some environment variables that
+it normally would, using locales may cause data to be tainted, and the
+current directory ('.') won't be included in the `@INC' list. See
+`perlsec(1)' in this node for the full list.
+
+DIAGNOSTICS
+===========
+
+Attempt to taint read-only value
+     Just what it sounds like. taint is not able to taint something which
+     can't be modified, such as an expression or a constant.
+
+Pattern was /.../o
+     When `$Taint::DEBUGGING' is set to a true value, this message will be
+     issued as a warning for each pattern passed to make_extractor().
+     This sub will make an attempt to represent the pattern in the
+     "traditional" `/foo/' format, although there are some differences.
+     For example, some escapes, such as `\Q', aren't really part of the
+     regular expression engine. So, if this shows a regular expression as
+     `/\Q/', that means that it's trying to match a backslash followed by
+     a capital Q. Also, this format does backwhack the slash mark itself
+     (since it'll be quoted in the string by slashes), even though you
+     don't want to pass a backslash before a true slash in the pattern.
+     The represented pattern always ends in /o, since that option is
+     always used internally in make_extractor().
+
+sub unconditional_untaint() not properly imported
+     You should read `perlsec(1)' in this node again to see how to untaint
+     your data. Repeat as needed.
+
+Can't make code from tainted string
+     You tried to pass a tainted string to make_extractor(). You should be
+     ashamed of yourself.
+
+Wrong way to import unconditional_untaint()
+     You should read `perlsec(1)' in this node again to see how to untaint
+     your data. Repeat as needed.
+
+Can't redefine
+     You already had a subroutine with the same name as the
+     `unconditional_untaint()' routine you were trying to import. How many
+     of these do you need?
+
+Taint checks not enabled
+     Just what it sounds like. Somehow, you didn't have taint checks
+     turned on, and (since you're using this module) you probably were
+     counting on them. Possible reasons:  You thought your script would be
+     run set-id, but it wasn't. You forgot to put -T on the top of your
+     script.  You're using a module which uses this one, and you didn't
+     know that that module expects taint checks to be on.  (If you wish to
+     allow taint checks to be either on or off, see `' in this node.
+
+Disabled option requested
+     You tried to use the `unconditional_untaint()' routine, but whoever
+     installed this module thought you shouldn't.  You should read
+     `perlsec(1)' in this node again to see how to untaint your data.
+     Repeat as needed.
+
+Unexpected error
+     Something went wrong when trying to taint some data, probably because
+     you tried to taint the untaintable. (For example, a tied variable.)
+     If this happens, please let the author of this module know the
+     circumstances and the error message so that I can try to get a better
+     error message into a future version.
+
+BUGS
+====
+
+   We have no way to enforce understanding the docs.
+
+   Debugging a program which uses taint checks can be problematic.
+
+   Some modules aren't compatible with taint checking. Write to their
+authors and offer to help improve the modules. Modules which implement
+tied variables often need help.
+
+   The look of some of this module's internal code makes some people think
+its author was smoking crack. But some people think that when they see any
+Perl code.
+
+   `is_tainted @foo' isn't what you might think. And it don't use no good
+grammars, neither, if you asks me.
+
+   `taint %bar' doesn't do anything good. (Hey, I'd make an error message
+if I knew how to detect it.)
+
+   There is no routine which will taint all the taintable parts of a
+structure more complex than a simple list.
+
+   Taint checking is a largely-unexplored area of Perl. It's not unlikely
+that there are as-yet undiscovered bugs in Perl's tainting code. While
+working on this module and its tests, the author found three bugs in
+Perl's internal taint handling. (Using taint checking is like using a
+safety net with holes. At least it's better than no net at all.) Most new
+versions of Perl (and even many subversions) fix at least one
+tainting-related bug. The moral of the story: Stay on alert for
+announcements about new versions of Perl and vital modules like this one.
+(Watch comp.lang.perl.announce.)
+
+   `no Taint;' doesn't turn off taint checks (lexically or otherwise), and
+`use Taint;' doesn't turn them on. Dang.
+
+   Some bugs are documented only in this sentence. (Please send
+documentation patches and other corrections to the author.)
+
+   The following data can never be tainted: references, undef, hash keys,
+anything which is not a scalar, and some magical or tied variables.
+Attempting to taint some of these may cause interesting and educational
+results. (The module which implements a tied variable may allow (or even
+force) tainting. (For that matter, a tied hash could conceivably have
+tainted keys! But untainting those would be ...interesting.) Although a
+reference can't be tainted, it may reference a thingy which is tainted in
+whole or in part.)
+
+   There's no routine which taints data "in passing". That is, there's
+nothing to which you can pass *@foo* and get back a tainted copy of it,
+leaving @foo unmodified. I have a wonderful reason for this, but there's
+not enough room to write it here in the margin.
+
+   Okay, here's the reason, which is simply too big and complex to stuff
+into the BUGS section of the manpage.
+
+   Suppose you have a module that you're adding taint checks to.  You've
+got a sub that ends something like this:
+
+     ...
+     return &foo(@bar);
+         }
+
+   Now you decide to add taint to the data you're returning, so you apply
+the (hypothetical) taint_in_passing routine to it.
+
+     ...
+     return taint_in_passing &foo(@bar);
+         }
+
+   Unknown to you, somebody has been calling your sub in a scalar context,
+and somebody else has been calling it in a list context.  Now,
+`&foo(@bar)' is being called in the context of taint_in_passing, which
+will be the wrong context part of the time.
+
+   You may be wondering now why we don't simply make taint_in_passing
+notice the context it's called in, with wantarray, so that it can evaluate
+its args in the same context it was called in. (If you're wondering why we
+don't just have it return the number of elements returned by `&foo(@bar)'
+when it's called in a scalar context, you don't understand context issues
+very well.) But that's not something that can be done with Perl, at least
+not currently.  By the time the sub is called, the args have already been
+evaluated, context right or wrong.
+
+   Thus, there's no way to write a taint_in_passing sub which can be
+counted on to do the right thing. :-(
+
+   Instead, you should see what your code returns in different contexts,
+and then do the right thing, whatever that is.
+
+   This module's author believes that a taint_in_passing sub in this
+module would be misused by people who don't understand this issue.  If you
+still want one, now that you understand this issue of context, you should
+be able to make one which will do what you need for your application. Just
+don't add it to this module unless and until you can change my mind. :-)
+Thanks!
+
+   Some bugs should be construed as features, and vice versa. This may be
+one of them.
+
+AUTHOR
+======
+
+   Tom Phoenix, <`rootbeer@teleport.com'>
+
+COPYRIGHT
+=========
+
+   This entire module is Copyright (C) 1997 by Tom Phoenix. This module is
+experimental and may be installed for TESTING AND DEVELOPMENT PURPOSES
+ONLY. It may not be distributed or redistributed except through the
+Comprehensive Perl Archive Network (CPAN). A modified or partial copy of
+this package must not be redistributed without prior written permission.
+In particular, this module and Perl's taint checking may not do what you
+want, and they may do what you do not want; using this module in any way
+without understanding that fact is strictly forbidden.
+
+DISCLAIMER
+==========
+
+   THIS ENTIRE MODULE, INCLUDING ITS DOCUMENTATION AND ALL OTHER FILES, IS
+PROVIDED "AS IS" AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING,
+WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS
+FOR A PARTICULAR PURPOSE.
+
+   You must read and understand all appropriate documentation, especially
+including `perlsec(1)' in this node and this manpage. I say again, this
+module and Perl's taint checking may not do what you want, and they may do
+what you do not want; using this module in any way without understanding
+that fact is strictly forbidden.
+
+   Although all reasonable efforts have been made to ensure its quality,
+utility, and accuracy, it is the users' responsibility to decide whether
+this is suitable for any given purpose. You runs your code and you takes
+your chances.
+
+   Okay, this is a heck of a disclaimer. Try not to be too scared; the
+author uses this code himself (when not writing about himself in the third
+person). Watch the newsgroup comp.lang.perl.announce for announcements of
+new versions of this module and other cool stuff.
+
+SEE ALSO
+========
+
+   `perlsec(1)' in this node and `perlre(1)' in this node.
+
+
+File: pm.info,  Node: Tar,  Next: Tcl,  Prev: Taint,  Up: Module List
+
+module for manipulation of tar archives.
+****************************************
+
+NAME
+====
+
+   Tar - module for manipulation of tar archives.
+
+SYNOPSIS
+========
+
+     use Tar;
+
+     $tar = Tar->new();
+     $tar->add_files("file/foo.c", "file/bar.c");
+     $tar->add_data("file/bar.c","This is the file contents");
+     $tar->write("files.tar");
+
+DESCRIPTION
+===========
+
+   This module is definitely tentative, and several things will be changed
+rather shortly. The exported routines will not be exported [done], all the
+calls to croak() should be replaced with returning undef() and putting
+error messages in a package global [done].
+
+   At the moment these methods are implemented:
+
+new()
+     Returns a new Tar object. If given a filename as an argument, it will
+     try to load that as a tar file.
+
+`add_files(@filenamelist)'
+     Takes a list of filenames and adds them to the in-memory archive.
+
+`add_data($filename,$data,$opthashref)'
+     Takes a filename, a scalar full of data and optionally a reference to
+     a hash with specific options. Will add a file to the in-memory
+     archive, with name $filename and content $data. Specific options can
+     be set using `$opthashref', which will be documented later.
+
+`remove(@filenamelist)'
+     Removes any entries with names matching any of the given filenames
+     from the in-memory archive. String comparisons are done with eq.
+
+`read('`file.tar'')'
+     Try to read the given tarfile into memory. Will replace any previous
+     content in `$tar'!
+
+`write('`file.tar'')'
+     Will write the in-memory archive to disk.
+
+data()
+     Returns the in-memory archive. This is a list of references to hashes,
+     the internals of which is not currently documented.
+
+`extract(@filenames)'
+     Write files whose names are equivalent to any of the names in
+     `@filenames' to disk, creating subdirectories as neccesary. This
+     might not work too well under VMS and MacOS.
+
+CHANGES
+=======
+
+Version 0.04
+Made changes to write_tar so that Solaris' tar likes the resulting        archives better.
+Protected the calls to readlink() and symlink(). AFAIK this module        should now run just fine on Windows NT.
+Add method to write a single entry to disk (extract)
+Added method to add entries entirely from scratch (add_data)
+Changed name of add() to add_file()
+All calls to croak() removed and replaced with returning undef       and setting Tar::error.
+Better handling of tarfiles with garbage at the end.
+
+File: pm.info,  Node: Tcl,  Next: Tcl/Tk,  Prev: Tar,  Up: Module List
+
+Tcl extension module for Perl
+*****************************
+
+NAME
+====
+
+   Tcl - Tcl extension module for Perl
+
+SYNOPSIS
+========
+
+     use Tcl;
+
+     $interp = new Tcl;
+     $interp->Eval('puts "Hello world"');
+
+DESCRIPTION
+===========
+
+   The Tcl extension module gives access to the Tcl library with
+functionality and interface similar to the C functions of Tcl.  In other
+words, you can
+
+create Tcl interpreters
+     The Tcl interpreters so created are Perl objects whose destructors
+     delete the interpreters cleanly when appropriate.
+
+execute Tcl code in an interpreter
+     The code can come from strings, files or Perl filehandles.
+
+bind in new Tcl procedures
+     The new procedures can be either C code (with addresses presumably
+     obtained using *dl_open* and *dl_find_symbol*) or Perl subroutines
+     (by name, reference or as anonymous subs). The (optional) deleteProc
+     callback in the latter case is another perl subroutine which is called
+     when the command is explicitly deleted by name or else when the
+     destructor for the interpreter object is explicitly or implicitly
+     called.
+
+Manipulate the result field of a Tcl interpreter
+Set and get values of variables in a Tcl interpreter
+Tie perl variables to variables in a Tcl interpreter
+     The variables can be either scalars or hashes.
+
+Methods in class Tcl
+--------------------
+
+   To create a new Tcl interpreter, use
+
+     $i = new Tcl;
+
+   The following methods and routines can then be used on the Perl object
+returned (the object argument omitted in each case).
+
+Init ()
+     Invoke *Tcl_Init* on the interpeter.
+
+Eval (STRING)
+     Evaluate script STRING in the interpreter. If the script returns
+     successfully (TCL_OK) then the Perl return value corresponds to
+     interp->result otherwise a die exception is raised with the $@
+     variable corresponding to interp->result. In each case, *corresponds*
+     means that if the method is called in scalar context then the string
+     interp->result is returned but if the method is called in list context
+     then interp->result is split as a Tcl list and returned as a Perl
+     list.
+
+GlobalEval (STRING)
+     Evalulate script STRING at global level. Otherwise, the same as
+     Eval() above.
+
+EvalFile (FILENAME)
+     Evaluate the contents of the file with name FILENAME. Otherwise, the
+     same as Eval() above.
+
+EvalFileHandle (FILEHANDLE)
+     Evaluate the contents of the Perl filehandle FILEHANDLE. Otherwise,
+     the same as Eval() above. Useful when using the filehandle DATA to
+     tack on a Tcl script following an __END__ token.
+
+call (PROC, ARG, ...)
+     Looks up procedure PROC in the interpreter and invokes it directly
+     with arguments (ARG, ...) without passing through the Tcl parser. For
+     example, spaces embedded in any ARG will not cause it to be split
+     into two Tcl arguments before being passed to PROC.
+
+result ()
+     Returns the current interp->result field. List v. scalar context is
+     handled as in Eval() above.
+
+CreateCommand (CMDNAME, CMDPROC, CLIENTDATA, DELETEPROC)
+     Binds a new procedure named CMDNAME into the interpreter. The
+     CLIENTDATA and DELETEPROC arguments are optional. There are two cases:
+
+     (1) CMDPROC is the address of a C function
+
+     (presumably obtained using *dl_open* and *dl_find_symbol*. In this
+     case CLIENTDATA and DELETEPROC are taken to be raw data of the
+     ClientData and deleteProc field presumably obtained in a similar way.
+
+     (2) CMDPROC is a Perl subroutine
+
+     (either a sub name, a sub reference or an anonymous sub). In this case
+     CLIENTDATA can be any perl scalar (e.g. a ref to some other data) and
+     DELETEPROC must be a perl sub too. When CMDNAME is invoked in the Tcl
+     interpeter, the arguments passed to the Perl sub CMDPROC are
+
+          (CLIENTDATA, INTERP, LIST)
+
+     where INTERP is a Perl object for the Tcl interpreter which called out
+     and LIST is a Perl list of the arguments CMDNAME was called with.  As
+     usual in Tcl, the first element of the list is CMDNAME itself.  When
+     CMDNAME is deleted from the interpreter (either explicitly with
+     DeleteCommand or because the destructor for the interpeter object is
+     called), it is passed the single argument CLIENTDATA.
+
+DeleteCommand (CMDNAME)
+     Deletes command CMDNAME from the interpreter. If the command was
+     created with a DELETEPROC (see CreateCommand above), then it is
+     invoked at this point. When a Tcl interpreter object is destroyed
+     either explicitly or implicitly, an implicit DeleteCommand happens on
+     all its currently registered commands.
+
+SetResult (STRING)
+     Sets interp->result to STRING.
+
+AppendResult (LIST)
+     Appends each element of LIST to interp->result.
+
+AppendElement (STRING)
+     Appends STRING to interp->result as an extra Tcl list element.
+
+ResetResult ()
+     Resets interp->result.
+
+SplitList (STRING)
+     Splits STRING as a Tcl list. Returns a Perl list or the empty list if
+     there was an error (i.e. STRING was not a properly formed Tcl list).
+     In the latter case, the error message is left in interp->result.
+
+SetVar (VARNAME, VALUE, FLAGS)
+     The FLAGS field is optional. Sets Tcl variable VARNAME in the
+     interpreter to VALUE. The FLAGS argument is the usual Tcl one and can
+     be a bitwise OR of the constants $Tcl::GLOBAL_ONLY,
+     $Tcl::LEAVE_ERR_MSG, $Tcl::APPEND_VALUE, $Tcl::LIST_ELEMENT.
+
+SetVar2 (VARNAME1, VARNAME2, VALUE, FLAGS)
+     Sets the element VARNAME1(VARNAME2) of a Tcl array to VALUE. The
+     optional argument FLAGS behaves as in SetVar above.
+
+GetVar (VARNAME, FLAGS)
+     Returns the value of Tcl variable VARNAME. The optional argument FLAGS
+     behaves as in SetVar above.
+
+GetVar2 (VARNAME1, VARNAME2, FLAGS)
+     Returns the value of the element VARNAME1(VARNAME2) of a Tcl array.
+     The optional argument FLAGS behaves as in SetVar above.
+
+UnsetVar (VARNAME, FLAGS)
+     Unsets Tcl variable VARNAME. The optional argument FLAGS behaves as
+     in SetVar above.
+
+UnsetVar2 (VARNAME1, VARNAME2, FLAGS)
+     Unsets the element VARNAME1(VARNAME2) of a Tcl array.  The optional
+     argument FLAGS behaves as in SetVar above.
+
+Linking Perl and Tcl variables
+------------------------------
+
+   You can tie a Perl variable (scalar or hash) into class Tcl::Var so
+that changes to a Tcl variable automatically "change" the value of the
+Perl variable. In fact, as usual with Perl tied variables, its current
+value is just fetched from the Tcl variable when needed and setting the
+Perl variable triggers the setting of the Tcl variable.
+
+   To tie a Perl scalar $scalar to the Tcl variable *tclscalar* in
+interpreter *$interp* with optional flags $flags (see SetVar above), use
+
+     tie $scalar, Tcl::Var, $interp, "tclscalar", $flags;
+
+   Omit the $flags argument if not wanted.
+
+   To tie a Perl hash *%hash* to the Tcl array variable array in
+interpreter *$interp* with optional flags $flags (see SetVar above), use
+
+     tie %hash, Tcl::Var, $interp, "array", $flags;
+
+   Omit the $flags argument if not wanted. Any alteration to Perl variable
+*$hash{"key"}* affects the Tcl variable *array(key)* and *vice versa*.
+
+AUTHOR
+------
+
+   Malcolm Beattie, mbeattie@sable.ox.ac.uk, 23 Oct 1994.
+
+
+File: pm.info,  Node: Tcl/Tk,  Next: TeX/DVI,  Prev: Tcl,  Up: Module List
+
+Extension module for Perl giving access to Tk via the Tcl extension
+*******************************************************************
+
+NAME
+====
+
+   Tcl::Tk - Extension module for Perl giving access to Tk via the Tcl
+extension
+
+SYNOPSIS
+========
+
+     use Tcl;
+     use Tcl::Tk qw(:widgets :misc);
+     $interp = new Tcl::Tk;
+     label(".l", -text => "Hello world");
+     tkpack ".l";
+     MainLoop;
+
+DESCRIPTION
+===========
+
+   The Tcl::Tk submodule of the Tcl module gives access to the Tk library.
+It does this by creating a Tcl interpreter object (using the Tcl extension)
+and binding in all of Tk into the interpreter (in the same way that *wish*
+or other Tcl/Tk applications do).
+
+Access to the Tcl and Tcl::Tk extensions
+----------------------------------------
+
+   To get access to the Tcl and Tcl::Tk extensions, put the commands
+use Tcl;     use Tcl::Tk;
+
+   near the top of your program. You can also import short-cut functions
+into your namespace from Tcl::Tk if you want to avoid using method calls
+for everything.
+
+Creating a Tcl interpreter for Tk
+---------------------------------
+
+   To create a Tcl interpreter initialised for Tk, use
+
+     $i = new Tcl::Tk (DISPLAY, NAME, SYNC);
+
+   All arguments are optional. This creates a Tcl interpreter object $i,
+and creates a main toplevel window. The window is created on display
+DISPLAY (defaulting to the display named in the DISPLAY environment
+variable) with name NAME (defaulting to the name of the Perl program, i.e.
+the contents of Perl variable $0). If the SYNC argument is present and
+true then an *XSynchronize()* call is done ensuring that X events are
+processed synchronously (and thus slowly). This is there for completeness
+and is only very occasionally useful for debugging errant X clients
+(usually at a much lower level than Tk users will want).
+
+Entering the main event loop
+----------------------------
+
+   The Perl method call
+
+     $i->MainLoop;
+
+   on the Tcl::Tk interpreter object enters the Tk event loop. You can
+instead do `Tcl::Tk::MainLoop' or `Tcl::Tk->MainLoop' if you prefer.  You
+can even do simply MainLoop if you import it from Tcl::Tk in the use
+statement. Note that commands in the Tcl and Tcl::Tk extensions closely
+follow the C interface names with leading Tcl_ or Tk_ removed.
+
+Creating widgets
+----------------
+
+   If desired, widgets can be created and handled entirely by Tcl/Tk code
+evaluated in the Tcl interpreter object $i (created above). However, there
+is an additional way of creating widgets in the interpreter directly from
+Perl. The names of the widgets (frame, toplevel, label etc.)  can be
+imported as direct commands from the Tcl::Tk extension. For example, if
+you have imported the label command then
+
+     $l = label(".l", -text => "Hello world);
+
+   executes the command
+
+     $i->call("label", ".l", "-text", "Hello world);
+
+   and hence gets Tcl to create a new label widget .l in your Tcl/Tk
+interpreter. You can either import such commands one by one with, for
+example,
+
+     use Tcl::Tk qw(label canvas MainLoop winfo);
+
+   or you can use the pre-defined Exporter tags *:widgets* and *:misc*.
+The *:widgets* tag imports all the widget commands and the *:misc* tag
+imports all non-widget commands (see the next section).
+
+   Let's return to the creation of the label widget above. Since Tcl/Tk
+creates a command ".l" in the interpreter and creating a similarly named
+sub in Perl isn't a good idea, the Tcl::Tk extension provides a slightly
+more convenient way of manipulating the widget. Instead of returning the
+name of the new widget as a string, the above label command returns a Perl
+reference to the widget's name, blessed into an almost empty class. Perl
+method calls on the object are translated into commands for the Tcl/Tk
+interpreter in a very simplistic fashion. For example, the Perl command
+
+     $l->configure(-background => "green");
+
+   is translated into the command
+
+     $i->call($$l, "configure", "-background", "green");
+
+   for execution in your Tcl/Tk interpreter. Notice that it simply
+dereferences the object to find the widget name. There is no automagic
+conversion that happens: if you use a Tcl command which wants a widget
+pathname and you only have an object returned by `label()' (or `button()'
+or `entry()' or whatever) then you must dereference it yourself.
+
+Non-widget Tk commands
+----------------------
+
+   For convenience, the non-widget Tk commands (such as destroy, focus,
+`wm', `winfo' and so on) are also available for export as Perl commands
+and translate into into their Tcl equivalents for execution in your Tk/Tcl
+interpreter. The names of the Perl commands are the same as their Tcl
+equivalents except for two: Tcl's pack command becomes `tkpack' in Perl
+and Tcl's bind command becomes `tkbind' in Perl. The arguments you pass to
+any of these Perl commands are not touched by the Tcl parser: each Perl
+argument is passed as a separate argument to the Tcl command.
+
+AUTHOR
+------
+
+   Malcolm Beattie, mbeattie@sable.ox.ac.uk
+
+
+File: pm.info,  Node: TeX/DVI,  Next: TeX/DVI/Parse,  Prev: Tcl/Tk,  Up: Module List
+
+write out TeX's DVI (DeVice Independent) file
+*********************************************
+
+NAME
+====
+
+   TeX::DVI - write out TeX's DVI (DeVice Independent) file
+
+SYNOPSIS
+========
+
+     use TeX::DVI;
+     use Font::TFM;
+
+     my $dvi = new TeX::DVI "texput.dvi";
+     my $font = new_at Font::TFM "cmr10", 12
+     	or die "Error loading cmr10 at 12 pt: $Font::TFM::errstr\n";
+     $dvi->preamble();
+     $dvi->begin_page();
+     $dvi->push();
+     my $fn = $dvi->font_def($font);
+     $dvi->font($fn);
+     $dvi->word("difficulty");
+     $dvi->hskip($font->space());
+     $dvi->word("AVA");
+     $dvi->black_box($font->em_width(), $font->x_height());
+     $dvi->pop();
+     $dvi->end_page();
+     $dvi->postamble();
+     $dvi->close();
+
+DESCRIPTION
+===========
+
+   Method *TeX::DVI::new* creates a new DVI object in memory and opens the
+output DVI file. After that, elements can be written into the file using
+appropriate methods.
+
+   These are the methods available on the *Font::TFM* object:
+
+preamble, postamble, begin_page, end_page, push, pop
+     Writes out appropriate command of the `.dvi' file.
+
+font_def
+     The parameter is a reference to a *Font::TFM* object. Info out of this
+     object will be printed out. The method returns the internal number of
+     the font in this `.dvi' file.
+
+font
+     Writes out the font_sel command, the parametr is the number returned
+     by font_def.
+
+hskip, vskip
+     Skips.
+
+black_box
+     Creates a black box, can be used for hrules and vrules.
+
+special
+     Writes out the special command, one parameter is written as the
+     command.
+
+word
+     Writes out a word given as the first parameter. The currently selected
+     font is used to gather information about ligatures and kernings,
+     that's why it's possible to say
+
+          $dvi->word("difficulty");
+          
+          and the C<ffi> will be ligatured all right.
+
+close
+     Close the file.
+
+BUGS
+====
+
+   The error handling is rather weak - the modul currently assumes you
+know why you call the method you call.
+
+VERSION
+=======
+
+   0.100
+
+AUTHOR
+======
+
+   (c) 1996-1998 Jan Pazdziora, adelton@fi.muni.cz,
+http://www.fi.muni.cz/~adelton/ at Faculty of Informatics, Masaryk
+University in Brno, Czech Republic
+
+SEE ALSO
+========
+
+   Font::TFM(3), TeX::DVI::Parse(3), perl(1).
+
+
+File: pm.info,  Node: TeX/DVI/Parse,  Next: TeX/Hyphen,  Prev: TeX/DVI,  Up: Module List
+
+parse TeX's DVI output file
+***************************
+
+NAME
+====
+
+   TeX::DVI::Parse - parse TeX's DVI output file
+
+SYNOPSIS
+========
+
+     use TeX::DVI::Parse;
+     my $dvi_parse = new TeX::DVI::Parse("test.dvi");
+     $dvi_parse->parse();
+
+DESCRIPTION
+===========
+
+   I have created this module on request from Mirka Misáková. She wanted
+to do some post-processing on the DVI file and I said that it will be
+better to parse the DVI file directly, instead of the output of the
+*dvitype* program.
+
+   As the result there is this module *TeX::DVI::Parse* that recognizes
+all commands from the DVI file and for each command found it calls method
+of appropriate name, if defined in the class.
+
+   The example above is not very reasonable because the core
+*TeX::DVI::Parse* module doesn't itself define any methods for the DVI
+commands. You will probably want to inherit a new class and define the
+functions yourself:
+
+     packages My_Parse_DVI;
+     use TeX::DVI::Parse;
+     @ISA = qw( TeX::DVI::Parse );
+
+     sub set_char
+     	{
+     	my ($self, $ord, $char) = @_;
+     	## print the info or something;
+     	}
+
+   As an example there is class *TeX::DVI::Print* coming in this file, so
+you can do
+
+     use TeX::DVI::Parse;
+     my $dvi_parse = new TeX::DVI::Print("test.dvi");
+     $dvi_parse->parse();
+
+   and get listing of DVI's content printed in (hopefully) readable form.
+
+Methods
+-------
+
+   For creating new classes, a documentation of expected methods names and
+their parameters is necessary, so here is the list. The names come from
+the *dvitype* documentation and that is also the basic reference for the
+meaning of the parameters. Note that each method receives as the first two
+parameters *$self* and *$ord*, reference to the parsing object and the
+byte value of the command as found in the DVI file.  These are mandatory
+so only the other parameters to each method are listed below.
+
+set_char - typeset character and shift right by its width
+     *$char* - specifies the ordinal value of the character.
+
+put_char - as set_char but without moving
+     *$char* - ordinal value of the character.
+
+set_rule - typeset black rectangle and shift to the right
+     $height, $width - dimensions of the rectangle.
+
+put_rule - as set_rule without moving
+     $height, $width - dimensions of the rectangle.
+
+nop - no operation
+     no parameter
+
+bop - begin of page
+     *$number[0]* .. *$number[9]*, *$prev_page* - the ten numbers that
+     specify the page, the pointer to the start of the previous page.
+
+eop - end of page
+     no parameter
+
+push - push to the stack
+     no parameter
+
+pop - pop from the stack
+     no parameter
+
+right - move right
+     $value - how much to move.
+
+move_w, move_x, down, move_y, move_z - move position
+     all take one parameter, $value.
+
+fnt_def - define font
+     $k, $c, $s, $d, *$a*, *$l*, $n - number of the font, checksum, scale
+     factor, design size, length of the directory and length of the
+     filename, name of the font.
+
+fnt_num - select font
+     $k - number of the font.
+
+special - generic DVI primitive
+     $k, $x - length of the special and its data.
+
+preamble
+     $i, $num, *$den*, *$mag*, $k, $x - ID of the format, numerator and
+     denumerator of the multiplication fraction, magnification, length of
+     the comment and comment.
+
+post - postamble
+     $p, $num, *$den*, *$mag*, *$l*, $u, $s, $t - pointer to the last
+     page, the next three are as in preamble, maximal dimensions (*$l* and
+     $u), maximal depth of the stack and the final page number.
+
+post_post - post postamble
+     $q, $i, *$dummy* - pointer to the postamble, ID and the last fill.
+
+undefined_command - for byte that has no other meaning
+     no parameter
+
+VERSION
+=======
+
+   0.02
+
+SEE ALSO
+========
+
+   Font::TFM(3), TeX::DVI(3), perl(1).
+
+AUTHOR
+======
+
+   (c) 1997-1998 Jan Pazdziora, adelton@fi.muni.cz,
+http://www.fi.muni.cz/~adelton/ at Faculty of Informatics, Masaryk
+University in Brno, Czech Republic
+
+

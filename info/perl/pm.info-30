@@ -1,0 +1,1673 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Apache/SizeLimit,  Next: Apache/SmallProf,  Prev: Apache/SimpleReplace,  Up: Module List
+
+Because size does matter.
+*************************
+
+NAME
+====
+
+   Apache::SizeLimit - Because size does matter.
+
+SYNOPSIS
+========
+
+   This module allows you to kill off Apache httpd processes if they grow
+too large.  You can choose to set up the process size limiter to check the
+process size on every request:
+
+     # in your startup.pl:
+     use Apache::SizeLimit;
+     $Apache::SizeLimit::MAX_PROCESS_SIZE = 10000; # in KB, so this is 10MB
+
+     # in your httpd.conf:
+     PerlFixupHandler Apache::SizeLimit
+     # you can set this up as any Perl*Handler that handles part of the
+     # request, even the LogHandler will do.
+
+   Or you can just check those requests that are likely to get big, such as
+CGI requests.  This way of checking is also easier for those who are mostly
+just running CGI.pm/Registry scripts:
+
+     # in your CGI:
+     use Apache::SizeLimit;
+     &Apache::SizeLimit::setmax(10000);	# Max Process Size in KB
+
+   Since checking the process size can take a few system calls on some
+platforms (e.g. linux), you may want to only check the process size every
+N times.  To do so, put this in your startup.pl or CGI:
+
+     $Apache::SizeLimit::CHECK_EVERY_N_REQUESTS = 2;
+
+   This will only check the process size every other time the process size
+checker is called.
+
+DESCRIPTION
+===========
+
+   This module is highly platform dependent, please read the CAVEATS
+section.
+
+   This module was written in response to questions on the mod_perl mailing
+list on how to tell the httpd process to exit if it gets too big.
+
+   Actually there are two big reasons your httpd children will grow.
+First, it could have a bug that causes the process to increase in size
+dramatically, until your system starts swapping.  Second, your process just
+does stuff that requires a lot of memory, and the more different kinds of
+requests your server handles, the larger the httpd processes grow over
+time.
+
+   This module will not really help you with the first problem.  For that
+you should probably look into Apache::Resource or some other means of
+setting a limit on the data size of your program.  BSD-ish systems have
+setrlimit() which will croak your memory gobbling processes.  However it
+is a little violent, terminating your process in mid-request.
+
+   This module attempts to solve the second situation where your process
+slowly grows over time.  The idea is to check the memory usage after every
+request, and if it exceeds a threshold, exit gracefully.
+
+   By using this module, you should be able to discontinue using the Apache
+configuration directive *MaxRequestsPerChild*, although for some folks,
+using both in combination does the job.  Personally, I just use the
+technique shown in this module and set my MaxRequestsPerChild value to
+6000.
+
+CAVEATS
+=======
+
+   This module is platform dependent, since finding the size of a process
+is pretty different from OS to OS, and some platforms may not be supported.
+
+   Currently supported OSes:
+
+linux
+     For linux we read the process size out of /proc/self/status.  This is
+     a little slow, but usually not too bad. If you are worried about
+     performance, try only setting up the the exit handler inside CGIs
+     (with the `setmax' function), and see if the CHECK_EVERY_N_REQUESTS
+     option is of benefit.
+
+solaris 2.6 and above
+     For solaris we simply retrieve the size of /proc/self/as, which
+     contains the address-space image of the process, and convert to KB.
+
+     NOTE: This is only known to work for solaris 2.6 and above. Evidently
+     the /proc filesystem has changed between 2.5.1 and 2.6. Can anyone
+     confirm or deny?
+
+
+     Uses BSD::Resource::getrusage() to determine process size.  This is
+     pretty efficient (a lot more efficient than reading it from the /proc
+     fs anyway).
+
+AIX?
+     Uses BSD::Resource::getrusage() to determine process size.
+
+   If your platform is not supported, and if you can tell me how to check
+for the size of a process under your OS (in KB), then I will add it to the
+list.  The more portable/efficient the solution, the better, of course.
+
+TODO
+====
+
+   Possibly provide a perl make/install so that the SizeLimit.pm is
+created at build time with only the code you need on your platform.
+
+   If Apache was started in non-forking mode, should hitting the size limit
+cause the process to exit?
+
+AUTHOR
+======
+
+   Doug Bagley <doug+modperl@bagley.org>, channeling Procrustes.
+
+   Brian Moseley <ix@maz.org>: Solaris 2.6 support
+
+
+File: pm.info,  Node: Apache/SmallProf,  Next: Apache/Stage,  Prev: Apache/SizeLimit,  Up: Module List
+
+Hook Devel::SmallProf into mod_perl
+***********************************
+
+NAME
+====
+
+   Apache::SmallProf - Hook Devel::SmallProf into mod_perl
+
+SYNOPSIS
+========
+
+     <IfDefine PERLSMALLPROF>
+
+     <Perl>
+      use Apache::DB ();
+      Apache::DB->init;
+     </Perl>
+
+     <Location />
+      PerlFixupHandler Apache::SmallProf
+     </Location>
+      </IfDefine>
+
+DESCRIPTION
+===========
+
+   Devel::SmallProf is a line-by-line code profiler.  Apache::SmallProf
+provides this profiler in the mod_perl environment.  Profiles are written
+to *ServerRoot/logs/smallprof* and unlike *Devel::SmallProf* the profile is
+split into several files based on package name.
+
+   The *Devel::SmallProf* documentation explains how to analyize the
+profiles, e.g.:
+
+     % sort -nrk 2  logs/smallprof/CGI.pm.prof | more
+             1 0.104736       629:     eval "package $pack; $$auto";
+             2 0.002831       647:       eval "package $pack; $code";
+             5 0.002002       259:    return $self->all_parameters unless @p;
+             5 0.000867       258:    my($self,@p) = self_or_default(@_);
+             ...
+
+SEE ALSO
+========
+
+   Devel::SmallProf(3), Apache::DB(3), Apache::DProf(3)
+
+AUTHOR
+======
+
+   Devel::SmallProf - Ted Ashton Apache::SmallProf derived from
+Devel::SmallProf - Doug MacEachern
+
+
+File: pm.info,  Node: Apache/Stage,  Next: Apache/StatINC,  Prev: Apache/SmallProf,  Up: Module List
+
+Manage A Staging Directory
+**************************
+
+NAME
+====
+
+   Apache::Stage - Manage A Staging Directory
+
+SYNOPSIS
+========
+
+     <Location /STAGE>
+       # this location is served by normal apache. It's recommended to
+       # restrict access to this location to registered authors of this
+       # site, but a restriction isn't necessary
+       ErrorDocument 403 /stage-redir
+       ErrorDocument 404 /stage-redir
+     </Location>
+
+     <Location /stage-redir>
+       # the name of this location must match the ErrorDocument redirects
+       # above
+
+     # PerlSetVar apache_stage_regex " ^ (/STAGE/[^/]*) (.*) $ "
+
+     # This regex has to split a staged URI into two parts. It is
+     # evaluated with the /ox switch in effect, so this will NOT be a
+     # per-directory variable. The first part will be thrown away and
+     # just the second part will be served if the original URI cannot
+     # be accessed. In case of 301 and 302 redirects the first part
+     # will be prepended again. The default regex is defined as above
+     # which means that URIS will be split into "/STAGE/anyuser" and
+     # the rest.
+
+     SetHandler perl-script
+     PerlHandler Apache::Stage
+     Options ExecCGI
+
+     </Location>
+
+DESCRIPTION
+===========
+
+   A staging place is a place where an author of an HTML document checks
+the look and feel of a document before it's uploaded to the final
+location. A staging place doesn't need to be a separate server, nor need
+it be a mirror of the "real" tree, and not even a tree of symbolic links.
+A sparse directory tree that holds nothing but the staged files will do.
+
+   Apache::Stage implements a staging directory that needs a minimum of
+space.  Per default the path for the per-user staging directory is
+hardcoded as
+
+     /STAGE/any-user-name
+
+   The code cares for proper internal and external redirects for any
+documents that are not in the stage directory tree. This means that all
+graphics are displayed as they will be later after the staged files will
+have been published. The following table describes what has been tested:
+
+     Location              Redirect to       Comment
+
+     /STAGE/u1/            /                 Homepage. Internal Redirect.
+
+     /STAGE/u2/dir1        /dir1/            Really /dir1/index.html
+
+     /STAGE/u3/dir2        /dir2/            Directory has no index.html
+                                             Options Indexes is off, thus
+                                             "Forbidden"
+
+     /STAGE/u4/dir2/foo    /dir2/foo         Internal redirect.
+
+     /STAGE/u5/bar         -                 Exists really, no redirect
+                                             necessary
+
+     /STAGE/u6             -                 Fails unless location exists
+
+   The entries described in SYNOPSIS in the access.conf or an equivalent
+place define the name of the staging directory, the name of an internal
+location that catches the exception when a document is not in the staging
+directory, and the regular expression that transforms the staging URI into
+the corresponding public URI.
+
+   With this setup only ErrorDocument 403 and 404 will be served by
+Apache::Stage. If you need coexistence with different ErrorDocument
+handlers, you will either have to disable them for /STAGE or integrate the
+code of Apache::Stage into an if/else branch based on the path.
+
+AUTHOR
+======
+
+   Andreas König <koenig@kulturbox.de>
+
+
+File: pm.info,  Node: Apache/StatINC,  Next: Apache/Status,  Prev: Apache/Stage,  Up: Module List
+
+Reload %INC files when updated on disk
+**************************************
+
+NAME
+====
+
+   Apache::StatINC - Reload %INC files when updated on disk
+
+SYNOPSIS
+========
+
+     #httpd.conf or some such
+     #can be any Perl*Handler
+     PerlInitHandler Apache::StatINC
+
+DESCRIPTION
+===========
+
+   When Perl pulls a file via require, it stores the filename in the
+global hash %INC.  The next time Perl tries to require the same file, it
+sees the file in %INC and does not reload from disk.  This module's
+handler iterates over %INC and reloads the file if it has changed on disk.
+
+   Note that StatINC operates on the current context of `@INC'.  Which
+means, when called as a Perl*Handler it will not see `@INC' paths added or
+removed by Apache::Registry scripts, as the value of `@INC' is saved on
+server startup and restored to that value after each request.  In other
+words, if you want StatINC to work with modules that live in custom `@INC'
+paths, you should modify `@INC' when the server is started.  Besides, 'use
+lib' in startup scripts, you can also set the PERL5LIB variable in the
+httpd's environment to include any non-standard 'lib' directories that you
+choose.  For example, you might use a script called 'start_httpd' to start
+apache, and include a line like this:
+
+     PERL5LIB=/usr/local/foo/myperllibs; export PERL5LIB
+
+   When you have problems with modules not being reloaded, please refer to
+the following lines in 'perlmodlib':
+
+   "Always use -w. Try to `use strict;' (or `use strict qw(...);').
+Remember that you can add `no strict qw(...);' to individual blocks of
+code that need less strictness. Always use -w. Always use -w!  Follow the
+guidelines in the perlstyle(1) manual."
+
+   Warnings when running under mod_perl is enabled with 'PerlWarn On' in
+your httpd.conf.
+
+   It will most likely help you to find the problem. Really.
+
+OPTIONS
+=======
+
+StatINC_UndefOnReload
+     Normally, StatINC will turn of warnings to avoid "Subroutine
+     redefined" warnings when it reloads a file.  However, this does not
+     disable the Perl mandatory warning when re-defining constant
+     subroutines (see perldoc perlsub).  With this option On, StatINC will
+     invoke the *Apache::Symbol* *undef_functions* method to avoid these
+     mandatory warnings:
+
+          PerlSetVar StatINC_UndefOnReload On
+
+StatINC_Debug
+     You can make StatINC tell when it reloads a module by setting this
+     option to on.
+
+          PerlSetVar StatINC_Debug 1
+
+     The only used debug level is currently 1.
+
+SEE ALSO
+========
+
+   mod_perl(3)
+
+AUTHOR
+======
+
+   Currently maintained by Ask Bjoern Hansen <ask@netcetera.dk>.  Written
+by Doug MacEachern.
+
+
+File: pm.info,  Node: Apache/Status,  Next: Apache/Storage,  Prev: Apache/StatINC,  Up: Module List
+
+Embedded interpreter status information
+***************************************
+
+NAME
+====
+
+   Apache::Status - Embedded interpreter status information
+
+SYNOPSIS
+========
+
+     <Location /perl-status>
+     SetHandler  perl-script
+     PerlHandler Apache::Status
+     </Location>
+
+DESCRIPTION
+===========
+
+   The *Apache::Status* module provides some information about the status
+of the Perl interpreter embedded in the server.
+
+   Configure like so:
+
+     <Location /perl-status>
+     SetHandler  perl-script
+     PerlHandler Apache::Status
+     </Location>
+
+   Other modules can "plugin" a menu item like so:
+
+     Apache::Status->menu_item(
+        'DBI' => "DBI connections", #item for Apache::DBI module
+        sub {
+            my($r,$q) = @_; #request and CGI objects
+            my(@strings);
+            push @strings,  "blobs of html";
+            return \@strings;     #return an array ref
+        }
+     ) if Apache->module("Apache::Status"); #only if Apache::Status is loaded
+
+   WARNING: Apache::Status must be loaded before these modules via the
+PerlModule or PerlRequire directives.
+
+OPTIONS
+=======
+
+StatusOptionsAll
+     This single directive will enable all of the options described below.
+
+          PerlSetVar StatusOptionsAll On
+
+StatusDumper
+     When browsing symbol tables, the values of arrays, hashes ans calars
+     can be viewed via Data::Dumper if this configuration variable is set
+     to On:
+
+          PerlSetVar StatusDumper On
+
+StatusPeek
+     With this option On and the *Apache::Peek* module installed,
+     functions and variables can be viewed ala Devel::Peek style:
+
+          PerlSetVar StatusPeek On
+
+StatusLexInfo
+     With this option On and the *B::LexInfo* module installed, subroutine
+     lexical variable information can be viewed.
+
+          PerlSetVar StatusLexInfo On
+
+StatusDeparse
+     With this option On and B::Deparse version 0.59 or higher (included
+     in Perl 5.005_59+), subroutines can be "deparsed".
+
+          PerlSetVar StatusDeparse On
+
+     Options can be passed to B::Deparse::new like so:
+
+          PerlSetVar StatusDeparseOptions "-p -sC"
+
+     See the B::Deparse manpage for details.
+
+StatusTerse
+     With this option On, text-based op tree graphs of subroutines can be
+     displayed, thanks to B::Terse.
+
+          PerlSetVar StatusTerse On
+
+StatusTerseSize
+     With this option On and the *B::TerseSize* module installed,
+     text-based op tree graphs of subroutines and their size can be
+     displayed.  See the *B::TerseSize* docs for more info.
+
+          PerlSetVar StatusTerseSize On
+
+StatusTerseSizeMainSummary
+     With this option On and the *B::TerseSize* module installed, a
+     "Memory Usage" will be added to the Apache::Status main menu.  This
+     option is disabled by default, as it can be rather cpu intensive to
+     summarize memory usage for the entire server.  It is strongly
+     suggested that this option only be used with a development server
+     running in -X mode, as the results will be cached.
+
+          PerlSetVar StatusTerseSizeMainSummary On
+
+StatusGraph
+     When StatusDumper is enabled, another link "OP Tree Graph" will be
+     present with the dump if this configuration variable is set to On:
+
+          PerlSetVar StatusGraph
+
+     This requires the B module (part of the Perl compiler kit) and
+     B::Graph (version 0.03 or higher) module to be installed along with
+     the dot program.
+
+     Dot is part of the graph visualization toolkit from AT&T:
+     `http://www.research.att.com/sw/tools/graphviz/').
+
+     WARNING: Some graphs may produce very large images, some graphs may
+     produce no image if B::Graph's output is incorrect.
+
+Dot
+     Location of the dot program for StatusGraph, if other than /usr/bin
+     or /usr/local/bin
+
+GraphDir
+     Directory where StatusGraph should write it's temporary image files.
+     Default is $ServerRoot/logs/b_graphs
+
+PREREQUISITES
+=============
+
+   The *Devel::Symdump* module, version *2.00* or higher.
+
+SEE ALSO
+========
+
+   perl(1), Apache(3), Devel::Symdump(3), Data::Dumper(3), B(3),
+B::Graph(3)
+
+AUTHOR
+======
+
+   Doug MacEachern
+
+
+File: pm.info,  Node: Apache/Storage,  Next: Apache/Sybase/CTlib,  Prev: Apache/Status,  Up: Module List
+
+Storing data in Apache.
+***********************
+
+NAME
+====
+
+   Apache::Storage - Storing data in Apache.
+
+SYNOPSIS
+========
+
+     use Apache::Storage;
+
+DESCRIPTION
+===========
+
+   Ever wanted to store information in Apache so the additional requests
+could gain access to it?
+
+   For example, you create an object which is fairly expensive and you
+don't want to have to recreate each time, or say you just have some
+information you are storing in a reference that you want requests that
+follow you to see.
+
+   This module is for you.
+
+   It has three functions described below. They allow you to store and
+retrieve information from the Apache process. The functions are fairly
+simple and should make it pretty easy for you to do so without to much
+hassle.
+
+   All of this works with subrequests, so unlike pnotes, you don't need to
+worry about loosing data if your request is subrequested by an outside
+Apache module.
+
+   You can also use the ApacheStorage directive inside of Apache to prime
+data into the Apache::Storage.
+
+FUNCTIONS
+---------
+
+   Note
+
+   Keep in mind that data is only stored on the Apache process itself.
+Different child processes all have their own storage. Don't assume you will
+get the same Apache child process when reconnecting.
+
+   Make sure you put a "PerlModule Apache::Storage" in your httpd.conf
+file. Apache make core if you do not do this.
+
+set_storage
+     Set functions can be called in two ways. They can be called with a
+     key and a reference. The reference will then be available by calling
+     it through a get function.  You can also pass in hash reference. The
+     contents of this hash will be mapped into storage based on it
+     original key pair. Nothing is returned by either of these functions
+
+get_storage
+     Get functions can be calling in two ways. They can either be called
+     with a single key, where they will return a single hash
+
+get_storage_dump
+     This gives you a hash of the entire contents of what is being stored
+     currently.
+
+Apache Directives
+-----------------
+
+ApacheStore
+     Takes two arguments, a key and a value. The value is evaled.
+
+ApacheStorageInit
+     Takes no values, and only needs to be used if you don't have at least
+     one ApacheStore call.
+
+Example
+=======
+
+httpd.conf
+     <VirtualHost 10.0.2.25:80>
+
+          ServerAdmin root@tangent.org
+
+          DocumentRoot /usr/local/apache/htdocs
+
+          ServerName slash.tangent.org
+
+          ErrorLog logs/error_log
+
+          CustomLog logs/access_log common
+
+          ApacheStoreINIT
+
+     </VirtualHost>
+
+     <VirtualHost 10.0.2.25:80>
+
+          ServerAdmin root@tangent.org
+
+          DocumentRoot /usr/local/apache/htdocs
+
+          ServerName slash2.tangent.org
+
+          ErrorLog logs/error_log
+
+          CustomLog logs/access_log common
+
+          ApacheStore foo "[qw(skdjf slkdjf lskdjf)]"
+
+     </VirtualHost>
+
+LICENSE
+=======
+
+   See the file LICENSE that this comes with.
+
+SEE ALSO
+========
+
+   perl(3).  mod_perl(3).
+
+HOME
+====
+
+   http://tangent.org/Apache-Storage/
+
+Author
+======
+
+   Brian Aker, brian@tangent.org
+
+   Seattle, WA.
+
+
+File: pm.info,  Node: Apache/Sybase/CTlib,  Next: Apache/Symbol,  Prev: Apache/Storage,  Up: Module List
+
+Perl extension for creating persistant database connections to sybase using Apache and Sybperl.
+***********************************************************************************************
+
+NAME
+====
+
+   Apache::Sybase::CTlib - Perl extension for creating persistant database
+connections to sybase using Apache and Sybperl.
+
+SYNOPSIS
+========
+
+   use Apache::Sybase::CTlib;
+
+   Apache::Sybase::CTlib->connect_on_init("user", "password", "server",
+"db");
+
+DESCRIPTION
+===========
+
+   This module allows Apache/Modperl/Sybperl users to connect to sybase
+data servers, and maintain persistant connections. The advantage should be
+clear, as this avoids the overhead of creating a connection, gathering
+data, and then destroying the connection with every query.
+
+   Place the above commands in your startup file for apache:
+
+   In httpd.conf
+
+   PerlRequire /apache/startup.pl
+
+   In /apache/startup.pl
+
+   use Apache::Sybase::CTlib;
+
+   Apache::Sybase::CTlib->connect_on_init("user", "password", "server",
+"db");
+
+   Passing db (database name) to the module will allow you to specify a
+database to start in (the module will execute "use database" after the
+connection is established). This is an optional parameter.
+
+AUTHOR
+======
+
+   Mark A. Downing, mdowning@rdatasys.com http://www.wm7d.net/
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: Apache/Symbol,  Next: Apache/Symdump,  Prev: Apache/Sybase/CTlib,  Up: Module List
+
+Things for symbol things
+************************
+
+NAME
+====
+
+   Apache::Symbol - Things for symbol things
+
+SYNOPSIS
+========
+
+     use Apache::Symbol ();
+
+     @ISA = qw(Apache::Symbol);
+
+DESCRIPTION
+===========
+
+   *perlsub/Constant Functions* says:
+
+     If you redefine a subroutine which was eligible for inlining you'll get
+     a mandatory warning.  (You can use this warning to tell whether or not a
+     particular subroutine is considered constant.)  The warning is
+     considered severe enough not to be optional because previously compiled
+     invocations of the function will still be using the old value of the
+     function.
+
+   *mandatory warning* means there is _no_ way to avoid this warning no
+matter what tricks you pull in Perl.  This is bogus for us mod_perl users
+when restarting the server with *PerlFreshRestart* on or when
+Apache::StatINC pulls in a module that has changed on disk.
+
+   You can, however, pull some tricks with XS to avoid this warning,
+*Apache::Symbol::undef* does just that.
+
+ARGUMENTS
+=========
+
+   `undef_functions' takes two arguments: skip and `only_undef_exports'.
+
+   skip is a regular expression indicating the function names to skip.
+
+   Use the `only_undef_exports' flag to undef only those functions which
+are listed in `@EXPORT', `@EXPORT_OK', `%EXPORT_TAGS', or
+`@EXPORT_EXTRAS'.  `@EXPORT_EXTRAS' is not used by the Exporter, it is
+only exists to communicate with `undef_functions'.
+
+   As a special case, if none of the EXPORT variables are defined ignore
+`only_undef_exports'.  This takes care of trivial modules that don't use
+the Exporter.
+
+ARGUMENTS
+=========
+
+   `undef_functions' takes two arguments: skip and `only_undef_exports'.
+
+   skip is a regular expression indicating the function names to skip.
+
+   Use the `only_undef_exports' flag to undef only those functions which
+are listed in `@EXPORT', `@EXPORT_OK', `%EXPORT_TAGS', or
+`@EXPORT_EXTRAS'.  `@EXPORT_EXTRAS' is not used by the Exporter, it is
+only exists to communicate with `undef_functions'.
+
+   As a special case, if none of the EXPORT variables are defined ignore
+`only_undef_exports'.  This takes care of trivial modules that don't use
+the Exporter.
+
+PLAYERS
+=======
+
+   This module and the undefining of functions is optional, if you wish to
+have this functionality enabled, there are one or more switches you need
+to know about.
+
+PerlRestartHandler
+     Apache::Symbol defines a PerlRestartHandler which can be useful in
+     conjuction with `PerlFreshRestart On' as it will avoid subroutine
+     redefinition messages.  Configure like so:
+
+          PerlRestartHandler Apache::Symbol
+
+Apache::Registry
+     By placing the SYNOPSIS bit in you script, Apache::Registry will
+     undefine subroutines in your script before it is re-compiled to avoid
+     "subroutine re-defined" warnings.
+
+Apache::StatINC
+     See Apache::StatINC's docs.
+
+APACHE_SYMBOL_UNIVERSAL
+     If this environment variable is true when Symbol.pm is compiled, it
+     will define UNIVERSAL::undef_functions, which means all classes will
+     inherit *Apache::Symbol::undef_functions*.
+
+Others
+     Module such as *HTML::Embperl* and *Apache::ePerl* who compile and
+     script cache scripts ala Apache::Registry style can use
+     `undef_functions' with this bit of code:
+
+          if($package->can('undef_functions')) {
+          	$package->undef_functions;
+          }
+
+     Where `$package' is the name of the package in which the script is
+     being re-compiled.
+
+SEE ALSO
+========
+
+   perlsub(1), Devel::Symdump(3)
+
+AUTHOR
+======
+
+   Doug MacEachern
+
+
+File: pm.info,  Node: Apache/Symdump,  Next: Apache/Table,  Prev: Apache/Symbol,  Up: Module List
+
+Symbol table snapshots
+**********************
+
+NAME
+====
+
+   Apache::Symdump - Symbol table snapshots
+
+SYNOPSIS
+========
+
+     PerlLogHandler Apache::Symdump
+
+DESCRIPTION
+===========
+
+   Apache:Symdump uses Devel::Symdump to record snapshots of the Perl
+symbol table in ServerRoot/logs/symdump.$$.$n Where $$ is the process id
+and $n is incremented each time the handler is run.  The diff utility can
+be used to compare snapshots and get an idea of what might be making a
+process grow.  Normally, new symbols come from modules or scripts that
+were not preloaded, the Perl method cache, etc.
+
+     % diff -u symdump.$$.0 symdump.$$.1
+
+CAVEATS
+=======
+
+   Apache::Symdump does not cleanup up its snapshot files, do so simply by:
+
+     % rm logs/symdump.* logs/incdump.*
+
+SEE ALSO
+========
+
+   Devel::Symdump(3), Apache::Leak(3)
+
+AUTHOR
+======
+
+   Doug MacEachern
+
+
+File: pm.info,  Node: Apache/Table,  Next: Apache/Taco,  Prev: Apache/Symdump,  Up: Module List
+
+Perl interface to the Apache table structure
+********************************************
+
+NAME
+====
+
+   Apache::Table - Perl interface to the Apache table structure
+
+SYNOPSIS
+========
+
+     use Apache::Table ();
+
+     my $headers_out = $r->headers_out;
+     while(my($key,$val) = each %$headers_out) {
+     ...
+     }
+
+     my $table = $r->headers_out;
+     $table->set(From => 'dougm@perl.apache.org');
+
+   mod_perl needs to be compiled with at least one of the following
+options:
+
+     DYNAMIC=1
+     PERL_TABLE_API=1
+     EVERYTHING=1
+
+DESCRIPTION
+===========
+
+   This module provides tied interfaces to Apache data structures.
+
+CLASSES
+-------
+
+Apache::Table
+     The Apache::Table class provides methods for interfacing with the
+     Apache table structure.  The following Apache class methods, when
+     called in a scalar context with no "key" argument, will return a HASH
+     reference blessed into the Apache::Table class and where HASH is tied
+     to Apache::Table:
+
+          headers_in
+          headers_out
+          err_headers_out
+          notes
+          dir_config
+          subprocess_env
+
+METHODS
+-------
+
+get
+     Corresponds to the `ap_table_get' function.
+
+          my $value = $table->get($key);
+
+          my $value = $headers_out->{$key};
+
+set
+     Corresponds to the `ap_table_set' function.
+
+          $table->set($key, $value);
+
+          $headers_out->{$key} = $value;
+
+unset
+     Corresponds to the `ap_table_unset' function.
+
+          $table->unset($key);
+
+          delete $headers_out->{$key};
+
+clear
+     Corresponds to the `ap_table_clear' function.
+
+          $table->clear;
+
+          %$headers_out = ();
+
+add
+     Corresponds to the `ap_table_add' function.
+
+          $table->add($key, $value);
+
+merge
+     Corresponds to the `ap_table_merge' function.
+
+          $table->merge($key, $value);
+
+AUTHOR
+======
+
+   Doug MacEachern
+
+SEE ALSO
+========
+
+   Apache(3), mod_perl(3)
+
+
+File: pm.info,  Node: Apache/Taco,  Next: Apache/TempFile,  Prev: Apache/Table,  Up: Module List
+
+mod_perl handler for Taco
+*************************
+
+NAME
+====
+
+   Apache::Taco.pm - mod_perl handler for Taco
+
+SYNOPSIS
+========
+
+   This module defines a mod_perl handler (running under the Apache web
+server) that serves Taco pages.
+
+     # In Apache's srm.conf (or similar), setup so
+     # files ending in .taco get handled by Apache::Taco
+     <Files ~ "\.taco$">
+      SetHandler perl-script
+      PerlHandler Apache::Taco
+      PerlSetVar TacoRelayHost whatever.you.want/no_taco  # for SSI
+     </Files>
+
+DESCRIPTION
+===========
+
+   This module lets you serve Taco files over the World Wide Web.  It lets
+you write Taco modules that take advantage of mod_perl's speed and power.
+
+PerlSetVar parameters
+---------------------
+
+   When this handler runs, it takes several different parameters that can
+alter its behavior.  To set any of these parameters, use the PerlSetVar
+command in an appropriate Apache config file.  This may be any of
+httpd.conf, srm.conf, etc., or a .htaccess file:
+
+     PerlSetVar TacoService joes_cars
+
+   See the mod_perl documentation for more information about PerlSetVar.
+
+   * TacoService <service name>
+
+     Use this to set the service that a request will run under.  See
+     Taco::ServiceRegistry.pm for more information about services.
+
+   * TacoCGI <true or false>
+
+     If set to true, Taco will interpret the file as Perl code.  The Perl
+     code will have access to all of Taco's internal functions.
+
+   * TacoRelayHost < URL prefix >
+
+     By default, Apache::Taco will just read in the file pointed to by the
+     URL and interpret it as a Taco template.  This prevents server-side
+     includes, however.  If you want to use server-side includes, you
+     should use either the TacoRelayHost parameter or the TacoFilterMod
+     parameter.
+
+     If your server is configured with the following:
+
+          PerlSetVar TacoRelayHost http://whatever.host.edu/no_taco
+
+     and Apache::Taco gets a request at http://taco.host.edu/page.taco, it
+     will request the URL http://whatever.host.edu/no_taco/page.taco, and
+     then interpret the content of that page as a Taco template.
+
+   * TacoFilterMod < Perl module (class) >
+
+     If you'd rather implement SSI (or any other text processing) yourself
+     in a Perl module, you can use the TacoFilterMod parameter:
+
+          PerlSetVar TacoFilterMod  MyPackage::filter
+
+     The MyPackage::filter class needs to define a new() method and an
+     output() method, because it will be called like this:
+
+          # Pass the filename and the current Apache::Request object
+          my $p = MyPackage::filter->new($filename, $G::r);
+          $template->set_text( $p->output );
+          $template->output($buffer);
+
+     It's possible that the TacoFilterMod capability can be better
+     implemented by using an Apache::OutputChain, but I don't know much
+     about that yet.
+
+   * TacoDebug <true or false>
+
+     When this parameter is set to 'true', Apache::Taco will print a few
+     debug statements to Apache's error log.
+
+SEE ALSO
+========
+
+   Taco(3), Apache(3), mod_perl(1), and the mod_perl web site at
+http://perl.apache.org/
+
+AUTHOR
+======
+
+   Ken Williams (ken@forum.swarthmore.edu)
+
+   Copyright (c) 1998 Swarthmore College. All rights reserved.
+
+
+File: pm.info,  Node: Apache/TempFile,  Next: Apache/Template,  Prev: Apache/Taco,  Up: Module List
+
+Allocate temporary filenames for the duration of a request
+**********************************************************
+
+NAME
+====
+
+   Apache::TempFile - Allocate temporary filenames for the duration of a
+request
+
+SYNOPSIS
+========
+
+     use Apache::TempFile qw(tempname)
+     my($name) = tempname();
+     open(FILE,">$name");
+     print FILE "Testing\n";
+     close(FILE);
+
+DESCRIPTION
+===========
+
+   This module provides names for temporary files and ensures that they are
+removed when the current request is completed.
+
+FUNCTIONS
+=========
+
+tempname
+     This routine returns a unique temporary filename and arranges for that
+     file to be removed when the current request is completed. If an
+     extension is supplied as an argument that it will be appended to the
+     filename which is generated.
+
+          my($name) = Apache::TempFile::tempname();
+          my($name) = Apache::TempFile::tempname("html");
+
+AUTHOR
+======
+
+   Tom Hughes, tom@compton.demon.co.uk
+
+SEE ALSO
+========
+
+   Apache(3), mod_perl(3)
+
+
+File: pm.info,  Node: Apache/Template,  Next: Apache/Throttle,  Prev: Apache/TempFile,  Up: Module List
+
+Apache/mod_perl interface to the Template Toolkit
+*************************************************
+
+NAME
+====
+
+   Apache::Template - Apache/mod_perl interface to the Template Toolkit
+
+SYNOPSIS
+========
+
+     # add the following to your httpd.conf
+     PerlModule          Apache::Template
+
+     # set various configuration options, e.g.
+     TT2Trim             On
+     TT2PostChomp        On
+     TT2EvalPerl         On
+     TT2IncludePath      /usr/local/tt2/templates
+     TT2IncludePath      /home/abw/tt2/lib
+     TT2PreProcess       config header
+     TT2PostProcess      footer
+     TT2Error            error
+
+     # now define Apache::Template as a PerlHandler, e.g.
+     <Files *.tt2>
+     	SetHandler	perl-script
+         PerlHandler     Apache::Template
+     </Files>
+
+     <Location /tt2>
+     	SetHandler	perl-script
+         PerlHandler     Apache::Template
+     </Location>
+
+DESCRIPTION
+===========
+
+   The Apache::Template module provides a simple interface to the Template
+Toolkit from Apache/mod_perl.  The Template Toolkit is a fast, powerful
+and extensible template processing system written in Perl.  It implements
+a general purpose template language which allows you to clearly separate
+application logic, data and presentation elements.  It boasts numerous
+features to facilitate in the generation of web content both online and
+offline in "batch mode".
+
+   This documentation describes the Apache::Template module, concerning
+itself primarily with the Apache/mod_perl configuration options (e.g. the
+httpd.conf side of things) and not going into any great depth about the
+Template Toolkit itself.  The Template Toolkit includes copious
+documentation which already covers these things in great detail.  See
+*Note Template: Template, for further information.
+
+CONFIGURATION
+=============
+
+   Most of the Apache::Template configuration directives relate directly
+to their Template Toolkit counterparts, differing only in having a 'TT2'
+prefix, mixed capitalisation and lack of underscores to space individual
+words.  This is to keep Apache::Template configuration directives in
+keeping with the preferred Apache/mod_perl style.
+
+   e.g.
+
+     Apache::Template  =>  Template Toolkit
+     --------------------------------------
+     TT2Trim	          TRIM
+     TT2IncludePath        INCLUDE_PATH
+     TT2PostProcess        POST_PROCESS
+     ...etc...
+
+   In some cases, the configuration directives are named or behave
+slightly differently to optimise for the Apache/mod_perl environment or
+domain specific features.  For example, the TT2Tags configuration
+directive can be used to set TAG_STYLE and/or START_TAG and END_TAG and as
+such, is more akin to the Template Toolkit TAGS directive.
+
+   e.g.
+
+     TT2Tags	    html
+     TT2Tags	    <!--  -->
+
+   The configuration directives are listed in full below.  Consult *Note
+Template: Template, for further information on their effects within the
+Template Toolkit.
+
+TT2Tags
+     Used to set the tags used to indicate Template Toolkit directives
+     within source templates.  A single value can be specified to indicate
+     a TAG_STYLE, e.g.
+
+          TT2Tags	    html
+
+     A pair of values can be used to indicate a START_TAG and END_TAG.
+
+          TT2Tags	    <!--    -->
+
+     Note that, unlike the Template Toolkit START_TAG and END_TAG
+     configuration options, these values are automatically escaped to
+     remove any special meaning within regular expressions.
+
+          TT2Tags	    [*  *]	# no need to escape [ or *
+
+     By default, the start and end tags are set to `[%' and `%]'
+     respectively.  Thus, directives are embedded in the form: [% INCLUDE
+     my/file %].
+
+TT2PreChomp
+     Equivalent to the PRE_CHOMP configuration item.  This flag can be set
+     to have removed any whitespace preceeding a directive, up to and
+     including the preceeding newline.  Default is 'Off'.
+
+          TT2PreChomp	    On
+
+TT2PostChomp
+     Equivalent to the POST_CHOMP configuration item.  This flag can be set
+     to have any whitespace after a directive automatically removed, up to
+     and including the following newline.  Default is 'Off'.
+
+          TT2PostChomp    On
+
+TT2Trim
+     Equivalent to the TRIM configuration item, this flag can be set to
+     have all surrounding whitespace stripped from template output.
+     Default is 'Off'.
+
+          TT2Trim	    On
+
+TT2AnyCase
+     Equivalent to the ANY_CASE configuration item, this flag can be set
+     to allow directive keywords to be specified in any case.  By default,
+     this setting is 'Off' and all directive (e.g. 'INCLUDE', 'FOREACH',
+     etc.) should be specified in UPPER CASE only.
+
+          TT2AnyCase	    On
+
+TT2Interpolate
+     Equivalent to the INTERPOLATE configuration item, this flag can be set
+     to allow simple variables of the form `$var' to be embedded within
+     templates, outside of regular directives.  By default, this setting is
+     'Off' and variables must appear in the form [% var %], or more
+     explicitly, [% GET var %].
+
+          TT2Interpolate  On
+
+TT2IncludePath
+     Equivalent to the INCLUDE_PATH configuration item.  This can be used
+     to specify one or more directories in which templates are located.
+     Multiple directories may appear on each TT2IncludePath directive line,
+     and the directive may be repeated.  Directories are searched in the
+     order defined.
+
+          TT2IncludePath  /usr/local/tt2/templates
+          TT2InludePath   /home/abw/tt2   /tmp/tt2
+
+     Note that this only affects templates which are processed via
+     directive such as INCLUDE, PROCESS, INSERT, WRAPPER, etc.  The full
+     path of the main template processed by the Apache/mod_perl handler is
+     generated (by Apache) by appending the request URI to the
+     DocumentRoot, as per usual.  For example, consider the following
+     configuration extract:
+
+          DocumentRoot    /usr/local/web/ttdocs
+          [...]
+          TT2IncludePath  /usr/local/tt2/templates
+
+          <Files *.tt2>
+          	SetHandler	perl-script
+              PerlHandler     Apache::Template
+          </Files>
+
+     A request with a URI of '/foo/bar.tt2' will cause the handler to
+     process the file '/usr/local/web/ttdocs/foo/bar.tt2' (i.e.
+     DocumentRoot + URI).  If that file should include a directive such as
+     [% INCLUDE foo/bar.tt2 %] then that template should exist as the file
+     '/usr/local/tt2/templates/foo/bar.tt2' (i.e. TT2IncludePath +
+     template name).
+
+TT2Absolute
+     Equivalent to the ABSOLUTE configuration item, this flag can be
+     enabled to allow templates to be processed (via INCLUDE, PROCESS,
+     etc.) which are specified with absolute filenames.
+
+          TT2Absolute	    On
+
+     With the flag enabled a template directive of the form:
+
+          [% INCLUDE /etc/passwd %]
+
+     will be honoured.  The default setting is 'Off' and any attempt to
+     load a template by absolute filename will result in a 'file' exception
+     being throw with a message indicating that the ABSOLUTE option is not
+     set.  See *Note Template: Template, for further discussion on
+     exception handling.
+
+TT2Relative
+     Equivalent to the RELATIVE configuration item.  This is similar to the
+     TT2Absolute option, but relating to files specified with a relative
+     filename, that is, starting with './' or '../'
+
+          TT2Relative On
+
+     Enabling the option permits templates to be specifed as per this
+     example:
+
+          [% INCLUDE ../../../etc/passwd %]
+
+     As with TT2Absolute, this option is set 'Off', causing a 'file'
+     exception to be thrown if used in this way.
+
+TT2Delimiter
+     Equivalent to the DELIMTER configuration item, this can be set to
+     define an alternate delimiter for separating multiple TT2IncludePath
+     options.  By default, it is set to ':', and thus multiple directories
+     can be specified as:
+
+          TT2IncludePath  /here:/there
+
+     Note that Apache implicitly supports space-delimited options, so the
+     following is also valid and defines 3 directories, /here, /there and
+     /anywhere.
+
+          TT2IncludePath  /here:/there /anywhere
+
+     If you're unfortunate enough to be running Apache on a Win32 system
+     and you need to specify a ':' in a path name, then set the
+     TT2Delimiter to an alternate value to avoid confusing the Template
+     Toolkit into thinking you're specifying more than one directory:
+
+          TT2Delimiter    ,
+          TT2IncludePath  C:/HERE D:/THERE E:/ANYWHERE
+
+TT2PreProcess
+     Equivalent to PRE_PROCESS, this option allows one or more templates to
+     be named which should be processed before the main template.  This can
+     be used to process a global configuration file, add canned headers,
+     etc.  These templates should be located in one of the TT2IncludePath
+     directories, or specified absolutely if the TT2Absolute option is set.
+
+          TT2PreProcess   config header
+
+TT2PostProcess
+     Equivalent to POST_PROCESS, this option allow one or more templates to
+     be named which should be processed after the main template, e.g. to
+     add standard footers.  As per TTPreProcess, these should be located in
+     one of the TT2IncludePath directories, or specified absolutely if the
+     TT2Absolute option is set.
+
+          TT2PostProcess  copyright footer
+
+TT2Process
+     This is equivalent to the PROCESS configuration item.  It can be used
+     to specify one or more templates to be process instead of the main
+     template.  This can be used to apply a standard "wrapper" around all
+     template files processed by the handler.
+
+          TT2Process	    mainpage
+
+     The original template (i.e. whose path is formed from the DocumentRoot
+     + URI, as explained in the `TT2IncludePath|TT2IncludePath' in this
+     node item above) is preloaded and available as the 'template'
+     variable.  This a typical TT2Process template might look like:
+
+          [% PROCESS header %]
+          [% PROCESS $template %]
+          [% PROCESS footer %]
+
+     Note the use of the leading '$' on template to defeat the auto-quoting
+     mechanism which is applied to INCLUDE, PROCESS, etc., directives.  The
+     directive would otherwise by interpreted as:
+
+          [% PROCESS "template" %]
+
+TT2Default
+     This is equivalent to the DEFAULT configuration item.  This can be
+     used to name a template to be used in place of a missing template
+     specified in a directive such as INCLUDE, PROCESS, INSERT, etc.  Note
+     that if the main template is not found (i.e. that which is mapped from
+     the URI) then the handler will decline the request, resulting in a 404
+     - Not Found.  The template specified should exist in one of the
+     directories named by TT2IncludePath.
+
+          TT2Default	    nonsuch
+
+TT2Error
+     This is equivalent to the ERROR configuration item.  It can be used
+     to name a template to be used to report errors that are otherwise
+     uncaught.  The template specified should exist in one of the
+     directories named by TT2IncludePath.  When the error template is
+     processed, the 'error' variable will be set to contain the relevant
+     error details.
+
+          TT2Error	    error
+
+TT2EvalPerl
+     This is equivalent to the EVAL_PERL configuration item.  It can be
+     enabled to allow embedded [% PERL %] ... [% END %] sections within
+     templates.  It is disabled by default and any PERL sections
+     encountered will raise 'perl' exceptions with the message 'EVAL_PERL
+     not set'.
+
+          TT2EvalPerl	    On
+
+TT2LoadPerl
+     This is equivalent to the LOAD_PERL configuration item which allows
+     regular Perl modules to be loaded as Template Toolkit plugins via the
+     USE directive.  It is set 'Off' by default.
+
+          TT2LoadPerl	    On
+
+TT2Recursion
+     This is equivalent to the RECURSION option which allows templates to
+     recurse into themselves either directly or indirectly.  It is set
+     'Off' by default.
+
+          TT2Recursion    On
+
+TT2PluginBase
+     This is equivalent to the PLUGIN_BASE option.  It allows multiple
+     Perl packages to be specified which effectively form a search path
+     for loading Template Toolkit plugins.  The default value is
+     'Template::Plugin'.
+
+          TT2PluginBase   My::Plugins  Your::Plugins
+
+TT2AutoReset
+     This is equivalent to the AUTO_RESET option and is enabled by default.
+     It causes any template BLOCK definitions to be cleared before each
+     main template is processed.
+
+          TT2AutoReset    Off
+
+TT2CacheSize
+     This is equivalent to the CACHE_SIZE option.  It can be used to limit
+     the number of compiled templates that are cached in memory.  The
+     default value is undefined and all compiled templates will be cached
+     in memory.  It can be set to a specified numerical value to define
+     the maximum number of templates, or to 0 to disable caching
+     altogether.
+
+          TT2CacheSize    64
+
+TT2CompileExt
+     This is equivalent to the COMPILE_EXT option.  It can be used to
+     specify a filename extension which the Template Toolkit will use for
+     writing compiled templates back to disk, thus providing cache
+     persistance.
+
+          TT2CompileExt   .ttc
+
+TT2CompileDir
+     This is equivalent to the COMPILE_DIR option.  It can be used to
+     specify a root directory under which compiled templates should be
+     written back to disk for cache persistance.  Any TT2IncludePath
+     directories will be replicated in full under this root directory.
+
+          TT2CompileDir   /var/tt2/cache
+
+TT2Debug
+     This is equivalent to the DEBUG option which enables Template Toolkit
+     debugging.  The main effect is to raise additional warnings when
+     undefined variables are used but is likely to be expanded in a future
+     release to provide more extensive debugging capabilities.
+
+          TT2Debug	    On
+
+TT2Headers
+     Allows you to specify which HTTP headers you want added to the
+     response.  Current permitted values are: 'modified' (Last-Modified),
+     'length' (Content-Length) or 'all' (all the above).
+
+          TT2Headers	    all
+
+TT2Params
+     Allows you to specify which parameters you want defined as template
+     variables.  Current permitted values are 'uri', 'env' (hash of
+     environment variables), 'params' (hash of CGI parameters), 'pnotes'
+     (the request pnotes hash), 'cookies' (hash of cookies) or 'all'.
+
+          TT2Params	    uri env params
+
+     When set, these values can then be accessed from within any template
+     processed:
+
+          The URI is [% uri %]
+
+          Server name is [% env.SERVER_NAME %]
+
+          CGI params are:
+          <table>
+          [% FOREACH key = params.keys %]
+             <tr>
+          	 <td>[% key %]</td>  <td>[% params.$key %]</td>
+             </tr>
+          [% END %]
+          </table>
+
+TT2ServiceModule
+     The modules have been designed in such a way as to make it easy to
+     subclass the Template::Service::Apache module to create your own
+     custom services.
+
+     For example, the regular service module does a simple 1:1 mapping of
+     URI to template using the request filename provided by Apache, but
+     you might want to implement an alternative scheme.  You might prefer,
+     for example, to map multiple URIs to the same template file, but to
+     set some different template variables along the way.
+
+     To do this, you can subclass Template::Service::Apache and redefine
+     the appropriate methods.  The template() method performs the task of
+     mapping URIs to templates and the params() method sets up the template
+     variable parameters.  Or if you need to modify the HTTP headers, then
+     headers() is the one for you.
+
+     The TT2ServiceModule option can be set to indicate the name of your
+     custom service module.  The following trivial example shows how you
+     might subclass Template::Service::Apache to add an additional
+     parameter, in this case as the template variable 'message'.
+
+          <perl>
+          package My::Service::Module;
+          use base qw( Template::Service::Apache );
+
+          sub params {
+          	my $self = shift;
+              my $params = $self->SUPER::params(@_);
+              $params->{ message } = 'Hello World';
+              return $params;
+          }
+          </perl>
+
+          PerlModule          Apache::Template
+          TT2ServiceModule    My::Service::Module
+
+BUGS, LIMITATIONS AND FUTURE ENHANCEMENTS
+=========================================
+
+Multiple Concurrent Configurations
+----------------------------------
+
+   The biggest current limitation is that it's not possible to run multiple
+Template Toolkit configurations within the same Apache/mod_perl server
+process.  For example, it would be nice to be able to do something like
+this:
+
+     PerlModule		Apache::Template
+
+     TT2PostChomp	On
+     TT2IncludePath	/usr/local/tt2/shared
+     
+     <Location /tom>
+     	TT2IncludePath	/home/tom/tt2
+     	TT2EvalPerl	On
+     </Location>
+     
+     <Location /dick>
+     	TT2IncludePath	/home/dick/tt2
+     	TT2Trim		On
+     	TT2PostChomp	Off
+     </Location>
+
+   Here, all URI's starting '/tom' should have an effective TT2IncludePath
+of:
+
+     TT2IncludePath  /usr/local/tt2/shared /home/tom/tt2
+
+   and those starting '/dick' should be:
+
+     TT2IncludePath  /usr/local/tt2/shared /home/dick/tt2
+
+   Similarly, different options such as TT2PostChomp, TT2EvalPerl, etc.,
+should enabled/disabled appropriately for different locations.
+
+   This should be possible using the DIR_MERGE facility, and also
+SERVER_MERGE for handling multiple virtual hosts.  It should also be
+relatively easy to generate the required Template Toolkit configurations
+to support this (having multiple Template::Providers chained together in
+different ways would be the obvious way to implement different
+TT2IncludePath settings, for example).
+
+   Alas, my extended experimentation with DIR_MERGE and SERVER_MERGE left
+my brain scrambled.  It seems to be the case that they both get called
+twice at each merge point instead of just once.  I have no idea why this
+is the case and it seems to be contrary to the advertised behaviour.
+After spending far too long trying to figure it out, I gave up and decided
+to leave that feature for a later version.
+
+   Any insight into this matter that anyone can provide would be
+gratefully accepted.  I've left the code intact, above.  Simply remove the
+'not_used_' prefixes from the DIR/SERVER_CREATE/MERGE subs above and
+rebuild to see the problem in action.
+
+Headers and Parameters
+----------------------
+
+   I'm in two minds about whether it's better to use full names to specify
+TT2Headers, e.g.
+
+     TT2Headers	Content-Length Last-Modified
+
+   or short keyword forms for brevity:
+
+     TT2Header	length modified
+
+   The latter is less typing, but the former are more "offical".  In an
+ideal module, we'd do a regex match on /(Content-)?Length/i, for example,
+but at present we just stuff 'length' in a hash and don't bother.
+
+   Oh, and I need to add E-Tag as well.  That was in Darren's Grover
+module, but I forgot to add it here.  Darn, I know I'm being lazy because
+I could have added it in the time it took me to type this.
+
+AUTHOR
+======
+
+   Andy Wardley <abw@kfs.org>
+
+   This module has been derived in part from the 'Grover' module by Darren
+Chamberlain (darren@boston.com).  Darren kindly donated his code for
+integration into the Apache::Template module.
+
+VERSION
+=======
+
+   This is version 0.2 of the Apache::Template module.
+
+COPYRIGHT
+=========
+
+     Copyright (C) 1996-2001 Andy Wardley.  All Rights Reserved.
+     Copyright (C) 1998-2001 Canon Research Centre Europe Ltd.
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+   For further information about the Template Toolkit, see *Note Template:
+Template, or http://www.template-toolkit.org/
+
+

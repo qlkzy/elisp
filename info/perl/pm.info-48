@@ -1,0 +1,1981 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Bio/AlignIO,  Next: Bio/AlignIO/bl2seq,  Prev: BingoX/Time,  Up: Module List
+
+Handler for AlignIO Formats
+***************************
+
+NAME
+====
+
+   Bio::AlignIO - Handler for AlignIO Formats
+
+SYNOPSIS
+========
+
+     use Bio::AlignIO;
+
+     $in  = Bio::AlignIO->new(-file => "inputfilename" , '-format' => 'fasta');
+     $out = Bio::AlignIO->new(-file => ">outputfilename" , '-format' => 'pfam');
+     # note: we quote -format to keep older perl's from complaining.
+
+     while ( my $aln = $in->next_aln() ) {
+     	$out->write_aln($aln);
+     }
+
+   or
+
+     use Bio::AlignIO;
+
+     $in  = Bio::AlignIO->newFh(-file => "inputfilename" , '-format' => 'fasta');
+     $out = Bio::AlignIO->newFh('-format' => 'pfam');
+
+     # World's shortest Fasta<->pfam format converter:
+     print $out $_ while <$in>;
+
+DESCRIPTION
+===========
+
+   Bio::AlignIO is a handler module for the formats in the AlignIO set (eg,
+Bio::AlignIO::fasta). It is the officially sanctioned way of getting at
+the alignment objects, which most people should use.
+
+   The idea is that you request a stream object for a particular format.
+All the stream objects have a notion of an internal file that is read from
+or written to. A particular AlignIO object instance is configured for
+either input or output. A specific example of a stream object is the
+Bio::AlignIO::fasta object.
+
+   Each stream object has functions
+
+     $stream->next_aln();
+
+   and
+
+     $stream->write_aln($aln);
+
+   also
+
+     $stream->type() # returns 'INPUT' or 'OUTPUT'
+
+   As an added bonus, you can recover a filehandle that is tied to the
+AlignIO object, allowing you to use the standard <> and print operations
+to read and write sequence objects:
+
+     use Bio::AlignIO;
+
+     $stream = Bio::AlignIO->newFh(-format => 'Fasta'); # read from standard input
+
+     while ( $aln = <$stream> ) {
+     	# do something with $aln
+     }
+
+   and
+
+     print $stream $aln; # when stream is in output mode
+
+   This makes the simplest ever reformatter
+
+     #!/usr/local/bin/perl
+
+     $format1 = shift;
+     $format2 = shift || die "Usage: reformat format1 format2 < input > output";
+
+     use Bio::AlignIO;
+
+     $in  = Bio::AlignIO->newFh(-format => $format1 );
+     $out = Bio::AlignIO->newFh(-format => $format2 );
+     #note: you might want to quote -format to keep older perl's from complaining.
+
+     print $out $_ while <$in>;
+
+   AlignIO.pm is patterned on the module SeqIO.pm and shares most the
+SeqIO.pm features.  One significant difference currently is that
+AlignIO.pm only handles IO for a single alignment at a time (SeqIO.pm
+handles IO for multiple sequences in a single stream.)  The principal
+reason for this is that whereas simultaneously handling multiple sequences
+is a common requirement, simultaneous handling of multiple alignments is
+not. Capability for IO for more than one multiple alignment (which may be
+of use for certain applications such as IO for Pfam libraries) may be
+included in the future.  For this reason we keep the name "next_aln()" for
+the alignment input routine, even though currently only one alignment is
+read (or written) at a time and the name "read_aln()" might be more
+appropriate.
+
+CONSTRUCTORS
+============
+
+Bio::AlignIO->new()
+-------------------
+
+     $seqIO = Bio::AlignIO->new(-file => 'filename',   -format=>$format);
+     $seqIO = Bio::AlignIO->new(-fh   => \*FILEHANDLE, -format=>$format);
+     $seqIO = Bio::AlignIO->new(-format => $format);
+
+   The new() class method constructs a new Bio::AlignIO object.  The
+returned object can be used to retrieve or print BioAlign objects. new()
+accepts the following parameters:
+
+-file
+     A file path to be opened for reading or writing.  The usual Perl
+     conventions apply:
+
+          'file'       # open file for reading
+          '>file'      # open file for writing
+          '>>file'     # open file for appending
+          '+<file'     # open file read/write
+          'command |'  # open a pipe from the command
+          '| command'  # open a pipe to the command
+
+-fh
+     You may provide new() with a previously-opened filehandle.  For
+     example, to read from STDIN:
+
+          $seqIO = Bio::AlignIO->new(-fh => \*STDIN);
+
+     Note that you must pass filehandles as references to globs.
+
+     If neither a filehandle nor a filename is specified, then the module
+     will read from the @ARGV array or STDIN, using the familiar <>
+     semantics.
+
+-format
+     Specify the format of the file.  Supported formats include:
+
+          fasta       FASTA format
+          pfam        pfam format
+          selex       selex (hmmer) format
+          stockholm   stockholm format
+          prodom      prodom (protein domain) format
+          clustalw    clustalw (.aln) format
+          msf         msf (GCG) format
+          mase        mase (seaview) format
+
+     Currently only those formats which were implemented in SimpleAlign.pm
+     have been incorporated in AlignIO.pm.  Specifically, mase, stockholm
+     and prodom have only been implemented for input. Clustalw format has
+     only been implemented for output.
+
+     If no format is specified and a filename is given, then the module
+     will attempt to deduce it from the filename.  If this is unsuccessful,
+     Fasta format is assumed.
+
+     The format name is case insensitive.  'FASTA', 'Fasta' and 'fasta' are
+     all supported.
+
+Bio::AlignIO->newFh()
+---------------------
+
+     $fh = Bio::AlignIO->newFh(-fh   => \*FILEHANDLE, -format=>$format);
+     $fh = Bio::AlignIO->newFh(-format => $format);
+     # etc.
+
+   This constructor behaves like new(), but returns a tied filehandle
+rather than a Bio::AlignIO object.  You can read sequences from this
+object using the familiar <> operator, and write to it using print().  The
+usual array and $_ semantics work.  For example, you can read all sequence
+objects into an array like this:
+
+     @sequences = <$fh>;
+
+   Other operations, such as read(), sysread(), write(), close(), and
+printf() are not supported.
+
+OBJECT METHODS
+==============
+
+   See below for more detailed summaries.  The main methods are:
+
+$alignment = $AlignIO->next_aln()
+---------------------------------
+
+   Fetch an alignment from a formatted file.
+
+$AlignIO->write_aln($aln)
+-------------------------
+
+   Write the specified alignment to a file..
+
+TIEHANDLE(), READLINE(), PRINT()
+--------------------------------
+
+   These provide the tie interface.  See *Note Perltie:
+(perl.info)perltie, for more details.
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules. Send your comments and suggestions preferably to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     bioperl-l@bioperl.org               - General discussion
+     http://bio.perl.org/MailList.html   - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.   Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR - Peter Schattner
+========================
+
+   Email: schattner@alum.mit.edu
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+new
+---
+
+     Title   : new
+     Usage   : $stream = Bio::AlignIO->new(-file => $filename, -format => 'Format')
+     Function: Returns a new seqstream
+     Returns : A Bio::AlignIO::Handler initialised with the appropriate format
+     Args    : -file => $filename
+               -format => format
+               -fh => filehandle to attach to
+
+newFh
+-----
+
+     Title   : newFh
+     Usage   : $fh = Bio::AlignIO->newFh(-file=>$filename,-format=>'Format')
+     Function: does a new() followed by an fh()
+     Example : $fh = Bio::AlignIO->newFh(-file=>$filename,-format=>'Format')
+               $sequence = <$fh>;   # read a sequence object
+               print $fh $sequence; # write a sequence object
+     Returns : filehandle tied to the Bio::AlignIO::Fh class
+     Args    :
+
+fh
+--
+
+     Title   : fh
+     Usage   : $obj->fh
+     Function:
+     Example : $fh = $obj->fh;      # make a tied filehandle
+               $sequence = <$fh>;   # read a sequence object
+               print $fh $sequence; # write a sequence object
+     Returns : filehandle tied to the Bio::AlignIO::Fh class
+     Args    :
+
+_load_format_module
+-------------------
+
+     Title   : _load_format_module
+     Usage   : *INTERNAL AlignIO stuff*
+     Function: Loads up (like use) a module at run time on demand
+     Example :
+     Returns :
+     Args    :
+
+next_aln
+--------
+
+     Title   : next_aln
+     Usage   : $aln = stream->next_aln
+     Function: reads the next $aln object from the stream
+     Returns : a Bio::Seq sequence object
+     Args    :
+
+write_aln
+---------
+
+     Title   : write_aln
+     Usage   : $stream->write_aln($aln)
+     Function: writes the $aln object into the stream
+     Returns : 1 for success and 0 for error
+     Args    : Bio::Seq object
+
+close
+-----
+
+     Title   : close
+     Usage   : $seqio->close()
+     Function: Closes the file handle associated with this seqio system
+     Example :
+     Returns :
+     Args    :
+
+_print
+------
+
+     Title   : _print
+     Usage   : $obj->_print(@lines)
+     Function:
+     Example :
+     Returns : writes output
+
+_readline
+---------
+
+     Title   : _readline
+     Usage   : $obj->_readline($newval)
+     Function:
+     Example :
+     Returns : reads a line of input
+
+_filehandle
+-----------
+
+     Title   : _filehandle
+     Usage   : $obj->_filehandle($newval)
+     Function:
+     Example :
+     Returns : value of _filehandle
+     Args    : newvalue (optional)
+
+_guess_format
+-------------
+
+     Title   : _guess_format
+     Usage   : $obj->_guess_format($filename)
+     Function:
+     Example :
+     Returns : guessed format of filename (lower case)
+     Args    :
+
+
+File: pm.info,  Node: Bio/AlignIO/bl2seq,  Next: Bio/AlignIO/clustalw,  Prev: Bio/AlignIO,  Up: Module List
+
+bl2seq sequence input/output stream
+***********************************
+
+NAME
+====
+
+   Bio::AlignIO::bl2seq - bl2seq sequence input/output stream
+
+SYNOPSIS
+========
+
+   Do not use this module directly.  Use it via the Bio::AlignIO class, as
+in:
+
+     use Bio::AlignIO;
+
+     $in  = Bio::AlignIO->new(-file => "inputfilename" , '-format' => 'bl2seq');
+     $aln = $in->next_aln();
+
+DESCRIPTION
+===========
+
+   This object can create Bio::SimpleAlign sequence alignment objects (of
+2 sequences) from bl2seq BLAST reports.
+
+   A nice feature of this module is that- in combination with
+StandAloneBlast.pm or remote blasting - it can be used to align 2
+sequences and make a SimpleAlign object from them which can then be
+manipulated using any SimpleAlign.pm methods, eg:
+
+     #Get 2 sequences
+     $str = Bio::SeqIO->new(-file=>'t/amino.fa' , '-format' => 'Fasta', );
+     my $seq3 = $str->next_seq();
+     my $seq4 = $str->next_seq();
+
+     # Run bl2seq on them
+     $factory = Bio::Tools::StandAloneBlast->new('program' => 'blastp',
+     					       'outfile' => 'bl2seq.out');
+     my $bl2seq_report = $factory->bl2seq($seq3, $seq4);
+
+     # Use AlignIO.pm to create a SimpleAlign object from the bl2seq report
+     $str = Bio::AlignIO->new(-file=> 'bl2seq.out','-format' => 'bl2seq');
+     $aln = $str->next_aln();
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules. Send your comments and suggestions preferably to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     bioperl-l@bioperl.org               - General discussion
+     http://bio.perl.org/MailList.html   - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.   Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR - Peter Schattner
+========================
+
+   Email: schattner@alum.mit.edu
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+next_aln
+--------
+
+     Title   : next_aln
+     Usage   : $aln = $stream->next_aln()
+     Function: returns the next alignment in the stream.
+     Returns : SimpleAlign object - returns 0 on end of file
+     	    or on error
+     Args    : NONE
+
+write_aln
+---------
+
+     Title   : write_aln
+     Usage   : $stream->write_aln(@aln)
+     Function: writes the $aln object into the stream in bl2seq format
+     Returns : 1 for success and 0 for error
+     Args    : Bio::SimpleAlign object
+
+
+File: pm.info,  Node: Bio/AlignIO/clustalw,  Next: Bio/AlignIO/fasta,  Prev: Bio/AlignIO/bl2seq,  Up: Module List
+
+clustalw sequence input/output stream
+*************************************
+
+NAME
+====
+
+   Bio::AlignIO::clustalw - clustalw sequence input/output stream
+
+SYNOPSIS
+========
+
+   Do not use this module directly.  Use it via the Bio::AlignIO class.
+
+DESCRIPTION
+===========
+
+   This object can transform Bio::SimpleAlign objects to and from clustalw
+flat file databases.
+
+FEEDBACK
+========
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.   Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHORS - Peter Schattner
+=========================
+
+   Email: schattner@alum.mit.edu
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+next_aln
+--------
+
+     Title   : next_aln
+     Usage   : $aln = $stream->next_aln()
+     Function: returns the next alignment in the stream
+     Returns : SimpleAlign object
+     Args    : NONE
+
+write_aln
+---------
+
+     Title   : write_aln
+     Usage   : $stream->write_aln(@aln)
+     Function: writes the clustalw-format object (.aln) into the stream
+     Returns : 1 for success and 0 for error
+     Args    : Bio::SimpleAlign object
+
+
+File: pm.info,  Node: Bio/AlignIO/fasta,  Next: Bio/AlignIO/mase,  Prev: Bio/AlignIO/clustalw,  Up: Module List
+
+fasta sequence input/output stream
+**********************************
+
+NAME
+====
+
+   Bio::AlignIO::fasta - fasta sequence input/output stream
+
+SYNOPSIS
+========
+
+   Do not use this module directly.  Use it via the Bio::AlignIO class.
+
+DESCRIPTION
+===========
+
+   This object can transform Bio::SimpleAlign objects to and from fasta
+flat file databases.
+
+FEEDBACK
+========
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.  Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHORS - Peter Schattner
+=========================
+
+   Email: schattner@alum.mit.edu
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+next_aln
+--------
+
+     Title   : next_aln
+     Usage   : $aln = $stream->next_aln()
+     Function: returns the next alignment in the stream.
+     Returns : SimpleAlign object - returns 0 on end of file
+     	    or on error
+     Args    : NONE
+
+write_aln
+---------
+
+     Title   : write_aln
+     Usage   : $stream->write_aln(@aln)
+     Function: writes the $aln object into the stream in fasta format
+     Returns : 1 for success and 0 for error
+     Args    : Bio::SimpleAlign object
+
+
+File: pm.info,  Node: Bio/AlignIO/mase,  Next: Bio/AlignIO/msf,  Prev: Bio/AlignIO/fasta,  Up: Module List
+
+mase sequence input/output stream
+*********************************
+
+NAME
+====
+
+   Bio::AlignIO::mase - mase sequence input/output stream
+
+SYNOPSIS
+========
+
+   Do not use this module directly.  Use it via the Bio::AlignIO class.
+
+DESCRIPTION
+===========
+
+   This object can transform Bio::SimpleAlign objects to and from mase flat
+file databases.
+
+FEEDBACK
+========
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.   Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHORS - Peter Schattner
+=========================
+
+   Email: schattner@alum.mit.edu
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+next_aln
+--------
+
+     Title   : next_aln
+     Usage   : $aln = $stream->next_aln()
+     Function: returns the next alignment in the stream.
+     Returns : SimpleAlign object
+     Args    : NONE
+
+write_aln
+---------
+
+     Title   : write_aln
+     Usage   : $stream->write_aln(@aln)
+     Function: writes the $aln object into the stream in mase format  ###Not yet implemented!###
+     Returns : 1 for success and 0 for error
+     Args    : Bio::SimpleAlign object
+
+
+File: pm.info,  Node: Bio/AlignIO/msf,  Next: Bio/AlignIO/pfam,  Prev: Bio/AlignIO/mase,  Up: Module List
+
+msf sequence input/output stream
+********************************
+
+NAME
+====
+
+   Bio::AlignIO::msf - msf sequence input/output stream
+
+SYNOPSIS
+========
+
+   Do not use this module directly.  Use it via the Bio::AlignIO class.
+
+DESCRIPTION
+===========
+
+   This object can transform Bio::SimpleAlign objects to and from msf flat
+file databases.
+
+FEEDBACK
+========
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.   Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHORS - Peter Schattner
+=========================
+
+   Email: schattner@alum.mit.edu
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+next_aln
+--------
+
+     Title   : next_aln
+     Usage   : $aln = $stream->next_aln()
+     Function: returns the next alignment in the stream. Tries to read *all* MSF
+              It reads all non whitespace characters in the alignment
+              area. For MSFs with weird gaps (eg ~~~) map them by using
+              $al->map_chars('~','-')
+     Returns : SimpleAlign object
+     Args    : NONE
+
+write_aln
+---------
+
+     Title   : write_aln
+     Usage   : $stream->write_aln(@aln)
+     Function: writes the $aln object into the stream in MSF format
+     Returns : 1 for success and 0 for error
+     Args    : Bio::SimpleAlign object
+
+
+File: pm.info,  Node: Bio/AlignIO/pfam,  Next: Bio/AlignIO/prodom,  Prev: Bio/AlignIO/msf,  Up: Module List
+
+pfam sequence input/output stream
+*********************************
+
+NAME
+====
+
+   Bio::AlignIO::pfam - pfam sequence input/output stream
+
+SYNOPSIS
+========
+
+   Do not use this module directly.  Use it via the Bio::AlignIO class.
+
+DESCRIPTION
+===========
+
+   This object can transform Bio::SimpleAlign objects to and from pfam flat
+file databases.
+
+FEEDBACK
+========
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.   Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHORS - Peter Schattner
+=========================
+
+   Email: schattner@alum.mit.edu
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+next_aln
+--------
+
+     Title   : next_aln
+     Usage   : $aln = $stream->next_aln()
+     Function: returns the next alignment in the stream
+     Returns : SimpleAlign object
+     Args    : NONE
+
+write_aln
+---------
+
+     Title   : write_aln
+     Usage   : $stream->write_aln(@aln)
+     Function: writes the $aln object into the stream
+     Returns : 1 for success and 0 for error
+     Args    : Bio::SimpleAlign object
+
+
+File: pm.info,  Node: Bio/AlignIO/prodom,  Next: Bio/AlignIO/selex,  Prev: Bio/AlignIO/pfam,  Up: Module List
+
+prodom sequence input/output stream
+***********************************
+
+NAME
+====
+
+   Bio::AlignIO::prodom - prodom sequence input/output stream
+
+SYNOPSIS
+========
+
+   Do not use this module directly.  Use it via the Bio::AlignIO class.
+
+DESCRIPTION
+===========
+
+   This object can transform Bio::SimpleAlign objects to and from prodom
+flat file databases.
+
+FEEDBACK
+========
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.   Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHORS - Peter Schattner
+=========================
+
+   Email: schattner@alum.mit.edu
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+next_aln
+--------
+
+     Title   : next_aln
+     Usage   : $aln = $stream->next_aln()
+     Function: returns the next alignment in the stream.
+     Returns : SimpleAlign object
+     Args    : NONE
+
+write_aln
+---------
+
+     Title   : write_aln
+     Usage   : $stream->write_aln(@aln)
+     Function: writes the $aln object into the stream in prodom format  ###Not yet implemented!###
+     Returns : 1 for success and 0 for error
+     Args    : Bio::SimpleAlign object
+
+
+File: pm.info,  Node: Bio/AlignIO/selex,  Next: Bio/AlignIO/stockholm,  Prev: Bio/AlignIO/prodom,  Up: Module List
+
+selex sequence input/output stream
+**********************************
+
+NAME
+====
+
+   Bio::AlignIO::selex - selex sequence input/output stream
+
+SYNOPSIS
+========
+
+   Do not use this module directly.  Use it via the Bio::AlignIO class.
+
+DESCRIPTION
+===========
+
+   This object can transform Bio::SimpleAlign objects to and from selex
+flat file databases.
+
+FEEDBACK
+========
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.   Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHORS - Peter Schattner
+=========================
+
+   Email: schattner@alum.mit.edu
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+next_aln
+--------
+
+     Title   : next_aln
+     Usage   : $aln = $stream->next_aln()
+     Function: returns the next alignment in the stream. Tries to read *all* selex
+              It reads all non whitespace characters in the alignment
+              area. For selexs with weird gaps (eg ~~~) map them by using
+              $al->map_chars('~','-')
+     Returns : SimpleAlign object
+     Args    : NONE
+
+write_aln
+---------
+
+     Title   : write_aln
+     Usage   : $stream->write_aln(@aln)
+     Function: writes the $aln object into the stream in selex format
+     Returns : 1 for success and 0 for error
+     Args    : Bio::SimpleAlign object
+
+
+File: pm.info,  Node: Bio/AlignIO/stockholm,  Next: Bio/Annotation,  Prev: Bio/AlignIO/selex,  Up: Module List
+
+stockholm sequence input/output stream
+**************************************
+
+NAME
+====
+
+   Bio::AlignIO::stockholm - stockholm sequence input/output stream
+
+SYNOPSIS
+========
+
+   Do not use this module directly.  Use it via the Bio::AlignIO class.
+
+DESCRIPTION
+===========
+
+   This object can transform Bio::SimpleAlign objects to and from
+stockholm flat file databases.
+
+FEEDBACK
+========
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.   Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHORS - Peter Schattner
+=========================
+
+   Email: schattner@alum.mit.edu
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+next_aln
+--------
+
+     Title   : next_aln
+     Usage   : $aln = $stream->next_aln()
+     Function: returns the next alignment in the stream.
+     Returns : SimpleAlign object
+     Args    : NONE
+
+write_aln
+---------
+
+     Title   : write_aln
+     Usage   : $stream->write_aln(@aln)
+     Function: writes the $aln object into the stream in stockholm format  ###Not yet implemented!###
+     Returns : 1 for success and 0 for error
+     Args    : Bio::SimpleAlign object
+
+
+File: pm.info,  Node: Bio/Annotation,  Next: Bio/Annotation/Comment,  Prev: Bio/AlignIO/stockholm,  Up: Module List
+
+A generic object for annotations
+********************************
+
+NAME
+====
+
+   Bio::Annotation - A generic object for annotations
+
+SYNOPSIS
+========
+
+     # get an annotation somehow in $ann
+
+     # description is a simple, one line description
+     print "Description is ",$ann->description, "\n";
+
+     foreach $genename ( $self->each_gene_name() ) {
+     	print "gene name: $genename\n";
+     }
+
+     foreach $comment ( $ann->each_Comment ) {
+        # $comment is a Bio::Annotation::Comment object
+        print "Comment: ", $comment->text(), "\n";
+     }
+
+     foreach $link ( $ann->each_DBLink ) {
+        # link is a Bio::Annotation::DBLink object
+        print "Link to ",$link->primary_id, " in database", $link->database, "\n";
+     }
+
+     foreach $ref ( $ann->each_Reference ) {
+        # link is a Bio::Annotation::Reference object
+        print "Reference title ", $ref->title , "\n";
+     }
+
+     #
+     # Making an annotation object from scratch
+     #
+
+     $ann = Bio::Annotation->new();
+
+     $ann->description("Description text");
+     print "Annotation description is ", $ann->description, "\n";
+
+DESCRIPTION
+===========
+
+   The object represents generic biological annotation of an object. It
+has the ability to provide
+
+     a brief, one line description
+     free text comments
+     links to other biological objects
+     references to literature
+
+   It does not have the following abilities
+
+     The basis (experimental/non experimental/homology)
+        of the annotation. This is considered to be part of
+        the object which owns the annotation. This is
+        because the type of relevant basis is usually
+        dependent on the object
+
+     The previous revisions of the object
+        This should be a property of whatever database this
+        object comes from
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules. Send your comments and suggestions preferably to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     bioperl-l@bioperl.org          - General discussion
+     http://bio.perl.org/MailList.html             - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.  Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR - Ewan Birney
+====================
+
+   Email birney@ebi.ac.uk
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+new
+---
+
+     Title   : new
+     Usage   : $annotation = Bio::Annotation->new( '-description' => 'a description line');
+     Function: Makes a new Annotation object. The main thing
+               you will want to do with this is add comment objects and
+               dblink objects, with calls like
+
+     $annotation->add_Comment($comment);
+     $annotation->add_DBLink($dblink);
+
+     Example :
+     Returns : a new Bio::Annotation Object
+     Args    : hash, potentially with one field, -description
+
+description
+-----------
+
+     Title   : description
+     Usage   : $obj->description($newval)
+     Function:
+     Example :
+     Returns : value of description
+     Args    : newvalue (optional)
+
+add_gene_name
+-------------
+
+     Title   : add_gene_name
+     Usage   : $self->add_gene_name($name1[,$name2,...])
+     Function: adds a reference object
+     Example :
+     Returns :
+     Args    : a string, or a list of strings
+
+remove_gene_name
+----------------
+
+     Title   : remove_gene_name
+     Usage   : $self->remove_gene_name($index)
+     Function: removes a particular gene name
+     Example :
+     Returns :
+     Args    : index of the name to remove
+
+each_gene_name
+--------------
+
+     Title   : each_gene_name
+     Usage   : foreach $genename ( $self->each_gene_name() ) {
+                   print "seq has gene name $genename\n";
+               }
+     Function: gets the array of gene names
+     Example :
+     Returns : an array of strings
+     Args    :
+
+add_Reference
+-------------
+
+     Title   : add_Reference
+     Usage   : $self->add_Reference($ref1[,$ref2,...])
+     Function: adds a reference object
+     Example :
+     Returns :
+     Args    : a Bio::Annotation::Reference or derived object
+
+remove_Reference
+----------------
+
+     Title   : remove_Reference
+     Usage   : $self->remove_Reference($index)
+     Function: removes a reference object
+     Example :
+     Returns :
+     Args    : index number from references array
+
+each_Reference
+--------------
+
+     Title   : each_Reference
+     Usage   : foreach $ref ( $self->each_Reference() )
+     Function: gets an array of reference
+     Example :
+     Returns : an array of Bio::Annotation::Reference or derived objects
+     Args    :
+
+add_Comment
+-----------
+
+     Title   : add_Comment
+     Usage   : $self->add_Comment($ref)
+     Function: adds a Comment object
+     Example :
+     Returns :
+     Args    : a Bio::Annotation::Comment or derived object
+
+remove_Comment
+--------------
+
+     Title   : remove_Comment
+     Usage   : $self->remove_Comment($index)
+     Function: removes a comment object
+     Example :
+     Returns :
+     Args    : index number from comments array
+
+each_Comment
+------------
+
+     Title   : each_Comment
+     Usage   : foreach $ref ( $self->each_Comment() )
+     Function: gets an array of Comment of objects
+     Example :
+     Returns : an array of Bio::Annotation::Comment or derived objects
+     Args    : none
+
+add_DBLink
+----------
+
+     Title   : add_DBLink
+     Usage   : $self->add_DBLink($ref)
+     Function: adds a link object
+     Example :
+     Returns :
+     Args    : a Bio::Annotation::DBLink or derived object
+
+remove_DBLink
+-------------
+
+     Title   : remove_DBLink
+     Usage   : $self->remove_DBLink($index)
+     Function: removes a DBLink object
+     Example :
+     Returns :
+     Args    : index number from links array
+
+each_DBLink
+-----------
+
+     Title   : each_DBLink
+     Usage   : foreach $ref ( $self->each_DBlink() )
+     Function: gets an array of DBlink of objects
+     Example :
+     Returns : an array of Bio::Annotation::DBlink or derived objects
+     Args    :
+
+
+File: pm.info,  Node: Bio/Annotation/Comment,  Next: Bio/Annotation/DBLink,  Prev: Bio/Annotation,  Up: Module List
+
+A comment object, holding text
+******************************
+
+NAME
+====
+
+   Bio::Annotation::Comment - A comment object, holding text
+
+SYNOPSIS
+========
+
+     $comment = Bio::Annotation::Comment->new();
+     $comment->text("This is the text of this comment");
+     $annotation->add_Comment($comment);
+
+DESCRIPTION
+===========
+
+   A holder for comments in annotations, just plain text. This is a very
+simple object, and justifably so.
+
+CONTACT
+=======
+
+   Describe contact details here
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+new
+---
+
+     Title   : new
+     Usage   : $comment = Bio::Annotation::Comment->new( '-text' => 'some text for this comment');
+     Function: This returns a new comment object, optionally with
+               text filed
+     Example :
+     Returns : a Bio::Annotation::Comment object
+     Args    : a hash with -text optionally set
+
+text
+----
+
+     Title   : text
+     Usage   : $value = $self->text($newval)
+     Function: get/set for the text field. A comment object
+               just holds a single string which is accessible through
+               this method
+     Example :
+     Returns : value of text
+     Args    : newvalue (optional)
+
+
+File: pm.info,  Node: Bio/Annotation/DBLink,  Next: Bio/Annotation/Reference,  Prev: Bio/Annotation/Comment,  Up: Module List
+
+DESCRIPTION of Object
+*********************
+
+NAME
+====
+
+   Bio::Annotation::DBLink - DESCRIPTION of Object
+
+SYNOPSIS
+========
+
+     $link1 = new Bio::Annotation::DBLink(-database => 'TSC',
+                                          -primary_id => 'TSC0000030'
+     				     );
+
+     #or
+
+     $link2 = new Bio::Annotation::DBLink();
+     $link2->database('dbSNP');
+     $link2->primary_id('2367');
+
+     # $feat is Bio::Annotation object, Bio::SeqFeature::Generic inherits it
+     $feat->add_DBLink($link2);
+
+DESCRIPTION
+===========
+
+   Provides an object which represents a link from one onbject to something
+in another database without proscribing what is in the other database
+
+CONTACT
+=======
+
+   Describe contact details here
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+database
+--------
+
+     Title   : database
+     Usage   : $self->database($newval)
+     Function: set/get on the database string. Databases are just
+               a string here which can then be interpretted elsewhere
+     Example :
+     Returns : value of database
+     Args    : newvalue (optional)
+
+primary_id
+----------
+
+     Title   : primary_id
+     Usage   : $self->primary_id($newval)
+     Function: set/get on the primary id (a string)
+               The primary id is the main identifier used for this object in
+               the database. Good examples would be accession numbers. The id
+               is meant to be the main, stable identifier for this object
+     Example :
+     Returns : value of primary_id
+     Args    : newvalue (optional)
+
+optional_id
+-----------
+
+     Title   : optional_id
+     Usage   : $self->optional_id($newval)
+     Function: get/set for the optional_id (a string)
+               optional id is a slot for people to use as they wish. The main
+               issue is that some databases do not have a clean single string
+               identifier scheme. It is hoped that the primary_id can behave like
+               a reasonably sane "single string identifier" of objects, and people
+               can use/abuse optional ids to their heart's content to provide
+               precise mappings.
+     Example :
+     Returns : value of optional_id
+     Args    : newvalue (optional)
+
+comment
+-------
+
+     Title   : comment
+     Usage   : $self->comment($newval)
+     Function: get/set of comments (comment object)
+               Sets or gets comments of this dblink, which is sometimes relevant
+     Example :
+     Returns : value of comment (Bio::Annotation::Comment)
+     Args    : newvalue (optional)
+
+
+File: pm.info,  Node: Bio/Annotation/Reference,  Next: Bio/DB/Ace,  Prev: Bio/Annotation/DBLink,  Up: Module List
+
+Specialised DBLink object for Literature References
+***************************************************
+
+NAME
+====
+
+   Bio::Annotation::Reference - Specialised DBLink object for Literature
+References
+
+SYNOPSIS
+========
+
+     $reg = Bio::Annotation::Reference->new( -title => 'title line',
+     					    -location => 'location line',
+     					    -authors => 'author line',
+     					    -medline => 998122 );
+
+DESCRIPTION
+===========
+
+   Object which presents a literature reference. This is considered to be
+a specialised form of database link. The additional methods provided are
+all set/get methods to store strings commonly associated with references,
+in particular title, location (ie, journal page) and authors line.
+
+   There is no attempt to do anything more than store these things as
+strings for processing elsewhere. This is mainly because parsing these
+things suck and generally are specific to the specific format one is
+using. To provide an easy route to go format -> object -> format without
+losing data, we keep them as strings. Feel free to post the list for a
+better solution, but in general this gets very messy very fast...
+
+CONTACT
+=======
+
+   Describe contact details here
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+new
+---
+
+     Title   : new
+     Usage   : $ref = Bio::Annotation::Reference->new( -title => 'title line',
+     						   -authors => 'author line',
+     						   -location => 'location line',
+     						   -medline => 9988812);
+     Function:
+     Example :
+     Returns : a new Bio::Annotation::Reference object
+     Args    : a hash with optional title, authors, location, medline, start and end
+               attributes
+
+start
+-----
+
+     Title   : start
+     Usage   : $self->start($newval)
+     Function: Gives the reference start base
+     Example :
+     Returns : value of start
+     Args    : newvalue (optional)
+
+rp
+--
+
+     Title   : rp
+     Usage   : $self->rp($newval)
+     Function: Gives the RP line. No attempt is made to parse this line.
+     Example :
+     Returns : value of rp
+     Args    : newvalue (optional)
+
+authors
+-------
+
+     Title   : authors
+     Usage   : $self->authors($newval)
+     Function: Gives the author line. No attempt is made to parse the author line
+     Example :
+     Returns : value of authors
+     Args    : newvalue (optional)
+
+location
+--------
+
+     Title   : location
+     Usage   : $self->location($newval)
+     Function: Gives the location line. No attempt is made to parse the location line
+     Example :
+     Returns : value of location
+     Args    : newvalue (optional)
+
+title
+-----
+
+     Title   : title
+     Usage   : $self->title($newval)
+     Function: Gives the title line (if exists)
+     Example :
+     Returns : value of title
+     Args    : newvalue (optional)
+
+medline
+-------
+
+     Title   : medline
+     Usage   : $self->medline($newval)
+     Function: Gives the medline number
+     Example :
+     Returns : value of medline
+     Args    : newvalue (optional)
+
+pubmed
+------
+
+     Title   : pubmed
+     Usage   : $refobj->pubmed($newval)
+     Function: Get/Set the PubMed number, if it is different from the MedLine
+               number.
+     Example :
+     Returns : value of medline
+     Args    : newvalue (optional)
+
+database
+--------
+
+     Title   : database
+     Usage   :
+     Function: Overrides DBLink database to be hard coded to 'MEDLINE', unless
+               the database has been set explicitely before.
+     Example :
+     Returns :
+     Args    :
+
+primary_id
+----------
+
+     Title   : primary_id
+     Usage   :
+     Function: Overrides DBLink primary_id to provide medline number
+     Example :
+     Returns :
+     Args    :
+
+optional_id
+-----------
+
+     Title   : optional_id
+     Usage   :
+     Function: Overrides DBLink optional_id to provide the PubMed number.
+     Example :
+     Returns :
+     Args    :
+
+
+File: pm.info,  Node: Bio/DB/Ace,  Next: Bio/DB/BioSeqI,  Prev: Bio/Annotation/Reference,  Up: Module List
+
+Database object interface to ACeDB servers
+******************************************
+
+NAME
+====
+
+   Bio::DB::Ace - Database object interface to ACeDB servers
+
+SYNOPSIS
+========
+
+     $db = Bio::DB::Ace->new( -server => 'myace.server.com', port => '120000');
+
+     $seq = $db->get_Seq_by_id('MUSIGHBA1'); # Unique ID
+
+     # or ...
+
+     $seq = $db->get_Seq_by_acc('J00522'); # Accession Number
+
+DESCRIPTION
+===========
+
+   This provides a standard BioPerl database access to Ace, using Lincoln
+Steins excellent AcePerl module. You need to download and install the
+aceperl module from
+
+     http://stein.cshl.org/AcePerl/
+
+   before this interface will work.
+
+   This interface is designed at the moment to work through a
+aceclient/aceserver type mechanism
+
+INSTALLING ACEPERL
+==================
+
+   Download the latest aceperl tar file, gunzip/untar and cd into the
+directory.  This is a standard CPAN-style directory, so if you go
+
+     Perl Makefile.PL
+     make
+     <become root>
+     make install
+
+   Then you will have installed Aceperl. Use the PREFIX mechanism to
+install elsewhere.
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules. Send your comments and suggestions preferably  to one of
+the Bioperl mailing lists.  Your participation is much appreciated.
+
+     bioperl-l@bioperl.org              - General discussion
+     http://bioperl.org/MailList.shtml  - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.   Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR - Ewan Birney
+====================
+
+   Email birney@sanger.ac.uk
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+get_Seq_by_id
+-------------
+
+     Title   : get_Seq_by_id
+     Usage   : $seq = $db->get_Seq_by_id($uid);
+     Function: Gets a Bio::Seq object by its unique identifier/name
+     Returns : a Bio::Seq object
+     Args    : $id : the id (as a string) of the desired sequence entry
+
+get_Seq_by_acc
+--------------
+
+     Title   : get_Seq_by_acc
+     Usage   : $seq = $db->get_Seq_by_acc($acc);
+     Function: Gets a Bio::Seq object by its accession number
+     Returns : a Bio::Seq object
+     Args    : $acc : the accession number of the desired sequence entry
+
+_aceobj
+-------
+
+     Title   : _aceobj
+     Usage   : $ace = $db->_aceobj();
+     Function: Get/Set on the acedb object
+     Returns : Ace object
+     Args    : New value of the ace object
+
+
+File: pm.info,  Node: Bio/DB/BioSeqI,  Next: Bio/DB/GDB,  Prev: Bio/DB/Ace,  Up: Module List
+
+Abstract interface for a sequence database
+******************************************
+
+NAME
+====
+
+   Bio::DB::BioSeqI - Abstract interface for a sequence database
+
+SYNOPSIS
+========
+
+     #
+     # get a database object somehow using a concrete class
+     #
+
+     $seq = $db->get_Seq_by_id('ROA1_HUMAN');
+
+     #
+     # $seq is a Bio::Seq object
+     #
+
+DESCRIPTION
+===========
+
+   This is a pure interface class - in other words, all this does is define
+methods which other (concrete) classes will actually implement.
+
+   The Bio::DB::BioSeqI class defines what methods a generic database class
+should have. At the moment it is just the ability to make Bio::Seq objects
+from a name (id) or a accession number.
+
+CONTACT
+=======
+
+   Ewan Birney originally wrote this class.
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution. Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+get_Seq_by_id
+-------------
+
+     Title   : get_Seq_by_id
+     Usage   : $seq = $db->get_Seq_by_id('ROA1_HUMAN')
+     Function: Gets a Bio::Seq object by its name
+     Returns : a Bio::Seq object
+     Args    : the id (as a string) of a sequence
+     Throws  : "id does not exist" exception
+
+get_Seq_by_acc
+--------------
+
+     Title   : get_Seq_by_acc
+     Usage   : $seq = $db->get_Seq_by_acc('X77802');
+     Function: Gets a Bio::Seq object by accession number
+     Returns : A Bio::Seq object
+     Args    : accession number (as a string)
+     Throws  : "acc does not exist" exception
+
+
+File: pm.info,  Node: Bio/DB/GDB,  Next: Bio/DB/GenBank,  Prev: Bio/DB/BioSeqI,  Up: Module List
+
+Database object interface to GDB HTTP query
+*******************************************
+
+NAME
+====
+
+   Bio::DB::GDB - Database object interface to GDB HTTP query
+
+SYNOPSIS
+========
+
+     $gdb = new Bio::DB::GDB;
+
+     $info = $gdb->get_info(-type=>'marker',
+     			     -id=>'D1S243'); # Marker name
+
+     print "genbank id is ", $info->{'gdbid'},
+      "\nprimers are (fwd, rev) ", join(",", @{$info->{'primers'}}),
+      "\nproduct length is ", $info->{'length'}, "\n";
+
+DESCRIPTION
+===========
+
+   This class allows connections to the Genome Database (GDB) and queries
+to retrieve any database objects. See http://www.gdb.org/ or any mirror
+for details.
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules. Send your comments and suggestions preferably to one of
+the Bioperl mailing lists. Your participation is much appreciated.
+
+     bioperl-l@bioperl.org              - General discussion
+     http://bioperl.org/MailList.shtml  - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.  Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR - Jason Stajich
+======================
+
+   Email jason@chg.mc.duke.edu
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+ua
+--
+
+     Title   : ua
+     Usage   : my $ua = $self->ua or
+               $self->ua($ua)
+     Function: Get/Set a LWP::UserAgent for use
+     Returns : reference to LWP::UserAgent Object
+     Args    : $ua - must be a LWP::UserAgent
+
+get_params       Title   : get_params  Usage   : my %params = $self->get_params($mode)  Function: Returns key,value pairs to be passed to query             for mode ('marker', 'gene')  Returns : a key,value pair hash  Args    : 'marker' or 'gene' mode for retrieval
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+get_info
+--------
+
+     Title   : get_info
+     Usage   : my $info = $self->get_info(-type => 'marker',
+     				      -id   => 'D1S234');
+     Function: Returns key,value pairs specific
+     Returns : a key,value pair hash
+     Args    : -type => 'marker' or 'gene' mode for retrieval
+               -id   => unique id to query for
+
+get_request
+-----------
+
+     Title   : get_request
+     Usage   : my $url = $self->get_request
+     Function: HTTP::Request
+     Returns :
+     Args    : %qualifiers = a hash of qualifiers (ids, format, etc)
+
+
+File: pm.info,  Node: Bio/DB/GenBank,  Next: Bio/DB/GenPept,  Prev: Bio/DB/GDB,  Up: Module List
+
+Database object interface to GenBank
+************************************
+
+NAME
+====
+
+   Bio::DB::GenBank - Database object interface to GenBank
+
+SYNOPSIS
+========
+
+     $gb = new Bio::DB::GenBank;
+
+     $seq = $gb->get_Seq_by_id('MUSIGHBA1'); # Unique ID
+
+     # or ...
+
+     $seq = $gb->get_Seq_by_acc('J00522'); # Accession Number
+
+     # or ... best when downloading very large files, prevents
+     # keeping all of the file in memory
+
+     # also don't want features, just sequence so let's save bandwith
+     # and request Fasta sequence
+     $gb = new Bio::DB::GenBank(-retrievaltype => 'tempfile' ,
+     			       -format => 'Fasta');
+     my $seqio = $gb->get_Stream_by_acc(['AC013798', 'AC021953'] );
+     while( my $clone =  $seqio->next_seq ) {
+       print "cloneid is ", $clone->
+     }
+
+DESCRIPTION
+===========
+
+   Allows the dynamic retrieval of Sequence objects (Bio::Seq) from the
+GenBank database at NCBI, via an Entrez query.
+
+   WARNING: Please do NOT spam the Entrez web server with multiple
+requests.  NCBI offers Batch Entrez for this purpose.  Batch Entrez
+support will likely be supported in a future version of DB::GenBank.
+
+FEEDBACK
+========
+
+Mailing Lists
+-------------
+
+   User feedback is an integral part of the evolution of this and other
+Bioperl modules. Send your comments and suggestions preferably to one of
+the Bioperl mailing lists. Your participation is much appreciated.
+
+     bioperl-l@bioperl.org              - General discussion
+     http://bioperl.org/MailList.shtml  - About the mailing lists
+
+Reporting Bugs
+--------------
+
+   Report bugs to the Bioperl bug tracking system to help us keep track
+the bugs and their resolution.  Bug reports can be submitted via email or
+the web:
+
+     bioperl-bugs@bio.perl.org
+     http://bio.perl.org/bioperl-bugs/
+
+AUTHOR - Aaron Mackey, Jason Stajich
+====================================
+
+   Email amackey@virginia.edu Email jason@chg.mc.duke.edu
+
+APPENDIX
+========
+
+   The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+get_params
+----------
+
+     Title   : get_params
+     Usage   : my %params = $self->get_params($mode)
+     Function: Returns key,value pairs to be passed to NCBI database
+               for either 'batch' or 'single' sequence retrieval method
+     Returns : a key,value pair hash
+     Args    : 'single' or 'batch' mode for retrieval
+
+Routines Bio::DB::WebDBSeqI from Bio::DB::RandomAccessI
+=======================================================
+
+get_Seq_by_id
+-------------
+
+     Title   : get_Seq_by_id
+     Usage   : $seq = $db->get_Seq_by_id('ROA1_HUMAN')
+     Function: Gets a Bio::Seq object by its name
+     Returns : a Bio::Seq object
+     Args    : the id (as a string) of a sequence
+     Throws  : "id does not exist" exception
+
+get_Seq_by_acc
+--------------
+
+     Title   : get_Seq_by_acc
+     Usage   : $seq = $db->get_Seq_by_acc($acc);
+     Function: Gets a Seq object by accession numbers
+     Returns : a Bio::Seq object
+     Args    : the accession number as a string
+     Note    : For GenBank, this just calls the same code for get_Seq_by_id()
+     Throws  : "id does not exist" exception
+
+Routines implemented by Bio::DB::NCBIHelper
+===========================================
+
+get_request
+-----------
+
+     Title   : get_request
+     Usage   : my $url = $self->get_request
+     Function: HTTP::Request
+     Returns :
+     Args    : %qualifiers = a hash of qualifiers (ids, format, etc)
+
+get_Stream_by_batch
+-------------------
+
+     Title   : get_Stream_by_batch
+     Usage   : $seq = $db->get_Stream_by_batch($ref);
+     Function: Retrieves Seq objects from Entrez 'en masse', rather than one
+               at a time.  For large numbers of sequences, this is far superior
+               than get_Stream_by_[id/acc]().
+     Example :
+     Returns : a Bio::SeqIO stream object
+     Args    : $ref : either an array reference, a filename, or a filehandle
+               from which to get the list of unique ids/accession numbers.
+
+get_Stream_by_id
+----------------
+
+     Title   : get_Stream_by_id
+     Usage   : $stream = $db->get_Stream_by_id( [$uid1, $uid2] );
+     Function: Gets a series of Seq objects by unique identifiers
+     Returns : a Bio::SeqIO stream object
+     Args    : $ref : a reference to an array of unique identifiers for
+                      the desired sequence entries
+
+get_Stream_by_acc
+-----------------
+
+     Title   : get_Stream_by_acc
+     Usage   : $seq = $db->get_Stream_by_acc([$acc1, $acc2]);
+     Function: Gets a series of Seq objects by accession numbers
+     Returns : a Bio::SeqIO stream object
+     Args    : $ref : a reference to an array of accession numbers for
+                      the desired sequence entries
+     Note    : For GenBank, this just calls the same code for get_Stream_by_id()
+
+   1; __END__
+
+

@@ -1,0 +1,1600 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Apache/AddHostPath,  Next: Apache/Album,  Prev: Apache/ASP,  Up: Module List
+
+Adds some or all of the hostname and port to the URI
+****************************************************
+
+NAME
+====
+
+   Apache::AddHostPath - Adds some or all of the hostname and port to the
+URI
+
+SYNOPSIS
+========
+
+     # in httpd.conf
+     PerlTransHandler Apache::AddHostPath
+
+DESCRIPTION
+===========
+
+   This module transforms the requested URI based on the hostname and port
+number from the http request header.  It allows you to manage an arbitrary
+number of domains and/or sub-domains all pointed to the same document
+root, but for which you want a combination of shared and distinct files.
+
+   Essentially the module implements Apache's URI translation phase by
+attempting to use some or all of the URL hostname and port number as the
+base of the URI.  It simply does file and directory existence tests on a
+series of URIs (from most-specific to least-specific) and sets the URI to
+the most specific match.
+
+   If the requested is:
+
+     URL: http://www.alpha.cvsroot.org:8080/index.html
+     URI: /index.html
+
+   Apache::AddHostPath would go through the following list of possible
+paths and set the new URI based on the first match which passes a -f or -d
+existence test:
+
+     $docRoot/org/cvsroot/alpha/www/8080/index.html
+     $docRoot/org/cvsroot/alpha/www/index.html
+     $docRoot/org/cvsroot/alpha/index.html
+     $docRoot/org/cvsroot/index.html
+     $docRoot/org/index.html
+     $docRoot/index.html
+
+   For example if you have three domains cvsroot.org, ransommoney.com, and
+inputsignal.com using the same apache instance and DocumentRoot (without
+using VirtualHosts). If you assume that the DocumentRoot contains the
+following files and directories:
+
+     images/
+     images/bg.gif
+     org/
+     org/cvsroot/
+     org/cvsroot/images/logo.gif
+     com/
+     com/images/
+     com/images/bg.gif
+     com/ransommoney/
+     com/ransommoney/images/
+     com/ransommoney/images/logo.gif
+     com/ransommoney/images/bg.gif
+     com/inputsignal/
+     com/inputsignal/images/
+     com/inputsignal/images/logo.gif
+
+   Apache::AddHostPath would transform the following requested URL/URIs as
+follows:
+
+     Input URL:  http://cvsroot.org/images/bg.gif
+     Input URI:  /images/bg.gif
+     Output URI: /images/bg.gif
+
+     Input URL:  http://cvsroot.org/images/logo.gif
+     Input URI:  /images/logo.gif
+     Output URI: /org/cvsroot/images/logo.gif
+
+     Input URL:  http://ransommoney.com/images/bg.gif
+     Input URI:  /images/bg.gif
+     Output URI: /com/ransommoney/images/bg.gif
+
+     Input URL:  http://inputsignal.com/images/bg.gif
+     Input URI:  /images/bg.gif
+     Output URI: /com/images/bg.gif
+
+   It also correctly handles extra path info to CGI scripts.  For example
+if you add the following files and dirs to the above example:
+
+     cgi-bin/
+     cgi-bin/magic.pl
+     org/cvsroot/cgi-bin/
+     org/cvsroot/cgi-bin/magic.pl
+
+   Apache::AddHostPath would transform the following requested URL/URIs as
+follows:
+
+     Input URL: http://cvsroot.org/cgi-bin/magic.pl/param1/param2
+     Input URI: /cgi-bin/magic.pl/param1/param2
+     Output URI: /org/cvsroot/cgi-bin/magic.pl/param1/param2
+
+     Input URL: http://ransommoney.com/cgi-bin/magic.pl/param1
+     Input URI: /cgi-bin/magic.pl/param1
+     Output URI: /cgi-bin/magic.pl/param1
+
+   You can debug this URI translation by setting your Apache LogLevel to
+"debug".  This will show add messages to your error log showing every URI
+combination tested and which one it ended up using.
+
+   This module adds powerful yet simplistic inheritance capabilities to a
+multi-domain server.  A number of domains could be set to a single flat
+document root initially. Then individual files could be overridden for a
+hostname, or set of hostnames, simply by creating the appropriate
+directory structures and specific files while leaving the rest of the
+domain untouched.
+
+AUTHOR
+======
+
+   Robert C W Jenks, rjenks@cvsroot.org
+
+SEE ALSO
+========
+
+   perl(1). `mod_perl' in this node
+
+COPYRIGHT
+=========
+
+   This program is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2 of the License, or (at your option)
+any later version.
+
+
+File: pm.info,  Node: Apache/Album,  Next: Apache/Archive,  Prev: Apache/AddHostPath,  Up: Module List
+
+Simple mod_perl Photo Album
+***************************
+
+NAME
+====
+
+   Apache::Album - Simple mod_perl Photo Album
+
+SYNOPSIS
+========
+
+   Add to httpd.conf
+
+     <Location /albums>
+       SetHandler perl-script
+       PerlHandler Apache::Album
+     #   PerlSetVar  AlbumDir            /albums_loc
+     #   PerlSetVar  ThumbNailUse        Width
+     #   PerlSetVar  ThumbNailWidth      100
+     #   PerlSetVar  ThumbNailAspect     2/11
+     #   PerlSetVar  ThumbSubDir         thumbs
+     #   PerlSetVar  DefaultBrowserWidth 640
+     #   PerlSetVar  NumberOfColumns     0
+     #   PerlSetVar  OutsideTableBorder  0
+     #   PerlSetVar  InsideTablesBorder  0
+     #   PerlSetVar  BodyArgs            BGCOLOR=white
+     #   PerlSetVar  Footer              "<EM>Optional Footer Here</EM>"
+     #   PerlSetVar  EditMode            0
+     #   PerlSetVar  AllowFinalResize    0
+     #   PerlSetVar  FinalResizeDir      thumbs
+     #   PerlSetVar  ReverseDirs         0
+     #   PerlSetVar  ReversePics         0
+     </Location>
+
+ABSTRACT
+========
+
+   This is a simple photo album.  You simply copy some gif's/jpeg's to a
+directory, create an optional text block (in a file called caption.txt) to
+go at the top, and the module does the rest.  It does however require that
+PerlMagick be installed.
+
+   Default settings in the httpd.conf file may be overriden by using
+.htaccess files.
+
+INSTALLATION
+============
+
+     perl Makefile.PL
+     make
+     make install
+
+   (no test necessary)
+
+CONFIGURATION
+=============
+
+   The configuration can be a little tricky, so here is a little more
+information.  It's important to realize that there are two separate, but
+related directories.  One is where the physical pictures reside, the other
+is where the "virtual" albums reside.
+
+   Consider a filesystem called /albums exists and it is this filesystem
+that will house the images.  Also consider that multiple people will have
+albums there, so you would create a directory for each user:
+
+     /albums/jdw/albums_loc
+     /albums/travis/albums_loc
+
+   Then in your httpd.conf file you would have the following entry to
+allow pictures in those directories to be viewed:
+
+     Alias /jdw /albums/jdw/
+
+   At this point you could view a full sized picture under the directory
+/albums/jdw/albums_loc as the url /jdw/albums_loc.
+
+   To have an album that creates thumbnails/captions of those pictures you
+would need an entry like:
+
+     <Location /jdw/albums>
+      SetHandler perl-script
+      AllowOverride None
+      Options None
+      PerlHandler Apache::Album
+      PerlSetVar  AlbumDir /jdw/albums_loc
+      PerlSetVar  Footer   "<a href=\"mailto:woody@bga.com\">Jim Woodgate</a>"
+     </Location>
+
+   Note how AlbumDir points to the url where the files exist, and the url
+you use to access the album will be just like that url, only substituting
+albums for albums_loc.
+
+   If anyone knows of a way to accomplish this same thing, but using a
+DirectoryIndex instead, please let me know.  I tried and could not get it
+to work!
+
+DESCRIPTION
+===========
+
+   This module sets up a virtual set of photo albums starting at the
+Location definition.  This virtual directory is mapped to a physical
+directory under `AlbumDir'.  Under `AlbumDir' create a sub-directory for
+each photo album, and copy image files into each subdirectory.  You must
+also make the permissions for each subdirectory so that the id which runs
+Apache can write to the directory.
+
+   At this point, if you have PerlMagick installed, you can go to
+*http://your.site/albums/album_name* Apache::Album will create thumbnails
+for each of the images, and send the caption.txt file along with the
+thumbnails to the client's browser.  The thumbnails are links to the full
+sized images.
+
+The caption.txt file
+     The caption.txt file consists of two parts.  The first part is
+     text/html that will be placed at the top of the html document.  The
+     second part is a mapping of filenames to captions.  The module will do
+     some simple mangling of the image file names to create the caption.
+     But if it finds a mapping in the caption.txt file, that value is used
+     instead.  The value __END__ signifies the end of the first section and
+     the beginning of the second.
+
+          For example:
+
+          Image   -> Bob_and_Jenny.jpg
+          Caption -> Bob and Jenny       (the auto-generated caption)
+
+          override in caption.txt
+          Bob_and_Jenny.jpg: This is me with my sister <EM>Jenny</EM>.
+
+     Here is a sample caption.txt file:
+
+          <H1>My Birthday Party</H1>
+
+          <center>This is me at my Birthday Party!.</center>
+
+          __END__
+          pieinface.gif: Here's me getting hit the face with a pie.
+          john5.jpg: This is <A HREF="mailto:johndoe@nowhere.com">John</A>
+
+ThumbNail Types
+     `ThumbNailUse' can either be set to "width" or "aspect".  If
+     `ThumbNailUse' is set to "width", thumbnails that need to be created
+     will be `ThumbNailWidth' wide, and the height will be modified to
+     keep the same aspect as the original image.
+
+     If `ThumbNailUse' is set to "aspect", thumbnails that need to be
+     created will be transformed by the value of `ThumbNailAspect'.
+     `ThumbNailAspect' can be either a floating point number like 0.25 or
+     it can be a ratio like 2 / 11.
+
+     If an image file is updated, the corresponding thumbnail file will be
+     updated the next time the page is accessed.  In practice I have found
+     that Netscape will used the cached images even if they are updated.  I
+     normally have to flush the cache and reload to see the new images.
+
+     At any time you can `rm -f tn__*' in the `AlbumDir'/album_name/
+     directory, the next time the page is loaded all the thumbnails will be
+     regenerated.  (Naturally image names that start with tn__ should be
+     renamed before placing them in the album directory.)
+
+ThumbSubDir
+     If you want your thumbnails to be in a different directory than the
+     original pictures, set ThumbSubDir which is the subdirectory the
+     thumbnails will be created in and viewed from.  (This could also be
+     used to allow multiple sets of thumbnails).
+
+DefaultBrowserWidth
+     A general number of how wide you want the final table to be, not an
+     absolute number.  If the next image would take it past this "invisible
+     line", a new row is started.
+
+NumberOfColumns
+     Instead of using DefaultBrowserWidth and a guess at the number of
+     pixels, NumberOfColumns can be set to the maximum number of columns in
+     a table.  The default is 0 (which causes DefaultBrowserWidth to be
+     used instead).
+
+BodyArgs
+     This entire string is passed in the <BODY> tag.  Useful for setting
+     background images, background color, link colors, etc.  If set in the
+     httpd.conf file, you must put quotes around the value, and escape any
+     quotes in the value.  If this value is set in the .htaccess file, this
+     is not necessary:
+
+          In httpd.conf: PerlSetVar BodyArgs "BACKGROUND=gray.gif text=\"#FFFFFF\""
+          In .htaccess : PerlSetVar BodyArgs BACKGROUND=gray.gif text="#FFFFFF"
+
+OutsideTableBorder
+     This variable's value is passed to the outer table's BORDER attribute.
+
+InsideTablesBorder
+     This variables's value is passed to all the inner table's BORDER
+     attributes.  Note that the name of the `InnerTablesBorder' has an 's'
+     in it, as it modifes all the inner tables.
+
+Footer
+     This text/html will placed at the bottom of the page after all the
+     thumbnails, but before the end of the page.  Useful for links back to
+     a home page, mailto: tag, etc.
+
+EditMode
+     Allows the user to create new albums and upload pictures.  Obviously
+     there are security implications here, so if EditMode is turned on that
+     location should probably have some kind of security.  Albums can share
+     the same AlbumDir, so you can have something like:
+
+     /albums      - ReadOnly version, no security /albums_edit - Allow new
+     album creation and picture uploads,                require
+     authentication
+
+     both using the same AlbumDir.
+
+AllowFinalResize
+     If this is set to true, the user will have 3 additional options when
+     viewing the full sized picture.  The thumbnail can still be selected
+     to view the full picture, or Sm (Small), Med (Medium), or Lg(Large)
+     can be selected to bring the picture down to fit better in a 640x480,
+     800x600, or 1024x758 screen.
+
+ReverseDirs
+     When viewing albums, they will be sorted by name.  If this is set to
+     true the order will be reversed.  (Useful if you want to use things
+     like dates/months as the directory names, this will put the most
+     recent albums first.
+
+ReversePics
+     When viewing pictures, they will be sorted by name.  If this is set to
+     true, the order of the pictures will be reversed.
+
+OTHER FEATURES
+==============
+
+   For people with lots of bandwidth and memory, Apache::Album can
+generate a single page with all the full sized pictures (or all the
+Small(sm), Medium(med) or Large(lg) pictures if AllowFinalResize is turned
+on).  This is enabled by passing ?all_full_images=sm|med|lg|full to the
+url of an album, for example:
+
+   `http://your.web.server/albums/specific_album/?all_full_images=sm'
+
+   Will create a page with all the picutres in an album, but none will be
+larger than 640x480.  The pictures will have captions as if the pictures
+were being viewed one at a time.
+
+LIMITATIONS
+===========
+
+   PerlMagick is a limiting factor.  If PerlMagick can't load the image,
+no thumbnail will be created.
+
+COPYRIGHT
+=========
+
+   Copyright (c) 1998-2000 Jim Woodgate. All rights reserved. This program
+is free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+AUTHOR
+======
+
+   Jim Woodgate woody@bga.com
+
+SEE ALSO
+========
+
+   perl(1), *Note Image/Magick: Image/Magick,(3).
+
+
+File: pm.info,  Node: Apache/Archive,  Next: Apache/AuthCookie,  Prev: Apache/Album,  Up: Module List
+
+Expose archive files through the Apache web server.
+***************************************************
+
+NAME
+====
+
+   Apache::Archive - Expose archive files through the Apache web server.
+
+SYNOPSIS
+========
+
+     <Files ~ "\.(tar|tgz|tar\.gz)">
+     SetHandler perl-script
+     PerlHandler Apache::Archive
+     </Files>
+
+DESCRIPTION
+===========
+
+   Apache::Archive is a mod_perl extension that allows the Apache HTTP
+server to expose tar and tar.gz archives on the fly. When a client
+requests such an archive file, the server will return a page displaying
+information about the file that allows the user to view or download
+individual files from within the archive.
+
+   *Please read the BUGS section before using this on any production
+server*
+
+REQUIREMENTS
+============
+
+   Apache::Archive requires *mod_perl 1.11* or later, and *Archive::Tar
+0.2* or later. Note that *Archive::Tar* itself requires *Compress::Zlib*.
+*Apache 1.3.6* or later is recommended. Earlier versions may well work too.
+
+HTTPD CONFIGURATION PARAMETERS
+==============================
+
+   Apache::Archive is a straightforward replacement for Apache's normal
+handler routine. There are currently three optional parameters that alter
+the way Apache::Archive functions. All of these are set using the
+PerlSetVar directive.
+
+Months
+     This should be a comma seperated list of month names for
+     Apache::Archive to use when generating dates. This allows you to use
+     names other than English ones, or to use numbers. If this option is
+     not specified it will default English three letter abbreviations.
+
+Template
+     This is the location of a template file that Apache::Archive should
+     use to generate the information page for the archive. If none is
+     specified then it will use a built in default. See the section below
+     for how to create a template file.
+
+SizeLimit
+     This should be a number representing size in Kb. Once Apache has
+     handled any archive file larger than this number, that Apache process
+     will terminate. This is because Perl does not return allocated memory
+     to the kernel, and processes tend to grow to the size of the largest
+     file opened. Since Archive::Tar 0.2, tar files do not have to be held
+     entirely in memory so this is less of a problem. If set to 0 or not
+     set, this feature is disabled. You may also want to consider using
+     Apache::SizeLimit if you OS supports it.
+
+   EXAMPLE
+
+     <Files ~ "\.(tar|tgz|tar\.gz)">
+     SetHandler perl-script
+     PerlHandler Apache::Archive
+     PerlSerVar Months '1,2,3,4,5,6,7,8,9,10,11,12'
+     PerlSetVar Template /any/path/template.html
+     PerlSetVar SizeLimit 5000
+     </Files>
+
+TEMPLATE CONFIGURATION FILE
+===========================
+
+   Apache::Archive can read in an HTML file containing special tags and
+use that as a template for its output. The configuration file should be
+readable by the httpd process. It does not need to be in the document
+root. The template file must contain a special section delimited by
+##StartData and ##EndData. This section httpd process. It does not need to
+be in the document root. The template file must contain a special section
+delimited by ##StartData and ##EndData. This section is repeated once for
+each component file in the archive, with any special tags being
+substituted with values of the current component file. A list of possible
+tags and what they are substituted with is shown below.
+
+   The first four tags provide information on the tar file itself, and can
+be used anywhere in the template file.
+
+   *##ArchiveName*
+
+   The name of the archive file currently being viewed.
+
+   *##ArchiveDate*
+
+   The last modification date of the archive file currently being viewed.
+
+   *##ArchiveSize*
+
+   The size of the archive file currently being viewed.
+
+   *##ArchiveLink*
+
+   An absolute URL that allows the user to download the archive file.
+
+   *##StartData*
+
+   A file in the archive. This tag should be place on a line by itself.
+
+   *##EndData*
+
+   Marks the end of the repeated section. This tag should be placed on a
+line by itself.
+
+   The next four tags provide information about one of the component files
+in the archive. These tags should only be used between the ##StartData and
+##EndData tags.
+
+   *##FileName*
+
+   The name of the archived file.
+
+   *##FileDate*
+
+   The last modification date of the file.
+
+   *##FileSize*
+
+   The size of the file.
+
+   *##FileLink*
+
+   An absolute URL that allows the user to download the file.
+
+   This example is the template used by default.
+
+     <HTML><BODY BGCOLOR="#cccccc">
+     <H2>
+     <A HREF=##ArchiveLink>##ArchiveName</A>
+     </H2>
+     ##ArchiveDate<BR>
+     ##ArchiveSize<BR>
+     This is the contents of the archive:
+     <P>
+     <TABLE border=4 cellpadding=6 cellspacing=2>
+     <TR>
+     <TH>View item</TH><TH>Name</TH><TH>Date</TH><TH>Size</TH>
+     </TR>
+     ##StartData
+     <TR>
+     	<TD><A HREF=##FileLink>View File</A></TD>
+     	<TD>##FileName</TD><TD>##FileDate</TD>
+     	<TD>##FileSize</TD>
+     </TR>
+     ##EndData
+     </TABLE></BODY></HTML>
+
+BUGS
+====
+
+MEMORY LEAK
+     There is a problem with memory leakage. This is greatly reduced with
+     Archive::Tar 0.2 and later. Still, if you have a busy site, I advise
+     checking memory consumption, and experimenting with the SizeLimit
+     variable, or with Apache::SizeLimit. Expect processes to be 10Mb and
+     more.
+
+No error checking on template file
+     If you create a faulty template file, the server will attempt to use
+     it regardless and may behave unpredictably.
+
+Tar files within tar files
+     If an archive contains other archives, the sub-archives are not
+     passed through the Apache::Archive handler - they are simply treated
+     as regular files. This is not really a bug per se, more a missing
+     feature.
+
+No support for .zip files
+     This will be added later.
+
+AUTHOR
+======
+
+   J. Peterson, jon@snowdrift.org
+
+COPYRIGHT
+=========
+
+   Copyright 1998-1999, J. Peterson
+
+   This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+   If you have questions or problems regarding use or installation of this
+module please feel free to email me directly.
+
+SEE ALSO
+========
+
+   Apache, Archive::Tar, Compress::Zlib, Apache::SizeLimit
+
+
+File: pm.info,  Node: Apache/AuthCookie,  Next: Apache/AuthCookieDBI,  Prev: Apache/Archive,  Up: Module List
+
+Perl Authentication and Authorization via cookies
+*************************************************
+
+NAME
+====
+
+   Apache::AuthCookie - Perl Authentication and Authorization via cookies
+
+SYNOPSIS
+========
+
+   Make sure your mod_perl is at least 1.24, with StackedHandlers,
+MethodHandlers, Authen, and Authz compiled in.
+
+     # In httpd.conf or .htaccess:
+     PerlModule Sample::AuthCookieHandler
+     PerlSetVar WhatEverPath /
+     PerlSetVar WhatEverLoginScript /login.pl
+     
+     # The following line is optional - it allows you to set the domain
+     # scope of your cookie.  Default is the current domain.
+     PerlSetVar WhatEverDomain .yourdomain.com
+
+     # Use this to only send over a secure connection
+     PerlSetVar WhatEverSecure 1
+
+     # Usually documents are uncached - turn off here
+     PerlSetVar WhatEverCache 1
+
+     # These documents require user to be logged in.
+     <Location /protected>
+      AuthType Sample::AuthCookieHandler
+      AuthName WhatEver
+      PerlAuthenHandler Sample::AuthCookieHandler->authenticate
+      PerlAuthzHandler Sample::AuthCookieHandler->authorize
+      require valid-user
+     </Location>
+
+     # These documents don't require logging in, but allow it.
+     <FilesMatch "\.ok$">
+      AuthType Sample::AuthCookieHandler
+      AuthName WhatEver
+      PerlFixupHandler Sample::AuthCookieHandler->recognize_user
+     </FilesMatch>
+
+     # This is the action of the login.pl script above.
+     <Files LOGIN>
+      AuthType Sample::AuthCookieHandler
+      AuthName WhatEver
+      SetHandler perl-script
+      PerlHandler Sample::AuthCookieHandler->login
+     </Files>
+
+DESCRIPTION
+===========
+
+   *Apache::AuthCookie* allows you to intercept a user's first
+unauthenticated access to a protected document. The user will be presented
+with a custom form where they can enter authentication credentials. The
+credentials are posted to the server where AuthCookie verifies them and
+returns a session key.
+
+   The session key is returned to the user's browser as a cookie. As a
+cookie, the browser will pass the session key on every subsequent
+accesses. AuthCookie will verify the session key and re-authenticate the
+user.
+
+   All you have to do is write a custom module that inherits from
+AuthCookie.  Your module is a class which implements two methods:
+
+`authen_cred()'
+     Verify the user-supplied credentials and return a session key.  The
+     session key can be any string - often you'll use some string
+     containing username, timeout info, and any other information you need
+     to determine access to documents, and append a one-way hash of those
+     values together with some secret key.
+
+`authen_ses_key()'
+     Verify the session key (previously generated by `authen_cred()',
+     possibly during a previous request) and return the user ID.  This user
+     ID will be fed to `$r->connection->user()' to set Apache's idea of
+     who's logged in.
+
+   By using AuthCookie versus Apache's built-in AuthBasic you can design
+your own authentication system.  There are several benefits.
+
+  1. The client doesn't *have* to pass the user credentials on every
+     subsequent access.  If you're using passwords, this means that the
+     password can be sent on the first request only, and subsequent
+     requests don't need to send this (potentially sensitive) information.
+     This is known as "ticket-based" authentication.
+
+  2. When you determine that the client should stop using the
+     credentials/session key, the server can tell the client to delete the
+     cookie.  Letting users "log out" is a notoriously impossible-to-solve
+     problem of AuthBasic.
+
+  3. AuthBasic dialog boxes are ugly.  You can design your own HTML login
+     forms when you use AuthCookie.
+
+  4. You can specify the domain of a cookie using PerlSetVar commands.  For
+     instance, if your AuthName is `WhatEver', you can put the command
+
+          PerlSetVar WhatEverDomain .yourhost.com
+
+     into your server setup file and your access cookies will span all
+     hosts ending in `.yourhost.com'.
+
+        This is the flow of the authentication handler, less the details
+of the redirects. Two REDIRECT's are used to keep the client from
+displaying the user's credentials in the Location field. They don't really
+change AuthCookie's model, but they do add another round-trip request to
+the client.
+
+     *  The session key that the client gets can be anything you want.  For
+        example, encrypted information about the user, a hash of the
+        username and password (similar in function to Digest
+        authentication), or the user name and password in plain text
+        (similar in function to HTTP Basic authentication).
+
+     The only requirement is that the authen_ses_key function that you
+     create must be able to determine if this session_key is valid and
+     map it back to the originally authenticated user ID.
+
+   `Apache::AuthCookie' has several methods you should know about.  Here
+is the documentation for each. =)
+
+   * authenticate()
+
+     This method is one you'll use in a server config file (httpd.conf,
+     .htaccess, ...) as a PerlAuthenHandler.  If the user provided a
+     session key in a cookie, the `authen_ses_key()' method will get
+     called to check whether the key is valid.  If not, or if there is no
+     key provided, we redirect to the login form.
+
+   * authorize()
+
+     This will step through the require directives you've given for
+     protected documents and make sure the user passes muster.  The
+     `require valid-user' and `require user joey-jojo' directives are
+     handled for you.  You can implement custom directives, such as
+     `require species hamster', by defining a method called `hamster()' in
+     your subclass, which will then be called.  The method will be called
+     as `$r->hamster($r, $args)', where $args is everything on your
+     require line after the word `hamster'.  The method should return OK
+     on success and FORBIDDEN on failure.
+
+     Currently users must satisfy ALL of the require directives.  I have
+     heard that other Apache modules let the user satisfy ANY of the
+     require directives.  I don't know which is correct, I haven't found
+     any Apache docs on the matter.  If you need one behavior or the other,
+     be careful.  I may change it if I discover that ANY is correct.
+
+   * authen_cred()
+
+     You must define this method yourself in your subclass of
+     `Apache::AuthCookie'.  Its job is to create the session key that will
+     be preserved in the user's cookie.  The arguments passed to it are:
+
+          sub authen_cred ($$\@) {
+            my $self = shift;  # Package name (same as AuthName directive)
+            my $r    = shift;  # Apache request object
+            my @cred = @_;     # Credentials from login form
+
+          ...blah blah blah, create a session key...
+          return $session_key;
+           }
+
+     The only limitation on the session key is that you should be able to
+     look at it later and determine the user's username.  You are
+     responsible for implementing your own session key format.  A typical
+     format is to make a string that contains the username, an expiration
+     time, whatever else you need, and an MD5 hash of all that data
+     together with a secret key.  The hash will ensure that the user
+     doesn't tamper with the session key.  More info in the Eagle book.
+
+   * authen_ses_key()
+
+     You must define this method yourself in your subclass of
+     Apache::AuthCookie.  Its job is to look at a session key and determine
+     whether it is valid.  If so, it returns the username of the
+     authenticated user.
+
+          sub authen_ses_key ($$$) {
+            my ($self, $r, $session_key) = @_;
+            ...blah blah blah, check whether $session_key is valid...
+            return $ok ? $username : undef;
+          }
+
+   * login()
+
+     This method handles the submission of the login form.  It will call
+     the `authen_cred()' method, passing it $r and all the submitted data
+     with names like `"credential_#"', where # is a number.  These will be
+     passed in a simple array, so the prototype is `$self->authen_cred($r,
+     @credentials)'.  After calling `authen_cred()', we set the user's
+     cookie and redirect to the URL contained in the `"destination"'
+     submitted form field.
+
+   * login_form()
+
+     This method is responsible for displaying the login form. The default
+     implementation will make an internal redirect and display the URL you
+     specified with the `PerlSetVar WhatEverLoginForm' configuration
+     directive. You can overwrite this method to provide your own
+     mechanism.
+
+   * logout()
+
+     This is simply a convenience method that unsets the session key for
+     you.  You can call it in your logout scripts.  Usually this looks like
+     `$r->auth_type->logout($r);'.
+
+   * send_cookie($session_key)
+
+     By default this method simply sends out the session key you give it.
+     If you need to change the default behavior (perhaps to update a
+     timestamp in the key) you can override this method.
+
+   * recognize_user()
+
+     If the user has provided a valid session key but the document isn't
+     protected, this method will set `$r->connection->user' anyway.  Use
+     it as a PerlFixupHandler, unless you have a better idea.
+
+   * key()
+
+     This method will return the current session key, if any.  This can be
+     handy inside a method that implements a require directive check (like
+     the species method discussed above) if you put any extra information
+     like clearances or whatever into the session key.
+
+UPGRADING FROM VERSION 1.4
+==========================
+
+   There are a few interface changes that you need to be aware of when
+migrating from version 1.x to 2.x.  First, the authen() and authz()
+methods are now deprecated, replaced by the new authenticate() and
+authorize() methods.  The old methods will go away in a couple versions,
+but are maintained intact in this version to ease the task of upgrading.
+The use of these methods is essentially the same, though.
+
+   Second, when you change to the new method names (see previous
+paragraph), you must change the action of your login forms to the location
+/LOGIN (or whatever URL will call your module's login() method).  You may
+also want to change their METHOD to POST instead of GET, since that's much
+safer and nicer to look at (but you can leave it as GET if you bloody well
+want to, for some god-unknown reason).
+
+   Third, you must change your login forms (see `THE LOGIN SCRIPT' in this
+node below) to indicate how requests should be redirected after a
+successful login.
+
+   Fourth, you might want to take advantage of the new logout() method,
+though you certainly don't have to.
+
+EXAMPLE
+=======
+
+   For an example of how to use Apache::AuthCookie, you may want to check
+out the test suite, which runs AuthCookie through a few of its paces.  The
+documents are located in t/eg/, and you may want to peruse t/real.t to see
+the generated httpd.conf file (at the bottom of real.t) and check out what
+requests it's making of the server (at the top of real.t).
+
+THE LOGIN SCRIPT
+================
+
+   You will need to create a login script (called login.pl above) that
+generates an HTML form for the user to fill out.  You might generate the
+page using an Apache::Registry script, or an HTML::Mason component, or
+perhaps even using a static HTML page.  It's usually useful to generate it
+dynamically so that you can define the 'destination' field correctly (see
+below).
+
+   The following fields must be present in the form:
+
+  1. The ACTION of the form must be /LOGIN (or whatever you defined in your
+     server configuration as handled by the ->login() method - see example
+     in the SYNOPSIS section).
+
+  2. The various user input fields (username, passwords, etc.) must be
+     named 'credential_0', 'credential_1', etc. on the form.  These will
+     get passed to your authen_cred() method.
+
+  3. You must define a form field called 'destination' that tells
+     AuthCookie where to redirect the request after successfully logging
+     in.  Typically this value is obtained from `$r->prev->uri'.  See the
+     login.pl script in t/eg/.
+
+        In addition, you might want your login page to be able to tell the
+difference between a user that sent an incorrect auth cookie, and a user
+that sent no auth cookie at all.  These typically correspond,
+respectively, to users who logged in incorrectly or aren't allowed to
+access the given page, and users who are trying to log in for the first
+time.  To help you differentiate between the two, *AuthCookie* will set
+`$r->subprocess_env('AuthCookieReason')' to either `bad_cookie' or
+`no_cookie'.  You can examine this value in your login form by examining
+`$r->prev->subprocess_env('AuthCookieReason')' (because it's a
+sub-request).
+
+   Of course, if you want to give more specific information about why
+access failed when a cookie is present, your `authen_ses_key()' method can
+set arbitrary entries in `$r->subprocess_env'.
+
+THE LOGOUT SCRIPT
+=================
+
+   If you want to let users log themselves out (something that can't be
+done using Basic Auth), you need to create a logout script.  For an
+example, see t/eg/logout.pl.  Logout scripts may want to take advantage of
+AuthCookie's logout() method, which will set the proper cookie headers in
+order to clear the user's cookie.  This usually looks like
+`$r->auth_type->logout($r);'.
+
+   Note that if you don't necessarily trust your users, you can't count on
+cookie deletion for logging out.  You'll have to expire some server-side
+login information too.  AuthCookie doesn't do this for you, you have to
+handle it yourself.
+
+ABOUT SESSION KEYS
+==================
+
+   Unlike the sample AuthCookieHandler, you have you verify the user's
+login and password in `authen_cred()', then you do something like:
+
+     my $date = localtime;
+     my $ses_key = MD5->hexhash(join(';', $date, $PID, $PAC));
+
+   save `$ses_key' along with the user's login, and return `$ses_key'.
+
+   Now `authen_ses_key()' looks up the `$ses_key' passed to it and returns
+the saved login.  I use Oracle to store the session key and retrieve it
+later, see the ToDo section below for some other ideas.
+
+KNOWN LIMITATIONS
+=================
+
+   If the first unauthenticated request is a POST, it will be changed to a
+GET after the user fills out the login forms, and POSTed data will be lost.
+
+TO DO
+-----
+
+   * There ought to be a way to solve the POST problem in the LIMITATIONS
+     section.  It involves being able to re-insert the POSTed content into
+     the request stream after the user authenticates.
+
+     It might be nice if the logout method could accept some parameters
+     that could make it easy to redirect the user to another URI, or
+     whatever.  I'd have to think about the options needed before I
+     implement anything, though.
+
+AUTHOR
+======
+
+   Ken Williams, ken@forum.swarthmore.edu
+
+   Originally written by Eric Bartley, bartley@purdue.edu
+
+SEE ALSO
+========
+
+   `perl(1)' in this node, `mod_perl(1)' in this node, `Apache(1)' in this
+node.
+
+
+File: pm.info,  Node: Apache/AuthCookieDBI,  Next: Apache/AuthCookieURL,  Prev: Apache/AuthCookie,  Up: Module List
+
+An AuthCookie module backed by a DBI database.
+**********************************************
+
+NAME
+====
+
+   Apache::AuthCookieDBI - An AuthCookie module backed by a DBI database.
+
+VERSION
+=======
+
+     $Revision: 1.18 $
+
+SYNOPSIS
+========
+
+     # In httpd.conf or .htaccess
+     PerlModule Apache::AuthCookieDBI
+     PerlSetVar WhatEverPath /
+     PerlSetVar WhatEverLoginScript /login.pl
+
+     # Optional, to share tickets between servers.
+     PerlSetVar WhatEverDomain .domain.com
+     
+     # These must be set
+     PerlSetVar WhatEverDBI_DSN "DBI:mysql:database=test"
+     PerlSetVar WhatEverDBI_SecretKeyFile /etc/httpd/acme.com.key
+
+     # These are optional, the module sets sensible defaults.
+     PerlSetVar WhatEverDBI_User "nobody"
+     PerlSetVar WhatEverDBI_Password "password"
+     PerlSetVar WhatEverDBI_UsersTable "users"
+     PerlSetVar WhatEverDBI_UserField "user"
+     PerlSetVar WhatEverDBI_PasswordField "password"
+     PerlSetVar WhatEverDBI_CryptType "none"
+     PerlSetVar WhatEverDBI_GroupsTable "groups"
+     PerlSetVar WhatEverDBI_GroupField "grp"
+     PerlSetVar WhatEverDBI_GroupUserField "user"
+     PerlSetVar WhatEverDBI_EncryptionType "none"
+     PerlSetVar WhatEverDBI_SessionLifetime 00-24-00-00
+
+     # Protected by AuthCookieDBI.
+     <Directory /www/domain.com/authcookiedbi>
+     	AuthType Apache::AuthCookieDBI
+     	AuthName WhatEver
+     	PerlAuthenHandler Apache::AuthCookieDBI->authenticate
+     	PerlAuthzHandler Apache::AuthCookieDBI->authorize
+     	require valid-user
+     	# or you can require users:
+     	require user jacob
+     	# You can optionally require groups.
+     	require group system
+     </Directory>
+
+     # Login location.  *** DEBUG *** I still think this is screwy
+     <Files LOGIN>
+     	AuthType Apache::AuthCookieDBI
+     	AuthName WhatEver
+     	SetHandler perl-script
+     	PerlHandler Apache::AuthCookieDBI->login
+     </Files>
+
+DESCRIPTION
+===========
+
+   This module is an authentication handler that uses the basic mechanism
+provided by Apache::AuthCookie with a DBI database for ticket-based
+protection.  It is based on two tokens being provided, a username and
+password, which can be any strings (there are no illegal characters for
+either).  The username is used to set the remote user as if Basic
+Authentication was used.
+
+   On an attempt to access a protected location without a valid cookie
+being provided, the module prints an HTML login form (produced by a CGI or
+any other handler; this can be a static file if you want to always send
+people to the same entry page when they log in).  This login form has
+fields for username and password.  On submitting it, the username and
+password are looked up in the DBI database.  The supplied password is
+checked against the password in the database; the password in the database
+can be plaintext, or a crypt() or md5_hex() checksum of the password.  If
+this succeeds, the user is issued a ticket.  This ticket contains the
+username, an issue time, an expire time, and an MD5 checksum of those and
+a secret key for the server.  It can optionally be encrypted before
+returning it to the client in the cookie; encryption is only useful for
+preventing the client from seeing the expire time.  If you wish to protect
+passwords in transport, use an SSL-encrypted connection.  The ticket is
+given in a cookie that the browser stores.
+
+   After a login the user is redirected to the location they originally
+wished to view (or to a fixed page if the login "script" was really a
+static file).
+
+   On this access and any subsequent attempt to access a protected
+document, the browser returns the ticket to the server.  The server
+unencrypts it if encrypted tickets are enabled, then extracts the
+username, issue time, expire time and checksum.  A new checksum is
+calculated of the username, issue time, expire time and the secret key
+again; if it agrees with the checksum that the client supplied, we know
+that the data has not been tampered with.  We next check that the expire
+time has not passed.  If not, the ticket is still good, so we set the
+username.
+
+   Authorization checks then check that any "require valid-user" or
+"require user jacob" settings are passed.  Finally, if a "require group
+foo" directive was given, the module will look up the username in a groups
+database and check that the user is a member of one of the groups listed.
+If all these checks pass, the document requested is displayed.
+
+   If a ticket has expired or is otherwise invalid it is cleared in the
+browser and the login form is shown again.
+
+APACHE CONFIGURATION DIRECTIVES
+===============================
+
+   All configuration directives for this module are passed in PerlSetVars.
+These PerlSetVars must begin with the AuthName that you are describing,
+so if your AuthName is PrivateBankingSystem they will look like:
+
+     PerlSetVar PrivateBankingSystemDBI_DSN "DBI:mysql:database=banking"
+
+   See also `Apache::Authcookie' in this node for the directives required
+for any kind of Apache::AuthCookie-based authentication system.
+
+   In the following descriptions, replace "WhatEver" with your particular
+AuthName.  The available configuration directives are as follows:
+
+`WhatEverDBI_DSN'
+     Specifies the DSN for DBI for the database you wish to connect to
+     retrieve user information.  This is required and has no default value.
+
+`WhatEverDBI_User'
+     The user to log into the database as.  This is not required and
+     defaults to undef.
+
+`WhatEverDBI_Password'
+     The password to use to access the database.  This is not required and
+     defaults to undef.
+
+`WhatEverDBI_UsersTable'
+     The table that user names and passwords are stored in.  This is not
+     required and defaults to 'users'.
+
+`WhatEverDBI_UserField'
+     The field in the above table that has the user name.  This is not
+     required and defaults to 'user'.
+
+`WhatEverDBI_PasswordField'
+     The field in the above table that has the password.  This is not
+     required and defaults to 'password'.
+
+`WhatEverDBI_CryptType'
+     What kind of hashing is used on the password field in the database.
+     This can be 'none', 'crypt', or 'md5'.  This is not required and
+     defaults to 'none'.
+
+`WhatEverDBI_GroupsTable'
+     The table that has the user / group information.  This is not
+     required and defaults to 'groups'.
+
+`WhatEverDBI_GroupField'
+     The field in the above table that has the group name.  This is not
+     required and defaults to 'grp' (to prevent conflicts with the SQL
+     reserved word 'group').
+
+`WhatEverDBI_GroupUserField'
+     The field in the above table that has the user name.  This is not
+     required and defaults to 'user'.
+
+`WhatEverDBI_SecretKeyFile'
+     The file that contains the secret key (on the first line of the
+     file).  This is required and has no default value.  This key should
+     be owned and only readable by root.  It is read at server startup
+     time.  The key should be long and fairly random.  If you want, you
+     can change it and restart the server, (maybe daily), which will
+     invalidate all prior-issued tickets.
+
+`WhatEverDBI_EncryptionType'
+     What kind of encryption to use to prevent the user from looking at
+     the fields in the ticket we give them.  This is almost completely
+     useless, so don't switch it on unless you really know you need it.
+     It does not provide any protection of the password in transport; use
+     SSL for that.  It can be 'none', 'des', 'idea', 'blowfish', or
+     'blowfish_pp'.
+
+     This is not required and defaults to 'none'.
+
+`WhatEverDBI_SessionLifetime'
+     How long tickets are good for after being issued.  Note that presently
+     Apache::AuthCookie does not set a client-side expire time, which
+     means that most clients will only keep the cookie until the user
+     quits the browser.  However, if you wish to force people to log in
+     again sooner than that, set this value.  This can be 'forever' or a
+     life time specified as:
+
+          DD-hh-mm-ss -- Days, hours, minute and seconds to live.
+
+     This is not required and defaults to '00-24-00-00' or 24 hours.
+
+DATABASE SCHEMAS
+================
+
+   For this module to work, the database tables must be laid out at least
+somewhat according to the following rules:  the user field must be a
+primary key so there is only one row per user; the password field must be
+NOT NULL.  If you're using MD5 passwords the password field must be 32
+characters long to allow enough space for the output of md5_hex().  If
+you're using crypt() passwords you need to allow 13 characters.
+
+   An minimal CREATE TABLE statement might look like:
+
+     CREATE TABLE users (
+     	user VARCHAR(16) PRIMARY KEY,
+     	password VARCHAR(32) NOT NULL
+     )
+
+   For the groups table, the access table is actually going to be a join
+table between the users table and a table in which there is one row per
+group if you have more per-group data to store; if all you care about is
+group membership though, you only need this one table.  The only
+constraints on this table are that the user and group fields be NOT NULL.
+
+   A minimal CREATE TABLE statement might look like:
+
+     CREATE TABLE groups (
+     	grp VARCHAR(16) NOT NULL,
+     	user VARCHAR(16) NOT NULL
+     )
+
+COPYRIGHT
+=========
+
+   Copyright (C) 2000 SF Interactive, Inc.  All rights reserved.
+
+LICENSE
+=======
+
+   This library is free software; you can redistribute it and/or modify it
+under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or (at
+your option) any later version.
+
+   This library is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
+License for more details.
+
+   You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+AUTHOR
+======
+
+   Jacob Davies
+
+     <jacob@sfinteractive.com>
+     <jacob@well.com>
+
+SEE ALSO
+========
+
+   Apache::AuthCookie(1)
+
+
+File: pm.info,  Node: Apache/AuthCookieURL,  Next: Apache/AuthDBI,  Prev: Apache/AuthCookieDBI,  Up: Module List
+
+Perl Authentication and Authorization or session management via cookies or URL munging
+**************************************************************************************
+
+NAME
+====
+
+   Apache::AuthCookieURL - Perl Authentication and Authorization or
+session management via cookies or URL munging
+
+SYNOPSIS
+========
+
+   In httpd.conf
+
+     # Your module that overrides AuthCookieURL methods
+     PerlModule My::AuthCookieURLHandler
+
+     # Or to use simple session generation w/o persistence
+     #PerlModule Apache::AuthCookieURL
+
+     ## Some settings -- "Whatever" is set by AuthName ##
+     # most can be set within <directory> sections
+
+     # Send expires with cookie
+     PerlSetVar WhateverExpires +90d
+
+     # Other cookie settings
+     #PerlSetVar WhateverDomain some.domain
+
+     # This can only be set to "/" if using URL sessions
+     #PerlSetVar WhateverPath /path
+     #PerlSetVar WhateverSecure 1
+
+     # Login script to call
+     PerlSetVar WhateverLoginScript /login.pl
+
+     # Or for just session management without a login script
+     #PerlSetVar WhateverLoginScript NONE
+
+     # Debugging options
+     #PerlSetVar AuthCookieURLDebug 5
+
+     # Disable cookies (only URL based sessions)
+     #PerlSetVar WhateverNoCookie 1
+
+     # Define a string that indicates to AuthCookieURL
+     # what a session looks like
+     # This can only be in main config
+     #PerlSetVar SessionPrefix Session-
+
+     # This block enables URL session handling
+     PerlTransHandler  Apache::AuthCookieURLHandler->URLsession
+
+     ErrorDocument 302 /MISSING
+     ErrorDocument 301 /MISSING
+     <Location /MISSING>
+         SetHandler perl-script
+         PerlHandler Apache::AuthCookieURLHandler->error_document
+     </Location>
+
+     <Location /protected>
+         AuthType Apache::AuthCookieURLHandler
+         AuthName Whatever
+         PerlAuthenHandler Apache::AuthCookieURLHandler->authenticate
+         PerlAuthzHandler Apache::AuthCookieURLHandler->authorize
+         require valid-user
+     </Location>
+
+     # provide open access to some areas below
+     <Location /protected/open>
+         PerlSetVar DisableAuthCookieURL 1
+     </Location>
+
+     # or if the entire directory tree was protected
+     <Location /images>
+         PerlSetVar DisableAuthCookieURL 1
+     </Location>
+
+     # Make sure the login script can be run
+     <Files login.pl>
+          Options +ExecCGI
+          SetHandler perl-script
+          PerlHandler Apache::Registry
+     </Files>
+
+     # LOGIN is the action defined by the login.pl script
+
+     <Files LOGIN>
+          AuthType Apache::AuthCookieURLHandler
+          AuthName Whatever
+          SetHandler perl-script
+          PerlHandler Apache::AuthCookieURLHandler->login
+     </Files>
+
+     # Note: If protecting the entire web site (from root down) then
+     # the action *must* be C</LOGIN> as the module looks for this string.
+
+     # better to just invalidate the session, of course
+     <Files LOGOUT>
+          AuthType Apache::AuthCookieURLHandler
+          PerlSetVar WhateverLogoutURI /
+          AuthName Whatever
+          SetHandler perl-script
+          PerlHandler Apache::AuthCookieURLHandler->logout
+     </Files>
+
+DESCRIPTION
+===========
+
+   ** Warning: beta software.  This should be used for testing purposes
+only.  That said, there are a few people using it and I've been using it
+for a few months without problem.  The interface may change (or disappear)
+without notice.  Please report any problems or comments back to Bill
+Moseley <moseley@hank.org>.
+
+   This module is a modification of Ken Williams
+<ken@forum.swarthmore.edu> Apache::AuthCookie.  Please see perldoc
+Apache::AuthCookie for complete instructions.  As this is intended to be a
+drop-in replacement for Apache::AuthCookie you may wish to install and
+test with Ken's Apache::AuthCookie before trying AuthCookieURL.
+
+   Basically, this module allows you to catch any unauthenticated access
+and redirect to a login script that you define.  The login script posts
+credentials (e.g. username and password) and your module can then validate
+and provide a session key.  The session key is sent in a cookie, and also
+in a munged URL and a redirect is issued and the process starts all over.
+
+   Typically, you will write your own module that will override methods in
+Apache::AuthCookieURL.  These methods are described completely in Ken's
+Apache::AuthCookie.  Your methods will be used to generate and validate
+session keys.  You can use Apache::AuthCookieURL without overriding its
+methods and then AuthCookieURL can be used as a simple session manager.
+
+   With this module you should be able to enable session management for an
+entire site using <Location />, and then allow access to, say, the images
+directory, and also require password access to other locations.  One issue
+at this point is that the session key is stripped from URLs in a Trans
+handler.  So you would need to use cookies to use different session keys
+for different parts of your web tree.
+
+   Apache::AuthCookieURL adds the following features to Apache::AuthCookie.
+
+   * URL munging
+
+     If the PerlTransHandler is enabled in httpd.conf the session key will
+     also be placed in the URL.  The session will be removed from the URL
+     if cookies are enabled on the next request.  Typically, someone
+     visiting your site with cookies enabled will never see the munged URL.
+
+     To make URL sessions work you must use relative links in your
+     documents so the client/browser knows to place the session key on all
+     links.  CGI scripts can also access the session information via the
+     environment.
+
+   * Simple Session Management
+
+     If the login script is set to `NONE' with PerlSetVar
+     WhateverLoginScript NONE then Apache::AuthCookeURL acts like a simple
+     session manager:  your module will provide a new session key if one
+     is not provided with the request, or if the one provided is invalid.
+
+   * Really Simple Session Management
+
+     Apache::AuthCookieURL provides default authen_cred() and
+     authen_ses_key() methods that generates a (questionably) random
+     session key.  This means you can use AuthCookieURL directly without
+     subclassing for really simple session management without any
+     persistence of session keys.
+
+   Unless you are not subclassing this module (and using the default
+methods provide), your own module must define two methods: authen_cred()
+and authen_ses_key(), and then subclass by including Apache::AuthCookieURL
+in your module's @ISA array.  Again, please see Apache::AuthCookie for
+complete documentation.
+
+   * authen_cred()
+
+     This method verifies the credentials (e.g. username/password) and
+     returns a session key.  If the credentials are not acceptable then
+     you can return a list, with the second element being an error message
+     that is placed in a cookie.  This allows your login script to display
+     a failure reason.  This method is needed since a redirect is done
+     before your login script is executed again.  Of course, this requires
+     that the client has cookies enabled.
+
+     Another method is to return a session key that is really an error
+     code and generate messages based on that returned session (error)
+     code.
+
+   * authen_ses_key()
+
+     This method's job is to validate and convert a session key into a
+     username and return it.  AuthCookieURL places the returned value into
+     $ENV{REMOTE_USER}.
+
+CONFIGURATION SETTINGS
+======================
+
+   Configuration settings are set with the PerlSetVar directive:
+
+     PerlSetVar WhateverExpires +90d
+
+   "Whatever" is whatever the current AuthName is set.  I think I might
+remove this and instead just use the settings as Apache dir_merge returns
+them.  In other words, if you want a setting to override a global setting,
+then use it within a <directory>, <file>, or <location> section.
+
+   * AuthCookieURLDebug
+
+     Sets the debugging level.  Since some debugging info is generated in
+     the Trans handler this needs to be set in the main httpd config.
+     Default is 0.
+
+     Example: PerlSetVar AuthCookieURLDebug 5
+
+   * SessionPrefix
+
+     SessionPrefix sets the prefix used by the Trans handler to recognize
+     the session in the URL (thus needs to be set in the main config), and
+     to create the session ID.  Default is 'Session-'.
+
+     Example: PerlSetVar SessionPrefix ID-
+
+   * WhateverCache
+
+     UNLESS set then $r->no_cache(1) will be called when processing the
+     login and logout requests.  Defaults to unset and thus
+     $r->no_cache(1) IS called.
+
+     Example: PerlSetVar WhateverCache 1
+
+   * WhateverLogoutURI
+
+     Sets where you are redirected after requesting the logout URL (see
+     SYNOPSIS).  Defaults to '/'.
+
+     Example: PerlSetVar WhateverLogoutURI /gone.html
+
+   * DisableAuthCookieURL
+
+     This causes the Authen and Authz handlers to return OK.  In other
+     words,
+
+          <Location /protected/notprotected>
+              PerlSetVar DisableAuthCookieURL 1
+          </Location>
+
+     Allows full access to the notprotected directory.
+
+   * WhateverLoginScript
+
+     This sets the Login script to be executed when authorization is
+     required (no valid session key was sent by cookie or URL).  This
+     login script can be a CGI script, Apache::Registry script, or a
+     mod_perl handler.
+
+     If set to `NONE' then AuthCookieURL will be in simple session
+     management mode.  AuthCookieURL->login will be called which calls
+     authen_cred() to generate a session key.  authen_cred() should just
+     return a session key without checking the credentials.
+
+     If you do not override AuthCookieURL::authen_cred(), then
+     AuthCookieURL::authen_cred() simply returns this for a session key.
+
+          return time . $$ . int rand $$;
+
+     Example: PerlSetVar WhateverLoginScript /login.pl          PerlSetVar
+     WhateverLoginScript NONE
+
+   * WhateverNoCookie
+
+     Turns off cookies.
+
+     Example: PerlSetVar WhateverNoCookie 1
+
+   * Whatever(Path|Expires|Domain|Secure)
+
+     These all control the values sent in cookies.  Path, if used, must be
+     '/' if using URL-based sessions.
+
+     Example: PerlSetVar WhateverPath /
+
+ENVIRONMENT AND NOTES
+=====================
+
+   Apache::AuthCookieURL sets some environment variables and Apache notes:
+
+   authen_ses_key() returns a value that is placed in $ENV{REMOTE_USER}.
+authen_ses_key() normally converts the session key into a username.
+
+   $ENV{SESSION} contains the current session key
+
+   $ENV{AuthCookieURLReason} contains the reason authentication failed.
+Either 'no_session_provided' or 'bad_session_provided'.
+
+   $r->notes( 'URI_Session' ) is the session extracted from the URI
+
+   $r->notes('Session_prefix') is the prefix used with the session keys,
+of course.
+
+   $r->notes( 'SESSION' ) is the full session, including the prefix.
+
+WARNING
+=======
+
+   URL munging has security issues.  Session keys can get written to
+access logs, cached by browsers, leak outside your site, and are broken if
+your pages use absolute links to other pages on-site.
+
+TO DO
+=====
+
+   Apache::AuthCookieURL uses error documents to try to fixup any
+redirects.  The obvious example is when a request is made for a directory
+without a trailing slash and Apache issues a redirect.  (Actually,
+AuthCookieURL tries to detect this case and rewrite the URL before Apache
+redirects.)  I wish I knew a better way to fixup Location: headers in
+redirects without sub-requesting every request.  There's no way to catch a
+CGI script or module that might issue a Location: header or REDIRECT.  I
+guess that's left for Apache 2.0 when all output can be filtered.
+
+REQUIRED
+========
+
+   mod_perl 1.24, Apache::Cookie
+
+AUTHOR
+======
+
+   Bill Moseley <moseley@hank.org> made minor changes to Ken Williams'
+<ken@forum.swarthmore.edu> Apache::AuthCookie.
+
+   Thanks very much to Ken for Apache::AuthCookie.
+
+VERSION
+=======
+
+     $Revision: 1.3 $
+
+SEE ALSO
+========
+
+   *Note Apache/AuthCookie: Apache/AuthCookie,
+
+

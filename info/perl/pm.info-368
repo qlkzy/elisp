@@ -1,0 +1,1514 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: Text/DoubleMetaphone,  Next: Text/EP3,  Prev: Text/DelimMatch,  Up: Module List
+
+Phonetic encoding of words.
+***************************
+
+NAME
+====
+
+   Text::DoubleMetaphone - Phonetic encoding of words.
+
+SYNOPSIS
+========
+
+     use Text::DoubleMetaphone qw( double_metaphone );
+     my($code1, $code2) = double_metaphone("Aubrey");
+
+DESCRIPTION
+===========
+
+   This module implements a "sounds like" algorithm developed by Lawrence
+Philips which he published in the June, 2000 issue of *C/C++ Users
+Journal*.  Double Metaphone is an improved version of Philips' original
+Metaphone algorithm.
+
+   In contrast to the Soundex and Metaphone algorithms, Double Metaphone
+will sometimes return two encodings for words that can be plausibly
+pronounced multiple ways.
+
+   For additional details, see Philips' discussion of the algorithm at:
+
+     http://www.cuj.com/archive/1806/feature.html
+
+FUNCTIONS
+=========
+
+double_metaphone( STRING )
+     Takes a word and returns a phonetic encoding.  In an array context,
+     it returns one or two phonetic encodings for the word.  In a scalar
+     context, it returns the first encoding.  The first encoding is
+     usually based on the most commonly heard U.S. pronounciation of the
+     word.
+
+AUTHOR
+======
+
+   Copyright 2000, Maurice Aubrey <maurice@hevanet.com>.  All rights
+reserved.
+
+   This code is based heavily on the C++ implementation by Lawrence
+Philips, and incorporates several bug fixes courtesy of Kevin Atkinson
+<kevina@users.sourceforge.net>.
+
+   This module is free software; you may redistribute it and/or modify it
+under the same terms as Perl itself.
+
+SEE ALSO
+========
+
+Man Pages
+---------
+
+   *Note Text/Metaphone: Text/Metaphone,, *Note Text/Soundex: Text/Soundex,
+
+Additional References
+---------------------
+
+   Philips, Lawrence. *C/C++ Users Journal*, June, 2000.
+
+   Philips, Lawrence. *Computer Language*, Vol. 7, No. 12 (December), 1990.
+
+   Kevin Atkinson (author of the Aspell spell checker) maintains a page
+dedicated to the Metaphone and Double Metaphone algorithms at
+<http://aspell.sourceforge.net/metaphone/>
+
+
+File: pm.info,  Node: Text/EP3,  Next: Text/EP3/Verilog,  Prev: Text/DoubleMetaphone,  Up: Module List
+
+The Extensible Perl PreProcessor
+********************************
+
+NAME
+====
+
+   EP3 - The Extensible Perl PreProcessor
+
+SYNOPSIS
+========
+
+     use Text::EP3;
+     [use Text::EP3::{Extension}] # Language Specific Modules
+     my $object = new Text::EP3 file;
+     $object->ep3_execute;
+        [other methods that can be invoked]
+        $object->ep3_process([$filename, [$condition]]);
+        $object->ep3_output_file([$filename]);
+        $object->ep3_parse_command_line;
+        $object->ep3_modules([@modules]);
+        $object->ep3_includes([@include_directories]);
+        $object->ep3_reset;
+        $object->ep3_end_comment([$string]);
+        $object->ep3_start_comment([$string]);
+        $object->ep3_line_comment([$string]);
+        $object->ep3_delimeter([$string]);
+        $object->ep3_gen_depend_list([$value]);
+        $object->ep3_keep_comments([$value]);
+        $object->ep3_protect_comments([$value]);
+        $object->ep3_defines($string1=$string2);
+
+DESCRIPTION
+===========
+
+   EP3 is a Perl5 program that preprocesses STDIN or some set of input
+files and produces an output file.  EP3 only works on input files and
+produces output files. It seems to me that if you want to preprocess
+arrays or somesuch, you should be using perl.  EP3 was first developed to
+provide a flexible preprocessor for the Verilog hardware description
+language. Verilog presents some problems that were not easily solved by
+using cpp or m4. I wanted to be able to use a normal preprocessor, but
+extend its functionality.  So I wrote EP3 - the Extensible Perl
+PreProcessor. The main difference between EP3 and other preprocessors is
+its built-in extensibility. Every directive in EP3 is really a method
+defined in EP3, one of its submodules, or embedded in the file that is
+being processed. By linking the directive name to the associated methods,
+other methods could be added, thus extending the preprocessor.
+
+   Many of the features of EP3 can be modified via command line switches.
+For every command line switch, there is an also accessor method.
+
+Directives and Method Invocation
+     Directives are preceded with the a user defined delimeter. The
+     default delimeter is `@'. This delimeter was chosen to avoid
+     conflicts with other preprocessor delimeters (`#' and the Verilog
+     backtick), as well as Verilog syntax that might be found a the
+     beginning of a line (`$', `&', etc.). A directive is defined in Perl
+     as the beginning of the line, any amount of whitespace, and the
+     delimeter immediately followed by Perl word characters (0-9A-Za-z_).
+
+     EP3 looks for directives, strips off the delimeter, and then invokes
+     a method of the same name. The standard directives are defined within
+     the EP3 program. Library or user defined directives may be loaded as
+     perl modules either via the use command or from a command line switch
+     for inclusion at the beginning of the EP3 run. Using the "include"
+     directive coupled with the "perl_begin/end" directives perl
+     subroutines (and hence EP3 directives) may be dynamically included
+     during the EP3 run.
+
+Directive Extension Method 1: The use command.
+     A module may be included with the use statement provided that it
+     pushes its package name onto EP3's @ISA array (thus telling EP3 to
+     inherit its methods).  For a Verilog module whose filename is
+     Verilog.pm and has the package name Text::EP3::Verilog, the following
+     line must be included ...
+
+          push (@Text::EP3::ISA, qw(Text::EP3::Verilog));
+
+     This package can then be simply included in whatever script you are
+     using to call EP3 with the line:
+
+          use Text::EP3::Verilog;
+
+     All methods within the module are now available to EP3 as directives.
+
+Directive Extension Method 2: The command line switch.
+     A module can be included at run time with the -module modulename
+     switch on the command line (assuming the ep3_parse_command_line
+     method is invoked). The modulename is assumed to have a .pm extension
+     and exist somewhere in the directories specified in @INC.  All
+     methods within the module are now available to EP3 as directives.
+
+Directive Extension Method 3: The ep3_modules accessor method.
+     Modules can be added by using the accessor method ep3_modules.
+
+          $object->ep3_modules("module1","module2", ....);
+
+     All methods within the module are now available to EP3 as directives.
+
+Directive Extension Method 4: Embedded in the source code or included files.
+     Using the perl_begin and perl_end directives to delineate perl
+     sections, subroutines can be declared (as methods) anywhere in a
+     processed file or in a file that the process file includes. In this
+     way, runtime methods are made available to EP3. For example ...
+
+          1 Text to be printed ...
+          @perl_begin
+          sub hello {
+          	my $self = shift;
+          	print "Hello there\n";
+          }
+          @perl_end
+          2 Text to be printed ...
+          @hello
+          3 Text to be printed ...
+          
+          would result in
+          1 Text to be printed ...
+          2 Text to be printed ...
+          Hello there
+          3 Text to be printed ...
+
+     Using this method, libraries of directives can be built and included
+     with the include directive (but it is recommended that they be moved
+     into a module when they become static).
+
+Input Files and Processing
+     Input files are processed one line at a time. The EP3 engine attempts
+     to perform substitutions with elements stored in macro/define/replace
+     lists. All directive lines are preprocessed before being evaluated
+     (the only exception being the key portions of the if[n]def and define
+     directives). Directive lines can be extended across multiple lines by
+     placing the `\' character at the end of each line. Comments are
+     normally protected from the preprocessor, but protection can be
+     dynamically turned off and then back on. From a command line switch,
+     comments can also be deleted from the output.
+
+Output Files
+     EP3 typically writes output to Perl's STDOUT, but can be assigned to
+     any output file. EP3 can also be run in "dependency check" mode via a
+     command line switch. In this mode, normal output is suppressed, and
+     all dependent files are output in the order accessed.  NOTE! EP3 uses
+     the select call to change the default output file for included perl
+     blocks. However, if you are using a method invocation of ep3, note
+     that the default output for the rest of your script will be changed
+     as well.  (This can be easily worked with, but should be known
+     beforehand).
+
+     Most parameters can be modified before invoking EP3 including
+     directive string, comment delimeters, comment protection and
+     inclusion, include path, and startup defines.
+
+Standard Directives
+===================
+
+   EP3 defines a standard set of preprocessor directives with a few
+special additions that integrate the power of Perl into the coded language.
+
+The define directive
+     @define key definition The define directive assigns the definition to
+     the key. The definition can contain any character including
+     whitespace. The key is searched for as an individual word (i.e the
+     input to be searched is tokenized on Perl word boundaries). The
+     definition contains everything from the whitespace following the key
+     until the end of the line.
+
+The replace directive
+     @replace key definition The replace directive is identical to the
+     define directive except that the substitution is performed if the key
+     exists anywhere, not just on word boundaries.
+
+The macro directive
+     @macro key(value[,value]*) definition The macro directive tokenizes
+     as the define directive, replacing the key(value,...) text with the
+     definition and saving the value list. The definition is then parsed
+     and the original macro values are replaced with the saved values.
+
+The eval directive
+     @eval key expr The eval directive first evaluates the expr using
+     Perl. Any valid Perl expr is accepted. This key is then defined with
+     the result of the evaluation.
+
+The include directive
+     @include <file> or "file" [condition] The include directive looks for
+     the "file" in the present directory, and <file> anywhere in the
+     include path (definable via command line switch). Included files are
+     recursively evaluated by the preprocessor. If the optional condition
+     is specified, only those lines in between the text strings "@mark
+     condition_BEGIN" and "@mark condition_END" will be included. The
+     condition can be any string. For example if the file "file.V"
+     contains the following lines:
+
+          1 Stuff before
+          @mark PORT_BEGIN
+          2 Stuff middle
+          @mark PORT_END
+          3 Stuff after
+
+     Then any file with the following line:
+
+          @include "file.V" PORT
+
+     will include the following line from file.V
+
+          2 Stuff middle
+
+     This is useful for partial inclusion of files (like port list
+     specifications in Verilog).
+
+The enum directive
+     @enum a,b,c,d,...  enum generates multiple define's with each
+     sequential element receiving a 1 up count from the previous element.
+     Default starts at 0. If any element is a number, the enum value will
+     be set to that value.
+
+The ifdef and ifndef directives
+     @ifdef and @ifndef key Conditional compilation directives. The key is
+     defined if it was placed in the define/replace list by define,
+     replace, or any command that generates a define or replace.
+
+The if directive
+     @if expr The expression is evaluated using Perl. The expression can
+     be any valid Perl expression. This allows for a wide range of
+     conditional compilation.
+
+The elif [elsif] directive
+     @[elif|elsif] key | expr The else if directive. Used for either
+     "if[n]def" or "if".
+
+The else directive
+     @else The else directive. Used for either "if[n]def" or "if".
+
+The endif directive
+     @endif The conclusion of any "if[n]def" or "if" block.
+
+The comment directive
+     @comment on|off|default|previous The comment switch can be one of
+     "on", "off", "default", or "previous". This is used to turn comments
+     on or off in the resultant file. This directive is very useful when
+     including other files with commented header descriptions. By using
+     "comment off" and "comment previous" surrounding a header the output
+     will not see the included files comments. Using "comment on" with
+     "comment previous" insures that comments are included (as in an
+     attached synthesis directive file). The default comment setting is
+     on. This can be altered by a command line switch. The "comment
+     default" directive will restore the comment setting to the EP3
+     invocation default.
+
+The ep3 directive
+     @ep3 on|off The "ep3 off" directive turns off preprocessing until the
+     "ep3 on" directive is encountered. This can greatly speed up
+     processing of large files where postprocessing is only necessary in
+     small chunks.
+
+The perl_begin and perl_end directives
+     @perl_begin perl code here ....  (Single line and multi-line output
+     mechanisms are available)
+
+     @> text to be output after variable interpolation or
+
+     @>> text to be output
+
+          after variable interpolation
+
+          @<<
+
+     @perl_end
+
+     The "perl" directives provide the underlying language with all of the
+     power of perl, embedded in the preprocessed code. Anything enclosed
+     within the "perl_begin" and "perl_end" directives will be evaluated
+     as a Perl script. This can be used to include a subroutine that can
+     later be called as a directive. Using this type of extension,
+     directive libraries can be developed and included to perform a
+     variety of powerful source code development features.  This construct
+     can also be used to mimic and expand the VHDL generate capabilities.
+     The "@>" and "@>> @<<" directives from within a perl_[begin|end]
+     block directs ep3 to perform variable interpolation on the given line
+     and then print it to the output.
+
+The debug directive
+     @debug on|off|value The debug directive enables debug statements to
+     go to the output file. The debug statements are preceded by the Line
+     Comment string. Currently the debug values that will enable printouts
+     are the following:
+
+          0x01  1  - Primary messages (Entering Subroutines)
+          0x02  2  - ep3_process Engine
+          0x04  4  - define (replace, macro, eval, enum)
+          0x08  8  - include
+          0x10  16 - if (else, ifdef, etc.)
+          0x20  32 - perl_begin/end
+
+EP3 Methods
+===========
+
+   EP3 defines several methods that can be invoked by the user.
+
+ep3_execute
+     Execute sets up EP3 to act like a perl script. It parses the command
+     line, includes any modules specified on the command line, loads in
+     any specified modules, does any preexisting defines, sets up the
+     output files, and then processes the input. Sort of the whole shebang.
+
+ep3_parse_command_line
+     ep3_parse_command_line does just that - parses the command line
+     looking for EP3 options. It uses the GetOpt::Long module.
+
+ep3_modules
+     This method will find and include any modules specified as arguments.
+     It expects just the name and will append .pm to it before doing a
+     require.  The module returns the methods specified in the objects
+     methods array.
+
+ep3_output_file
+     ep3_output_file  determines what the output should be (either the
+     processed text or a list of dependencies) and where it should go. It
+     then proceeds to open the required output files.  NOTE! - this module
+     uses select to change the default output file.  The module returns
+     the output filename.
+
+ep3_reset
+     ep3_reset resets all of the internal EP3 lists (defines, replaces,
+     keycounts, etc.) so that a user can do multiple files independently
+     from within one script.
+
+ep3_process([$filename [$condition]])
+     ep3_process is the guts of the whole thing. It takes a filename as
+     input and produces the specified output. This is the method that is
+     iteratively called by the include directive. A null filenam will
+     cause ep3_process to look for filenames in ARGV.
+
+ep3_includes([@include_directories])
+     This method will add the specified directories to the ep3 include
+     path.
+
+ep3_defines($string1=$string2);
+     This method will initialize defines with string1 defined as string 2.
+     It initializes all of the defines in the objects Defines array.
+
+ep3_end_comment([$string]);
+     This method sets the end_comment string to the value specifed.  If
+     null, the method returns the current value.
+
+ep3_start_comment([$string]);
+     This method sets the start_comment string to the value specifed.  If
+     null, the method returns the current value.
+
+ep3_line_comment([$string]);
+     This method sets the end_commenline string to the value specifed.  If
+     null, the method returns the current value.
+
+ep3_delimeter([$string]);
+     This method sets the delimeter string to the value specifed.  If
+     null, the method returns the current value.
+
+ep3_gen_depend_list([$value]);
+     This method enables/disables dependency list generation. When
+     gen_depend_list is 1, a dependency list is generated. When it is 0,
+     normal operation occurs.  If null, the method returns the current
+     value.
+
+ep3_keep_comments([$value]);
+     This method sets the keep_comments variable to the value specifed.
+     If null, the method returns the current value.
+
+ep3_protect_comments([$value]);
+     This method sets the protect_comments variable to the value specifed.
+     If null, the method returns the current value.
+
+EP3 Options
+===========
+
+   EP3 Options can be set from the command line (if ep3_execute or
+ep3_parse_command_line is invoked) or the internal variables can be
+explicitly set.
+
+[-no]protect
+          Should comments be protected from substution?
+          Default: 1
+
+[-no]comment
+          Should comments be passed to the output?
+          Default: 1
+
+[-no]depend
+          Are we generating a dependency list or simply processing?
+          Default: 0
+
+-delimeter string
+          The directive delimeter - can be a string
+          Default: @
+
+-define string1=string2
+          Defines from the command line.
+          Multiple -define options can be specified
+          Default: ()
+
+-includes directory
+          Where to look for include files.
+          Multiple -include options can be specified
+          Default: ()
+
+-output_filename filename
+          Where to place the output.
+          Default: STDOUT
+
+-modules filename
+          Modules to load (just the module name, expecting to find module.pm somewhere in @INC.
+          Multiple -modules options can be specified
+          Default: ()
+
+-line_comment string
+          The Line Comment string.
+          Default: //
+
+-start_comment string
+          The Start Comment string.
+          Default: /*
+
+-end_comment string
+          The End Comment string.
+          Default: */
+
+AUTHOR
+======
+
+   Gary Spivey, Dept. of Defense, Ft. Meade, MD.  spivey@romulus.ncsc.mil
+
+   Many thanks to Steve Bresson for his help, ideas, and code ...
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: Text/EP3/Verilog,  Next: Text/English,  Prev: Text/EP3,  Up: Module List
+
+Verilog extension for the EP3 preprocessor.
+*******************************************
+
+NAME
+====
+
+   Text::EP3::Verilog - Verilog extension for the EP3 preprocessor.
+
+SYNOPSIS
+========
+
+     use Text::EP3;
+     use Text::EP3::Verilog;
+
+DESCRIPTION
+===========
+
+   This module is an EP3 extension for the Verilog Hardware Description
+Language.
+
+The signal directive
+     @signal key definition Take a list of signals and generate signal
+     lists in the differing formats that Verilog uses.  This is
+     accomplished by formatting a list of new defines and then calling the
+     EP3 define method For example, the following command:
+
+          @signal KEY a[3:0], b, c[width:0], etc.
+
+     will cause the following to be done:
+
+          Define KEY with the list as it appears (can be used in further signal defs)
+          Define KEY{SIG} with the signal list (can be used in port lists)
+             	e.g. replace KEY{SIG} with  a[3:0], b, c[width:0]
+          Define KEY{EVENT} with the reg list  (To be used in event lists)
+             	e.g. replace KEY{EVENT} with a or b or c
+          Define KEY{IN}  with the input list (you supply the first input and the trailing ';'
+             	e.g. replace KEY{INPUT} with [3:0] a;\ninput b;\ninput[width:0] c
+             	or ... make the line
+             	input KEY{INPUT}; become ..
+             	input [3:0] a;
+             	input b;
+             	input [width:0] c;
+          Define KEY{OUT} with the output list (output [] sig).
+             	e.g. like KEY{IN}
+          Define KEY{INOUT}  with the inout list (inout [] sig).
+             	e.g. like KEY{IN}
+          Define KEY{WIRE} with the wire list (wire [] sig).
+             	e.g. like KEY{IN}
+          Define KEY{REG} with the reg list (reg [] sig).
+             	e.g. like KEY{IN}
+          Define KEY{DSP} with the printf list (sig=%0[b|x] depending on width).
+             	e.g. replace KEY{DSP} with a=%0x, b=%0b, c=%0x
+             	This can be used in the $display task
+                	$display("KEY{DSP}",KEY{SIG});
+
+     If the module and the test bench default is set up properly, the user
+     needs only enter the signals in one place in the module file. This
+     section can be included conditionally (e.g. @include "file" PORT) in
+     the test bench and the signals can be automatically generated in the
+     correct format in whichever header they are used. This means that a
+     user can produce a module and its test bench by simply filling in the
+     port list, the behavioral code, and the stimulus (which is of course,
+     the real work). All of the signal header crud can be taken care of
+     automagically.
+
+The step directive
+     @step number [command] The step directive is useful to save verbage
+     in test benches. @step 5 command; generates the following code:
+
+          repeat 5 @ (posedge tclk); command;
+
+     The posdege can be changed to " or negedge (or whatever) using the
+     edgetype directive. The tclk can be changed using the edgename
+     directive.
+
+The edgename directive
+     @edgename name The edgename directive allows the user to change the
+     name used in the step directive. The default is 'tclk'.
+
+The edgetype directive
+     @edgetype type The edgetype directive allows the user to change the
+     type used in the step directive. The default is 'posedge'.
+
+The denum directive
+     @denum key, key, [value], key, ...  denum works like the ep3 enum,
+     except that it generates verilog define statements. It also replaces
+     KEY anywhere in the text with `KEY so that the verilog defines will
+     work.  (e.g. @denum orange, blue, green     will generate:
+
+          `define orange 0
+          `define blue 0
+          `define green 0
+          @define orange `orange
+          @define blue `blue
+          @define green `green
+
+AUTHOR
+======
+
+   Gary Spivey, Dept. of Defense, Ft. Meade, MD.  spivey@romulus.ncsc.mil
+
+SEE ALSO
+========
+
+   perl(1).
+
+
+File: pm.info,  Node: Text/English,  Next: Text/FIGlet,  Prev: Text/EP3/Verilog,  Up: Module List
+
+Porter's stemming algorithm
+***************************
+
+NAME
+====
+
+   Text::English - Porter's stemming algorithm
+
+SYNOPSIS
+========
+
+     use Text::English;
+     @stems = Text::English::stem( @words );
+
+DESCRIPTION
+===========
+
+   This routine applies the Porter Stemming Algorithm to its parameters,
+returning the stemmed words.  It is derived from the C program "stemmer.c"
+as found in freewais and elsewhere, which contains these notes:
+
+     Purpose:    Implementation of the Porter stemming algorithm documented
+                 in: Porter, M.F., "An Algorithm For Suffix Stripping,"
+                 Program 14 (3), July 1980, pp. 130-137.
+     Provenance: Written by B. Frakes and C. Cox, 1986.
+
+   I have re-interpreted areas that use Frakes and Cox's "WordSize"
+function. My version may misbehave on short words starting with "y", but I
+can't think of any examples.
+
+   The step numbers correspond to Frakes and Cox, and are probably in
+Porter's article (which I've not seen).  Porter's algorithm still has
+rough spots (e.g current/currency, -ings words), which I've not attempted
+to cure, although I have added support for the British -ise suffix.
+
+NOTES
+=====
+
+   This is version 0.1. I would welcome feedback, especially improvements
+to the punctuation-stripping step.
+
+AUTHOR
+======
+
+   Ian Phillipps <ian@unipalm.pipex.com>
+
+COPYRIGHT
+=========
+
+   Copyright Public IP Exchange Ltd (PIPEX).  Available for use under the
+same terms as perl.
+
+
+File: pm.info,  Node: Text/FIGlet,  Next: Text/FillIn,  Prev: Text/English,  Up: Module List
+
+a perl module to provide FIGlet abilities, akin to banner
+*********************************************************
+
+NAME
+====
+
+   Text::FIGlet - a perl module to provide FIGlet abilities, akin to banner
+
+SYNOPSIS
+========
+
+     my $font = Text::FIGlet-Greater_Than_Special_Sequencenew(-f=>"doh");
+     $font->figify(-A=>"Hello World");
+
+DESCRIPTION
+===========
+
+   new
+
+*-D=>*boolean
+     If true, switches  to  the German (ISO 646-DE) character set.  Turns
+     `[', `\' and `]' into umlauted A, O and U,  respectively.   `{',  `|'
+     and `}' turn into the respective lower case versions of these.  `~'
+     turns into  s-z. Assumin, of course, that the font author included
+     these characters. This option is deprecated, which means it may not
+     appear in upcoming versions of *Text::FIGlet*.
+
+*-d=>*`fontdir'
+     Whence to load the font.
+
+     Defaults to `/usr/games/lib/figlet'
+
+*-f=>*`fontfile'
+     The font to load.
+
+     Defaults to `standard'
+
+*-m=>**smushmode*
+     Specifies how *Text::FIGlet* should "smush" and kern consecutive
+     characters together.  On the command line, *-m0* can be useful, as it
+     tells FIGlet to kern characters without smushing them together.
+     Otherwise, this option is rarely needed, as a *Text::FIGlet* font file
+     specifies the best smushmode to use with the  font.  -m  is,
+     therefore,  most  useful to font designers testing the various
+
+     -2        Get mode from font file (default).
+
+          Every  FIGlet  font  file specifies the best
+          smushmode to use with the font.   This  will
+          be  one  of  the  smushmodes (-1 through 63)
+          described in the following paragraphs.
+
+     -1        No smushing or kerning.
+
+          Characters are simply concatenated together.
+
+     -0        Fixed width.
+
+          This will pad each character in the font such that they are all
+          a consistent width. The padding is done such that the character
+          is centered in it's "cell", and any odd padding is the trailing edge.
+
+     0        Kern only.
+
+          Characters  are  pushed  together until they touch.
+
+   `figify'
+
+*-A=>*text
+     The text to transmogrify.
+
+-L *-R* -X
+     These  options  control whether FIGlet prints left-to-right or
+     right-to-left. -L selects left-to-right printing. *-R* selects
+     right-to-left printing.  -X (default) makes FIGlet use whichever is
+     specified in the font file.
+
+-c -l -r -x
+     These  options  handle  the justification of *Text::FIGlet* output.
+     -c centers the  output  horizontally.   -l makes  the  output
+     flush-left.  -r makes it flush- right.  -x (default) sets the
+     justification according to whether left-to-right or right-to-left text
+     is selected.  Left-to-right  text  will  be  flush- left, while
+     right-to-left text will be flush-right.  (Left-to-rigt versus
+     right-to-left  text  is  controlled by -L, *-R* and -X.)
+
+*-w=>**outputwidth*
+     The output width, output text is wrapped to this value by breaking the
+     input on whitspace where possible. There are two special width values
+
+          -1 the text is not wrapped.
+           1 the text is wrapped after very character.
+
+     NOTE: This currently broken, it wraps to width but breaks on the
+     nearest input character, not necessarily whitespace.
+
+     Defaults to 80
+
+EXAMPLES
+========
+
+   `perl -MText::FIGlet -e 'print Text::FIGlet->new()->figify(-A=>"Hello
+World")''
+
+ENVIRONMENT
+===========
+
+   *Text::FIGlet* will make use of these environment variables if present
+
+FIGFONT
+     The default font to load.  It should reside in the directory
+     specified by FIGLIB.
+
+FIGLIB
+     The default location of fonts.
+
+FILES
+=====
+
+   FIGlet home page
+
+     http://st-www.cs.uiuc.edu/users/chai/figlet.html
+     http://mov.to/figlet/
+
+   FIGlet font files, these can be found at
+
+     http://www.internexus.net/pub/figlet/
+     ftp://wuarchive.wustl.edu/graphics/graphics/misc/figlet/
+     ftp://ftp.plig.org/pub/figlet/
+
+SEE ALSO
+========
+
+   `figlet' in this node
+
+CAVEATS
+=======
+
+$/ is used to
+          split incoming text into seperate lines.
+          item create the output string
+          item parse the font file
+
+   Consequently, make sure it is set appropriately i.e.;  Don't mess with
+it, *perl* sets it correctly for you.
+
+AUTHOR
+======
+
+   Jerrad Pierce <jpierce@cpan.org>|<webmaster@pthbb.rg>
+
+
+File: pm.info,  Node: Text/FillIn,  Next: Text/Filter,  Prev: Text/FIGlet,  Up: Module List
+
+a class implementing a fill-in template
+***************************************
+
+NAME
+====
+
+   Text::FillIn.pm - a class implementing a fill-in template
+
+SYNOPSIS
+========
+
+     use Text::FillIn;
+     
+     # Set the functions to do the filling-in:
+     Text::FillIn->hook('$', sub { return ${$_[0]} });  # Hard reference
+     Text::FillIn->hook('&', "main::run_function");     # Symbolic reference
+     sub run_function { return &{$_[0]} }
+     
+     $template = new Text::FillIn('some text with [[$vars]] and [[&routines]]');
+     $filled_in = $template->interpret();  # Returns filled-in template
+     print $filled_in;
+     $template->interpret_and_print();  # Prints template to currently
+                                        # selected filehandle
+     
+     # Or
+     $template = new Text::FillIn();
+     $template->set_text('the text is [[ $[[$var1]][[$var2]] ]]');
+     $TVars{'var1'} = 'two_';
+     $TVars{'var2'} = 'parter';
+     $TVars{'two_parter'} = 'interpreted';
+     $template->interpret_and_print();  # Prints "the text is interpreted"
+     
+     # Or
+     $template = new Text::FillIn();
+     $template->get_file('/etc/template_dir/my_template');  # Fetches a file
+     
+     # Or
+     $template = new Text::FillIn();
+     $template->path('.', '/etc/template_dir');  # Where to find templates
+     $template->get_file('my_template'); # Gets ./my_template or
+                                         # /etc/template_dir/my_template
+
+DESCRIPTION
+===========
+
+   This module provides a class for doing fill-in templates.  These
+templates may be used as web pages with dynamic content, e-mail messages
+with fill-in fields, or whatever other uses you might think of.
+*Text::FillIn* provides handy methods for fetching files from the disk,
+printing a template while interpreting it (also called streaming), and
+nested fill-in sections (i.e. expressions like [[ $th[[$thing2]]ing1 ]]
+are legal).
+
+   Note that the version number here is 0.04 - that means that the
+interface may change a bit.  In fact, it's already changed some with
+respect to 0.02 (see the CHANGES file).  In particular, the $LEFT_DELIM,
+$RIGHT_DELIM, %HOOK, and @TEMPLATE_PATH variables are gone, replaced by a
+default/instance variable system.
+
+   I might also change the default hooks or something.  Please read the
+CHANGES file before upgrading to find out whether I've changed anything
+you use.
+
+   In this documentation, I generally use "template" to mean "an object of
+class Text::FillIn".
+
+Defining the structure of templates
+-----------------------------------
+
+   * delimiters
+
+     *Text::FillIn* has some special variables that it uses to do its
+     work.  You can set those variables and customize the way templates
+     get filled in.
+
+     The delimiters that set fill-in sections of your form apart from the
+     rest of the form are generally *[[* and *]]*, but they don't have to
+     be, you can set them to whatever you want.  So you could do this:
+
+          Text::FillIn->Ldelim('{');
+          Text::FillIn->Rdelim('}');
+          $template->set_text('this is a {$variable} and a {&function}.');
+
+     Whatever you set the delimiter to, you can put backslashes before
+     them in your templates, to force them to be interpreted as literals:
+
+          $template->set_text('some [[$[[$var2]][[$var]]]] and \[[ text \]]');
+          $template->interpret_and_print();
+          # Prints "some stuff and [[ text ]]"
+
+     You cannot currently have several different kinds of delimiters in a
+     single template.
+
+   * interpretation hooks
+
+     In order to interpret templates, `Text::FillIn' needs to know how to
+     treat different kinds of [[tags]] it finds.  The way it accomplishes
+     this is through "hook functions."  These are various functions that
+     `Text::FillIn' will run when confronted with various kinds of fill-in
+     fields.  There are two hooks provided by default:
+
+          Text::FillIn->hook('$') is \&find_value,
+          Text::FillIn->hook('&') is \&run_function.
+
+     So if you leave these hooks the way they are, when *Text::FillIn* sees
+     some text like "some [[$vars]] and some [[&funk]]", it will run
+     `&Text::FillIn::find_value' to find the value of [[$vars]], and it
+     will run `&Text::FillIn::run_function' to find the value of
+     [[&funk]].  This is based on the first non-whitespace character after
+     the delimiter, which is required to be a non-word character (no
+     letters, numbers, or underscores).  You can define hooks for any
+     non-word character you want:
+
+          $template = new Text::FillIn("some [[!mushrooms]] were in my shoes!");
+          $template->hook('!', "main::scream_it");  # or \&scream_it
+          sub scream_it {
+             my $text = shift;
+             return uc($text); # Uppercase-it
+          }
+          $new_text = $template->interpret();
+          # Returns "some MUSHROOMS were in my shoes!"
+
+     Every hook function will be passed all the text between the
+     delimiters, without any surrounding whitespace or the leading
+     identifier (the & or $, or whatever).  Hooks can be given as either
+     hard references or symbolic references, but if they are symbolic,
+     they need to use the complete package name and everything.
+
+     Beginning in version 0.04, you may use some object's methods as hook
+     functions.  For example, if you have a template $template and another
+     object `$myObj', you can instruct $template to call
+     `$myObj->find_value()' and `$myObj->run_function()' to fill in
+     templates.  See the `$template->object()' method below.
+
+   * the default hook functions
+
+     The hook functions installed with the shipping version of this module
+     are `&Text::FillIn::find_value' and `&Text::FillIn::run_function'.
+     They are extremely simple.  I suggest you take a look at them to see
+     how they work.  What follows here is a description of how these
+     functions will fill in your templates.
+
+     The `&find_value' function looks for an entry in a hash called
+     %main::TVars.  So put an entry in this hash if you want it to be
+     available to templates:
+
+          my $template = new Text::FillIn( 'hey, [[$you]]!' );
+          $::TVars{'you'} = 'Sam';
+          $template->interpret_and_print();  # Prints "hey, Sam!"
+
+     The `&run_function' function looks for a function in the `TExport'
+     package and runs it.  The reason it doesn't look in the main package
+     is that you probably don't want to make all the functions in your
+     program available to the templates (not that putting all your
+     program's functions in the main package is always the greatest
+     programming style).  Here are a couple of ways to make functions
+     available:
+
+          sub TExport::add_numbers {
+             my $result;
+             foreach (@_) {
+                $result += $_;
+             }
+             return $result;
+          }
+
+          #  or, if you like:
+          
+          package TExport;
+          sub add_numbers {
+             my $result;
+             foreach (@_) {
+                $result += $_;
+             }
+             return $result;
+          }
+
+     The `&run_function' function will split the argument string at
+     commas, and pass the resultant list to your function:
+
+          my $template = new Text::FillIn(
+             'Pi is about [[&add_numbers(3,.1,.04,.001,.0006)]]'
+          );
+          $template->interpret_and_print;
+
+     In the original version of `Text::FillIn', I didn't provide any hook
+     functions.  I expected people to write their own, partly because I
+     didn't want to stifle creativity or anything.  I now include hook
+     functions because the ones I give will probably work okay for most
+     people, and providing them means it's easier to use the module right
+     out of "the box."  But I hope you won't be afraid to write your own
+     hooks - if mine don't work well for you, by all means go ahead and
+     replace them with your own.  If you think you've written some really
+     killer hooks, let me know.  I may include cool ones with future
+     distributions.
+
+   * template directories
+
+     You can tell `Text::FillIn' where to look for templates:
+
+          Text::FillIn->path('.', '/etc/template_dir');
+          $template->get_file('my_template'); # Gets ./my_template or /etc/template_dir/my_template
+
+METHODS
+=======
+
+   * new Text::FillIn($text)
+
+     This is the constructor, which means it returns a new object of type
+     *Text::FillIn*.  If you feed it some text, it will set the template's
+     text to be what you give it:
+
+          $template = new Text::FillIn("some [[$vars]] and some [[&funk]]");
+
+   * $template->get_file( $filename );
+
+     This will look for a template called $filename (in the directories
+     given in *$template->path()*) and slurp it in.  If $filename starts
+     with / , then *Text::FillIn* will treat $filename as an absolute
+     path, and not search through the directories for it:
+
+          $template->get_file( "my_template" );
+          $template->get_file( "/weird/place/with/template" );
+
+     The default path is ('.').
+
+   * $template->interpret()
+
+     Returns the interpreted contents of the template:
+
+          $interpreted_text = $template->interpret();
+
+     This, along with interpret_and_print, are the main point of this
+     whole module.
+
+   * $template->interpret_and_print()
+
+     Interprets the [[ fill-in parts ]]  of a template and prints the
+     template, streaming its output as much as possible.  This means that
+     if it encounters an expression like "[[ stuff [[ more stuff]] ]]", it
+     will fill in [[ more stuff ]], then use the filled-in value to
+     resolve the value of [[ stuff something ]], and then print it out.
+
+     If it encounters an expression like "stuff1 [[thing1]] stuff2
+     [[thing2]]", it will print stuff1, then the value of [[thing1]], then
+     stuff2, then the value of [[thing2]].  This is as streamed as
+     possible if you want nested brackets to resolve correctly.
+
+   The following methods all get and/or set certain attributes of the
+template.  They can all be called as instance methods, a la
+`$template->Ldelim()', or as static methods, a la
+`Text::FillIn->Ldelim()'.  Using an instance method only changes the given
+template, it does not affect the properties of any other template.  Using
+a static method will change the default behavior of all templates created
+in the future.
+
+   I think I need to reserve the right to change what happens when you
+create a template $t, then change the default behavior of all templates,
+then call $t->interpret() - should it use the new defaults or the old
+defaults?  Currently it uses the old defaults, but that might change.
+
+   * $template->Ldelim($new_delimiter)
+
+   * $template->Rdelim($new_delimiter)
+
+     Get or set the left or right delimiter.  When called with no
+     arguments, simply returns the delimiter.  When called with an
+     argument, sets the delimiter.
+
+   * $template->text($new_text)
+
+     Get or set the contents of the template.
+
+   * $template->path($dir1, $dir2, ...)
+
+     Get or set the list of directories to search for templates in.  The
+     path is used in the get_file() method.
+
+   * $template->hook($character, $hook_function)
+
+     Get or set the functions for filling in the sections of the template
+     between delimiters.  The first argument is the non-word character the
+     hook is installed under.  The second argument, if present, is the
+     function to install as a hook.  It may either be a hard reference to
+     a function, a string containing the fully package-qualified name of a
+     function, or if you're using objects to fill in your template, a
+     method name.  See also the subsection on interpretation hooks in the
+     DESCRIPTION section.
+
+   * $template->object($obj)
+
+     As of version 0.04, you may use method calls on an arbitrary object as
+     template hooks.  This can be very powerful.  Your code might look
+     like this:
+
+          $t   = new Text::FillIn("some [[$animal]]s");
+          $obj = new MyClass(animal=>'chicken');  # Create some object
+          $t->object($obj);  # Tell $t to use methods of $obj as hooks
+          $t->hook('$', 'lookup_var');  # Set the method name for '$'
+          $t->interpret_and_print();  # Calls $obj->lookup_var()
+
+     The object methods will be passed the same arguments as regular
+     (static) hook functions.
+
+   * $template->property( $name, $value );
+
+     This method lets you get and set arbitrary properties of the
+     template, like this:
+
+          $template->property('color', 'blue');  # Set the color
+          # ... some code...
+          $color = $template->property('color'); # Get the color
+
+     The *Text::FillIn* class doesn't actually pay any attention
+     whatsoever to the properties - it's purely for your own convenience,
+     so that small changes in functionality can be achieved without having
+     to subclass *Text::FillIn*.
+
+COMMON MISTAKES
+===============
+
+   If you want to use nested fill-ins on your template, make sure things
+get printed in the order you think they'll be printed.  If you have
+something like this: `[[$var_number_[[&get_number]]]]', and your
+&get_number *prints* a number, you won't get the results you probably
+want.  *Text::FillIn* will print your number, then try to interpret
+`[[$var_number_]]', which probably won't work.
+
+   The solution is to make &get_number return its number rather than print
+it.  Then *Text::FillIn* will turn `[[$var_number_[[&get_number]]]]' into
+`[[$var_number_5]]', and then print the value of `$var_number_5'.  That's
+probably what you wanted.
+
+TO DO
+=====
+
+   The deprecated methods get_text(), set_text(), get_property(), and
+set_property() will be removed in version 0.06 and greater.  Use text()
+and property() instead.
+
+   By slick use of local() variables, it would be possible to have
+Text::FillIn keep track of when it's doing nested tags and when it's not,
+allowing the user to nest tags using arbitrary depth and not have to worry
+about the above "common mistake."  This would let hook functions be
+oblivious to whether they're supposed to print their results or return
+them, since Text::FillIn would keep track of it all.  This will take some
+doing on my part, but it's not insurmountable.  It would probably involve
+evaluating the tags from the outside in, rather than the inside out.
+
+BUGS
+====
+
+   The interpreting engine can be fooled by certain backslashing sequences
+like `\\[[$var]]', which looks to it like the `[[' is backslashed.  I
+think I know how to fix this, but I need to think about it a little.
+
+AUTHOR
+======
+
+   Ken Williams (ken@forum.swarthmore.edu)
+
+   Copyright (c) 1998 Swarthmore College. All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+
+File: pm.info,  Node: Text/Filter,  Next: Text/Filter/Chain,  Prev: Text/FillIn,  Up: Module List
+
+base class for objects that can read and write text lines
+*********************************************************
+
+NAME
+====
+
+   Text::Filter - base class for objects that can read and write text lines
+
+SYNOPSIS
+========
+
+   A plethora of tools exist that operate as filters: they get data from a
+source, operate on this data, and write possibly modified data to a
+destination. In the Unix world, these tools can be chained using a
+technique called pipelining, where the output of one filter is connected
+to the input of another filter. Some non-Unix worlds are reported to have
+similar provisions.
+
+   To create Perl modules for filter functionality seems trivial at first.
+Just open the input file, read and process it, and write output to a
+destination file. But for really reusable modules this approach is too
+simple. A reusable module should not read and write files itself, but rely
+on the calling program to provide input as well as to handle the output.
+
+   `Text::Filter' is a base class for modules that have in common that
+they process text lines by reading from some source (usually a file),
+manipulating the contents and writing something back to some destination
+(usually some other file).
+
+   This module can be used on itself, but it is most powerfull when used
+to derive modules from it. See section EXAMPLES for an extensive example.
+
+DESCRIPTION
+===========
+
+   The main purpose of the `Text::Filter' class is to abstract out the
+details out how input and output must be done. Although in most cases
+input will come from a file, and output will be written to a file,
+advanced modules require more detailed control over the input and output.
+For example, the module could be called from another module, in this case
+the callee could be allowed to process only a part of the input. Or, a
+program could have prepared data in an array and wants to call the module
+to process this data as if it were read from a file.  Also, the input
+stream provides a pushback functionality to make peeking at the input easy.
+
+   `Text::Filter' can be used on its own as a convenient input/output
+handler. For example:
+
+     use Text::Filter;
+     my $filter = new Text::Filter (input = *STDIN, output = *STDOUT);
+     my $line;
+     while (defined ($line = $filter->readline)) {
+         $filter->writeline ($line);
+     }
+
+   Its real power shows when such a program is turned into a module for
+optimal reuse.
+
+   When creating a module that is to process lines of text, it can be
+derived from `Text::Filter', for example:
+
+     package MyFilter;
+
+     BEGIN {
+     	use vars qw(@ISA);
+     	@ISA = qw(Text::Filter);
+     }
+
+   The constructor method must then call the new() method of the
+`Text::Filter' class to set up the base class. This is conveniently done
+by calling SUPER::new(). A hash containing attributes must be passed to
+this method, some of these attributes will be used by the base class setup.
+
+     sub new {
+     	my $proto = shift;
+     	my $class = ref($proto) || $proto;
+     	# ... fetch non-attribute arguments from @_ ...
+     	# Create the instance, using the attribute arguments.
+     	my $self = $class->SUPER::new (@_);
+
+   Finally, the newly created object must be re-blessed into the desired
+class, and returned:
+
+     # Rebless into the desired class.
+     	bless ($self, $class);
+         }
+
+   When creating new instances for this class, attributes input and output
+can be used to specify how input and output is to be handled. Several
+possible values can be supplied for these attributes.
+
+   For input:
+
+   * A scalar, containing a file name.  The named file will be opened,
+     input lines will be read using <>.
+
+   * A file handle (glob).  Lines will be read using <>.
+
+   * An instance of class IO::File.  Lines will be read using <>.
+
+   * A reference to an array.  Input lines will be shift()ed from the
+     array.
+
+   * A reference to an anonymous subroutine.  This routine will be called
+     to get the next line of data.
+
+   For output:
+
+   * A scalar, containing a file name.  The named file will be created
+     automatically, output lines will be written using print().
+
+   * A file handle (glob).  Lines will be written using print().
+
+   * An instance of class IO::File.  Lines will be written using print().
+
+   * A reference to an array.  Output lines will be push()ed into the
+     array.  The array will be initialised to `()' if necessary.
+
+   * A reference to a scalar.  Output lines will be appended to the scalar.
+     The scalar will be initialised to "" if necessary.
+
+   * A reference to an anonymous subroutine.  This routine will be called
+     to append a line of text to the destination.
+
+   Additional attributes can be used to specify actions to be performed
+after the data is fetched, or prior to being written. For example, to
+strip line endings upon input, and add them upon output.
+
+CONSTRUCTOR
+===========
+
+   The constructor is called new() and takes a hash with attributes as its
+parameter.
+
+   The following attributes are recognized and used by the constructor,
+all others are ignored.
+
+   The constructor will return a blessed hash containing all the original
+attributes, plus some new attributes. The names of the new attributes all
+start with `_filter_', the new attributes should not be touched.
+
+input
+     This designates the input source. The value must be a scalar
+     (containing a file name), a file handle (either a glob or an instance
+     of class IO::File), an array reference, or a reference to a
+     subroutine, as described above.
+
+     If a subroutine is specified, it must return the next line to be
+     processed, and undef at end.
+
+input_postread
+     This attribute can be used to select an action to be performed after
+     the data has been read.  Its prime purpose is to handle line endings
+     (e.g. remove a trailing newline).
+
+     The value can be 'none' or 0 (no action), 'chomp' or 1 (standard
+     chomp() operation), an array reference, or a reference to a
+     subroutine. Default value is 0 (no chomping).
+
+     If the value is a reference to a subroutine, this will be called with
+     the text line that was just read as its only argument, and it must
+     return the new contents of the text line..
+
+output
+     This designates the output. The value must be a scalar (containing a
+     file name), a file handle (either a glob or an instance of class
+     IO::File), or a reference to a subroutine, as described above.
+
+     Note: when a file name is passed, a '>' will be prepended if
+     necessary.
+
+output_prewrite
+     This attribute can be used to select an action to be performed just
+     before the data is added to the output.  Its prime purpose is to
+     handle line endings (e.g. add a trailing newline).  The value can be
+     'none' or 0 (no action) , 'newline' or 1 (append the value of $/ to
+     the line), or a reference to a subroutine. Default value is 0 (no
+     action).
+
+     If the value is 'newline' or 1, and the value of $/ is "" (paragraph
+     mode), two newlines will be added.
+
+     If the value is a reference to a subroutine, this will be called with
+     the text line as its only argument, and it must return the new
+     contents of the line to be output.
+
+INSTANCE METHODS
+================
+
+$filter->readline
+     If there is anything in the pushback buffer, this is returned and the
+     pushback buffer is marked empty.
+
+     Otherwise, returns the next line from the input stream, or undef if
+     there is no more input.
+
+$filter->pushback ($line)
+     Pushes a line of text back to the input stream.  Returns the line.
+
+$filter->peek
+     Peeks at the input.  Short for pushback(readline()).
+
+$filter->writeline ($line)
+     Adds `$line' to the output stream.
+
+$filter->set_input ($input [ , $postread ])
+     Sets the input method to `$input'.  If the optional argument
+     `$postread' is defined, sets the input line postprocessing strategy
+     as well.
+
+$filter->set_output ($output, [ $prewrite ])
+     Sets the output method to `$output'.  If the optional argument
+     `$prewrite' is defined, sets the output line preprocessing strategy
+     as well.
+
+EXAMPLE
+=======
+
+   This is an example of how to use the `Text::Filter' class.
+
+   It implements a module that provides a single instance method: grep(),
+that performs some kind of grep(1)-style function (how surprising!).
+
+   A class method grepper() is also provided for easy access to do 'the
+right thing' in the most common case.
+
+     package Grepper;
+
+     use strict;
+     use Text::Filter;
+
+     # Setup.
+     BEGIN {
+     	use vars qw(@ISA);
+     	@ISA = ();
+
+     # This class exports static method, so we need Exporter:
+     use Exporter;
+     use vars qw(@EXPORT);
+     @EXPORT = qw(grepper);
+     push (@ISA, qw(Exporter));
+
+     # This class derives from Text::Filter.
+     push (@ISA, qw(Text::Filter));
+         }
+
+     # Constructor. Major part of the job is done by the superclass.
+     sub new {
+     	my $proto = shift;
+     	my $class = ref($proto) || $proto;
+
+     # Create a new instance by calling the superclass constructor.
+     my $self = $class->SUPER::new(@_);
+     # The superclass constructor will take care of handling
+     # the input and output attributes, and setup everything for
+     # handling the IO.
+
+     # Bless the object into the desired class.
+     bless ($self, $class);
+
+     # And return it.
+     $self;
+         }
+
+     # Instance method, just an example. No magic.
+     sub grep {
+     	my $self = shift;
+     	my $pat = shift;
+     	my $line;
+     	while ( defined ($line = $self->readline) ) {
+     	    $self->writeline ($line) if $line =~ $pat;
+     	}
+     }
+
+     # Class method, for convenience.
+     # Usage: grepper (<input file>, <output file>, <pattern>);
+     sub grepper {
+     	my ($input, $output, $pat) = @_;
+
+     # Create a Grepper object.
+     my $grepper = new Grepper (input => $input, output => $output);
+
+     # Call its grep method.
+     $grepper->grep ($pat);
+         }
+
+AUTHOR AND CREDITS
+==================
+
+   Johan Vromans (jvromans@squirrel.nl) wrote this module.
+
+COPYRIGHT AND DISCLAIMER
+========================
+
+   This program is Copyright 1998,1999 by Squirrel Consultancy. All rights
+reserved.
+
+   This program is free software; you can redistribute it and/or modify it
+under the terms of either: a) the GNU General Public License as published
+by the Free Software Foundation; either version 1, or (at your option) any
+later version, or b) the "Artistic License" which comes with Perl.
+
+   This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE. See either the GNU General Public
+License or the Artistic License for more details.
+
+

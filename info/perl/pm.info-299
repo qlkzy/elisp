@@ -1,0 +1,2068 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: PPM,  Next: PPM/SOAPClient,  Prev: POSIX,  Up: Module List
+
+PPM (Perl Package Management)
+*****************************
+
+NAME
+====
+
+   ppm - PPM (Perl Package Management)
+
+SYNOPSIS
+========
+
+     use PPM;
+
+     PPM::InstallPackage("package" => $package, "location" => $location, "root" => $root);
+     PPM::RemovePackage("package" => $package, "force" => $force);
+     PPM::VerifyPackage("package" => $package, "location" => $location, "upgrade" => $upgrade);
+     PPM::QueryInstalledPackages("searchRE" => $searchRE, "searchtag" => $searchtag, "ignorecase" => $ignorecase);
+     PPM::InstalledPackageProperties();
+
+     PPM::ListOfRepositories();
+     PPM::RemoveRepository("repository" => $repository, "save" => $save);
+     PPM::AddRepository("repository" => $repository, "location" => $location, "save" => $save);
+     PPM::RepositoryPackages("location" => $location);
+     PPM::RepositoryPackageProperties("package" => $package, "location" => $location);
+     PPM::RepositorySummary("location" => $location);
+
+     PPM::GetPPMOptions();
+     PPM::SetPPMOptions("options" => %options, "save" => $save);
+
+DESCRIPTION
+===========
+
+   PPM is a group of functions intended to simplify the tasks of locating,
+installing, upgrading and removing software 'packages'.  It can determine
+if the most recent version of a software package is installed on a system,
+and can install or upgrade that package from a local or remote host.
+
+   PPM uses files containing a modified form of the Open Software
+Distribution (OSD) specification for information about software packages.
+These description files, which are written in Extensible Markup Language
+(XML) code, are referred to as 'PPD' files.  Information about OSD can be
+found at the W3C web site (at the time of this writing,
+http://www.w3.org/TR/NOTE-OSD.html).  The modifications to OSD used by PPM
+are documented in PPM::ppd.
+
+   PPD files for packages are generated from POD files using the pod2ppd
+command.
+
+USAGE
+=====
+
+PPM::InstallPackage("package" => $package, "location" => $location, "root" => $root);
+     Installs the specified package onto the local system.  'package' may
+     be a simple package name ('foo'), a pathname (P:\PACKAGES\FOO.PPD) or
+     a URL (HTTP://www.ActiveState.com/packages/foo.ppd).  In the case of a
+     simple package name, the function will look for the package's PPD file
+     at 'location', if provided; otherwise, it will use information stored
+     in the PPM data file (see 'Files' section below) to locate the PPD
+     file for the requested package.  The package's files will be
+     installed under the directory specified in 'root'; if not specified
+     the default value of 'root' will be used.
+
+     The function uses the values stored in the PPM data file to determine
+     the local operating system, operating system version and CPU type.
+     If the PPD for this package contains implementations for different
+     platforms, these values will be used to determine which one is
+     installed.
+
+     InstallPackage() updates the PPM data file with information about the
+     package installation. It stores a copy of the PPD used for
+     installation, as well as the location from which this PPD was
+     obtained.  This location will become the default PPD location for
+     this package.
+
+     During an installation, the following actions are performed:
+
+          - the PPD file for the package is read
+          - a directory for this package is created in the directory specified in
+            <BUILDDIR> in the PPM data file.
+          - the file specified with the <CODEBASE> tag in the PPD file is
+            retrieved/copied into the directory created above.
+          - the package is unarchived in the directory created for this package
+          - individual files from the archive are installed in the appropriate
+            directories of the local Perl installation.
+          - perllocal.pod is updated with the install information.
+          - if provided, the <INSTALL> script from the PPD is executed in the
+            directory created above.
+          - information about the installation is stored in the PPM data file.
+
+PPM::RemovePackage("package" => $package, "force" => $force)
+     Removes the specified package from the system.  Reads the package's
+     PPD (stored during installation) for removal details.  If 'force' is
+     specified, even a package required by PPM will be removed (useful
+     when installing an upgrade).
+
+PPM::VerifyPackage("package" => $package, "location" => $location, "upgrade" => $upgrade)
+     Reads a PPD file for 'package', and compares the currently installed
+     version of 'package' to the version available according to the PPD.
+     The PPD file is expected to be on a local directory or remote site
+     specified either in the PPM data file or in the 'location' argument.
+     The 'location' argument may be a directory location or a URL.  The
+     'upgrade' argument forces an upgrade if the installed package is not
+     up-to-date.
+
+     The PPD file for each package will initially be searched for at
+     'location', and if not found will then be searched for using the
+     locations specified in the PPM data file.
+
+PPM::QueryInstalledPackages("searchRE" => $searchRE, "searchtag" => $searchtag, "ignorecase" => $ignorecase);
+     Returns a hash containing information about all installed packages.
+     By default, a list of all installed packages is returned.  If a
+     regular expression 'searchRE' is specified, only packages matching it
+     are returned.  If 'searchtag' is specified, the pattern match is
+     applied to the appropriate tag (e.g., ABSTRACT).
+
+     The data comes from the PPM data file, which contains installation
+     information about each installed package.
+
+PPM::InstalledPackageProperties();
+     Returns a hash with package names as keys, and package properties as
+     attributes.
+
+PPM::RepositoryPackages("location" => $location);
+     Returns a hash, with 'location' being the key, and arrays of all
+     packages with package description (PPD) files available at 'location'
+     as its elements.  'location' may be either a remote address or a
+     directory path.  If 'location' is not specified, the default location
+     as specified in the PPM data file will be used.
+
+PPM::ListOfRepositories();
+     Returns a hash containing the name of the repository and its location.
+     These repositories will be searched if an explicit location is not
+     provided in any function needing to locate a PPD.
+
+PPM::RemoveRepository("repository" => $repository, "save" => $save);
+     Removes the repository named 'repository' from the list of available
+     repositories.  If 'save' is not specified, the change is for the
+     current session only.
+
+PPM::AddRepository("repository" => $repository, "location" => $location, "save" => $save);
+     Adds the repository named 'repository' to the list of available
+     repositories.  If 'save' is not specified, the change is for the
+     current session only.
+
+PPM::RepositoryPackageProperties("package" => $package, "location" => $location);
+     Reads the PPD file for 'package', from 'location' or the default
+     repository, and returns a hash with keys being the various tags from
+     the PPD (e.g.  'ABSTRACT', 'AUTHOR', etc.).
+
+PPM::RepositorySummary("location" => $location);
+     Attempts to retrieve the summary file associated with the specified
+     repository, or from all repositories if 'location' is not specified.
+     The return value is a hash with the key being the repository, and the
+     data being another hash of package name keys, and package detail data.
+
+PPM::GetPPMOptions();
+     Returns a hash containing values for all PPM internal options
+     ('IGNORECASE', 'CLEAN', 'CONFIRM', 'ROOT', 'BUILDDIR').
+
+PPM::SetPPMOptions("options" => %options, "save" => $save);
+     Sets internal PPM options as specified in the 'options' hash, which is
+     expected to be the hash previously returned by a call to
+     GetPPMOptions().
+
+EXAMPLES
+========
+
+PPM::AddRepository("repository" => 'ActiveState', "location" => "http://www.ActiveState.com/packages", "save" => 1);
+     Adds a repository to the list of available repositories, and saves it
+     in the PPM options file.
+
+PPM::InstallPackage("package" => 'http://www.ActiveState.com/packages/foo.ppd');
+     Installs the software package 'foo' based on the information in the
+     PPD obtained from the specified URL.
+
+PPM::VerifyPackage("package" => 'foo', "upgrade" => true)
+     Compares the currently installed version of the software package
+     'foo' to the one available according to the PPD obtained from the
+     package-specific location provided in the PPM data file, and upgrades
+     to a newer version if available.  If a location for this specific
+     package is not given in PPM data file, a default location is searched.
+
+PPM::VerifyPackage("package" => 'foo', "location" => 'P:\PACKAGES', "upgrade" => true);
+     Compares the currently installed version of the software package 'foo'
+     to the one available according to the PPD obtained from the specified
+     directory, and upgrades to a newer version if available.
+
+PPM::VerifyPackage("package" => 'PerlDB');
+     Verifies that package 'PerlDB' is up to date, using package locations
+     specified in the PPM data file.
+
+PPM::RepositoryPackages("location" => http://www.ActiveState.com/packages);
+     Returns a hash keyed on 'location', with its elements being an array
+     of packages with PPD files available at the specified location.
+
+%opts = PPM::GetPPMOptions();
+$options{'CONFIRM'} = '0';
+PPM::SetPPMOptions("options" => \%opts, "save" => 1);
+     Sets and saves the value of the option 'CONFIRM' to '0'.
+
+ENVIRONMENT VARIABLES
+=====================
+
+HTTP_proxy
+     If the environment variable 'HTTP_proxy' is set, then it will be used
+     as the address of a proxy for accessing the Internet.  If the
+     environment variables 'HTTP_proxy_user' and 'HTTP_proxy_pass' are
+     set, they will be used as the login and password for the proxy
+     server.  If a proxy requires a certain User-Agent value (e.g.
+     "Mozilla/5.0"), this can be set using the 'HTTP_proxy_agent'
+     environment variable.
+
+FILES
+=====
+
+package.ppd
+     A description of a software package, in Perl Package Distribution
+     (PPD) format.  More information on this file format can be found in
+     *Note XML/PPD: XML/PPD,.  PPM stores a copy of the PPD it uses to
+     install or upgrade any software package.
+
+ppm.xml - PPM data file.
+     The XML format file in which PPM stores configuration and package
+     installation information.  This file is created when PPM is installed,
+     and under normal circumstances should never require modification other
+     than by PPM itself.  For more information on this file, refer to
+     *Note XML/PPMConfig: XML/PPMConfig,.
+
+AUTHOR
+======
+
+   Murray Nesbitt, <`murray@ActiveState.com'>
+
+SEE ALSO
+========
+
+   *Note XML/PPMConfig: XML/PPMConfig, .
+
+
+File: pm.info,  Node: PPM/SOAPClient,  Next: PPM/SOAPServer,  Prev: PPM,  Up: Module List
+
+SOAP client for PPM repository
+******************************
+
+NAME
+====
+
+   PPM::SOAPClient - SOAP client for PPM repository
+
+SYNOPSIS
+========
+
+     use PPM::SOAPClient;
+     ...
+     my $client = new PPM::SOAPClient;
+     my @results = $client->search( 'sarathy' );
+
+DESCRIPTION
+===========
+
+   `PPM::SOAPClient' implements a SOAP client to be used to access a PPM
+repository through a SOAP interface.  All of the functionality for making
+and parsing the SOAP request is handled internally; simply access the
+provided methods and you'll be returned a data structure containing the
+actual response.
+
+METHODS
+=======
+
+new ($server)
+     Instantiates a new SOAP client, specifying the server that will be
+     used for all later connections. '$server' should be provided as the
+     URL to the SOAP server that we're going to connect to and make
+     queries against.
+
+     Note, that this method accepts both "http://" and "soap://" server
+     URLs exactly the same way (we treat '`soap://'' URLs as standard HTTP
+     URLs).
+
+version ()
+     Gets the version number of the SOAP server that we're connected to. If
+     we're unable to contact the server or its offline, this method returns
+     'undef'.
+
+searchAbstract ($search)
+     Searches within the 'ABSTRACT' field within all of the packages held
+     in the repository on the server. The value '`$search'' may be a regex
+     that will be used to match against the abstracts. If no value for
+     '`$search'' is provided, the server treats the search to be for
+     '`.*'' (everything).
+
+searchAuthor ($search)
+     Searches within the 'AUTHOR' field within all of the packages held in
+     the repository on the server. The value '`$search'' may be a regex
+     that will be used to match against the authors. If no value of
+     '`$search'' is provided, the server treats the search to be for
+     '`.*'' (everything).
+
+searchTitle ($search)
+     Searches within the 'title' field within all of the packages held in
+     the repository on the server. The value '`$search'' may be a regex
+     that will be used to match against the titles. If no value of
+     '`$search'' is provided, the server treats the search to be for
+     '`.*'' (everything).
+
+search ($search)
+     Searches through all of the fields within all of the packages held in
+     the repository on the server. The value '`$search'' may be a regex
+     that will be used to match against the field values. If no value of
+     '`$search'' is provided, the server treats the search to be for
+     '`.*'' (everything).
+
+packages ()
+     Generates a list of all of the packages currently available in the
+     repository. The value returned to the caller is a list containing the
+     names of all of the packages in the repository.
+
+fetch_ppd ($pkg)
+     Fetches the PPD associated with a given package. The full contents of
+     the PPD are returned to the caller in XML format as a scalar value.
+
+fetch_summary ()
+     Fetches the full summary of all of the packages held in the
+     repository. The full contents of the summary are returned to the
+     caller in XML format as a scalar value.
+
+_makeSOAPRequest ($method, $search)
+     *INTERNAL METHOD.* Makes the SOAP request to the server, doing the
+     bulk of the actual work for us.
+
+AUTHOR
+======
+
+   Graham TerMarsch (gtermars@home.com)
+
+SEE ALSO
+========
+
+   *Note PPM/SOAPServer: PPM/SOAPServer,, *Note SOAP: SOAP,.
+
+
+File: pm.info,  Node: PPM/SOAPServer,  Next: Palm/Address,  Prev: PPM/SOAPClient,  Up: Module List
+
+SOAP server for PPM repository
+******************************
+
+NAME
+====
+
+   PPM::SOAPServer - SOAP server for PPM repository
+
+SYNOPSIS
+========
+
+     use SOAP::Transport::HTTP::CGI;
+     my $safe_classes = {
+       'PPM::SOAPServer' => undef,
+       };
+     SOAP::Transport::HTTP::CGI->handler( $safe_classes );
+
+DESCRIPTION
+===========
+
+   `PPM::SOAPServer' is a module that provides an implementation of a SOAP
+server to hold the PPM repository.  Note that it is not required that you
+actually instantiate a copy of the server object yourself; the SOAP modules
+will take care of this for you when they instantiate the SOAP server.  All
+of the 'search*' methods that are provided by this module are made
+available through the SOAP interface and can be accessed through a SOAP
+client.
+
+METHODS
+=======
+
+new ()
+     Instantiates a new PPM::SOAPServer object, returning a reference to
+     the newly created object to the caller. During instantiation, we also
+     read in a full copy of the information held within the repository so
+     that we can run queries against it later.
+
+handle_request ($hdrs, $body, $envelope)
+     Handles the complete request provided through the SOAP interface. This
+     method determines which method is to be invoked and calls off to that
+     method to generate the response which is to be returned to the
+     caller. Once the response has been generated, we stuff this back into
+     the envelope so that it can be returned via the SOAP server.
+
+version ()
+     Returns to the caller the version number of the SOAP server that is
+     running.
+
+searchAbstract ($params)
+     Searches against the 'ABSTRACT' field within the packages held in the
+     repository. Within the given parameters, a key of "search" should be
+     provided containing the term to search for (which can be a regex). If
+     no "search" key is provided, a complete list of all of the packages
+     are returned to the caller.
+
+     The return value provided from this method will be a reference to a
+     hash containing the result set. A key named "num_results" will be
+     provided, stating the number of results to be found in the result
+     set. Each item in the result set will be named "result_???" where
+     '???' is the number of that item in the result set. For example, a
+     search returning two results would return a reference to a hash with
+     keys of '`num_results'', '`result_1'', and '`result_2''.
+
+searchAuthor ($params)
+     Searches against the 'AUTHOR' field within the packages held in the
+     repository. Within the given parameters, a key of "search" should be
+     provided containing the term to search for (which can be a regex). If
+     no "search" key is provided, a complete list of all of the packages
+     are returned to the caller.
+
+     The return value provided from this method will be a reference to a
+     hash containing the result set. A key named "num_results" will be
+     provided, stating the number of results to be found in the result
+     set. Each item in the result set will be named "result_???" where
+     '???' is the number of that item in the result set. For example, a
+     search returning two results would returns a reference to a hash with
+     keys of '`num_results'', '`result_1'', and '`result_2''.
+
+searchTitle ($params)
+     Searches against the 'TITLE' field within the packages held in the
+     repository. Within the given parameters, a key of "search" should be
+     provided containing the term to search for (which can be a regex). If
+     no "search" key is provided, a complete list of all of the packages
+     are returned to the caller.
+
+     The return value provided from this method will be a reference to a
+     hash containing the result set. A key named "num_results" will be
+     provided, stating the number of results to be found in the result
+     set. Each item in the result set will be named "result_???" where
+     '???' is the number of that item in the result set. For example, a
+     search returning two results would returns a reference to a hash with
+     keys of '`num_results'', '`result_1'', and '`result_2''.
+
+search ($params)
+     Searches against _all_ of the fields within the packages held in the
+     repository. Within the given parameters, a key of "search" should be
+     provided containing the term to search for (which can be a regex). If
+     no "search" key is provided, a complete list of all of the packages
+     are returned to the caller.
+
+     The return value provided from this method will be a reference to a
+     hash containing the result set. A key named "num_results" will be
+     provided, stating the number of results to be found in the result
+     set. Each item in the result set will be named "result_???" where
+     '???' is the number of that item in the result set. For example, a
+     search returning two results would returns a reference to a hash with
+     keys of '`num_results'', '`result_1'', and '`result_2''.
+
+packages ()
+     Generates a list of all of the packages currently available in the
+     repository.
+
+     The return value provided from this method will be a reference to a
+     hash containing the result set. A key named "num_results" will be
+     provided, stating the number of results to be found in the result
+     set. Each item in the result set will be named "result_???" where
+     '???' is the number of that item in the result set. For example, a
+     repository with two packages in it would return a reference to a hash
+     with keys of '`num_results'', '`result_1'', and '`result_2''.
+
+fetch_ppd ($params)
+     Fetches the PPD from our package list for a specific package. The
+     parameters provided should include a key named 'package', which is the
+     name of the package for which we wish to fetch the PPD for. This
+     method returns to the caller a hash reference containing the matching
+     results. A key named "num_results" will be present stating the number
+     of matching results (either 0 or 1). If a PPD has been found for the
+     requested package, a key of "result_1" will also be present, whose
+     value will be the full contents of the PPD file (in XML format) as a
+     scalar value.
+
+fetch_summary ()
+     Fetches a summary of the entire contents of the repository. This
+     method returns to the caller a reference to a hash containing the
+     following keys: '`num_results'', '`result_1''. The value of the
+     '`result_1'' key is the full contents of the repository summary file
+     (in XML format) as a scalar value.
+
+_xml_escape ($val)
+     *INTERNAL METHOD.* Cheap little function to escape out most of the
+     things in the value we're passing back so that its at least "clean".
+     This should really be using some sort of XML::Entities module to do
+     the conversion, though; I've just hacked this together because these
+     are the things that I encountered.
+
+_search ($field, $search)
+     *INTERNAL METHOD.* Does a general search against the fields present
+     for a package within the repository, searching for a specific term
+     (which could be a regex). If no '$field' value is provided, this
+     method searches through _all_ of the fields present for a given
+     package. If no '`$search'' value is provided, '`.*'' is deemed to be
+     the matching regex (everything).
+
+     The return value provided from this method will be a reference to a
+     hash containing the result set. A key named "num_results" will be
+     provided, stating the number of results to be found in the result
+     set. Each item in the result set will be named "result_???" where
+     '???' is the number of that item in the result set. For example, a
+     search returning two results would returns a reference to a hash with
+     keys of '`num_results'', '`result_1'', and '`result_2''.
+
+_pkginfo ($package)
+     *INTERNAL METHOD.* Takes the XML object representation of a package
+     and turns it into a single hash reference containing only select
+     portions of the package information. This hash reference is then
+     returned to the caller.
+
+_loadRepository ()
+     *INTERNAL METHOD.* Loads up information about the contents of the
+     repository, stuffing them into the global namespace. If the
+     repository has already been loaded, this method simply returns
+     without doing anything.  NOTE, that this method is _NOT_ an instance
+     method; it's a package method.
+
+AUTHOR
+======
+
+   Graham TerMarsch (gtermars@home.com)
+
+SEE ALSO
+========
+
+   *Note PPM/SOAPClient: PPM/SOAPClient,, *Note SOAP: SOAP,.
+
+
+File: pm.info,  Node: Palm/Address,  Next: Palm/Datebook,  Prev: PPM/SOAPServer,  Up: Module List
+
+Handler for Palm AddressBook databases.
+***************************************
+
+NAME
+====
+
+   Palm::Address - Handler for Palm AddressBook databases.
+
+SYNOPSIS
+========
+
+     use Palm::Address;
+
+DESCRIPTION
+===========
+
+   The Address PDB handler is a helper class for the Palm::PDB package.
+It parses AddressBook databases.
+
+AppInfo block
+-------------
+
+   The AppInfo block begins with standard category support. See *Note
+Palm/StdAppInfo: Palm/StdAppInfo, for details.
+
+   Other fields include:
+
+     $pdb->{appinfo}{lastUniqueID}
+     $pdb->{appinfo}{dirtyFields}
+
+   I don't know what these are.
+
+     $pdb->{appinfo}{fieldLabels}{name}
+     $pdb->{appinfo}{fieldLabels}{firstName}
+     $pdb->{appinfo}{fieldLabels}{company}
+     $pdb->{appinfo}{fieldLabels}{phone1}
+     $pdb->{appinfo}{fieldLabels}{phone2}
+     $pdb->{appinfo}{fieldLabels}{phone3}
+     $pdb->{appinfo}{fieldLabels}{phone4}
+     $pdb->{appinfo}{fieldLabels}{phone5}
+     $pdb->{appinfo}{fieldLabels}{phone6}
+     $pdb->{appinfo}{fieldLabels}{phone7}
+     $pdb->{appinfo}{fieldLabels}{phone8}
+     $pdb->{appinfo}{fieldLabels}{address}
+     $pdb->{appinfo}{fieldLabels}{city}
+     $pdb->{appinfo}{fieldLabels}{state}
+     $pdb->{appinfo}{fieldLabels}{zipCode}
+     $pdb->{appinfo}{fieldLabels}{country}
+     $pdb->{appinfo}{fieldLabels}{title}
+     $pdb->{appinfo}{fieldLabels}{custom1}
+     $pdb->{appinfo}{fieldLabels}{custom2}
+     $pdb->{appinfo}{fieldLabels}{custom3}
+     $pdb->{appinfo}{fieldLabels}{custom4}
+     $pdb->{appinfo}{fieldLabels}{note}
+
+   These are the names of the various fields in the address record.
+
+     $pdb->{appinfo}{country}
+
+   An integer: the code for the country for which these labels were
+designed. The country name is available as
+
+     $Palm::Address::countries[$pdb->{appinfo}{country}];
+
+     $pdb->{appinfo}{misc}
+
+   An integer. The least-significant bit is a flag that indicates whether
+the database should be sorted by company. The other bits are reserved.
+
+Sort block
+----------
+
+     $pdb->{sort}
+
+   This is a scalar, the raw data of the sort block.
+
+Records
+-------
+
+     $record = $pdb->{records}[N];
+
+     $record->{fields}{name}
+     $record->{fields}{firstName}
+     $record->{fields}{company}
+     $record->{fields}{phone1}
+     $record->{fields}{phone2}
+     $record->{fields}{phone3}
+     $record->{fields}{phone4}
+     $record->{fields}{phone5}
+     $record->{fields}{address}
+     $record->{fields}{city}
+     $record->{fields}{state}
+     $record->{fields}{zipCode}
+     $record->{fields}{country}
+     $record->{fields}{title}
+     $record->{fields}{custom1}
+     $record->{fields}{custom2}
+     $record->{fields}{custom3}
+     $record->{fields}{custom4}
+     $record->{fields}{note}
+
+   These are scalars, the values of the various address book fields.
+
+     $record->{phoneLabel}{phone1}
+     $record->{phoneLabel}{phone2}
+     $record->{phoneLabel}{phone3}
+     $record->{phoneLabel}{phone4}
+     $record->{phoneLabel}{phone5}
+
+   Most fields in an AddressBook record are straightforward: the "name"
+field always gives the person's last name.
+
+   The "phoneN" fields, on the other hand, can mean different things in
+different records. There are five such fields in each record, each of
+which can take on one of eight different values: "Work", "Home", "Fax",
+"Other", "E-mail", "Main", "Pager" and "Mobile".
+
+   The $record->{phoneLabel}{phone*} fields are integers. Each one is an
+index into @Palm::Address::phoneLabels, and indicates which particular
+type of phone number each of the $record->{phone*} fields represents.
+
+     $record->{phoneLabel}{display}
+
+   Like the phone* fields above, this is an index into
+@Palm::Address::phoneLabels. It indicates which of the phone* fields to
+display in the list view.
+
+     $record->{phoneLabel}{reserved}
+
+   I don't know what this is.
+
+METHODS
+=======
+
+new
+---
+
+     $pdb = new Palm::Address;
+
+   Create a new PDB, initialized with the various Palm::Address fields and
+an empty record list.
+
+   Use this method if you're creating an Address PDB from scratch.
+
+new_Record
+----------
+
+     $record = $pdb->new_Record;
+
+   Creates a new Address record, with blank values for all of the fields.
+The AppInfo block will contain only an "Unfiled" category, with ID 0.
+
+AUTHOR
+======
+
+   Andrew Arensburger <arensb@ooblick.com>
+
+SEE ALSO
+========
+
+   Palm::PDB(3)
+
+   Palm::StdAppInfo(3)
+
+BUGS
+====
+
+   The new() method initializes the AppInfo block with English labels and
+"United States" as the country.
+
+
+File: pm.info,  Node: Palm/Datebook,  Next: Palm/Mail,  Prev: Palm/Address,  Up: Module List
+
+Handler for Palm DateBook databases.
+************************************
+
+NAME
+====
+
+   Palm::Datebook - Handler for Palm DateBook databases.
+
+SYNOPSIS
+========
+
+     use Palm::Datebook;
+
+DESCRIPTION
+===========
+
+   The Datebook PDB handler is a helper class for the Palm::PDB package.
+It parses DateBook databases.
+
+AppInfo block
+-------------
+
+   The AppInfo block begins with standard category support. See *Note
+Palm/StdAppInfo: Palm/StdAppInfo, for details.
+
+Sort block
+----------
+
+     $pdb->{sort}
+
+   This is a scalar, the raw data of the sort block.
+
+Records
+-------
+
+     $record = $pdb->{records}[N]
+
+     $record->{day}
+     $record->{month}
+     $record->{year}
+
+   The day, month and year of the event. For repeating events, this is the
+first date at which the event occurs.
+
+     $record->{start_hour}
+     $record->{start_minute}
+     $record->{end_hour}
+     $record->{end_minute}
+
+   The start and end times of the event. For untimed events, all of these
+are 0xff.
+
+     $record->{when_changed}
+
+   This is defined and true iff the "when info" for the record has
+changed. I don't know what this means.
+
+     $record->{alarm}{advance}
+     $record->{alarm}{unit}
+
+   If the record has an alarm associated with it, the %{$record->{alarm}}
+hash exists. The "unit" subfield is an integer: 0 for minutes, 1 for
+hours, 2 for days. The "advance" subfield specifies how many units before
+the event the alarm should ring.  *e.g.*, if "unit" is 1 and "advance" is
+5, then the alarm will sound 5 hours before the event.
+
+   If "advance" is -1, then there is no alarm associated with this event.
+
+     %{$record->{repeat}}
+
+   This has exists iff this is a repeating event.
+
+     $record->{repeat}{type}
+
+   An integer which specifies the type of repeat:
+
+  1. no repeat.
+
+  2. a daily event, one that occurs every day.
+
+  3. a weekly event, one that occurs every week on the same day(s). An
+     event may occur on several days every week, *e.g.*, every Monday,
+     Wednesday and Friday.
+
+     For weekly events, the following fields are defined:
+
+          @{$record->{repeat}{repeat_days}}
+
+     This is an array of 7 elements; each element is true iff the event
+     occurs on the corresponding day. I don't know whether the array begins
+     with Sunday, or with the start-of-week day as defined in the
+     preferences.
+
+          $record->{repeat}{start_of_week}
+
+     I'm not sure what this is, but the Datebook app appears to perform
+     some hairy calculations involving this.
+
+  4. a "monthly by day" event, *e.g.*, one that occurs on the second
+     Friday of every month.
+
+     For "monthly by day" events, the following fields are defined:
+
+          $record->{repeat}{weeknum}
+
+     The number of the week on which the event occurs. A value of 5 means
+     that the event occurs on the last week of the month.
+
+          $record->{repeat}{daynum}
+
+     An integer, the day of the week on which the event occurs. Again, I
+     don't know whether 0 means Sunday, or the start-of-week day as defined
+     in the preferences.
+
+  5. a "monthly by date" event, *e.g.*, one that occurs on the 12th of
+     every month.
+
+  6. a yearly event, *e.g.*, one that occurs every year on December 25th.
+
+          $record->{repeat}{frequency}
+
+     Specifies the frequency of the repeat. For instance, if the event is a
+     daily one, and $record->{repeat}{frequency} is 3, then the event
+     occurs every 3 days.
+
+
+     $record->{repeat}{unknown}
+
+   I don't know what this is.
+
+     $record->{repeat}{end_day}
+     $record->{repeat}{end_month}
+     $record->{repeat}{end_year}
+
+   The last day, month and year on which the event occurs.
+
+     @{$record->{exceptions}}
+     $day   = $record->{exceptions}[N][0]
+     $month = $record->{exceptions}[N][0]
+     $year  = $record->{exceptions}[N][0]
+
+   If there are any exceptions to a repeating event, *e.g.* a weekly
+meeting that was cancelled one time, then the  @{$record->{exceptions}}
+array is defined.
+
+   Each element in this array is a reference to an anonymous array with
+three elements: the day, month, and year of the exception.
+
+     $record->{description}
+
+   A text string, the description of the event.
+
+     $record->{note}
+
+   A text string, the note (if any) attached to the event.
+
+METHODS
+=======
+
+new
+---
+
+     $pdb = new Palm::Datebook;
+
+   Create a new PDB, initialized with the various Palm::Datebook fields
+and an empty record list.
+
+new_Record
+----------
+
+     $record = $pdb->new_Record;
+
+   Creates a new Datebook record, with blank values for all of the fields.
+
+AUTHOR
+======
+
+   Andrew Arensburger <arensb@ooblick.com>
+
+SEE ALSO
+========
+
+   Palm::PDB(3)
+
+   Palm::StdAppInfo(3)
+
+
+File: pm.info,  Node: Palm/Mail,  Next: Palm/Memo,  Prev: Palm/Datebook,  Up: Module List
+
+Handler for Palm Mail databases.
+********************************
+
+NAME
+====
+
+   Palm::Mail - Handler for Palm Mail databases.
+
+SYNOPSIS
+========
+
+     use Palm::Mail;
+
+DESCRIPTION
+===========
+
+   The Mail PDB handler is a helper class for the Palm::PDB package. It
+parses Mail databases.
+
+AppInfo block
+-------------
+
+   The AppInfo block begins with standard category support. See *Note
+Palm/StdAppInfo: Palm/StdAppInfo, for details.
+
+   Other fields include:
+
+     $pdb->{appinfo}{sortOrder}
+     $pdb->{appinfo}{unsent}
+     $pdb->{appinfo}{sigOffset}
+
+   I don't know what these are.
+
+Sort block
+----------
+
+     $pdb->{sort}
+
+   This is a scalar, the raw data of the sort block.
+
+Records
+-------
+
+     $record = $pdb->{records}[N]
+
+     $record->{year}
+     $record->{month}
+     $record->{day}
+     $record->{hour}
+     $record->{minute}
+
+   The message's timestamp.
+
+     $record->{is_read}
+
+   This is defined and true iff the message has been read.
+
+     $record->{has_signature}
+
+   For outgoing messages, this is defined and true iff the message should
+have a signature attached. The signature itself is stored in the "Saved
+Preferences.prc" database, and is of type "mail" with ID 2.
+
+     $record->{confirm_read}
+
+   If this is defined and true, then the sender requests notification when
+the message has been read.
+
+     $record->{confirm_delivery}
+
+   If this is defined and true, then the sender requests notification when
+the message has been delivered.
+
+     $record->{priority}
+
+   An integer in the range 0-2, for high, normal, or low priority,
+respectively.
+
+     $record->{addressing}
+
+   An integer in the range 0-2, indicating the addressing type: To, Cc, or
+Bcc respectively. I don't know what this means.
+
+     $record->{subject}
+     $record->{from}
+     $record->{to}
+     $record->{cc}
+     $record->{bcc}
+     $record->{replyTo}
+     $record->{sentTo}
+
+   Strings, the various header fields.
+
+     $record->{body}
+
+   A string, the body of the message.
+
+METHODS
+=======
+
+new
+---
+
+     $pdb = new Palm::Mail;
+
+   Create a new PDB, initialized with the various Palm::Mail fields and an
+empty record list.
+
+   Use this method if you're creating a Mail PDB from scratch.
+
+new_Record
+----------
+
+     $record = $pdb->new_Record;
+
+   Creates a new Mail record, with blank values for all of the fields.
+
+   Note: the time given by the year, month, day, `hour', and `minute'
+fields in the new record are initialized to the time when the record was
+created. They should be reset to the time when the message was sent.
+
+AUTHOR
+======
+
+   Andrew Arensburger <arensb@ooblick.com>
+
+SEE ALSO
+========
+
+   Palm::PDB(3)
+
+   Palm::StdAppInfo(3)
+
+
+File: pm.info,  Node: Palm/Memo,  Next: Palm/PDB,  Prev: Palm/Mail,  Up: Module List
+
+Handler for Palm Memo databases.
+********************************
+
+NAME
+====
+
+   Palm::Memo - Handler for Palm Memo databases.
+
+SYNOPSIS
+========
+
+     use Palm::Memo;
+
+DESCRIPTION
+===========
+
+   The Memo PDB handler is a helper class for the Palm::PDB package. It
+parses Memo databases.
+
+AppInfo block
+-------------
+
+   The AppInfo block begins with standard category support. See *Note
+Palm/StdAppInfo: Palm/StdAppInfo, for details.
+
+   Other fields include:
+
+     $pdb->{appinfo}{sortOrder}
+
+   I don't know what this is.
+
+Sort block
+----------
+
+     $pdb->{sort}
+
+   This is a scalar, the raw data of the sort block.
+
+Records
+-------
+
+     $record = $pdb->{records}[N]
+
+     $record->{data}
+
+   A string, the text of the memo.
+
+new
+---
+
+     $pdb = new Palm::Memo;
+
+   Create a new PDB, initialized with the various Palm::Memo fields and an
+empty record list.
+
+   Use this method if you're creating a Memo PDB from scratch.
+
+new_Record
+----------
+
+     $record = $pdb->new_Record;
+
+   Creates a new Memo record, with blank values for all of the fields.
+
+AUTHOR
+======
+
+   Andrew Arensburger <arensb@ooblick.com>
+
+SEE ALSO
+========
+
+   Palm::PDB(3)
+
+   Palm::StdAppInfo(3)
+
+
+File: pm.info,  Node: Palm/PDB,  Next: Palm/PunchClock,  Prev: Palm/Memo,  Up: Module List
+
+Parse Palm database files.
+**************************
+
+NAME
+====
+
+   Palm::PDB - Parse Palm database files.
+
+SYNOPSIS
+========
+
+     use Palm::PDB;
+     use SomeHelperClass;
+
+     $pdb = new Palm::PDB;
+     $pdb->Load("myfile.pdb");
+
+     # Manipulate records in $pdb
+
+     $pdb->Write("myotherfile.pdb");
+
+DESCRIPTION
+===========
+
+   The Palm::PDB module provides a framework for reading and writing
+database files for use on PalmOS devices such as the PalmPilot. It can
+read and write both Palm Database (`.pdb') and Palm Resource (`.prc')
+files.
+
+   By itself, the PDB module is not terribly useful; it is intended to be
+used in conjunction with supplemental modules for specific types of
+databases, such as Palm::Raw or Palm::Memo.
+
+   The Palm::PDB module encapsulates the common work of parsing the
+structure of a Palm database. The `Load()|' in this node function reads
+the file, then passes the individual chunks (header, records, etc.) to
+application-specific functions for processing. Similarly, the `Write()|'
+in this node function calls application-specific functions to get the
+individual chunks, then writes them to a file.
+
+METHODS
+=======
+
+new
+---
+
+     $new = new Palm::PDB();
+
+   Creates a new PDB. $new is a reference to an anonymous hash. Some of
+its elements have special significance. See `Load()|' in this node.
+
+RegisterPDBHandlers
+-------------------
+
+     &Palm::PDB::RegisterPDBHandlers("classname", typespec...);
+
+   Typically:
+
+     &Palm::PDB::RegisterPDBHandlers(__PACKAGE__,
+     	[ "FooB", "DATA" ],
+     	);
+
+   The $pdb->`Load()|' in this node method acts as a virtual constructor.
+When it reads the header of a `.pdb' file, it looks up the file's creator
+and type in a set of tables, and reblesses $pdb into a class capable of
+parsing the application-specific parts of the file (AppInfo block,
+records, etc.)
+
+   RegisterPDBHandlers() adds entries to these tables; it says that any
+file whose creator and/or type match any of the *typespec*s (there may be
+several) should be reblessed into the class *classname*.
+
+   Note that RegisterPDBHandlers() applies only to record databases
+(`.pdb' files). For resource databases, see `RegisterPRCHandlers()|' in
+this node.
+
+   RegisterPDBHandlers() is typically called in the import() function of a
+helper class. In this case, the class is registering itself, and it is
+simplest just to use __PACKAGE__ for the package name:
+
+     package PalmFoo;
+     use Palm::PDB;
+
+     sub import
+     {
+         &Palm::PDB::RegisterPDBHandlers(__PACKAGE__,
+             [ "FooZ", "DATA" ]
+             );
+     }
+
+   A *typespec* can be either a string, or an anonymous array with two
+elements. If it is an anonymous array, then the first element is the
+file's creator; the second element is its type. If a *typespec* is a
+string, it is equivalent to specifying that string as the database's
+creator, and a wildcard as its type.
+
+   The creator and type should be either four-character strings, or the
+empty string. An empty string represents a wildcard. Thus:
+
+     &Palm::PDB::RegisterPDBHandlers("MyClass",
+         [ "fOOf", "DATA" ],
+         [ "BarB", "" ],
+         [ "", "BazQ" ],
+         "Fred"
+         );
+
+   Class MyClass will handle:
+
+
+     Databases whose creator is `fOOf' and whose type is DATA.
+
+
+     Databases whose creator is `BarB', of any type.
+
+
+     Databases with any creator whose type is `BazQ'.
+
+
+     Databases whose creator is `Fred', of any type.
+
+   sub RegisterPDBHandlers { 	my $handler = shift;		# Name of
+class that'll handle 					# these databases 	my @types = @_; 	my $item;
+
+     foreach $item (@types)
+     {
+     	if (ref($item) eq "ARRAY")
+     	{
+     		$PDBHandlers{$item->[0]}{$item->[1]} = $handler;
+     	} else {
+     		$PDBHandlers{$item}{""} = $handler;
+     	}
+     }
+     }
+
+RegisterPRCHandlers
+-------------------
+
+     &Palm::PDB::RegisterPRCHandlers("classname", typespec...);
+
+   Typically:
+
+     &Palm::PDB::RegisterPRCHandlers(__PACKAGE__,
+     	[ "FooZ", "CODE" ],
+     	);
+
+   RegisterPRCHandlers() is similar to `RegisterPDBHandlers()|' in this
+node, but specifies a class to handle resource database (`.prc') files.
+
+   A class for parsing applications should begin with:
+
+     package PalmApps;
+     use Palm::PDB;
+
+     sub import
+     {
+         &Palm::PDB::RegisterPRCHandlers(__PACKAGE__,
+             [ "", "appl" ]
+             );
+     }
+
+Load
+----
+
+     $pdb->Load("filename");
+
+   Reads the file filename, parses it, reblesses $pdb to the appropriate
+class, and invokes appropriate methods to parse the application-specific
+parts of the database (see `' in this node).
+
+   Load() uses the *typespec*s given to RegisterPDBHandlers() and
+RegisterPRCHandlers() when deciding how to rebless $pdb. For record
+databases, it uses the *typespec*s passed to RegisterPDBHandlers(), and
+for resource databases, it uses the *typespec*s passed to
+RegisterPRCHandlers().
+
+   Load() looks for matching *typespec*s in the following order, from most
+to least specific:
+
+  1. A *typespec* that specifies both the database's creator and its type
+     exactly.
+
+  2. A *typespec* that specifies the database's type and has a wildcard
+     for the creator (this is rarely used).
+
+  3. A *typespec* that specifies the database's creator and has a wildcard
+     for the type.
+
+  4. A *typespec* that has wildcards for both the creator and type.
+
+        After Load() returns, $pdb may contain the following fields:
+
+$pdb->{"name"}
+     The name of the database.
+
+$pdb->{"attributes"}{"resource"}
+$pdb->{"attributes"}{"read-only"}
+$pdb->{"attributes"}{"AppInfo dirty"}
+$pdb->{"attributes"}{"backup"}
+$pdb->{"attributes"}{"OK newer"}
+$pdb->{"attributes"}{"reset"}
+$pdb->{"attributes"}{"open"}
+     These are the attribute flags from the database header. Each is true
+     iff the corresponding flag is set.
+
+$pdb->{"version"}
+     The database's version number. An integer.
+
+$pdb->{"ctime"}
+$pdb->{"mtime"}
+$pdb->{"baktime"}
+     The database's creation time, last modification time, and time of last
+     backup, in Unix `time_t' format (seconds since Jan. 1, 1970).
+
+$pdb->{"modnum"}
+     The database's modification number. An integer.
+
+$pdb->{"type"}
+     The database's type. A four-character string.
+
+$pdb->{"creator"}
+     The database's creator. A four-character string.
+
+$pdb->{"uniqueIDseed"}
+     The database's unique ID seed. An integer.
+
+$pdb->{"2NULs"}
+     The two NUL bytes that appear after the record index and the AppInfo
+     block. Included here because every once in a long while, they are not
+     NULs, for some reason.
+
+$pdb->{"appinfo"}
+     The AppInfo block, as returned by the $pdb->ParseAppInfoBlock() helper
+     method.
+
+$pdb->{"sort"}
+     The sort block, as returned by the $pdb->ParseSortBlock() helper
+     method.
+
+@{$pdb->{"records"}}
+     The list of records in the database, as returned by the
+     $pdb->ParseRecord() helper method. Resource databases do not have
+     this.
+
+@{$pdb->{"resources"}}
+     The list of resources in the database, as returned by the
+     $pdb->ParseResource() helper method. Record databases do not have
+     this.
+
+   All of these fields may be set by hand, but should conform to the
+format given above.
+
+   # Load sub Load { 	my $self = shift; 	my $fname = shift;		#
+Filename to read from 	my $buf;			# Buffer into which to read stuff
+
+     # Open database file
+     open PDB, "< $fname" or die "Can't open \"$fname\": $!\n";
+
+     # Get the size of the file. It'll be useful later
+     seek PDB, 0, 2;		# 2 == SEEK_END. Seek to the end.
+     $self->{_size} = tell PDB;
+     seek PDB, 0, 0;		# 0 == SEEK_START. Rewind to the beginning.
+
+     # Read header
+     my $name;
+     my $attributes;
+     my $version;
+     my $ctime;
+     my $mtime;
+     my $baktime;
+     my $modnum;
+     my $appinfo_offset;
+     my $sort_offset;
+     my $type;
+     my $creator;
+     my $uniqueIDseed;
+
+     read PDB, $buf, $HeaderLen;	# Read the PDB header
+
+     # Split header into its component fields
+     ($name, $attributes, $version, $ctime, $mtime, $baktime,
+     $modnum, $appinfo_offset, $sort_offset, $type, $creator,
+     $uniqueIDseed) =
+     	unpack "a32 n n N N N N N N a4 a4 N", $buf;
+
+     ($self->{name} = $name) =~ s/\0*$//;
+     $self->{attributes}{resource} = 1 if $attributes & 0x0001;
+     $self->{attributes}{"read-only"} = 1 if $attributes & 0x0002;
+     $self->{attributes}{"AppInfo dirty"} = 1 if $attributes & 0x0004;
+     $self->{attributes}{backup} = 1 if $attributes & 0x0008;
+     $self->{attributes}{"OK newer"} = 1 if $attributes & 0x0010;
+     $self->{attributes}{reset} = 1 if $attributes & 0x0020;
+     $self->{attributes}{open} = 1 if $attributes & 0x0040;
+     $self->{version} = $version;
+     $self->{ctime} = $ctime - $EPOCH_1904;
+     $self->{mtime} = $mtime - $EPOCH_1904;
+     $self->{baktime} = $baktime - $EPOCH_1904;
+     $self->{modnum} = $modnum;
+     # _appinfo_offset and _sort_offset are private fields
+     $self->{_appinfo_offset} = $appinfo_offset;
+     $self->{_sort_offset} = $sort_offset;
+     $self->{type} = $type;
+     $self->{creator} = $creator;
+     $self->{uniqueIDseed} = $uniqueIDseed;
+
+     # Rebless this PDB object, depending on its type and/or
+     # creator. This allows us to magically invoke the proper
+     # &Parse*() function on the various parts of the database.
+
+     # Look for most specific handlers first, least specific ones
+     # last. That is, first look for a handler that deals
+     # specifically with this database's creator and type, then for
+     # one that deals with this database's creator and any type,
+     # and finally for one that deals with anything.
+
+     my $handler;
+     if ($self->{attributes}{resource})
+     {
+     	# Look among resource handlers
+     	$handler = $PRCHandlers{$self->{creator}}{$self->{type}} ||
+     		$PRCHandlers{undef}{$self->{type}} ||
+     		$PRCHandlers{$self->{creator}}{""} ||
+     		$PRCHandlers{""}{""};
+     } else {
+     	# Look among record handlers
+     	$handler = $PDBHandlers{$self->{creator}}{$self->{type}} ||
+     		$PDBHandlers{""}{$self->{type}} ||
+     		$PDBHandlers{$self->{creator}}{""} ||
+     		$PDBHandlers{""}{""};
+     }
+
+     if (defined($handler))
+     {
+     	bless $self, $handler;
+     } else {
+     	# XXX - This should probably return 'undef' or something,
+     	# rather than die.
+     	die "No handler defined for creator \"$creator\", type \"$type\"\n";
+     }
+
+     ## Read record/resource index
+     # Read index header
+     read PDB, $buf, $RecIndexHeaderLen;
+
+     my $next_index;
+     my $numrecs;
+
+     ($next_index, $numrecs) = unpack "N n", $buf;
+     $self->{_numrecs} = $numrecs;
+
+     # Read the index itself
+     if ($self->{attributes}{resource})
+     {
+     	&_load_rsrc_index($self, \*PDB);
+     } else {
+     	&_load_rec_index($self, \*PDB);
+     }
+
+     # Read the two NUL bytes
+     read PDB, $buf, 2;
+     $self->{"2NULs"} = $buf;
+
+     # Read AppInfo block, if it exists
+     if ($self->{_appinfo_offset} != 0)
+     {
+     	&_load_appinfo_block($self, \*PDB);
+     }
+
+     # Read sort block, if it exists
+     if ($self->{_sort_offset} != 0)
+     {
+     	&_load_sort_block($self, \*PDB);
+     }
+
+     # Read record/resource list
+     if ($self->{attributes}{resource})
+     {
+     	&_load_resources($self, \*PDB);
+     } else {
+     	&_load_records($self, \*PDB);
+     }
+
+     # These keys were needed for parsing the file, but are not
+     # needed any longer. Delete them.
+     delete $self->{_index};
+     delete $self->{_numrecs};
+     delete $self->{_appinfo_offset};
+     delete $self->{_sort_offset};
+     delete $self->{_size};
+
+     close PDB;
+     }
+
+   # _load_rec_index # Private function. Read the record index, for a
+record database sub _load_rec_index { 	my $pdb = shift; 	my $fh = shift;		#
+Input file handle 	my $i; my $lastoffset = 0;
+
+     # Read each record index entry in turn
+     for ($i = 0; $i < $pdb->{_numrecs}; $i++)
+     {
+     	my $buf;		# Input buffer
+
+     # Read the next record index entry
+     my $offset;
+     my $attributes;
+     my @id;			# Raw ID
+     my $id;			# Numerical ID
+     my $entry = {};		# Parsed index entry
+
+     read $fh, $buf, $IndexRecLen;
+
+     # The ID field is a bit weird: it's represented as 3
+     # bytes, but it's really a double word (long) value.
+
+     ($offset, $attributes, @id) = unpack "N C C3", $buf;
+     if ($offset == $lastoffset)
+     {
+     print STDERR "Record $i has same offset as previous one: $offset\n";
+     }
+     $lastoffset = $offset;
+
+     $entry->{offset} = $offset;
+     $entry->{attributes}{expunged} = 1 if $attributes & 0x80;
+     $entry->{attributes}{dirty} = 1 if $attributes & 0x40;
+     $entry->{attributes}{deleted} = 1 if $attributes & 0x20;
+     $entry->{attributes}{private} = 1 if $attributes & 0x10;
+     $entry->{id} = ($id[0] << 16) |
+     		($id[1] << 8) |
+     		$id[2];
+
+     # The lower 4 bits of the attributes field are
+     # overloaded: If the record has been deleted and/or
+     # expunged, then bit 0x08 indicates whether the record
+     # should be archived. Otherwise (if it's an ordinary,
+     # non-deleted record), the lower 4 bits specify the
+     # category that the record belongs in.
+     if (($attributes & 0xa0) == 0)
+     {
+     	$entry->{category} = $attributes & 0x0f;
+     } else {
+     	$entry->{attributes}{archive} = 1
+     		if $attributes & 0x08;
+     }
+
+     # Put this information on a temporary array
+     push @{$pdb->{_index}}, $entry;
+     	}
+     }
+
+   # _load_rsrc_index # Private function. Read the resource index, for a
+resource database sub _load_rsrc_index { 	my $pdb = shift; 	my $fh =
+shift;		# Input file handle 	my $i;
+
+     # Read each resource index entry in turn
+     for ($i = 0; $i < $pdb->{_numrecs}; $i++)
+     {
+     	my $buf;		# Input buffer
+
+     # Read the next resource index entry
+     my $type;
+     my $id;
+     my $offset;
+     my $entry = {};		# Parsed index entry
+
+     read $fh, $buf, $IndexRsrcLen;
+
+     ($type, $id, $offset) = unpack "a4 n N", $buf;
+
+     $entry->{type} = $type;
+     $entry->{id} = $id;
+     $entry->{offset} = $offset;
+
+     push @{$pdb->{_index}}, $entry;
+     	}
+     }
+
+   # _load_appinfo_block # Private function. Read the AppInfo block sub
+_load_appinfo_block { 	my $pdb = shift; 	my $fh = shift;		# Input file handle
+my $len;		# Length of AppInfo block 	my $buf;		# Input
+buffer
+
+     # Sanity check: make sure we're positioned at the beginning of
+     # the AppInfo block
+     if (tell($fh) != $pdb->{_appinfo_offset})
+     {
+     	die "Bad AppInfo offset: expected ",
+     		sprintf("0x%08x", $pdb->{_appinfo_offset}),
+     		", but I'm at ",
+     		tell($fh), "\n";
+     }
+
+     # There's nothing that explicitly gives the size of the
+     # AppInfo block. Rather, it has to be inferred from the offset
+     # of the AppInfo block (previously recorded in
+     # $pdb->{_appinfo_offset}) and whatever's next in the file.
+     # That's either the sort block, the first data record, or the
+     # end of the file.
+
+     if ($pdb->{_sort_offset})
+     {
+     	# The next thing in the file is the sort block
+     	$len = $pdb->{_sort_offset} - $pdb->{_appinfo_offset};
+     } elsif ((defined $pdb->{_index}) && (@{$pdb->{_index}} != ()))
+     {
+     	# There's no sort block; the next thing in the file is
+     	# the first data record
+     	$len = $pdb->{_index}[0]{offset} -
+     		$pdb->{_appinfo_offset};
+     } else {
+     	# There's no sort block and there are no records. The
+     	# AppInfo block goes to the end of the file.
+     	$len = $pdb->{_size} - $pdb->{_appinfo_offset};
+     }
+
+     # Read the AppInfo block
+     read $fh, $buf, $len;
+
+     # Tell the real class to parse the AppInfo block
+     $pdb->{appinfo} = $pdb->ParseAppInfoBlock($buf);
+     }
+
+   # _load_sort_block # Private function. Read the sort block.  sub
+_load_sort_block { 	my $pdb = shift; 	my $fh = shift;		# Input file handle 	my
+$len;		# Length of sort block 	my $buf;		# Input buffer
+
+     # Sanity check: make sure we're positioned at the beginning of
+     # the sort block
+     if (tell($fh) != $pdb->{_sort_offset})
+     {
+     	die "Bad sort block offset: expected ",
+     		sprintf("0x%08x", $pdb->{_sort_offset}),
+     		", but I'm at ",
+     		tell($fh), "\n";
+     }
+
+     # There's nothing that explicitly gives the size of the sort
+     # block. Rather, it has to be inferred from the offset of the
+     # sort block (previously recorded in $pdb->{_sort_offset})
+     # and whatever's next in the file. That's either the first
+     # data record, or the end of the file.
+
+     if (defined($pdb->{_index}))
+     {
+     	# The next thing in the file is the first data record
+     	$len = $pdb->{_index}[0]{offset} -
+     		$pdb->{_sort_offset};
+     } else {
+     	# There are no records. The sort block goes to the end
+     	# of the file.
+     	$len = $pdb->{_size} - $pdb->{_sort_offset};
+     }
+
+     # Read the AppInfo block
+     read $fh, $buf, $len;
+
+     # XXX - Check to see if the sort block has some predefined
+     # structure. If so, it might be a good idea to parse the sort
+     # block here.
+
+     # Tell the real class to parse the sort block
+     $pdb->{sort} = $pdb->ParseSortBlock($buf);
+     }
+
+   # _load_records # Private function. Load the actual data records, for a
+record database # (PDB) sub _load_records { 	my $pdb = shift; 	my
+$fh = shift;		# Input file handle 	my $i;
+
+     # Read each record in turn
+     for ($i = 0; $i < $pdb->{_numrecs}; $i++)
+     {
+     	my $len;	# Length of record
+     	my $buf;	# Input buffer
+
+     # Sanity check: make sure we're where we think we
+     # should be.
+     if (tell($fh) != $pdb->{_index}[$i]{offset})
+     {
+     	die "Bad offset for record $i: expected ",
+     		sprintf("0x%08x",
+     			$pdb->{_index}[$i]{offset}),
+     		" but it's at ",
+     		sprintf("0x%08x", tell($fh)), "\n";
+     }
+
+     # Compute the length of the record: the last record
+     # extends to the end of the file. The others extend to
+     # the beginning of the next record.
+     if ($i == $pdb->{_numrecs} - 1)
+     {
+     	# This is the last record
+     	$len = $pdb->{_size} -
+     		$pdb->{_index}[$i]{offset};
+     } else {
+     	# This is not the last record
+     	$len = $pdb->{_index}[$i+1]{offset} -
+     		$pdb->{_index}[$i]{offset};
+     }
+
+     # Read the record
+     read $fh, $buf, $len;
+
+     # Tell the real class to parse the record data. Pass
+     # &ParseRecord all of the information from the index,
+     # plus a "data" field with the raw record data.
+     my $record;
+
+     $record = $pdb->ParseRecord(
+     	%{$pdb->{_index}[$i]},
+     	"data"	=> $buf,
+     	);
+     push @{$pdb->{records}}, $record;
+     	}
+     }
+
+   # _load_resources # Private function. Load the actual data resources,
+for a resource database # (PRC) sub _load_resources { 	my $pdb = shift; 	my
+$fh = shift;		# Input file handle 	my $i;
+
+     # Read each resource in turn
+     for ($i = 0; $i < $pdb->{_numrecs}; $i++)
+     {
+     	my $len;	# Length of record
+     	my $buf;	# Input buffer
+
+     # Sanity check: make sure we're where we think we
+     # should be.
+     if (tell($fh) != $pdb->{_index}[$i]{offset})
+     {
+     	die "Bad offset for resource $i: expected ",
+     		sprintf("0x%08x",
+     			$pdb->{_index}[$i]{offset}),
+     		" but it's at ",
+     		sprintf("0x%08x", tell($fh)), "\n";
+     }
+
+     # Compute the length of the resource: the last
+     # resource extends to the end of the file. The others
+     # extend to the beginning of the next resource.
+     if ($i == $pdb->{_numrecs} - 1)
+     {
+     	# This is the last resource
+     	$len = $pdb->{_size} -
+     		$pdb->{_index}[$i]{offset};
+     } else {
+     	# This is not the last resource
+     	$len = $pdb->{_index}[$i+1]{offset} -
+     		$pdb->{_index}[$i]{offset};
+     }
+
+     # Read the resource
+     read $fh, $buf, $len;
+
+     # Tell the real class to parse the resource data. Pass
+     # &ParseResource all of the information from the
+     # index, plus a "data" field with the raw resource
+     # data.
+     my $resource;
+
+     $resource = $pdb->ParseResource(
+     	%{$pdb->{_index}[$i]},
+     	"data"	=> $buf,
+     	);
+     push @{$pdb->{resources}}, $resource;
+     	}
+     }
+
+Write
+-----
+
+     $pdb->Write("filename");
+
+   Invokes methods in helper classes to get the application-specific parts
+of the database, then writes the database to the file filename.
+
+   Write() uses the following helper methods:
+
+
+     PackAppInfoBlock()
+
+
+     PackSortBlock()
+
+
+     PackResource() or PackRecord()
+
+new_Record
+----------
+
+     $record = Palm::PDB->new_Record();
+     $record = new_Record Palm::PDB;
+
+   Creates a new record, with the bare minimum needed:
+
+     $record->{category}
+     $record->{attributes}{expunged}
+     $record->{attributes}{dirty}
+     $record->{attributes}{deleted}
+     $record->{attributes}{private}
+     $record->{id}
+
+   The "dirty" attribute is originally set, since this function will
+usually be called to create records to be added to a database.
+
+append_Record
+-------------
+
+     $record  = $pdb->append_Record;
+     $record2 = $pdb->append_Record($record1);
+
+   If called without any arguments, creates a new record with
+`new_Record()|' in this node, and appends it to $pdb.
+
+   If given a reference to a record, appends that record to
+@{$pdb->{records}}.
+
+   Returns a reference to the newly-appended record.
+
+   This method updates $pdb's "last modification" time.
+
+
+
+     $resource = Palm::PDB->new_Resource();
+     $resource = new_Resource Palm::PDB;
+
+   Creates a new resource and initializes
+
+     $resource->{type}
+     $resource->{id}
+
+append_Resource
+---------------
+
+     $resource  = $pdb->append_Resource;
+     $resource2 = $pdb->append_Resource($resource1);
+
+   If called without any arguments, creates a new resource with
+`new_Resource()|' in this node, and appends it to $pdb.
+
+   If given a reference to a resource, appends that resource to
+@{$pdb->{resources}}.
+
+   Returns a reference to the newly-appended resource.
+
+   This method updates $pdb's "last modification" time.
+
+findRecordByID
+--------------
+
+     $record = $pdb->findRecordByID($id);
+
+   Looks through the list of records in $pdb, and returns a reference to
+the record with ID $id, or the undefined value if no such record was found.
+
+delete_Record
+-------------
+
+     $pdb->delete_Record($record, $expunge);
+
+   Marks $record for deletion, so that it will be deleted from the
+database at the next sync.
+
+   If $expunge is false or omitted, the record will be marked for deletion
+with archival. If $expunge is true, the record will be marked for deletion
+without archival.
+
+   This method updates $pdb's "last modification" time.
+
+HELPER CLASSES
+==============
+
+   $pdb->Load() reblesses $pdb into a new class. This helper class is
+expected to convert raw data from the database into parsed representations
+of it, and vice-versa.
+
+   A helper class must have all of the methods listed below. The Palm::Raw
+class is useful if you don't want to define all of the required methods.
+
+ParseAppInfoBlock
+-----------------
+
+     $appinfo = $pdb->ParseAppInfoBlock($buf);
+
+   $buf is a string of raw data. ParseAppInfoBlock() should parse this
+data and return it, typically in the form of a reference to an object or
+to an anonymous hash.
+
+   This method will not be called if the database does not have an AppInfo
+block.
+
+   The return value from ParseAppInfoBlock() will be accessible as
+$pdb->{appinfo}.
+
+PackAppInfoBlock
+----------------
+
+     $buf = $pdb->PackAppInfoBlock();
+
+   This is the converse of ParseAppInfoBlock(). It takes $pdb's AppInfo
+block, $pdb->{appinfo}, and returns a string of binary data that can be
+written to the database file.
+
+ParseSortBlock
+--------------
+
+     $sort = $pdb->ParseSortBlock($buf);
+
+   $buf is a string of raw data. ParseSortBlock() should parse this data
+and return it, typically in the form of a reference to an object or to an
+anonymous hash.
+
+   This method will not be called if the database does not have a sort
+block.
+
+   The return value from ParseSortBlock() will be accessible as
+$pdb->{sort}.
+
+PackSortBlock
+-------------
+
+     $buf = $pdb->PackSortBlock();
+
+   This is the converse of ParseSortBlock(). It takes $pdb's sort block,
+$pdb->{sort}, and returns a string of raw data that can be written to the
+database file.
+
+ParseRecord
+-----------
+
+     $record = $pdb->ParseRecord(
+             offset         => $offset,	# Record's offset in file
+             attributes     =>		# Record attributes
+                 {
+           	expunged => bool,	# True iff expunged
+           	dirty    => bool,	# True iff dirty
+           	deleted  => bool,	# True iff deleted
+           	private  => bool,	# True iff private
+                 },
+             category       => $category,	# Record's category number
+             id             => $id,	# Record's unique ID
+             data           => $buf,	# Raw record data
+           );
+
+   ParseRecord() takes the arguments listed above and returns a parsed
+representation of the record, typically as a reference to a record object
+or anonymous hash.
+
+   The output from ParseRecord() will be appended to  @{$pdb->{records}}.
+The records appear in this list in the same order as they appear in the
+file.
+
+   $offset argument is not normally useful, but is included for
+completeness.
+
+   The fields in %$attributes are boolean values. They are true iff the
+record has the corresponding flag set.
+
+   $category is an integer in the range 0-15, which indicates which
+category the record belongs to. This is normally an index into a table
+given at the beginning of the AppInfo block.
+
+   A typical ParseRecord() method has this general form:
+
+     sub ParseRecord
+     {
+         my $self = shift
+         my %record = @_;
+
+     # Parse $self->{data} and put the fields into new fields in
+     # $self.
+
+     delete $record{data};		# No longer useful
+     return \%record;
+         }
+
+PackRecord
+----------
+
+     $buf = $pdb->PackRecord($record);
+
+   The converse of ParseRecord(). PackRecord() takes a record as returned
+by ParseRecord() and returns a string of raw data that can be written to
+the database file.
+
+   PackRecord() is never called when writing a resource database.
+
+ParseResource
+-------------
+
+     $record = $pdb->ParseResource(
+             type   => $type,		# Resource type
+             id     => $id,		# Resource ID
+             offset => $offset,		# Resource's offset in file
+             data   => $buf,		# Raw resource data
+           );
+
+   ParseResource() takes the arguments listed above and returns a parsed
+representation of the resource, typically as a reference to a resource
+object or anonymous hash.
+
+   The output from ParseResource() will be appended to
+@{$pdb->{resources}}. The resources appear in this list in the same order
+as they appear in the file.
+
+   $type is a four-character string giving the resource's type.
+
+   $id is an integer that uniquely identifies the resource amongst others
+of its type.
+
+   $offset is not normally useful, but is included for completeness.
+
+PackResource
+------------
+
+     $buf = $pdb->PackResource($resource);
+
+   The converse of ParseResource(). PackResource() takes a resource as
+returned by PackResource() and returns a string of raw data that can be
+written to the database file.
+
+   PackResource() is never called when writing a record database.
+
+BUGS
+====
+
+   These functions die too easily. They should return an error code.
+
+   Database manipulation is still an arcane art.
+
+   It may be possible to parse sort blocks further.
+
+AUTHOR
+======
+
+   Andrew Arensburger <arensb@ooblick.com>
+
+SEE ALSO
+========
+
+   Palm::Raw(3)
+
+   Palm::Address(3)
+
+   Palm::Datebook(3)
+
+   Palm::Mail(3)
+
+   Palm::Memo(3)
+
+   Palm::ToDo(3)
+
+   `Palm Database Files', in the ColdSync distribution.
+
+   The Virtual Constructor (aka Factory Method) pattern is described in
+`Design Patterns', by Erich Gamma *et al.*, Addison-Wesley.
+
+

@@ -1,0 +1,1669 @@
+This is Info file pm.info, produced by Makeinfo version 1.68 from the
+input file bigpm.texi.
+
+
+File: pm.info,  Node: CGI/FormMagick,  Next: CGI/FormMagick/FAQ,  Prev: CGI/Form,  Up: Module List
+
+easily create CGI form-based applications
+*****************************************
+
+NAME
+====
+
+   CGI::FormMagick - easily create CGI form-based applications
+
+SYNOPSIS
+========
+
+     use CGI::FormMagick;
+
+     my $f = new CGI::FormMagick();
+     my $f = new CGI::FormMagick(TYPE => FILE,  SOURCE => $myxmlfile, DEBUG => 1);
+     my $f = new CGI::FormMagick(TYPE => STRING,  SOURCE => $data , DEBUG => 1);
+
+     $f->add_lexicon("fr", { "Yes" => "Oui", "No" => "Non"});
+
+     $f->display();
+
+DESCRIPTION
+===========
+
+   FormMagick is a toolkit for easily building fairly complex form-based
+web applications.  It allows the developer to specify the structure of a
+multi-page "wizard" style form using XML, then display that form using
+only a few lines of Perl.
+
+How it works:
+-------------
+
+   You (the developer) provide at least:
+
+   * Form descriptions (XML)
+
+   * HTML templates (Text::Template format) for the page headers and
+     footers
+
+   And may optionally provide:
+
+   * L10N lexicon entries
+
+   * Validation routines for user input data
+
+   * Routines to run before or after a page of the form is displayed
+
+   FormMagick brings them all together to create a full application.
+
+METHODS
+=======
+
+new()
+-----
+
+   The new() method requires no arguments, but may take the following
+optional arguments (as a hash):
+
+TYPE
+     Defaults to "FILE" (the only currently implemented type).  Eventually
+     we'll also allow such things as FILEHANDLE, STRING, etc (c.f.
+     Text::Template, which does this quite nicely).
+
+SOURCE
+     Defaults to a filename matching that of your script, only with an
+     extension of .xml (we got this idea from XML::Simple).
+
+DEBUG
+     Defaults to 0 (no debug output).  Setting it to 1 (or any other true
+     value) will cause debugging messages to be output.
+
+display()
+---------
+
+   The display method displays your form.  It takes no arguments.
+
+add_lexicon()
+-------------
+
+   This method takes two arguments.  The first is a two-letter string
+representing the language to which entries should be added.  These are
+standard ISO language abbreviations, eg "en" for English, "fr" for French,
+"de" for German, etc.
+
+   The second argument is a hashref in which the keys of the hash are the
+phrases to be translated and the values are the translations.
+
+   For more information about how localization (L10N) works in FormMagick,
+see `CGI::FormMagick::L10N'.
+
+debug($msg)
+-----------
+
+   The debug method prints out a nicely formatted debug message.  It's
+usually called from your script as `$f-'debug($msg)>
+
+Form descriptions
+-----------------
+
+   Sample form description
+
+   The following is an example of how a form is described in XML. More
+complete examples can be found in the `examples/' subdirectory in the
+CGI::FormMagick distribution.
+
+     <FORM TITLE="My form application" HEADER="myform_header.tmpl"
+       FOOTER="myform_footer.tmpl" POST-EVENT="submit_order">
+       <PAGE NAME="Personal" TITLE="Personal details" DESCRIPTION="Please
+       provide us with the following personal details for our records">
+         <FIELD ID="firstname" LABEL="Your first name" TYPE="TEXT"
+           VALIDATION="nonblank"/>
+         <FIELD ID="lastname" LABEL="Your surname" TYPE="TEXT"
+           VALIDATION="nonblank"/>
+         <FIELD ID="username" LABEL="Choose a username" TYPE="TEXT"
+           VALIDATION="username" DESCRIPTION="Your username must
+     	be between 3 and 8 characters in length and contain only letters
+     	and numbers."/>
+       </PAGE>
+       <PAGE NAME="Payment" TITLE="Payment details"
+       POST-EVENT="check_credit_card" DESCRIPTION="We need your full credit
+       card details to process your order.  Please fill in all fields.
+       Your card will be charged within 48 hours.">
+         <FIELD ID="cardtype" LABEL="Credit card type" TYPE="SELECT"
+           OPTIONS="list_credit_card_types" VALIDATION="credit_card_type"/>
+         <FIELD ID="cardnumber" LABEL="Credit card number" TYPE="TEXT"
+           VALIDATION="credit_card_number"/>
+         <FIELD ID="cardexpiry" LABEL="Expiry date (MM/YY)" TYPE="TEXT"
+           VALIDATION="credit_card_expiry"/>
+       </PAGE>
+       <PAGE NAME="Random" TITLE="Random fields">
+         <FIELD ID="confirm" LABEL="Click here to confirm" TYPE="CHECKBOX"
+           VALUE="confirm" CHECKED="0"/>
+         <FIELD ID="color" LABEL="Choose a color" TYPE="RADIO"
+           OPTIONS="'red', 'green', 'blue'"/>
+       </PAGE>
+     </FORM>
+
+   The XML must comply with the FormMagick DTD (included in the
+distribution as FormMagick.dtd).  A command-line tool to test compliance
+is planned for a future release.
+
+Field types
+-----------
+
+   The following values are permitted in the TYPE attribute of the FIELD
+element:
+
+   * TEXT
+
+   * SELECT (requires OPTIONS attribute)
+
+   * RADIO (requires OPTIONS attribute)
+
+   * CHECKBOX (CHECKED attribute is optional)
+
+Notes on parsing of OPTIONS attribute
+-------------------------------------
+
+   The OPTIONS attribute has automagical Do What I Mean (DWIM) abilities.
+You can give it a value which looks like a Perl list, a Perl hash, or a
+subroutine name.  For instance:
+
+     OPTIONS="'red', 'green', 'blue'"
+
+     OPTIONS="'ff0000' => 'red', '00ff00' => 'green', '0000ff' => 'blue'"
+
+     OPTIONS="get_colors()"
+
+   How it works is that FormMagick looks for the => operator, and if it
+finds it it evals the OPTIONS string and assigns the result to a hash.  If
+it finds a comma (but no little => arrows) it figures it's a list, and
+evals it and assigns the results to an array.  Otherwise, it tries to
+interpret what's there as the name of a subroutine in the scope of the
+script that called FormMagick.
+
+   A few gotchas to look out for:
+
+   * Make sure you quote strings in lists and hashes.  "red,blue,green"
+     will fail (silently) because of the barewords.
+
+   * Single-element lists ("red") will fail because the DWIM parsing
+     doesn't find a comma there and treats it as the name of a subroutine.
+     But then, a single-element radio button group or select dropdown is
+     pretty meaningless anyway, so why would you do that?
+
+   * Arrays will result in options being sorted in the same order they were
+     listed.  Hashes will be sorted by key using the default Perl `sort()'.
+
+   * An anti-gotcha: subroutine names do not require the parens on them.
+     "get_colors" and "get_colors()" will work the same.
+
+SEE ALSO
+========
+
+   CGI::FormMagick::L10N
+
+   CGI::FormMagick::Validator
+
+   CGI::FormMagick::FAQ
+
+BUGS
+====
+
+   There are a number of features which have not yet been implemented.
+Also, there are probably mismatches between this perldoc and the actual
+functionality.
+
+AUTHOR
+======
+
+   Kirrily "Skud" Robert <skud@infotrope.net>
+
+   Contributors:
+
+   Shane R. Landrum <slandrum@turing.csc.smith.edu>
+
+   James Ramirez <jamesr@cogs.susx.ac.uk>
+
+   More information about FormMagick may be found at
+http://sourceforge.net/projects/formmagick/
+
+
+File: pm.info,  Node: CGI/FormMagick/FAQ,  Next: CGI/FormMagick/L10N,  Prev: CGI/FormMagick,  Up: Module List
+
+Frequently asked questions about FormMagick
+*******************************************
+
+NAME
+====
+
+   FormMagick FAQ - Frequently asked questions about FormMagick
+
+HOW DO I...
+===========
+
+How do I check that my XML is valid?
+------------------------------------
+
+How do I customise the look and feel of my forms?
+-------------------------------------------------
+
+   Use cascading style sheets.  Take a look at the HTML source output by
+FormMagick, and you'll see that most things have a "label" attribute to
+make CSS easier.
+
+How do I make my own validation routines?
+-----------------------------------------
+
+   Simply create a routine in your CGI script which accepts the data to
+validate as an argument.  Have it return "OK" on success or a detailed
+error message on failure.
+
+     sub my_validation {
+         my $data = shift;
+         if ($data =~ /$some_pattern/) {
+             return "OK";
+         } else {
+             return "That looks wrong to me.";
+         }
+     }
+
+How do I add translations into another language?
+------------------------------------------------
+
+   Use the add_lexicon() method:
+
+     $f->add_lexicon("fr", { "Yes" => "Oui", "No" => "Non" });
+
+How do I do extra processing when a user clicks "Next"?
+-------------------------------------------------------
+
+   Use a POST-EVENT on the PAGE element.  Create a subroutine that does
+what you want:
+
+     sub process_credit_card {
+         my $cgi = shift;
+     	my $cardnum = $cgi->param("cardnum");
+     	my $response = do_processing($cardnum);
+     	print "<p>$response</p>";
+     }
+
+How do I choose which page to go to based on user input?
+--------------------------------------------------------
+
+   Use a PAGE POST-EVENT and set the value of the "wherenext" CGI
+parameter:
+
+     sub my_post_page_event {
+         my $cgi = shift;
+     	if ($cgi->param("foo") eq "bar") {
+             $cgi->param(-name => "wherenext", -value => "GoToThisPageName")
+         } elsif ($cgi->param("had_enough") eq "Yes") {
+             $cgi->param(-name => "wherenext", -value => "Finish")
+         }
+     }
+
+TROUBLESHOOTING
+===============
+
+General troubleshooting tips
+----------------------------
+
+   Try turning on debugging when you invoke FormMagick:
+
+   my $f = new CGI::FormMagick( DEBUG => 1 );
+
+Why isn't my data preserved from one page to the next?
+------------------------------------------------------
+
+   You probably need to make your `session-tokens' directory writable and
+executable by the web server.  Either:
+
+     chown www session-tokens
+        (assuming your webserver runs as the www user)
+     chmod 700 session-tokens
+
+   Or...
+
+     chown 777 session-tokens
+
+
+File: pm.info,  Node: CGI/FormMagick/L10N,  Next: CGI/FormMagick/TagMaker,  Prev: CGI/FormMagick/FAQ,  Up: Module List
+
+   CGI::FormMagick::L10N - localization routines for FormMagick
+
+SYNOPSIS
+========
+
+     use CGI::FormMagick::L10N;
+
+DESCRIPTION
+===========
+
+   L10N (Localisation) is the name given to the process of providing
+translations into another language.  The previous step to this is I18N
+(internationalisation) which is the process of making an application ready
+to accept the translations.
+
+   We've done the work of I18N for you, so all you have to do is provide
+translations for your apps.
+
+   FormMagick uses the `Locale::Maketext' module for L10N.  It stores its
+translations for each language in a hash like this:
+
+     %Lexicon = (
+     	"Hello"		=> "Bonjour",
+     	"Click here"	=> "Appuyez ici"
+     );
+
+   You can add your own entries to any language lexicon using the
+add_lexicon() method (see `CGI::FormMagick' for how to call that method).
+
+   Localisation preferences are picked up from the HTTP_ACCEPT_LANGUAGE
+environment variable passed by the user's browser.  In Netscape, you set
+this by choosing "Edit, Preferences, Navigator, Languages" and then
+choosing your preferred language.
+
+   Localisation is performed on:
+
+   * Form titles
+
+   * Page titles and descriptions
+
+   * Field labels and descriptions
+
+   * Validation error messages
+
+   If you wish to localise other textual information such as your HTML
+Templates, you will have to explicitly call the l10n routines.
+
+SEE ALSO
+========
+
+   The general documentation for FormMagick (`perldoc CGI::FormMagick')
+
+   More information about FormMagick may be found at
+http://sourceforge.net/projects/formmagick/
+
+
+File: pm.info,  Node: CGI/FormMagick/TagMaker,  Next: CGI/FormMagick/Validator,  Prev: CGI/FormMagick/L10N,  Up: Module List
+
+Perl module that can create any HTML tags, as well as groups of or just parts of them, and complete html headers or footers.
+****************************************************************************************************************************
+
+NAME
+====
+
+   HTML::TagMaker - Perl module that can create any HTML tags, as well as
+groups of or just parts of them, and complete html headers or footers.
+
+DEPENDENCIES
+============
+
+Perl Version
+------------
+
+     5.004
+
+Standard Modules
+----------------
+
+     I<none>
+
+Nonstandard Modules
+-------------------
+
+     Class::ParamParser
+
+SYNOPSIS
+========
+
+     use HTML::TagMaker;
+
+     my $html = HTML::TagMaker->new();
+     $html->groups_by_default( 1 );
+
+     print
+     	'Content-type: text/html'."\n\n",
+     	$html->start_html(
+     		-title => "This Is My Page",
+     		-style => { -code => <<__endquote },
+     \nBODY {
+     	background-color: #ffffff;
+     	background-image: none;
+     }
+     __endquote
+     	),
+     	$html->h1( 'A Simple Example' ),
+     	$html->p(
+     		"Click " .
+     		$html->a( href => 'http://search.cpan.org', text => 'here' ) .
+     		" for more."
+     	),
+     	$html->hr,
+     	$html->table(
+     		$html->tr( [
+     			$html->th( [ 'Name', 'Count', 'URL', 'First Access' ] ),
+     			$html->td( [ 'Old Page', 33, 'http://www.domain.com',
+     				'1999/04/23 13:55:02' ] )
+     		] )
+     	),
+     	$html->hr,
+     	$html->form_start( method => 'post', action => 'http://localhost' ),
+     	$html->p(
+     		"What's your name? " .
+     		$html->input( type => 'text', name => 'name' )
+     	),
+     	$html->p(
+     		"What's the combination?" .
+     		$html->input_group(
+     			-type => 'checkbox',
+     			-name => 'words',
+     			-value => ['eenie', 'meenie', 'minie', 'moe'],
+     			-checked => [1, 0, 1, 0],
+     			-text => ['eenie', 'meenie', 'minie', 'moe'] ),
+     	),
+     	$html->p(
+     		"What's your favorite colour? " .
+     		$html->select_start( -size => 1, -name => 'color' ) .
+     		$html->option_group(
+     			-value => ['red', 'green', 'blue', 'chartreuse'],
+     			-text => ['Red', 'Green', 'Blue', 'Chartreuse'] ) .
+     		$html->select_end
+     	),
+     	$html->input( type => 'submit' ),
+     	$html->form_end,
+     	$html->end_html;
+
+DESCRIPTION
+===========
+
+   This Perl 5 object class can be used to generate any HTML tags in a
+format that is consistent with the W3C HTML 4.0 standard.  There are no
+restrictions on what tags are named, however; you can ask for any new or
+unsupported tag that comes along from Netscape or Microsoft, and it will
+be made.  Additionally, you can generate lists of said tags with one
+method call, or just parts of said tags (but not both at once).
+
+   In this implementation, "standard format" means that tags are made as
+pairs (<TAG></TAG>) by default, unless they are known to be "no pair"
+tags.  Tags that I know to be "no pair" are [basefont, img, area, param,
+br, hr, input, option, tbody, frame, comment, isindex, base, link, meta].
+However, you can force any tag to be "pair" or "start only" or "end only"
+by appropriately modifying your call to the tag making method.
+
+   Also, "standard format" means that tag modifiers are formatted as
+"key=value" by default, unless they are known to be "no value" modifiers.
+Modifiers that I know to be "no value" are [ismap, noshade, compact,
+checked, multiple, selected, nowrap, noresize, param].  These are
+formatted simply as "key" because their very presence indicates positive
+assertion, while their absense means otherwise.  For modifiers with
+values, the values will always become bounded by quotes, which ensures
+they work with both string and numerical quantities (eg: key="value").
+
+   Note that this class is a subclass of Class::ParamParser, and inherits
+all of its methods, "params_to_hash()" and "params_to_array()".
+
+HTML CODE FROM SYNOPSIS PROGRAM
+===============================
+
+     Content-type: text/html
+
+     <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN">
+     <HTML>
+     <HEAD>
+     <TITLE>This Is My Page</TITLE>
+     <STYLE>
+     <!--
+     BODY {
+     	background-color: #ffffff;
+     	background-image: none;
+     }
+      --></STYLE>
+     </HEAD>
+     <BODY>
+     <H1>A Simple Example</H1>
+     <P>Click
+     <A HREF="http://search.cpan.org">here</A> for more.</P>
+     <HR>
+     <TABLE>
+     <TR>
+     <TH>Name</TH>
+     <TH>Count</TH>
+     <TH>URL</TH>
+     <TH>First Access</TH></TR>
+     <TR>
+     <TD>Old Page</TD>
+     <TD>33</TD>
+     <TD>http://www.domain.com</TD>
+     <TD>1999/04/23 13:55:02</TD></TR></TABLE>
+     <HR>
+     <FORM METHOD="post" ACTION="http://localhost">
+     <P>What's your name?
+     <INPUT TYPE="text" NAME="name"></P>
+     <P>What's the combination?
+     <INPUT TYPE="checkbox" NAME="words" CHECKED VALUE="eenie">eenie
+     <INPUT TYPE="checkbox" NAME="words" VALUE="meenie">meenie
+     <INPUT TYPE="checkbox" NAME="words" CHECKED VALUE="minie">minie
+     <INPUT TYPE="checkbox" NAME="words" VALUE="moe">moe</P>
+     <P>What's your favorite colour?
+     <SELECT NAME="color" SIZE="1">
+     <OPTION VALUE="red">Red
+     <OPTION VALUE="green">Green
+     <OPTION VALUE="blue">Blue
+     <OPTION VALUE="chartreuse">Chartreuse
+     </SELECT></P>
+     <INPUT TYPE="submit">
+     </FORM>
+     </BODY>
+     </HTML>
+
+SYNTAX
+======
+
+   This class does not export any functions or methods, so you need to
+call them using indirect notation.  This means using *Class->function()*
+for functions and *$object->method()* for methods.
+
+   Methods of this class always "return" their results, rather than
+printing them out to a file or the screen.  Not only is this simpler, but
+it gives the calling code the maximum amount of control over what happens
+in the program.  They may wish to do post-processing with the generated
+HTML, or want to output it in a different order than it is generated.  By
+default, all results are returned as a scalar, but methods which generate
+a list of tags can optionally return an ARRAY ref, with each element
+containing a single tag.  This can aid in post-processing and possibly
+speed up the program because there is less copying done.
+
+   Through the magic of autoloading, this class can make any html tag by
+calling a class method with the same name as the tag you want.  For
+examples, use "hr()" to make a "<HR>" tag, or "p('text')" to make
+"<P>text</P>".  This also means that if you mis-spell any method name, it
+will still make a new tag with the mis-spelled name.  For autoloaded
+methods only, the method names are case-insensitive.
+
+   If you call a class method whose name ends in either of ['_start',
+'_end', '_pair'], this will be interpreted as an instruction to make just
+part of one tag whose name are the part of the method name preceeding that
+suffix.  For example, calling "p_start( 'text' )" results in "<P>text"
+rather than "<P>text</P>".  Similarly, calling "p_end()" will generate a
+"</P>" only.  Using the '_pair' suffix will force tags to be made as a
+pair, whether or not they would do so naturally.  For example, calling
+"br_pair" would produce a "<BR></BR>" rather than the normal "<BR>".  When
+using either of ['_start','_pair'], the arguments you pass the method are
+exactly the same as the unmodified method would use, and there are no
+other symantec differences.  However, when using the '_end' suffix, any
+arguments are ignored, as the latter member of a tag pair never carries any
+attributes anyway.
+
+   If you call a class method whose name ends in "_group", this will be
+interpreted as an instruction to make a list of tags whose name are the
+part of the method name preceeding the "_group".  For example, calling
+"td_group( ['here','we','are'] )" results in
+"<TD>here</TD><TD>we</TD><TD>are</TD>" being generated.  The arguments
+that you call this method are exactly the same as for calling a method to
+make a single tag of the same name, except that the extra optional
+parameter "list" can be used to force an ARRAY ref of the new tags to be
+returned instead of a scalar.  The symantec difference is that any
+arguments whose values are ARRAY refs are interpreted as a list of values
+where each one is used in a separate tag; for a single tag, the literal
+ARRAY ref itself would be used.  The number of tags produced is equal to
+the length of the longest ARRAY ref passed as an argument.  For any other
+arguments who have fewer than this count, their last value is replicated
+and appended enough times as necessary to make them the same length.  The
+value of a scalar argument is used for all the tags.  For example, calling
+"input_group( type => checkbox, name => 'letters', value => ['a','b','c']
+)" produces '<INPUT TYPE="checkbox" NAME="letters" VALUE="a"><INPUT
+TYPE="checkbox" NAME="letters" VALUE="b"><INPUT TYPE="checkbox"
+NAME="letters" VALUE="c">'.
+
+   All autoloaded methods require their parameters to be in named format.
+These names and values correspond to attribute names and values for the
+new tags.  Since "no value" attributes are essentially booleans, they can
+have any true or false value associated with them in the parameter list,
+which won't be printed.  If an autoloaded method is passed exactly one
+parameter, it will be interpreted as the "text" that goes between the tag
+pair (<TAG>text</TAG>) or after "start tags" (<TAG>text).  The same result
+can be had explicitely by passing the named parameter "text".  Most static
+(non-autoloaded) methods require positional parameters, except for
+start_html(), which can take either format.  The names of any named
+parameters can optionally start with a "-".
+
+FUNCTIONS AND METHODS
+=====================
+
+   Note that all the methods defined below are static, so information
+specific to autoloaded methods won't likely apply to them.  All of these
+methods take positional arguments unless otherwise specified.
+
+new()
+-----
+
+   This function creates a new HTML::TagMaker object (or subclass thereof)
+and returns it.
+
+initialize()
+------------
+
+   This method is used by new() to set the initial properties of an object,
+that it creates.  All page attributes are wiped clean, resulting in an
+empty page.
+
+clone([ CLONE ])
+----------------
+
+   This method initializes a new object to have all of the same properties
+of the current object and returns it.  This new object can be provided in
+the optional argument CLONE (if CLONE is an object of the same class as
+the current object); otherwise, a brand new object of the current class is
+used.  Only object properties recognized by HTML::TagMaker are set in the
+clone; other properties are not changed.
+
+groups_by_default([ VALUE ])
+----------------------------
+
+   This method is an accessor for the boolean "automatic grouping"
+property of this object, which it returns.  If VALUE is defined, this
+property is set to it.  In cases where we aren't told explicitely that
+autoloaded methods are making a single or multiple tags (using ['_start',
+'_end', '_pair'] and '_group' respectively), we look to this property to
+determine what operation we guess.  The default is "single".  When this
+property is true, we can make both single and groups of tags by using a
+suffix-less method name; however, making single tags this way is slower
+than when this property is false.  Also, be aware that when we are making
+a "group", arguments that are ARRAY refs are always flattened, and when we
+are making a "single", ARRAY ref arguments are always used literally.
+
+positional_by_default([ VALUE ])
+--------------------------------
+
+   This method is an accessor for the boolean "positional arguments"
+property of this object, which it returns.  If VALUE is defined, this
+property is set to it.  With methods whose parameters could be either
+named or positional, when we aren't sure what we are given, do we guess
+positional?  Default is named.
+
+prologue_tag()
+--------------
+
+   This method returns a prologue tag, which is meant to be the very first
+thing in an HTML document.  It tells the web browser such things as what
+version of the HTML standard we are adhering to, version 4.0 in this case.
+The prologue tag we make looks like '<!DOCTYPE HTML PUBLIC "-//W3C//DTD
+HTML 4.0//EN">'.
+
+comment_tag( TEXT )
+-------------------
+
+   This method returns a comment tag, which is only visible to people
+viewing the HTML source of a document, and not otherwise.  It can take
+either a scalar or a list or an Array ref as its TEXT argument.  If a
+single item of text is passed, then a comment tag that looks like "<!-
+text ->" is made.  If more than one item of text is passed, then a
+multi-line comment is made, which has each item of text on its own line
+and indented with a single tab.  The latter is suitable for displaying CSS
+or JavaScript code in an elegant manner.
+
+make_html_tag( NAME[, PARAMS[, TEXT[, PART]]] )
+-----------------------------------------------
+
+   This method is used internally to do the actual construction of single
+html tags.   You can call it directly when you want faster code and/or
+more control over how tags are made.  The first argument, NAME, is a
+scalar that defines the actual name of the tag we are making (eg: 'br');
+it is case-insensitive.  The optional second argument, PARAMS, is a HASH
+ref containing attribute names and values for the new tag; the names
+(keys) are case-insensitive.  The attribute values are all printed
+literally, so they should be scalars.  The optional third argument, TEXT,
+is a scalar containing the text that goes between the tag pairs; it is not
+a tag attribute.  The optional fourth argument, PART, is a scalar which
+indicates we should make just a certain part of the tag; acceptable values
+are ['pair', 'start', 'end'], and it is case-insensitive.  This method
+knows which HTML tags are normally paired or not, which tag attributes
+take specified values or not, and acts accordingly.
+
+make_html_tag_group( NAME[, PARAMS[, TEXT[, LIST]]] )
+-----------------------------------------------------
+
+   This method is used internally to do the actual construction of html
+tag groups.  You can call it directly when you want faster code and/or
+more control over how tags are made.  The first argument, NAME, is a
+scalar that defines the actual name of the tag we are making (eg: 'br');
+it is case-insensitive.  The optional second argument, PARAMS, is a HASH
+ref containing attribute names and values for the new tag; the names
+(keys) are case-insensitive.  Any attribute values which are ARRAY refs
+are flattened, and the number of tags made is determined by the length of
+the longest one.  The optional third argument, TEXT, is a HASH ref (or
+scalar) containing the text that goes between the tag pairs; it is not a
+tag attribute, but if its an ARRAY ref then its length will influence the
+number of tags that are made as the length of tag attribute arrays do.
+The optional fourth argument, LIST, is a boolean/scalar which indicates
+whether this method returns the new tags in an ARRAY ref (one tag per
+element) or as a scalar (tags are concatenated together); a true value
+forces an ARRAY ref, scalar is the default.  This method knows which HTML
+tags are normally paired or not, which tag attributes take specified
+values or not, and acts accordingly.
+
+start_html([ TITLE[, AUTHOR[, META[, STYLE[, HEAD[, BODY]]]]] ])
+----------------------------------------------------------------
+
+   This method returns a canned HTML template that is suitable for use as
+the top of an HTML page.  It consists of the prologue tag (<!DOCTYPE...),
+the opening 'html' tag, the entire 'head' section, and the opening 'body'
+tag.  The prologue tag looks the same as that generated by the class
+method prologue_tag().  This method can take its optional six arguments in
+either named or positional format; in the first case, the names look the
+same as the positional placeholders above, except they must be in lower
+case.  The first two arguments, TITLE and AUTHOR, are scalars which
+respectively define the title and author for the document.  The default
+value for TITLE is 'Untitled Document', and a '<LINK REV="made">' tag is
+made if AUTHOR is present.  The third argument, META, is a HASH ref
+containing name/value pairs of meta information, and a '<META NAME="n"
+VALUE="v">' tag is made for each one.  The fourth argument, STYLE, allows
+Cascading Style Sheets to be used in the document.  See the method
+*css_for_start_html()*, which handles the particulars of this argument.
+The fifth argument, HEAD, is an ARRAY ref (or scalar) containing anything
+else you would like to appear in the 'head' section; it is flattened and
+the elements used as-is.  The sixth argument, BODY, is a HASH ref
+containing attributes and values for the opening 'body' tag.
+
+end_html()
+----------
+
+   This method returns a canned HTML template that is suitable for use as
+the bottom of an HTML page.  It consists of the closing 'body' and 'html'
+tags.
+
+css_for_start_html([ SRC[, CODE] ])
+-----------------------------------
+
+   This method returns HTML code that allows Cascading Style Sheets to be
+used in the document when the code is included in its "head" section.
+This method is used by start_html() to handle its STYLE argument.  This
+method can take its optional arguments in either named or positional
+format; in the first case, the names look the same as the positional
+placeholders above, except they must be in lower case.  The first
+argument, SRC, is an Array ref (or scalar) whose elements are urls for
+external StyleSheet documents that should be linked to by the browser, and
+a '<LINK REL="stylesheet" SRC="url">' tag is made for each one.  The
+second argument, CODE, is an Array ref (or scalar) whose elements are
+lines of StyleSheet code that are to be embedded in the HTML document
+itself; a "<STYLE><!- code -></STYLE>" multi-line tag is made for them.
+When both arguments are used, the SRC appears first in the new HTML.
+
+COMPATABILITY WITH OTHER MODULES
+================================
+
+   The methods of this class and their parameters are designed to be
+compatible with any same-named methods in the popular CGI.pm class.  This
+class will produce identical or browser-compatible HTML from such methods,
+and this class can accept all the same argument formats.  Exceptions to
+this include:
+
+  1. None of our methods are exported and must be called using indirect
+     notation, whereas CGI.pm can export any of it's methods.
+
+  2. start_html() doesn't support all the same arguments, but those that
+     do have the same names.  However, the effects of the missing
+     arguments can be easily replicated by making the appropriate tags
+     explicitely and handing them in via either the "head" or "body"
+     arguments, where appropriate.  The common arguments are ['title',
+     'author', 'meta', 'style', 'head', 'body'], in that order.
+
+  3. Our textarea() method is autoloaded, and doesn't have the special
+     symantecs that CGI.pm's textarea() does.  However, any module who
+     subclasses from this one can override textarea() with one that
+     matches CGI.pm's symantecs.  The "HTML::FormMaker" module does this.
+
+  4. Autoloaded methods do not use the presence or absense of arguments to
+     decide whether to make the new tag as a pair or as "start only".
+
+  5. Autoloaded methods that make html tags won't concatenate their
+     arguments into a single argument under any circumstances, but in some
+     cases the "shortcuts" of CGI.pm will do so.
+
+  6. Currently we don't html-escape any argument values passed to our tag
+     making functions, whereas CGI.pm sometimes does.  While we expect our
+     caller to do the escaping themselves where necessary, we may do it
+     later in an update.
+
+  7. We go further to make the generated HTML human-readable by: 1. having
+     each new tag start on a new line; 2. making all tag and attribute
+     names uppercase; 3.  ensuring that about 20 often-used tag attributes
+     always appear in the same order (eg: 'type' is before 'name' is
+     before 'value'), and before any others.
+
+
+AUTHOR
+======
+
+   Copyright (c) 1999-2000, Darren R. Duncan. All rights reserved. This
+module is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.  However, I do request that this copyright
+information remain attached to the file.  If you modify this module and
+redistribute a changed version then please attach a note listing the
+modifications.
+
+   I am always interested in knowing how my work helps others, so if you
+put this module to use in any of your own code then please send me the
+URL.  Also, if you make modifications to the module because it doesn't
+work the way you need, please send me a copy so that I can roll desirable
+changes into the main release.
+
+   Address comments, suggestions, and bug reports to
+*perl@DarrenDuncan.net*.
+
+CREDITS
+=======
+
+   Thanks very much to *Kevin Werbach* for publishing "The Bare Bones
+Guide to HTML", which I found to be an invaluable resource when writing
+this module (and at other times as well).  The latest version of the
+document is available at *http://werbach.com/barebones/*.
+
+   This quick reference lists all the HTML tags that current browsers are
+likely to recognize, including all the elements of the official HTML 4.0
+recommendation, and some Netscape and Microsoft extensions as well.
+Common attributes for these tags are also included in context, giving a
+good idea on how they are used.
+
+   When writing this module, I used the Bare Bones reference to verify the
+consistant formatting used by all HTML tags, including how tag attributes
+are formatted.  I could see the proper formatting for prologue and comment
+tags as well; their formats are unique compared to all the other tags.
+The other main uses I had for the document was in determining all the HTML
+tags which were not used as a pair (most use pairs, few don't), and for
+determining which tag attributes made a positive assertion just by their
+presence, without need for any associated values (most have values, few
+don't).
+
+   Thanks also to *Lincoln D. Stein* for publishing the popular CGI.pm
+module, which I found very useful in my programs.  Moreover, I have
+decided to emulate much of its functionality in some of my own modules, so
+I should give credit where its due for implementing that functionality
+first.  Lincoln should be pleased that I am following his advice (look
+under heading "BUGS" in CGI) and discarding his large and monolithic
+module in favor of simpler ones.
+
+SEE ALSO
+========
+
+   perl(1), CGI, Class::ParamParser.
+
+
+File: pm.info,  Node: CGI/FormMagick/Validator,  Next: CGI/Formalware,  Prev: CGI/FormMagick/TagMaker,  Up: Module List
+
+   CGI::FormMagick::Validator - validate data from FormMagick forms
+
+SYNOPSIS
+========
+
+   use CGI::FormMagick::Validator;
+
+DESCRIPTION
+===========
+
+   This module provides some common validation routines.  Validation
+routines return the string "OK" if they succeed, or a descriptive message
+if they fail.
+
+Validation routines provided:
+-----------------------------
+
+nonblank
+     The data is not an empty string : `$data ne ""'
+
+number
+     The data is a number (strictly speaking, data is a positive number):
+     `$data =~ /^[0-9.]+$/'
+
+word
+     The data looks like a single word: `$data !~ /\W/'
+
+minlength(n)
+     The data is at least n characters long: `length($data) >= $n'
+
+maxlength(n)
+     The data is no more than  n characters long: `length($data) <= $n'
+
+exactlength(n)
+     The data is exactly  n characters long: `length($data) E== $n'
+
+lengthrange(n,m)
+     The data is between  n and c<m> characters long: `length($data) >= $n'
+     and `length($data) <= $m'.  =cut
+
+     sub lengthrange { 	my $data = $_[0]; 	my $minlength= $_[1]; 	my
+     $maxlength= $_[2]; 	print "min $minlength, max $maxlength";
+     if ( ( length($data) >= $minlength ) and (length($data) <=
+     $maxlength) ) { 	        return "OK"; 	} else { 		return
+     "This field must be between $minlength and $maxlength characters";
+     } }
+
+url
+     The data looks like a (normalish) URL: `$data =~
+     m!(http|ftp)://[\w/.-/)!'
+
+email
+     The data looks more or less like an internet email address: `$data =~
+     /\@/'
+
+     Note: not fully compliant with the entire gamut of RFC 822 addressing
+     ;)
+
+domain_name
+     The data looks like an internet domain name or hostname.
+
+ip_number
+     The data looks like a valid IP number.
+
+     The data looks like a good, valid username
+
+password
+     The data looks like a good password
+
+date
+     The data looks like a date.  Requires the Time::ParseDate module to be
+     installed.
+
+iso_country_code
+     The data is a standard 2-letter ISO country code.  Requires the
+     Locale::Country module to be installed.
+
+US_state
+     The data is a standard 2-letter US state abbreviation.  Uses
+     Geography::State in non-strict mode, so this module must be installed
+     for it to work.
+
+US_zipcode
+     The data looks like a valid US zipcode
+
+credit_card_type
+     The data looks like a valid type of credit card (eg Visa, Mastercard).
+     Requires Business::CreditCard to be installed.
+
+credit_card_number
+     The data looks like a valid credit card number.  Requires
+     Business::CreditCard to be installed.
+
+credit_card_expiry
+     The data looks like a valid credit card expiry date.  Requires
+     Business::CreditCard to be installed.
+
+Using more than one validation routine per field
+------------------------------------------------
+
+   You can use multiple validation routines like this:
+
+     VALUE="foo" VALIDATION="my_routine, my_other_routine"
+
+   However, there are some requirements on formatting to make sure that
+FormMagick can parse what you've given it.
+
+   * Parens are optional on subroutines with no args.  `my_routine' is
+     equivalent to `my_routine()'.
+
+   * You *MUST* put a comma then a space between routine names, eg
+     `my_routine, my_other_routine' *NOT* `my_routine,my_other_routine'.
+
+   * You *MUST NOT* put a comma between args to a routine, eg
+     `my_routine(1,2,3)' *NOT* `my_routine(1, 2, 3)'.
+
+   This will be fixed to be more flexible in a later release.
+
+Making your own routines
+------------------------
+
+   FormMagick's validation routines may be overridden and others may be
+added on a per-application basis.  To do this, simply define a subroutine
+in your CGI script that works in a similar way to the routines provided by
+CGI::FormMagick::Validator and use its name in the VALIDATION attribute in
+your XML.
+
+   The arguments passed to the validation routine are the value of the
+field (to be validated) and any subsequent arguments given in the
+VALIDATION attribute.  For example:
+
+     VALUE="foo" VALIDATION="my_routine"
+     ===> my_routine(foo)
+
+     VALUE="foo" VALIDATION="my_routine(42)"
+     ===> my_routine(foo, 42)
+
+   The latter type of validation routine is useful for routines like
+`minlength()' and `lengthrange()' which come with
+CGI::FormMagick::Validator.
+
+   Here's an example routine that you might write:
+
+     sub my_grep {
+         my $data = shift;
+         my @list = @_;
+         if (grep /$data/, @list) {
+             return "OK"
+         } else {
+             return "That's not one of: @list"
+         }
+     }
+
+AUTHOR
+======
+
+   Kirrily "Skud" Robert <skud@infotrope.net>
+
+   More information about FormMagick may be found at
+http://sourceforge.net/projects/formmagick/
+
+
+File: pm.info,  Node: CGI/Formalware,  Next: CGI/Imagemap,  Prev: CGI/FormMagick/Validator,  Up: Module List
+
+Convert an XML file into a suite of CGI forms.
+**********************************************
+
+NAME
+====
+
+   `CGI::Formalware' - Convert an XML file into a suite of CGI forms.
+
+SYNOPSIS
+========
+
+   In your browser, type: localhost/cgi-bin/x.pl
+
+   where x.pl contains nothing more than:
+
+     #!perl -w
+     use integer;
+     use strict;
+     use lib 'C:/Perl';
+     use lib 'C:/Perl/Scripts/General';	# Ie $PERL5LIB.
+     use CGI::Formalware;
+     my($form) = CGI::Formalware -> new({form2file => 1, debug => 1});
+     $form -> process();
+     exit(0);
+
+   Upon starting, `CGI::Formalware' asks for the name of your XML file,
+which is assumed to be in cgi-bin/.
+
+DESCRIPTION
+===========
+
+   To provide a type of repository for frequently used scripts, which can
+then be executed locally or remotely (via Net::Telnet), by just entering a
+password (for remote scripts), and clicking.
+
+INSTALLATION
+============
+
+   You install `CGI::Formalware', as you would install any perl module
+library, by running these commands:
+
+     perl Makefile.PL
+     make
+     make test
+     make install
+
+   If you want to install a private copy of `CGI::Formalware' in your home
+directory, then you should try to produce the initial Makefile with
+something like this command:
+
+     perl Makefile.PL LIB=~/perl
+     	or
+     perl Makefile.PL LIB=C:/Perl/Site/Lib
+
+   If, like me, you don't have permission to write man pages into unix
+system directories, use:
+
+     make pure_install
+
+   instead of make install. This option is secreted in the middle of p 414
+of the second edition of the dromedary book.
+
+AUDIENCE
+========
+
+   Webmasters.
+
+SECURITY
+========
+
+   None. Even worse, `CGI::Formalware' is designed to circumvent a web
+server's concept of what Apache calls DocumentRoot.
+
+CONSTRUCTOR new
+===============
+
+   new takes either no parameters, or an anonymous hash. See the example
+above.  Keys and values recognized are:
+
+   * debug => 1 means turn on debugging. At the moment this opens and
+     closes the file CGI-Formalware.log, but does not write anything to it
+
+   * form2file => 1 means output each form to a file, using the name given
+     by the form's formFileName attribute. The forms are written to
+     cgi-bin/.  If the form has no such attribute, this option is ignored.
+     See example below
+
+   * timeScripts => 1 means report elapsed time at the end of each
+     script's output
+
+HIGHLIGHTS
+==========
+
+   * Read an XML file, whose format is fixed, and generate a suite of CGI
+     forms
+
+   * A cascading style sheet can be specified for each form individually
+
+   * A Table of Contents may appear on each form
+
+   * Each form is more-or-less assumed to contain a list of scripts
+
+   * Tokens in the XML correspond to a few functions available in Lincoln
+     Stein's CGI.pm. Available tokens are:
+
+        * fileField
+
+               <fileField
+               	name		= 'fileName'
+               	prompt		= 'Filename: '
+               	size		= '60'
+               	override	= '0'
+               />
+
+        * horizontalRule
+
+               <horizontalRule />
+
+        * paragraph
+
+               <paragraph />
+
+               <paragraph text = 'Output a comment' />
+
+        * radioGroup
+
+               <radioGroup
+               	name		= 'serverName'
+               	prompt		= 'Server name: '
+               	value		= 'Example|Simple|Test'
+               	columns		= '1'	# Optional. Defaults to '1'. Use a string, not a digit
+               />
+
+        * textField
+
+               <textField
+               	name		= 'username'
+               	prompt		= 'Username: '
+               	value		= ''
+               	size		= '15'
+               	override	= '0'
+               />
+
+     Over time, more functions will be added.
+
+   * A textField with the name 'password' is treated as a password field.
+     Also, the entity 'script' defines a Unix- or DOS-type batch file
+
+   * These entities produce on-screen fields, or, in the case of the
+     scripts, a vertical array of radio buttons
+
+   * So, to run a script you fill in whatever fields the script uses and
+     then select that script
+
+   * Macros in the scripts, eg %fileName% are expanded with the current
+     value of the field whose name appears between the % signs
+
+   * A script whose last line is 'ftp -n -v' is recognized and handled
+     specially.  Your form must contain textFields called 'host',
+     'username' and 'password' and 'fileName'. A binary 'get' is
+     performed. This will be made more flexible one day
+
+   * Scripts have an attribute 'type', which can be 'local' or 'remote'.
+
+     Remote scripts are passed to Net::Telnet, on the assumption that you
+     know what you are doing. Your form must contain textFields called
+     'host', 'username' and 'password'
+
+NAVIGATION
+==========
+
+   Forms are linked with 'Previous form', 'Next form' buttons.
+
+   Any previously-entered textFields, except those whose name is
+'password', are remembered when you return to a form. This is very
+convenient.
+
+   The password values are zapped by CGI.pm, not by me. This is a security
+feature.  It means you can walk away from your system and not have someone
+gain automatic access to a remote system.
+
+CASCADING STYLE SHEETS
+======================
+
+   Each form entity may have a 'css' attribute, giving the name of the CSS
+file for that form. These attribute values are like '/CGI-Formalware.css',
+which, under Apache, means this value is prefixed with DocumentRoot. That
+is, the path to the CSS is a URI, and will not be seen if in cgi-bin/.
+
+   The compulsory elements are: H1, H2 and P.TOC.
+
+   Herewith a sample:
+
+     H1
+     {
+     	font-size:			20pt;
+     	alignment:			center;
+     	color:				teal;
+     }
+
+     H2
+     {
+     	font-size:			16pt;
+     	font-style:			italic;
+     	color:				maroon;
+     }
+
+     P.TOC
+     {
+     	font-size:			12pt;
+     	color:				white;
+     	background-color:	blue;
+     }
+
+ENVIRONMENT VARIABLES
+=====================
+
+   None.
+
+INPUT DATA VALIDATION
+=====================
+
+   These checks are performed:
+
+   * Each forms entity may have a 'tocEntry' attribute. If present, and if
+     the tocVisible attribute is 'true', then a Table of Contents is put on
+     each form, headed by this text. The default is 'Contents'
+
+   * Each forms entity may have a 'tocVisible' attribute. If its value is
+     'True', then a Table of Contents is put on each form, headed by the
+     value of 'tocEntry'. The default is 'True'
+
+   * Each form entity must have 'heading' and 'tocEntry' attributes
+
+   * Each form entity must have a unique 'heading' attribute
+
+   * Each form entity may have a unique 'formFileName' attribute. If
+     present, then this file name is used to output the form to a file if
+     the constructor option new({form2file => 1}) is used
+
+   * Each fileField entity must have 'name', 'prompt', 'value' and 'size'
+     attributes
+
+   * Each textField entity must have 'name', 'prompt', 'value' and 'size'
+     attributes
+
+   * Each scripts entity must have a 'heading' attribute
+
+   * Each script entity must have 'heading', 'type' and 'line' attributes
+
+   * Each script entity must have a unique 'heading' attribute
+
+   * Each script entity's 'type' attribute must be 'local' or 'remote'
+
+XML DTD
+=======
+
+   TBA.
+
+XML FILE FORMAT
+===============
+
+   Herewith a sample:
+
+     <forms
+     	tocEntry	= 'Forms'
+     	tocVisible	= 'True'
+     >
+     <form
+     	heading			= 'Unix Command Menu'
+     	tocEntry		= 'Unix menu'
+     	css				= '/CGI-Formalware.css'
+     	formFileName	= '1.html'
+     >
+     	<horizontalRule />
+
+     <radioGroup
+     	name	= 'host'
+     	prompt	= 'Host: '
+     	value	= 'bigBox|littleBox'
+     />
+
+     <paragraph />
+
+     <textField
+     	name		= 'username'
+     	prompt		= 'Username: '
+     	value		= ''
+     	size		= '15'
+     	override	= '0'
+     />
+
+     <textField
+     	name		= 'password'
+     	prompt		= '  Password: '
+     	value		= ''
+     	size		= '15'
+     	override	= '0'
+     />
+
+     <horizontalRule />
+
+     <scripts
+     	heading			= 'Unix Scripts'
+     	numberScripts	= 'Yes'
+     >
+     	<script
+     		heading		= 'Files in home directory'
+     		type		= 'remote'
+     		line1		= 'dir'
+     	/>
+     	<script
+     		heading		= 'Tags in repository'
+     		type		= 'remote'
+     		line1		= 'cd $M'
+     		line2		= 'getTags'
+     	/>
+     </scripts>
+     	</form>
+
+     <form
+     	heading		= 'DOS Command Menu'
+     	tocEntry	= 'DOS menu'
+     >
+
+     <horizontalRule />
+
+     <radioGroup
+     	name	= 'host'
+     	prompt	= 'Host: '
+     	value	= 'bigBox|littleBox'
+     />
+
+     <paragraph text = 'Enter a username and a password.' />
+
+     <textField
+     	name		= 'username'
+     	prompt		= 'Username: '
+     	value		= ''
+     	size		= '15'
+     	override	= '0'
+     />
+
+     <textField
+     	name		= 'password'
+     	prompt		= '  Password: '
+     	value		= ''
+     	size		= '15'
+     	override	= '0'
+     />
+
+     <horizontalRule />
+
+     <fileField
+     	name		= 'fileName'
+     	prompt		= 'Filename: '
+     	size		= '60'
+     	override	= '0'
+     />
+
+     <horizontalRule />
+
+     <scripts
+     	heading	= 'PC Scripts'
+     >
+
+     <script
+     	heading		= 'Files in root directory'
+     	type		= 'local'
+     	line1		= 'cd \'
+     	line2		= 'dir'
+     />
+     <script
+     	heading		= 'FTP something somewhere'
+     	type		= 'local'
+     	line1		= 'ftp -n -v'
+     />
+     <script
+     	heading		= 'Untar a file'
+     	type		= 'local'
+     	line1		= 'cd \'
+     	line2		= 'tar mxvzf %fileName%'
+     />
+     		</scripts>
+     	</form>
+     	</forms>
+
+NESTED FORMS
+============
+
+   Nope, I don't recognize them. Maybe one day...
+
+REQUIRED MODULES
+================
+
+   * CGI
+
+   * Net::Telnet
+
+   * XML::DOM
+
+AUTHOR
+======
+
+   `CGI::Formalware' was written by Ron Savage *<ron@savage.net.au>* in
+1999.
+
+   Copyright (c) 1999 Ron Savage.
+
+   Available from http://savage.net.au/Perl.html.
+
+LICENCE
+=======
+
+   This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+File: pm.info,  Node: CGI/Imagemap,  Next: CGI/Lite,  Prev: CGI/Formalware,  Up: Module List
+
+imagemap behavior for CGI programs
+**********************************
+
+NAME
+====
+
+   CGI::Imagemap.pm - imagemap behavior for CGI programs
+
+SYNOPSIS
+========
+
+     use CGI::Imagemap;
+     
+     $map = new CGI::Imagemap;
+     $map->setmap(@map);
+     $action = $map->action($x,$y);
+     
+     -- or --
+
+     use CGI::Imagemap 'action_map';
+     
+     $action = action_map($x,$y,@map);
+
+DESCRIPTION
+===========
+
+   CGI::Imagemap allows CGI programmers to place TYPE=IMAGE form fields on
+their HTML fill-out forms, with either client-side or server-side maps
+emulated.
+
+   The imagemap file follows that of the NCSA imagemap program.  Each point
+is an x,y tuple.  Each line in the map consists of one of the following
+formats.  Comment lines start with "#".
+
+     circle action center edgepoint
+     rect action upperleft lowerright
+     point action point
+     poly action point1 point2 ... pointN
+     default action
+
+   Using "point" and "default" in the same map makes no sense. If "point"
+is used, the action for the closest one is selected.
+
+   To use CGI::Imagemap, define an image submit map on your form with
+something like:
+
+     <input type=image name=mv_todo
+          SRC="image_url">
+
+   You can pass a "client-side" imagemap like this:
+
+     <input type="hidden" name="todo.map"
+     		value="rect action1 0,0 25,20">
+     <input type="hidden" name="todo.map"
+     		value="rect action2 26,0 50,20">
+     <input type="hidden" name="todo.map"
+     		value="rect action3 51,0 75,20">
+     <input type="hidden" name="todo.map"
+     		value="default action0">
+
+   If the @map passed parameter contains a NUL (\0) in the first array
+position, the map is assumed to be null-separated and @map is built by
+splitting it.  This allows a null-separated todo.map with multiple values
+(parsed by a cgi-lib.pl or the like) to be referenced.
+
+   All of the following examples assume the above definitions in your form.
+
+Static Methods
+--------------
+
+   CGI::Imagemap allows the export of two routines, *action_map* and
+*map_untaint*.   If you choose to use CGI::Imagemap statically, call the
+module with:
+
+     use CGI::Imagemap qw(action_map map_untaint);
+
+action_map(x,y,map)
+     We are assuming the map definition above, with the *type=image*
+     variable named todo, and the map in *todo.map*. You can pass the map
+     in one of two ways.  The first is compatible with the CGI.pm (or
+     CGI::*) modules, and passes the map as an array:
+
+          $query = new CGI;
+          my $x = $query->param('todo.x');
+          my $y = $query->param('todo.y');
+          my $map = $query->param('todo.map');
+          $action = action_map($x, $y, $map);
+
+     If you are using the old *cgi-lib.pl* library, which places multiple
+     instances of the same form variable in a scalar, separated by null
+     (\0) characters, you can do this:
+
+          ReadParse(*FORM);
+          my $x = $FORM{'todo.x'};
+          my $y = $FORM{'todo.y'};
+          my $map = $FORM{'todo.map'};
+          $action = action_map($x, $y, $map);
+
+map_untaint($untaint)
+     If you are running with taint checking, as is suggested for CGI
+     programs, you can use map_untaint(1) to set map untainting on a
+     global basis.  (If using class methods, each has its own instance of
+     untainting).
+
+     It ensures all characters in the action fit pattern of [-\w.+@]+,
+     meaning alphnumerics, underscores, dashes (-), periods, and the @
+     sign.  It also checks the methods (rect,poly,point,default,circle)
+     and ensures that points/tuples are only integers.  Once that is done,
+     it untaints the passed form variables.
+
+          map_untaint(1);    # Turns on untainting
+          map_untaint('yes');# Same as above
+
+          map_untaint(0);    # Disable untainting
+          map_untaint('no'); # Same as above
+          
+          $status = map_untaint(); # Get status
+
+     Default is no untainting.
+
+Class Methods
+-------------
+
+   The class methods for CGI::Imagemap are much the same as above, with the
+exception that multiple imagemaps are then maintained by the module, with
+full independence. The following method definitions assume the CGI::Form
+module is being used, like this:
+
+     use CGI::Form;
+     use CGI::Imagemap;
+
+     $query  = new CGI::Form;
+     $map    = new CGI::Imagemap;
+
+setmap(@map)
+     This sets the map for the instance.
+
+          $map = new CGI::Imagemap;
+          $map->setmap($query->param('todo.map'));
+
+addmap(@map)
+     This adds a new map action specification *to the current map*.
+
+          $map->addmap('point action5 3,9'));
+
+action(x,y)
+     This finds the action, based on the active map and the values of x
+     and y,
+
+          $x = $query->param('todo.x');
+          $y = $query->param('todo.y');
+          $action = $map->action($x, $y);
+
+untaint()
+     Sets, unsets, or returns the taint status for the instance.
+
+          $map->untaint(1);       # Turns on untainting
+          $map->untaint('yes');   # Same as above
+          $map->untaint(1);       # Disables untainting
+          $map->untaint('yes');   # Same as above
+          $status = $map->untaint(); # Get status
+
+version()
+     Returns the version number of the module.
+
+EXAMPLE
+=======
+
+   A couple of self-contained examples are included in the CGI::Imagemap
+package.  They are:
+
+     testmap     -  Uses the CGI::Form module
+     testmap.old -  Uses the old cgi-lib.pl
+
+BUGS
+====
+
+   The untainting stuff is not totally independent - threading might not
+work very well.  This can be fixed if it is important - in the CGI world,
+I doubt it.
+
+AUTHOR
+======
+
+   Mike Heins, Internet Robotics, <mikeh@iac.net>
+
+CREDITS
+=======
+
+   This work is heavily kited from the Perl imagemap program originally
+written by V. Khera <khera@kciLink.com>.
+
+
