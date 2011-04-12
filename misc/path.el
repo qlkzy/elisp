@@ -15,3 +15,5 @@
             (drm-custom-load (concat x "/" x "-init.el")))
           path))
 
+(defun drm-custom-path (path)
+  (concat drm-dot-emacs-customisation-path path))
