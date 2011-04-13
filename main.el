@@ -44,4 +44,5 @@
                  "fortunes"
                  "geiser"
                  "ccl"                  ;CCL standards stuff
+                 "git"
                  )
