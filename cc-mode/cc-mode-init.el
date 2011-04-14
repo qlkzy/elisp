@@ -96,7 +96,8 @@
   (setq semantic-symref-tool 'global))
 
 (defun c-mode-init ()
-  (local-set-key (kbd "C-c c o") 'drm-c-goto-other))
+  (local-set-key (kbd "C-c c o") 'drm-c-goto-other)
+  (setq comment-style 'extra-line))
 
 (defun c++-mode-init ()
   (local-set-key (kbd "C-c c o") 'drm-cpp-goto-other))
