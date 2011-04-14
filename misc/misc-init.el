@@ -370,5 +370,17 @@ enough room"
           (set-visited-file-name new-name)
           (set-buffer-modified-p nil))))))
 
+(defun replace-regexps-in-region (beg end &rest regexps)
+  (let ((curr regexps))
+    (while curr
+      (let ((from (car curr))
+            (to (cadr curr)))
+        (replace-regexp from
+                        to
+                        nil
+                        beg end)
+        (setq curr (cddr curr))))))
+
+
 (load-file "~/elisp/misc/misc-keys.el")
 
