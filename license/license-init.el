@@ -14,8 +14,13 @@
   (interactive
    (list
     (completing-read "License: " (license-get-licenses))))
-  (insert-file (concat license-dir name ".txt"))
-  (license-expand (region-beginning) (region-end)))
+  (let ((license-start (point)))
+    (insert-file (concat license-dir name ".txt"))
+    (goto-char (mark))
+    (insert "\n")
+    (let ((license-end (point)))
+      (license-expand license-start license-end)
+      (comment-region license-start license-end))))
 
 (defun license-expand (beg end)
   (apply 'replace-regexps-in-region 
