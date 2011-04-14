@@ -45,4 +45,5 @@
                  "geiser"
                  "ccl"                  ;CCL standards stuff
                  "git"
+                 "license"
                  )
