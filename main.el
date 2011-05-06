@@ -47,4 +47,5 @@
                  "git"
                  "license"
                  "changelog"
+                 "vbnet"
                  )
