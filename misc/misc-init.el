@@ -53,6 +53,7 @@
 ;; Make abbrev expansion work propely with MixedCase
 (setq dabbrev-case-fold-search nil)
 
+(setq-default ps-print-color-p 'black-white)
 (setq ps-print-color-p 'black-white)
 
 (setq ps-black-white-faces 
@@ -66,6 +67,7 @@
         (font-lock-variable-name-face "black" nil italic)
         (font-lock-warning-face "black" nil bold italic)))
 
+(setq ps-line-number t)
 
 ;; Set Up Load Path
 
