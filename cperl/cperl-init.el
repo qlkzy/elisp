@@ -26,7 +26,8 @@
   (add-to-list 'hs-special-modes-alist
                '(cperl-mode 
                  "{" "}" "^\\s*#" 
-                 nil nil)))
+                 nil nil))
+  (drm-install-shebang))
 
 ;; Specific things that don't seem to work in a hook
 

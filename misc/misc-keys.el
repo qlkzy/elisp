@@ -57,7 +57,16 @@
 
 
 ;; Other stuff
-(global-set-key (kbd "<f12>") 'drm-slotify-function)
+;; (global-set-key (kbd "<f12>") 'drm-slotify-function)
+(global-set-key (kbd "C-#") 'drm-bracket-replace)
+
+
+;; eshell
+(global-set-key (kbd "<f12>") 'eshell)
+
+;; fast text maniupulation
+(global-set-key (kbd "M-z") 'zap-up-to-char)
+(global-set-key (kbd "M-Z") 'zap-to-char)
 
 
 ;; Tags

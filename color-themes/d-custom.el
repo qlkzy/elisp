@@ -51,6 +51,8 @@
      (custom-state-face ((t (:foreground "dark green"))))
      (custom-variable-button-face ((t (:bold t :underline t))))
      (custom-variable-tag-face ((t (:foreground "blue" :underline t))))
+     (mumamo-background-chunk-major ((t (:background "#202030"))))
+     (mumamo-background-chunk-submode1 ((t (:background "#203020"))))
      (diary-face ((t (:foreground "red"))))
      (ediff-current-diff-face-A ((t (:foreground "firebrick" :background "pale green"))))
      (ediff-current-diff-face-Ancestor ((t (:foreground "Black" :background "VioletRed"))))

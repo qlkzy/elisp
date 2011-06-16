@@ -5,6 +5,8 @@
 (add-to-list 'interpreter-mode-alist '("python" . python-mode))
 
 (defun d-python-init-hook ()
-  (turn-on-font-lock))
+  (turn-on-font-lock)
+  (abbrev-mode t)
+  (drm-install-shebang))
 
 (add-hook 'python-mode-hook 'd-python-init-hook)

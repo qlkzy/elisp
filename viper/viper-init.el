@@ -14,7 +14,7 @@
 
 (setq viper-custom-file-name "~/elisp/viper/dotviper.el")
 
-;; (setq viper-mode t)
+(setq viper-mode t)
 (require 'viper)
 
 (setq viper-expert-level 5)

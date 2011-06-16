@@ -1,3 +1,4 @@
+
 ;;; CC-Mode Initialisation
 
 ;; load reqired files
@@ -92,7 +93,6 @@
   (local-set-key (kbd "C-c c t s") 'drm-cpp-new-boost-test-suite)
   (local-set-key (kbd "C-c c t c") 'drm-cpp-new-boost-test-case)
   (local-set-key (kbd "C-c c t a") 'drm-cpp-new-boost-ce-assertion)
-  (add-hook 'c-special-indent-hook 'drm-c-indent-case)
   (setq semantic-symref-tool 'global))
 
 (defun c-mode-init ()
