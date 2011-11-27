@@ -173,7 +173,7 @@
 (setq shift-select-mode nil)
 
 (when (>= emacs-major-version 23)
-  (set-face-font 'default "Inconsolata-9"))
+  (set-face-font 'default "Inconsolata-12"))
 
 
 (transient-mark-mode -1)
