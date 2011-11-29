@@ -47,4 +47,5 @@
                  "license"
                  "changelog"
                  "vbnet"
+                 "ido"
                  )
