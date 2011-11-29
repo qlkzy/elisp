@@ -48,4 +48,5 @@
                  "changelog"
                  "vbnet"
                  "ido"
+                 "rails"
                  )
