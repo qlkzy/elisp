@@ -49,4 +49,5 @@
                  "vbnet"
                  "ido"
                  "rails"
+                 "markdown"
                  )
