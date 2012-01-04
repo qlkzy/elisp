@@ -8,10 +8,10 @@
   ;; actually variable settings!
   (color-theme-install
    '(color-theme-d-custom
-     ((foreground-color . "#00FF00")
+     ((foreground-color . "#dddddd")
       (background-color . "#000000")
       (mouse-color . "black")
-      (cursor-color . "green")
+      (cursor-color . "#dddddd")
       (border-color . "green")
       (background-mode . dark))
      ((Man-overstrike-face . bold)
@@ -89,8 +89,8 @@
      (flyspell-duplicate-face ((t (:foreground "Gold3" :bold t :underline t))))
      (flyspell-incorrect-face ((t (:foreground "OrangeRed" :bold t :underline t))))
      (font-lock-builtin-face ((t (:foreground "#FFA000"))))
-     (font-lock-comment-face ((t (:foreground "#FF4040"))))
-     (font-lock-comment-delimiter-face ((t (:foreground "#FF4040"))))
+     (font-lock-comment-face ((t (:foreground "#904040"))))
+     (font-lock-comment-delimiter-face ((t (:foreground "#904040"))))
      (font-lock-doc-face ((t (:foreground "#E0E0E0"))))
      (font-lock-constant-face ((t (:foreground "#FFFFFF" :bold t))))
      (font-lock-function-name-face ((t (:foreground "#EEEE00" :bold t))))
