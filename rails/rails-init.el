@@ -38,7 +38,7 @@
 (defun drm-rhtml-init ()
   (rinari-launch)
   (abbrev-def-list local-abbrev-table
-    ("rbif" "" 'html-skeleton-if)
+    ("rbif" "" 'rhtml-skeleton-if)
     ("div" "" 'html-skeleton-div)
     ("span" "" 'html-skeleton-span)
     ("br" "<br/>" nil)

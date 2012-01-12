@@ -50,4 +50,6 @@
                  "ido"
                  "rails"
                  "markdown"
+                 "haml"
+                 "scss"
                  )
