@@ -52,4 +52,5 @@
                  "markdown"
                  "haml"
                  "scss"
+		 "yasnippet"
                  )
