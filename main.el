@@ -52,5 +52,6 @@
                  "markdown"
                  "haml"
                  "scss"
-		 "yasnippet"
+                 "yasnippet"
+                 "vhdl"
                  )
