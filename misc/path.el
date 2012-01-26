@@ -17,3 +17,7 @@
 
 (defun drm-custom-path (path)
   (concat drm-dot-emacs-customisation-path path))
+
+(defun drm-custom-load-path-install (path)
+  (add-to-list 'load-path
+               (drm-custom-path path)))

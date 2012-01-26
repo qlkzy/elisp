@@ -53,5 +53,6 @@
                  "haml"
                  "scss"
                  "yasnippet"
-                 "vhdl"
+                 "vhdl-mode"
+                 "magit"
                  )
