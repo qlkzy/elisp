@@ -9,11 +9,11 @@
 (defvar ccl-style-enforced nil
   "CCL coding standard is enforced")
 
-(when ccl-style-available
-    (drm-custom-load "cc-mode/ccl-coding-standard.el"))
+;; (when ccl-style-available
+    ;; (drm-custom-load "cc-mode/ccl-coding-standard.el"))
 
-(drm-custom-load "cc-mode/cc-mode-skeletons.el")
-(drm-custom-load "cc-mode/cc-mode-general-skeletons.el")
+;; (drm-custom-load "cc-mode/cc-mode-skeletons.el")
+;; (drm-custom-load "cc-mode/cc-mode-general-skeletons.el")
 
 (defun drm-c-pre-abbrev ()
   (if (nth 4 (syntax-ppss (point)))
@@ -341,7 +341,7 @@
 
 
 (add-hook 'c-mode-common-hook 'c-mode-general-init t)
-(add-hook 'c-mode-common-hook 'cc-mode-skeleton-init t)
+;; (add-hook 'c-mode-common-hook 'cc-mode-skeleton-init t)
 
 (add-hook 'c-mode-hook 'c-mode-init t)
 (add-hook 'c++-mode-hook 'c++-mode-init t)
