@@ -55,4 +55,6 @@
                  "yasnippet"
                  "vhdl-mode"
                  "magit"
+                 "uniquify"
+                 "cmake"
                  )
