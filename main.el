@@ -22,7 +22,7 @@
                  "latex"                ;standard latex mode - convert to auctex at some point
                  "csharp"               ;ugh
                  "asm"                  ;standard assembly language mode
-                 "icicles"              ;nice completion
+;                 "icicles"              ;nice completion
                  "mpasm"                ;PIC assembly mode - can't remember how finished it is
                  "org"                  ;org-mode - too fancy
                  "outline"              ;good old outline mode
@@ -58,3 +58,4 @@
                  "uniquify"
                  "cmake"
                  )
+
