@@ -198,7 +198,7 @@
 
 (setq comment-style 'indent)
 
-(windmove-default-keybindings 'control)
+(windmove-default-keybindings 'meta)
 
 (add-hook 'before-save-hook 'time-stamp)
 
