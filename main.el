@@ -37,7 +37,7 @@
                  "remember"             ;notes mode
                  ;; "viper"                ;vi has some nice features
                  "findr"
-                 ;; "cedet"
+                 "cedet"
                  "qmake"
                  "comment"
                  "fortunes"
