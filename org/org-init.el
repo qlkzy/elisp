@@ -35,6 +35,11 @@
 
 (org-remember-insinuate)
 
+(org-babel-do-load-languages
+ 'org-babel-load-languages
+ '((R . t)
+   (java . t)))
+
 (add-to-list 'org-agenda-files "~/notes/")
 
 (add-hook 'org-mode-hook 'drm-org-init)
