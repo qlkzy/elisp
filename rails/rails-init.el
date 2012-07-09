@@ -1,5 +1,3 @@
-(add-to-list 'load-path (drm-custom-path "rails/rinari"))
-(require 'rinari)
 
 (define-skeleton html-skeleton-div
   "" nil
