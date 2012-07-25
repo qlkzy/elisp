@@ -57,5 +57,6 @@
                  "magit"
                  "uniquify"
                  "cmake"
+                 "expand-region"
                  )
 
