@@ -102,15 +102,15 @@ unless horrible manual things are done."
      (concat
       "/*---------------------------------------"
       "--------------------------------------\n"
-      "NAME\n"
+      "NAME\n\n"
       name "\n\n"
       "DESCRIPTION\n\n"
       args "\n\n"
-      "RETURNS\n"
+      "RETURNS\n\n"
       ret "\n\n"
       "-----------------------------------------"
-      "------------------------------------*/\n"
-      (indent-region p (point))))))
+      "------------------------------------*/\n"))
+      (indent-region p (point))))
 
 ;; keybindings
 (define-prefix-command 'ccl-prefix-map)
@@ -206,6 +206,29 @@ unless horrible manual things are done."
       "\n"))))
 
 
+(defun ccl-insert-c-function-header-for-function-at-point ()
+  (interactive)
+  (let ((details (ccl-enclosing-function-name)))
+    (beginning-of-defun)
+    (ccl-insert-c-function-header (car details)
+                                  ""
+                                  (cadr details))))
+       
+(defun ccl-enclosing-function-name-and-return-type ()
+  (save-excursion
+    (beginning-of-defun)
+    (search-forward "(")
+    (backward-char)
+    (let ((e (point)))
+      (backward-sexp)
+      (let ((name (buffer-substring-no-properties (point) e)))
+        (backward-sexp)
+        (list name (buffer-substring-no-properties (point) 
+                                                   (progn
+                                                     (forward-sexp)
+                                                     (point))))))))
+
+
 ;; boilerplate keybindings
 (define-prefix-command 'ccl-boilerplate-map)
 (global-set-key (kbd "C-c s b") 'ccl-boilerplate-map)
@@ -216,3 +239,5 @@ unless horrible manual things are done."
                                     (ccl-insert-pod-boilerplate)))
 (global-set-key (kbd "C-c s b f") (lambda () (interactive)
                                     (ccl-insert-c-function-header "" "" "")))
+
+(global-set-key (kbd "C-c s b q") 'ccl-insert-c-function-header-for-function-at-point)

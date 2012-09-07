@@ -295,7 +295,21 @@
               (setq char (cdr (car special-chars))))
           (insert (format (concat line char "\n") i i i i))
           (setq i (+ i 1))))))
-  (beginning-of-buffer))
+  (beginning-of-buffer)
+  (ascii-table-mode))
+
+(define-derived-mode ascii-table-mode fundamental-mode
+  "ASCII-Table"
+  (suppress-keymap ascii-table-mode-map)
+  (local-set-key (kbd "q") (lambda () (interactive)
+                             (kill-buffer nil)))
+  (local-set-key (kbd "s") 'isearch-forward)
+  (local-set-key (kbd "j") 'forward-line)
+  (local-set-key (kbd "k") (lambda () (interactive)
+                             (forward-line -1)))
+  (local-set-key (kbd "n") 'forward-line)
+  (local-set-key (kbd "p") (lambda () (interactive)
+                             (forward-line -1))))
 
 
 (defun drm-map-across-buffers (cmd buffers)

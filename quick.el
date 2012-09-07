@@ -4,6 +4,14 @@
 
 (defun drm-compile-tests ()
   (interactive)
-  (if (string-match "test/$" default-directory)
-      (compile "make -C .. test")
-    (compile "make test")))
+    (compile 
+     (concat "make -C \""
+             (drm-find-parent-with-makefile-path default-directory)
+             "\" test")))
+
+(defun drm-find-parent-with-makefile-path (dir)
+  (if (directory-files dir nil "Makefile")
+      dir
+    (drm-find-parent-with-makefile-path
+     (concat dir "../"))))
+

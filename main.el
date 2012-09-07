@@ -29,7 +29,8 @@
                  "stripes"              ;funny highlighting
                  "graphviz"             ;edit .dot files
                  "mss"                  ;cool start menu hack
-                 "color-themes"         ;make things less ugly
+                 ;; "color-themes"         ;make things less ugly
+                 "tomorrow-theme"
                  "completion-ui"        ;don't think this is in use
                  "mini-wiki"            ;own crappy wiki
                  "typing"               ;typing tutor
