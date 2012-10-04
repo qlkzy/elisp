@@ -173,7 +173,7 @@
 (setq shift-select-mode nil)
 
 (when (>= emacs-major-version 23)
-  (set-face-font 'default "Inconsolata-14"))
+  (set-face-font 'default "Dejavu Sans Mono-14"))
 
 
 (transient-mark-mode -1)
@@ -197,8 +197,6 @@
 (set-scroll-bar-mode 'right)
 
 (setq comment-style 'indent)
-
-(windmove-default-keybindings 'meta)
 
 (add-hook 'before-save-hook 'time-stamp)
 

@@ -59,5 +59,6 @@
                  "uniquify"
                  "cmake"
                  "expand-region"
+                 "framemove"
                  )
 
