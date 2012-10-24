@@ -338,8 +338,6 @@
             (string= (current-word) "default"))
         (insert-tab))))
 
-
-
 (add-hook 'c-mode-common-hook 'c-mode-general-init t)
 ;; (add-hook 'c-mode-common-hook 'cc-mode-skeleton-init t)
 
