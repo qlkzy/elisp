@@ -438,5 +438,6 @@ enough room"
     ("shebang" "" 'drm-insert-shebang)))
 
 
-(load-file "~/elisp/misc/misc-keys.el")
+(drm-custom-load "misc/misc-keys.el")
 
+(drm-custom-load "misc/eperiodic.el")
