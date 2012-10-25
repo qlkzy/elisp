@@ -60,5 +60,6 @@
                  "cmake"
                  "expand-region"
                  "framemove"
+                 "haskell"
                  )
 
