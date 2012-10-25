@@ -108,10 +108,16 @@ value of mini-wiki-link-regex"
   (set (make-local-variable 'mini-wiki-pages-list)
        (mini-wiki-scan-pages)))
 
+(defun mini-wiki-make-homepage ()
+  (interactive)
+  (goto-char (point-min))
+  (mini-wiki-make-page "HomePage"))
+
 (define-derived-mode mini-wiki-mode fundamental-mode 
   "Mini-Wiki"
   "Major mode for editing mini-wiki files"
   (mini-wiki-setup-font-lock)
   (mini-wiki-setup-keymap)
   (mini-wiki-setup-pagelist)
+  (longlines-mode)
   (mini-wiki-refresh-font-lock))

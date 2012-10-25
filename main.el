@@ -61,5 +61,6 @@
                  "expand-region"
                  "framemove"
                  "haskell"
+                 "arduino"
                  )
 
