@@ -1,6 +1,6 @@
 ;;; MATLAB mode
 
-(load-file "~/elisp/matlab/matlab-skeletons.el")
+(drm-custom-load "matlab/matlab-skeletons.el")
 
 (autoload 'matlab-mode "matlab" "Matlab Editing Mode" t)
 

@@ -12,7 +12,7 @@
                               :foreground nil
                               :background nil)))
 
-(setq viper-custom-file-name "~/elisp/viper/dotviper.el")
+(setq viper-custom-file-name (drm-custom-path "viper/dotviper.el"))
 
 (setq viper-mode t)
 (require 'viper)

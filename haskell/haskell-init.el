@@ -1,10 +1,11 @@
-(progn
-  (cd "~/elisp/haskell")
+(let ((d default-directory))
+  (cd (drm-custom-path "haskell"))
   (normal-top-level-add-subdirs-to-load-path)
-  (cd "~/"))
+  (cd d))
 
 (add-hook 'haskell-mode-hook
           (lambda ()
+            (drm-custom-load "haskell/inf-haskell")
             (setq comment-padding " ")
             (setq comment-start "--")))
 
@@ -14,3 +15,5 @@
         "Major mode for editing Haskell scripts." t)
 (autoload 'literate-haskell-mode "haskell-mode"
   "Major mode for editing literate Haskell scripts." t)
+
+(require 'inf-haskell)

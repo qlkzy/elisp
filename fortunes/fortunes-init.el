@@ -1,1 +1,1 @@
-(load-file "~/elisp/fortunes/drm-fortunes.el")
+(drm-custom-load "fortunes/drm-fortunes.el")

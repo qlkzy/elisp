@@ -8,9 +8,9 @@
 
 ;; Load Other Misc Files
 
-(load-file "~/elisp/misc/humour.el")
-(load-file "~/elisp/misc/keywiz.el")
-(load-file "~/elisp/misc/w32-fullscreen.el")
+(drm-custom-load "misc/humour.el")
+(drm-custom-load "misc/keywiz.el")
+(drm-custom-load "misc/w32-fullscreen.el")
 
 ;; Other modules we would like
 (require 'generic-x)
@@ -70,14 +70,6 @@
         (font-lock-warning-face "black" nil bold italic)))
 
 (setq ps-line-number t)
-
-;; Set Up Load Path
-
-(progn 
-  (cd "~/elisp")
-  (normal-top-level-add-subdirs-to-load-path) 
-  (cd "~/"))
-
 
 ;; Set Up Indentation &c.
 
@@ -172,8 +164,13 @@
 
 (setq shift-select-mode nil)
 
+;; select font size based on screen size
 (when (>= emacs-major-version 23)
-  (set-face-font 'default "Dejavu Sans Mono-14"))
+  (set-face-font 
+   'default 
+   (if (eq drm-fontsize 'large)
+       "Dejavu Sans Mono-14"
+     "Dejavu Sans Mono-12")))
 
 
 (transient-mark-mode -1)
@@ -437,6 +434,13 @@ enough room"
   (abbrev-def-list local-abbrev-table
     ("shebang" "" 'drm-insert-shebang)))
 
+(defun toggle-fullscreen ()
+  "Toggle full screen on X11"
+  (interactive)
+  (when (eq window-system 'x)
+    (set-frame-parameter
+     nil 'fullscreen
+     (when (not (frame-parameter nil 'fullscreen)) 'fullboth))))
 
 (drm-custom-load "misc/misc-keys.el")
 

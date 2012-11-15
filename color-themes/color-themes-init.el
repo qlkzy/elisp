@@ -15,9 +15,9 @@ one activated"
 
 (setq color-theme-history-max-length 2)
 
-(load-file "~/elisp/color-themes/d-custom.el")
-(load-file "~/elisp/color-themes/peril-sensitive-sunglasses.el") ;-)
-(load-file "~/elisp/color-themes/color-theme-djcb-dark.el")
+(drm-custom-load "color-themes/d-custom.el")
+(drm-custom-load "color-themes/peril-sensitive-sunglasses.el") ;-)
+(drm-custom-load "color-themes/color-theme-djcb-dark.el")
 
 (drm-color-theme-switch color-theme-d-custom)
 

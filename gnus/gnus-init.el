@@ -1,2 +1,2 @@
-(setq gnus-directory "~/elisp/gnus/")
-(load-file "~/elisp/gnus/.gnus.el")
+(setq gnus-directory (drm-custom-path "gnus/"))
+(drm-custom-load "gnus/.gnus.el")

@@ -1,4 +1,4 @@
 ;;; Custom Stuff
 
-(load-file "~/elisp/util/perl.el")
-(load-file "~/elisp/util/util-keys.el")
+(drm-custom-load "util/perl.el")
+(drm-custom-load "util/util-keys.el")

@@ -2,7 +2,7 @@
 
 (require 'compile)
 
-(load "~/elisp/csharp/csharp-skeletons.el")
+(drm-custom-load "csharp/csharp-skeletons.el")
 
 (autoload 'csharp-mode 
   "csharp-mode" "Major mode for editing C# code." t)
