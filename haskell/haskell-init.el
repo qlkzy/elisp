@@ -14,3 +14,9 @@
         "Major mode for editing Haskell scripts." t)
 (autoload 'literate-haskell-mode "haskell-mode"
   "Major mode for editing literate Haskell scripts." t)
+
+(add-hook 'haskell-mode-hook 'turn-on-haskell-indent)
+
+;; (setq haskell-program-name "ghci")
+
+(require 'inf-haskell)

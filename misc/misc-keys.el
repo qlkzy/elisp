@@ -25,6 +25,7 @@
 (global-set-key (kbd "C-c h t") 'totd)
 (global-set-key (kbd "C-c r") 'reload-dot-emacs)
 
+(global-set-key [f11] 'toggle-fullscreen)
 
 
 ;; Buffer manipulation
@@ -73,6 +74,11 @@
 (global-set-key (kbd "S-C-<right>") 'enlarge-window-horizontally)
 (global-set-key (kbd "S-C-<down>") 'shrink-window)
 (global-set-key (kbd "S-C-<up>") 'enlarge-window)
+
+;; compile
+(define-prefix-command 'drm-build-map)
+(global-set-key (kbd "C-c SPC") 'drm-build-map)
+(global-set-key (kbd "C-c SPC SPC") 'compile)
 
 
 ;; Tags
