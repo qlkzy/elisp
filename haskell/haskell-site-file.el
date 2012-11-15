@@ -7,8 +7,8 @@
 
 
 
-;;;### (autoloads (haskell-c-mode) "haskell-c" "haskell-c.el" (18170
-;;;;;;  47169))
+;;;### (autoloads (haskell-c-mode) "haskell-c" "haskell-c.el" (20607
+;;;;;;  56372))
 ;;; Generated autoloads from haskell-c.el
 
 (add-to-list 'auto-mode-alist '("\\.hsc\\'" . haskell-c-mode))
@@ -21,7 +21,7 @@ Major mode for Haskell FFI files.
 ;;;***
 
 ;;;### (autoloads (haskell-cabal-mode) "haskell-cabal" "haskell-cabal.el"
-;;;;;;  (18231 1867))
+;;;;;;  (20607 56372))
 ;;; Generated autoloads from haskell-cabal.el
 
 (add-to-list 'auto-mode-alist '("\\.cabal\\'" . haskell-cabal-mode))
@@ -34,7 +34,7 @@ Major mode for Cabal package description files.
 ;;;***
 
 ;;;### (autoloads (haskell-decl-scan-mode) "haskell-decl-scan" "haskell-decl-scan.el"
-;;;;;;  (18271 24057))
+;;;;;;  (20607 56372))
 ;;; Generated autoloads from haskell-decl-scan.el
 
 (autoload 'haskell-decl-scan-mode "haskell-decl-scan" "\
@@ -84,7 +84,7 @@ Invokes `haskell-decl-scan-mode-hook'.
 ;;;***
 
 ;;;### (autoloads (haskell-doc-show-type haskell-doc-mode) "haskell-doc"
-;;;;;;  "haskell-doc.el" (18271 24003))
+;;;;;;  "haskell-doc.el" (20607 56372))
 ;;; Generated autoloads from haskell-doc.el
 
 (autoload 'haskell-doc-mode "haskell-doc" "\
@@ -107,7 +107,7 @@ current buffer.
 ;;;***
 
 ;;;### (autoloads (haskell-indent-mode) "haskell-indent" "haskell-indent.el"
-;;;;;;  (18271 24057))
+;;;;;;  (20607 56372))
 ;;; Generated autoloads from haskell-indent.el
 
 (autoload 'haskell-indent-mode "haskell-indent" "\
@@ -144,7 +144,7 @@ Invokes `haskell-indent-hook' if not nil.
 ;;;***
 
 ;;;### (autoloads (haskell-hoogle literate-haskell-mode haskell-mode)
-;;;;;;  "haskell-mode" "haskell-mode.el" (18271 25098))
+;;;;;;  "haskell-mode" "haskell-mode.el" (20607 56372))
 ;;; Generated autoloads from haskell-mode.el
 
 (autoload 'haskell-mode "haskell-mode" "\
@@ -200,8 +200,8 @@ Do a Hoogle search for QUERY.
 
 ;;;### (autoloads (inferior-haskell-find-haddock inferior-haskell-find-definition
 ;;;;;;  inferior-haskell-info inferior-haskell-type inferior-haskell-load-file
-;;;;;;  switch-to-haskell) "inf-haskell" "inf-haskell.el" (18231
-;;;;;;  1814))
+;;;;;;  switch-to-haskell) "inf-haskell" "inf-haskell.el" (20607
+;;;;;;  56372))
 ;;; Generated autoloads from inf-haskell.el
 
 (defalias 'run-haskell 'switch-to-haskell)
@@ -255,8 +255,8 @@ we load it.
 ;;;***
 
 ;;;### (autoloads nil nil ("haskell-font-lock.el" "haskell-ghci.el"
-;;;;;;  "haskell-hugs.el" "haskell-simple-indent.el") (18271 25750
-;;;;;;  579943))
+;;;;;;  "haskell-hugs.el" "haskell-init.el" "haskell-simple-indent.el")
+;;;;;;  (20626 42404 241831))
 
 ;;;***
 

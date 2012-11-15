@@ -1,5 +1,5 @@
 (setq viper-inhibit-startup-message t)
-(setq viper-expert-level 5
+(setq-default viper-expert-level 5
       viper-want-emacs-keys-in-vi t
       viper-want-emacs-keys-in-insert t
       viper-no-multiple-esc nil
