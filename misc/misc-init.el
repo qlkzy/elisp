@@ -10,7 +10,7 @@
 
 (load-file "~/elisp/misc/humour.el")
 (load-file "~/elisp/misc/keywiz.el")
-(load-file "~/elisp/misc/w32-fullscreen.el")
+;; (load-file "~/elisp/misc/w32-fullscreen.el")
 
 ;; Other modules we would like
 (require 'generic-x)
@@ -437,6 +437,15 @@ enough room"
   (abbrev-def-list local-abbrev-table
     ("shebang" "" 'drm-insert-shebang)))
 
+(defun toggle-fullscreen ()
+  "Toggle full screen on X11"
+  (interactive)
+  (when (eq window-system 'x)
+    (set-frame-parameter
+     nil 'fullscreen
+     (when (not (frame-parameter nil 'fullscreen)) 'fullboth))))
+
+(global-set-key [f11] 'toggle-fullscreen)
 
 (drm-custom-load "misc/misc-keys.el")
 
