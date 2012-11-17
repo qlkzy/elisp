@@ -1,4 +1,4 @@
-(setq inferior-lisp-program "clisp")
-(add-to-list 'load-path "~/elisp/slime")
+(setq inferior-lisp-program "sbcl")
+(add-to-list 'load-path "~/elisp/vendor/slime")
 (require 'slime)
 (slime-setup)
