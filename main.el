@@ -62,5 +62,6 @@
                  "framemove"
                  "haskell"
                  "arduino"
+                 "spotify"
                  )
 
