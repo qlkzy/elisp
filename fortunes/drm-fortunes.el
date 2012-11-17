@@ -1,5 +1,5 @@
 (defvar drm-fortune-path
-  "~/elisp/fortunes/")
+  (drm-custom-path "fortunes/"))
 
 (defvar drm-fortune-files
   '("catv" "doc" "plan9" "fortunes" "openbsd" "freebsd"
@@ -9,7 +9,7 @@
 
 
 (defvar drm-fortune-file
-  "~/elisp/fortunes/fortunes.txt")
+  (drm-custom-path "fortunes/fortunes.txt"))
 
 (defvar drm-fortune-idle-delay
   10)

@@ -11,7 +11,7 @@
   "C:/Python26/python.exe"
   "Path to python executable")
 (defvar w32-fullscreen-toggletitle-cmd
-   "~/elisp/darkroom/w32toggletitle.py"
+   (drm-custom-path "darkroom/w32toggletitle.py")
    "Path to w32toggletitle.py")
 
 ;; ------ code -----

@@ -3,10 +3,10 @@
 (load-file (concat drm-dot-emacs-customisation-path "misc/path.el"))
 
 ;; Additional General Lisp
-(progn
-  (cd "~/elisp")
+(let ((d default-directory))
+  (cd drm-dot-emacs-customisation-path)
   (normal-top-level-add-subdirs-to-load-path)
-  (cd "~/"))
+  (cd d))
 
 
 (drm-custom-load "elisp/macros.el")
@@ -63,5 +63,6 @@
                  "haskell"
                  "arduino"
                  "spotify"
+                 "writing"
                  )
 

@@ -8,9 +8,8 @@
 
 ;; Load Other Misc Files
 
-(load-file "~/elisp/misc/humour.el")
-(load-file "~/elisp/misc/keywiz.el")
-;; (load-file "~/elisp/misc/w32-fullscreen.el")
+(drm-custom-load "misc/humour.el")
+(drm-custom-load "misc/keywiz.el")
 
 ;; Other modules we would like
 (require 'generic-x)
@@ -70,14 +69,6 @@
         (font-lock-warning-face "black" nil bold italic)))
 
 (setq ps-line-number t)
-
-;; Set Up Load Path
-
-(progn 
-  (cd "~/elisp")
-  (normal-top-level-add-subdirs-to-load-path) 
-  (cd "~/"))
-
 
 ;; Set Up Indentation &c.
 
@@ -172,9 +163,9 @@
 
 (setq shift-select-mode nil)
 
+;; select font size based on screen size
 (when (>= emacs-major-version 23)
   (set-face-font 'default "Dejavu Sans Mono-10"))
-
 
 (transient-mark-mode -1)
 

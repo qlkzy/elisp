@@ -1,4 +1,4 @@
-(load-file "~/elisp/custom-matlab/custom-matlab-vars.el")
+(drm-custom-load "custom-matlab/custom-matlab-vars.el")
 
 (defun custom-matlab-make-keyword-regex (strings)
     (regexp-opt strings))

@@ -3,7 +3,7 @@
 
 ;; Number Pad
 
-(load-file "~/elisp/misc/numpad-prefixes.el")
+(drm-custom-load "misc/numpad-prefixes.el")
 
 ;; Align
 
@@ -25,7 +25,11 @@
 (global-set-key (kbd "C-c h t") 'totd)
 (global-set-key (kbd "C-c r") 'reload-dot-emacs)
 
+(global-set-key [f11] 'toggle-fullscreen)
+<<<<<<< HEAD
+=======
 
+>>>>>>> 6e65e9793ed5ed6783c7b8e82c9b0a74ce4612a8
 
 ;; Buffer manipulation
 (define-prefix-command 'ctrl-c-b-map)
@@ -73,6 +77,11 @@
 (global-set-key (kbd "S-C-<right>") 'enlarge-window-horizontally)
 (global-set-key (kbd "S-C-<down>") 'shrink-window)
 (global-set-key (kbd "S-C-<up>") 'enlarge-window)
+
+;; build
+(define-prefix-command 'drm-build-prefix)
+(global-set-key (kbd "C-c SPC") 'drm-build-prefix)
+(global-set-key (kbd "C-c SPC SPC") 'compile)
 
 
 ;; Tags

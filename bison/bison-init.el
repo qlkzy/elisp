@@ -1,3 +1,1 @@
-;;
-
-(load-file "~/elisp/bison/bison-mode.el")
+(drm-custom-load "bison/bison-mode.el")
