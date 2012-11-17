@@ -173,7 +173,7 @@
 (setq shift-select-mode nil)
 
 (when (>= emacs-major-version 23)
-  (set-face-font 'default "Dejavu Sans Mono-14"))
+  (set-face-font 'default "Dejavu Sans Mono-10"))
 
 
 (transient-mark-mode -1)
