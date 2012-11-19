@@ -11,11 +11,6 @@
 
 (add-hook 'icicle-mode-hook 'drm-icicle-init)
 
-(let ((d default-directory))
-  (cd (drm-custom-path "icicles"))
-  (normal-top-level-add-subdirs-to-load-path)
-  (cd d))
-
 (load-library "hexrgb")
 (require 'two-column)
 (load-library "icicles")

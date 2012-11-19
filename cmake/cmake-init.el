@@ -1,5 +1,3 @@
-(drm-custom-load-path-install "cmake")
-
 (require 'cmake-mode)
  (setq auto-mode-alist
        (append '(("CMakeLists\\.txt\\'" . cmake-mode)

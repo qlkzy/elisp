@@ -1,8 +1,3 @@
-(let ((d default-directory))
-  (cd (drm-custom-path "haskell"))
-  (normal-top-level-add-subdirs-to-load-path)
-  (cd d))
-
 (add-hook 'haskell-mode-hook
           (lambda ()
             (drm-custom-load "haskell/inf-haskell")

@@ -1,4 +1,3 @@
-(drm-custom-load-path-install "framemove")
 (require 'framemove)
-(windmove-default-keybindings 'meta)
+(windmove-default-keybindings 'shift)
 (setq framemove-hook-into-windmove t)

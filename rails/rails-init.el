@@ -47,7 +47,6 @@
 (add-to-list 'auto-mode-alist
              '("Gemfile\\'" . ruby-mode))
 
-(add-to-list 'load-path (drm-custom-path "rails/rhtml"))
 (require 'rhtml-mode)
 (add-hook 'rhtml-mode-hook 'drm-rhtml-init)
 
