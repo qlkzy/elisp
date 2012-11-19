@@ -26,10 +26,6 @@
 (global-set-key (kbd "C-c r") 'reload-dot-emacs)
 
 (global-set-key [f11] 'toggle-fullscreen)
-<<<<<<< HEAD
-=======
-
->>>>>>> 6e65e9793ed5ed6783c7b8e82c9b0a74ce4612a8
 
 ;; Buffer manipulation
 (define-prefix-command 'ctrl-c-b-map)
