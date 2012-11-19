@@ -64,5 +64,6 @@
                  "arduino"
                  "spotify"
                  "writing"
+                 "paredit"
                  )
 
