@@ -1,2 +1,2 @@
 ;; findr initialisation
-(drm-custom-load "findr/findr.el")
+(drm-custom-load "findr/findr")

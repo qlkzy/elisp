@@ -2,7 +2,7 @@
 
 (load-library "hideshow")
 
-(drm-custom-load "hide-show/hide-show-keys.el")
+(drm-custom-load "hide-show/hide-show-keys")
 
 ;; (define-prefix-command 'hs-prefix-map)
 

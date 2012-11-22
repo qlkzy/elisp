@@ -1,4 +1,4 @@
 ;; Flex-mode customisations
 
 
-(drm-custom-load "flex/flex-mode.el")
+(drm-custom-load "flex/flex-mode")

@@ -1,4 +1,4 @@
 ;;; Custom Stuff
 
-(drm-custom-load "util/perl.el")
-(drm-custom-load "util/util-keys.el")
+(drm-custom-load "util/perl")
+(drm-custom-load "util/util-keys")

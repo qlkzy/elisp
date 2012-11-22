@@ -6,7 +6,7 @@
 (defalias 'perl-mode 'cperl-mode)
 
 ;; Load appropriate files
-(drm-custom-load "cperl/cperl-skeletons.el")
+(drm-custom-load "cperl/cperl-skeletons")
 
 
 ;; General Init Hook

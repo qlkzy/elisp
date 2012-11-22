@@ -3,7 +3,7 @@
 
 ;; Number Pad
 
-(drm-custom-load "misc/numpad-prefixes.el")
+(drm-custom-load "misc/numpad-prefixes")
 
 ;; Align
 

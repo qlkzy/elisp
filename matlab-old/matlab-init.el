@@ -1,6 +1,6 @@
 ;;; MATLAB mode
 
-(drm-custom-load "matlab/matlab-skeletons.el")
+(drm-custom-load "matlab/matlab-skeletons")
 
 (autoload 'matlab-mode "matlab" "Matlab Editing Mode" t)
 

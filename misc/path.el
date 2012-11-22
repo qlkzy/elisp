@@ -7,12 +7,12 @@
 
 (defun drm-custom-load (&rest path)
   (mapcar (lambda (x)
-            (load-file (concat drm-dot-emacs-customisation-path x)))
+            (load (concat drm-dot-emacs-customisation-path x)))
           path))
 
 (defun drm-custom-init (&rest path)
   (mapcar (lambda (x)
-            (drm-custom-load (concat x "/" x "-init.el")))
+            (drm-custom-load (concat x "/" x "-init")))
           path))
 
 (defun drm-custom-path (path)

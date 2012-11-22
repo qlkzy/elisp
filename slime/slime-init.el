@@ -1,4 +1,4 @@
-(setq inferior-lisp-program "sbcl")
+(setq inferior-lisp-program "clisp")
 (require 'slime)
 (slime-setup)
 (require 'info-look)

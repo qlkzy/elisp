@@ -1,1 +1,1 @@
-(drm-custom-load "geiser/elisp/geiser.el")
+(drm-custom-load "geiser/elisp/geiser")

@@ -8,8 +8,8 @@
 
 ;; Load Other Misc Files
 
-(drm-custom-load "misc/humour.el")
-(drm-custom-load "misc/keywiz.el")
+(drm-custom-load "misc/humour")
+(drm-custom-load "misc/keywiz")
 
 ;; Other modules we would like
 (require 'generic-x)
@@ -438,6 +438,6 @@ enough room"
 
 (global-set-key [f11] 'toggle-fullscreen)
 
-(drm-custom-load "misc/misc-keys.el")
+(drm-custom-load "misc/misc-keys")
 
-(drm-custom-load "misc/eperiodic.el")
+(drm-custom-load "misc/eperiodic")

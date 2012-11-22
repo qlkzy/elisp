@@ -1,4 +1,4 @@
-(drm-custom-load "spotify/spotify.el")
+(drm-custom-load "spotify/spotify")
 
 (define-prefix-command 'music-control)
 (global-set-key (kbd "C-c m") 'music-control)

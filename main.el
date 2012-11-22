@@ -9,7 +9,7 @@
   (cd d))
 
 
-(drm-custom-load "elisp/macros.el")
+(drm-custom-load "elisp/macros")
 
 (drm-custom-init "misc"                 ;general stuff
                  "cperl"                ;nice perl mode

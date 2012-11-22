@@ -1,1 +1,1 @@
-(drm-custom-load "haml/haml-mode/haml-mode.el")
+(drm-custom-load "haml/haml-mode/haml-mode")

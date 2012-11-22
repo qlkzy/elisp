@@ -1,1 +1,1 @@
-(drm-custom-load "mss/mss.el")
+(drm-custom-load "mss/mss")

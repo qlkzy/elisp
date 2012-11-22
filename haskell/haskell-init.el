@@ -13,6 +13,6 @@
 
 (add-hook 'haskell-mode-hook 'turn-on-haskell-indent)
 
-;; (setq haskell-program-name "ghci")
+(setq haskell-program-name "ghci")
 
 (require 'inf-haskell)

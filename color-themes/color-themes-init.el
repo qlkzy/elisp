@@ -15,9 +15,9 @@ one activated"
 
 (setq color-theme-history-max-length 2)
 
-(drm-custom-load "color-themes/d-custom.el")
-(drm-custom-load "color-themes/peril-sensitive-sunglasses.el") ;-)
-(drm-custom-load "color-themes/color-theme-djcb-dark.el")
+(drm-custom-load "color-themes/d-custom")
+(drm-custom-load "color-themes/peril-sensitive-sunglasses") ;-)
+(drm-custom-load "color-themes/color-theme-djcb-dark")
 
 (drm-color-theme-switch color-theme-d-custom)
 

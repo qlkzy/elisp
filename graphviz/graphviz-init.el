@@ -1,4 +1,4 @@
 ;; graphviz dot mode for emacs
 ;;
 
-(drm-custom-load "graphviz/graphviz-dot-mode.el")
+(drm-custom-load "graphviz/graphviz-dot-mode")

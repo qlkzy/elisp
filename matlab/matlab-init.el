@@ -1,6 +1,6 @@
 ;;; Matlab mode customisations
 
-(drm-custom-load "matlab/matlab-mode.el")
+(drm-custom-load "matlab/matlab-mode")
 
 
 (add-to-list 'auto-mode-alist 
@@ -13,5 +13,5 @@
        "end"
        "%" nil nil))
 
-(drm-custom-load "matlab/matlab-skeletons.el")
+(drm-custom-load "matlab/matlab-skeletons")
 

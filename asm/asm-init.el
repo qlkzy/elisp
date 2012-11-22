@@ -1,6 +1,6 @@
 ;;; Customisations for assembly language mode
 
-(drm-custom-load "asm/asm-skeletons.el")
+(drm-custom-load "asm/asm-skeletons")
 
 (defun asm-outdent ()
   (interactive)
