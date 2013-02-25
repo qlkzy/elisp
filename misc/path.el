@@ -5,9 +5,15 @@
 ;;       x
 ;;     (list x)))
 
-(defun drm-custom-load (&rest path)
+
+(defun drm-custom-load-file (&rest path)
   (mapcar (lambda (x)
-            (load (concat drm-dot-emacs-customisation-path x)))
+            (load-file (concat drm-dot-emacs-customisation-path x)))
+          path))
+
+(defun drm-custom-load (&rest path)
+  (mapcar (lambda (x) 
+            (drm-custom-load-file (concat x ".el")))
           path))
 
 (defun drm-custom-init (&rest path)

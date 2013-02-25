@@ -10,4 +10,5 @@
   ;; (drm-install-shebang))
 
 ;; (add-hook 'python-mode-hook 'd-python-init-hook)
-(require 'python)
+(load-file "~/elisp/python/python.el")
+;; (require 'python)

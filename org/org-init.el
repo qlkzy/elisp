@@ -33,7 +33,7 @@
     ;; use handy keys for really basic features
     ((kbd "C-j") 'org-insert-subheading)))
 
-(org-remember-insinuate)
+;; (org-remember-insinuate)
 
 (org-babel-do-load-languages
  'org-babel-load-languages

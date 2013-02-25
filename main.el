@@ -22,14 +22,14 @@
                  "latex"                ;standard latex mode - convert to auctex at some point
                  "csharp"               ;ugh
                  "asm"                  ;standard assembly language mode
-;                 "icicles"              ;nice completion
+                 ;; "icicles"              ;nice completion (does not play nice with stuff
                  "mpasm"                ;PIC assembly mode - can't remember how finished it is
                  "org"                  ;org-mode - too fancy
                  "outline"              ;good old outline mode
                  "stripes"              ;funny highlighting
                  "graphviz"             ;edit .dot files
                  "mss"                  ;cool start menu hack
-                 ;; "color-themes"         ;make things less ugly
+                 ;; "color-themes"         ;make things less ugly --DEPRECATED--
                  "tomorrow-theme"
                  "completion-ui"        ;don't think this is in use
                  "mini-wiki"            ;own crappy wiki
@@ -44,7 +44,7 @@
                  "fortunes"
                  "geiser"
                  "ccl"                  ;CCL standards stuff
-                 ;; "git"
+                 ;; "git"                  ;add git to VC -- NOW USING MAGIT
                  "license"
                  "changelog"
                  "vbnet"
