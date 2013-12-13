@@ -412,11 +412,12 @@ enough room"
 
 (defvar drm-shebang-lines
   '(("\\.py\\'" . "/usr/bin/env python")
-    ("\\.pl\\'" . "/usr/bin/env perl")))
+    ("\\.pl\\'" . "/usr/bin/perl")
+    ("\\.sh\\'" . "/bin/bash")))
 
 (defun drm-insert-shebang ()
   (interactive)
-  (insert (concat "#! " 
+  (insert (concat "#!"
                   (assoc-default (buffer-file-name) drm-shebang-lines
                                  'string-match))))
 

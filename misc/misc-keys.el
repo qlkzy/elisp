@@ -26,6 +26,7 @@
 (global-set-key (kbd "C-c r") 'reload-dot-emacs)
 
 (global-set-key [f11] 'toggle-fullscreen)
+(global-set-key (kbd "C-c !") 'drm-insert-shebang)
 
 ;; Buffer manipulation
 (define-prefix-command 'ctrl-c-b-map)
