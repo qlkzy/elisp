@@ -30,7 +30,8 @@
                  "graphviz"             ;edit .dot files
                  "mss"                  ;cool start menu hack
                  ;; "color-themes"         ;make things less ugly --DEPRECATED--
-                 "tomorrow-theme"
+                 ;; "tomorrow-theme"
+                 "base16-theme"
                  "completion-ui"        ;don't think this is in use
                  "mini-wiki"            ;own crappy wiki
                  "typing"               ;typing tutor
