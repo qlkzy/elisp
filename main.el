@@ -36,7 +36,7 @@
                  "mini-wiki"            ;own crappy wiki
                  "typing"               ;typing tutor
                  "slime"                ;nice lisp stuff
-                 "remember"             ;notes mode
+                 ;; "remember"             ;notes mode
                  ;; "viper"                ;vi has some nice features
                  "findr"
                  "cedet"
@@ -66,5 +66,6 @@
                  "spotify"
                  "writing"
                  "paredit"
+                 "lua-mode"
                  )
 
