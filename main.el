@@ -67,5 +67,6 @@
                  "writing"
                  "paredit"
                  "lua-mode"
+                 "multi-term"
                  )
 

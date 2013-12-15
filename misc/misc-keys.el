@@ -62,9 +62,6 @@
 (global-set-key (kbd "C-#") 'drm-bracket-replace)
 
 
-;; eshell
-(global-set-key (kbd "<f12>") 'shell)
-
 ;; fast text maniupulation
 (global-set-key (kbd "M-z") 'zap-up-to-char)
 (global-set-key (kbd "M-Z") 'zap-to-char)
