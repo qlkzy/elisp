@@ -165,7 +165,7 @@
 
 ;; select font size based on screen size
 (when (>= emacs-major-version 23)
-  (set-face-font 'default "Dejavu Sans Mono-10"))
+  (set-face-font 'default (concat "Dejavu Sans Mono-" drm-fontsize)))
 
 (transient-mark-mode -1)
 
