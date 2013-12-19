@@ -1,4 +1,4 @@
-#! /bin/bash
+#! /usr/bin/env bash
 
 perl -pe 's/%elisp%/$ENV{PWD}/g' dotemacs > local-dotemacs
 
