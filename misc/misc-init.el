@@ -1,3 +1,4 @@
+
 ;; Miscellaneous Customisations
 
 (require 'misc)
@@ -174,11 +175,11 @@
   "String to show for ^L in text")
 
 (setq ctrl-l-appearance
-      (vconcat "\n\n\n"
+      (vconcat "\n"
                (make-vector 20 ?-)
                " Page Break "
                (make-vector 20 ?-)
-               "\n\n\n\n"))
+               "\n"))
 
 (unless standard-display-table
   (setq standard-display-table (make-display-table)))
