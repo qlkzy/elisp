@@ -67,7 +67,7 @@
                  "writing"
                  "paredit"
                  "lua-mode"
-                 "multi-term"
+                 ;; "multi-term"
                  "evil" ; using this vi emulator now :)
                  )
 
