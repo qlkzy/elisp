@@ -165,7 +165,7 @@
 
 ;; select font size based on screen size
 (when (>= emacs-major-version 23)
-  (set-face-font 'default (concat "Dejavu Sans Mono-" drm-fontsize)))
+  (set-face-font 'default "DejaVu Sans Mono-12"))
 
 (transient-mark-mode -1)
 
@@ -174,11 +174,11 @@
   "String to show for ^L in text")
 
 (setq ctrl-l-appearance
-      (vconcat "\n\n\n"
+      (vconcat "\n"
                (make-vector 20 ?-)
                " Page Break "
                (make-vector 20 ?-)
-               "\n\n\n\n"))
+               "\n"))
 
 (unless standard-display-table
   (setq standard-display-table (make-display-table)))
