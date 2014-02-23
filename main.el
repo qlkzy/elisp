@@ -68,6 +68,6 @@
                  "paredit"
                  "lua-mode"
                  "multi-term"
-                 "evil" ; using this vi emulator now :)
+                 ;; "evil" ; using this vi emulator now :)
                  )
 
