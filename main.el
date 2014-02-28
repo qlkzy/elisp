@@ -67,8 +67,8 @@
                  "writing"
                  "paredit"
                  "lua-mode"
+                 ;; "evil" ; using this vi emulator now :)
                  ;; "multi-term"
-                 "evil" ; using this vi emulator now :)
                  "ada"
                  "csp-mode"
                  )
