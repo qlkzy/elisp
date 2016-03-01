@@ -35,7 +35,7 @@
                  "completion-ui"        ;don't think this is in use
                  "mini-wiki"            ;own crappy wiki
                  "typing"               ;typing tutor
-                 "slime"                ;nice lisp stuff
+                 ;; "slime"                ;nice lisp stuff
                  ;; "remember"             ;notes mode
                  ;; "viper"                ;vi has some nice features
                  "findr"
@@ -71,5 +71,7 @@
                  ;; "multi-term"
                  "ada"
                  "csp-mode"
+                 "jq-mode"
+                 "web-mode"
                  )
 
