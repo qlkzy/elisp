@@ -16,7 +16,7 @@
                  "hide-show"            ;hide & show blocks
                  "cc-mode"              ;c/c++
                  "elmode"               ;elisp
-                 "python"               
+                 ;; "python"
                  "auto-hotkey"          ;ahk
                  "matlab"               ;own matlab mode
                  "latex"                ;standard latex mode - convert to auctex at some point
@@ -69,5 +69,7 @@
                  "lua-mode"
                  ;; "evil" ; using this vi emulator now :)
                  ;; "multi-term"
+                 "ada"
+                 "csp-mode"
                  )
 
