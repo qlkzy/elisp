@@ -73,5 +73,6 @@
                  "csp-mode"
                  "jq-mode"
                  "web-mode"
+                 "yaml-mode"
                  )
 
