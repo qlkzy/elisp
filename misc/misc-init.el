@@ -403,13 +403,14 @@ enough room"
   "Switch around the types of brackets at point."
   (interactive)
   (let* ((c (char-after (point)))
-        (bmap (aget drm-bracket-mappings c t)))
+         (bmap (aget drm-bracket-mappings c t)))
+    (save-excursion
+      (forward-sexp)
+      (delete-char -1)
+      (insert (car (aget drm-bracket-mappings (cadr bmap)))))
     (save-excursion
       (delete-char 1)
-      (insert (cadr bmap))
-      (search-forward (char-to-string (car bmap)))
-      (delete-char -1)
-      (insert (car (aget drm-bracket-mappings (cadr bmap)))))))
+      (insert (cadr bmap)))))
 
 (defvar drm-shebang-lines
   '(("\\.py\\'" . "/usr/bin/env python")
