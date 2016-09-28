@@ -60,7 +60,7 @@
                  "scss"
                  "yasnippet"
                  "vhdl-mode"
-                 ;"magit"
+                 "magit"
                  "uniquify"
                  "cmake"
                  "expand-region"
