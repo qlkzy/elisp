@@ -11,6 +11,10 @@
 
 (drm-custom-load "elisp/macros")
 
+(require 'package)
+(add-to-list 'package-archives
+             '("melpa" . "http://melpa.org/packages/") t)
+
 (drm-custom-init "misc"                 ;general stuff
                  "cperl"                ;nice perl mode
                  "hide-show"            ;hide & show blocks
