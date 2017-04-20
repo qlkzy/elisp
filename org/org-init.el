@@ -31,7 +31,9 @@
     ;; useless org function
     ((kbd "C-c C-a") 'org-agenda)
     ;; use handy keys for really basic features
-    ((kbd "C-j") 'org-insert-subheading)))
+    ((kbd "C-j") 'org-insert-subheading))
+  (setq org-time-clocksum-format
+        '(:hours "%d" :require-hours t :minutes ":%02d" :require-minutes t)))
 
 ;; (org-remember-insinuate)
 
@@ -39,6 +41,20 @@
  'org-babel-load-languages
  '((R . t)
    (java . t)))
+
+(defun my-org-clocktable-indent-string (level)
+  (if (= level 1)
+      ""
+    (let ((str "^"))
+      (while (> level 2)
+        (setq level (1- level)
+              str (concat str "--")))
+      (concat str "-> "))))
+
+(advice-add 'org-clocktable-indent-string :override #'my-org-clocktable-indent-string)
+
+(setq org-agenda-clockreport-parameter-plist '(:link t :maxlevel 3))
+
 
 (add-to-list 'org-agenda-files "~/notes/")
 
